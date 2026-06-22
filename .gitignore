@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.expo/
+.env
+.env.*
+!.env.example
+coverage/
+ios/Pods/
+ios/build/
+android/
+*.log
+.DS_Store
+.worktrees/
+worktrees/
