@@ -29,7 +29,11 @@ import type {
   lifestyleTargetsSchema,
   mealLogInputSchema,
   mealLogResponseSchema,
+  mealLogScanDetailResponseSchema,
+  mealScanAnalysisSchema,
+  mealScanCoachContentSchema,
   mealScanInputSchema,
+  mealScanModeSchema,
   mealScanResponseSchema,
   mealVoiceInputSchema,
   medicationCatalogItemSchema,
@@ -103,7 +107,13 @@ export type LogListQuery = z.infer<typeof logListQuerySchema>;
 export type LifestyleTargets = z.infer<typeof lifestyleTargetsSchema>;
 export type MealLogInput = z.infer<typeof mealLogInputSchema>;
 export type MealLogResponse = z.infer<typeof mealLogResponseSchema>;
+export type MealLogScanDetailResponse = z.infer<
+  typeof mealLogScanDetailResponseSchema
+>;
+export type MealScanAnalysis = z.infer<typeof mealScanAnalysisSchema>;
+export type MealScanCoachContent = z.infer<typeof mealScanCoachContentSchema>;
 export type MealScanInput = z.infer<typeof mealScanInputSchema>;
+export type MealScanMode = z.infer<typeof mealScanModeSchema>;
 export type MealScanResponse = z.infer<typeof mealScanResponseSchema>;
 export type MealVoiceInput = z.infer<typeof mealVoiceInputSchema>;
 export type MedicationCatalogItem = z.infer<typeof medicationCatalogItemSchema>;

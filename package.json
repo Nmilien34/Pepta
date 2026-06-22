@@ -17,6 +17,7 @@
     "pretypecheck": "npm run build -w @pepta/shared",
     "typecheck": "npm run typecheck -ws --if-present",
     "test": "npm run test -ws --if-present",
+    "check:integrations": "npm run check:integrations -w @pepta/backend",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },

@@ -12,7 +12,8 @@
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "Pepta uses your camera to scan meals and capture progress photos.",
-        "NSPhotoLibraryUsageDescription": "Pepta uses your photo library so you can upload progress photos and meal images."
+        "NSPhotoLibraryUsageDescription": "Pepta uses your photo library so you can upload progress photos and meal images.",
+        "NSMicrophoneUsageDescription": "Pepta uses your microphone so you can log meals by voice."
       }
     },
     "android": {
@@ -39,10 +40,15 @@
       [
         "@react-native-google-signin/google-signin",
         {
-          "iosUrlScheme": "com.googleusercontent.apps.replace-me"
+          "iosUrlScheme": "com.googleusercontent.apps.853468832171-j7pc8665i51q9lf9tbe0a5toji28e4dd"
         }
       ],
-      "expo-audio"
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Pepta uses your microphone so you can log meals by voice."
+        }
+      ]
     ]
   }
 }

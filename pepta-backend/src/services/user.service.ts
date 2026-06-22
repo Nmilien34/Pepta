@@ -1,12 +1,16 @@
 import {
+  ERROR_CODES,
   userProfileInputSchema,
   userProfileResponseSchema,
   userResponseSchema,
+  type AuthProvider,
   type UserProfileSettingsPatch,
+  type User,
 } from "@pepta/shared";
-import { NotFoundError } from "../lib/errors";
+import type { ProviderIdentity } from "../auth/google";
+import { AppError, NotFoundError } from "../lib/errors";
 import { computeProfileTargets } from "../lib/profile-targets";
-import { UserModel, UserProfileModel } from "../models";
+import { UserModel, UserProfileModel, type UserDocument } from "../models";
 import { serializeWithSchema } from "./serializers";
 
 function documentObject(document: unknown): Record<string, unknown> {
@@ -22,6 +26,38 @@ function documentObject(document: unknown): Record<string, unknown> {
   }
 
   return {};
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object";
+}
+
+function idToString(value: unknown): string {
+  if (value === null || value === undefined) {
+    return "";
+  }
+
+  return String(value);
+}
+
+function dateToIso(value: unknown): string | undefined {
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (isRecord(value) && typeof value.toISOString === "function") {
+    return value.toISOString();
+  }
+
+  return undefined;
+}
+
+function optionalString(value: unknown): string | undefined {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
 export async function getOrCreateUser(userId: string) {
@@ -49,6 +85,210 @@ export async function getOrCreateUser(userId: string) {
   return user;
 }
 
+function normalizeEmail(email?: string): string | undefined {
+  const normalized = email?.trim().toLowerCase();
+  return normalized && normalized.length > 0 ? normalized : undefined;
+}
+
+function findProvider(
+  user: UserDocument,
+  provider: AuthProvider,
+  providerUserId: string,
+) {
+  return user.authProviders.find(
+    (authProvider) =>
+      authProvider.provider === provider &&
+      authProvider.providerUserId === providerUserId,
+  );
+}
+
+function applyIdentityToUser(
+  user: UserDocument,
+  identity: ProviderIdentity,
+): void {
+  const email = normalizeEmail(identity.email);
+  const provider = findProvider(
+    user,
+    identity.provider,
+    identity.providerUserId,
+  );
+
+  if (email && !user.email) {
+    user.email = email;
+    user.emailVerified = identity.emailVerified === true;
+  }
+
+  if (email && user.email === email && identity.emailVerified) {
+    user.emailVerified = true;
+  }
+
+  if (identity.name && user.displayName !== identity.name) {
+    user.displayName = identity.name;
+  }
+
+  if (identity.picture && user.avatarUrl !== identity.picture) {
+    user.avatarUrl = identity.picture;
+  }
+
+  if (provider) {
+    provider.linkedAt = new Date();
+    return;
+  }
+
+  user.authProviders.push({
+    provider: identity.provider,
+    providerUserId: identity.providerUserId,
+    linkedAt: new Date(),
+  });
+}
+
+function providerConflict(message: string): AppError {
+  return new AppError({
+    code: ERROR_CODES.conflict,
+    message,
+    statusCode: 409,
+  });
+}
+
+export function serializeUser(user: UserDocument): User {
+  const value = documentObject(user);
+  const entitlement = isRecord(value.entitlement) ? value.entitlement : {};
+  const authProviders = Array.isArray(value.authProviders)
+    ? value.authProviders
+    : [];
+  const legalAcceptance = isRecord(value.legalAcceptance)
+    ? value.legalAcceptance
+    : undefined;
+
+  return userResponseSchema.parse({
+    id: idToString(value.id ?? value._id),
+    email: optionalString(value.email),
+    emailVerified: value.emailVerified === true,
+    displayName: optionalString(value.displayName),
+    avatarUrl: optionalString(value.avatarUrl),
+    authProviders: authProviders.map((provider) => {
+      const providerRecord = isRecord(provider) ? provider : {};
+
+      return {
+        provider: providerRecord.provider,
+        providerUserId: providerRecord.providerUserId,
+        linkedAt: dateToIso(providerRecord.linkedAt),
+      };
+    }),
+    entitlement: {
+      status: entitlement.status ?? "free",
+      expiresAt: dateToIso(entitlement.expiresAt) ?? null,
+      willRenew: entitlement.willRenew === true,
+      revenueCatCustomerId: optionalString(entitlement.revenueCatCustomerId),
+      revenueCatEntitlement: optionalString(entitlement.revenueCatEntitlement),
+    },
+    onboardingComplete: value.onboardingComplete === true,
+    onboardingCompletedAt: dateToIso(value.onboardingCompletedAt),
+    legalAcceptance: legalAcceptance
+      ? {
+          termsVersion: legalAcceptance.termsVersion,
+          privacyVersion: legalAcceptance.privacyVersion,
+          acceptedAt: dateToIso(legalAcceptance.acceptedAt),
+        }
+      : undefined,
+    createdAt: dateToIso(value.createdAt),
+    updatedAt: dateToIso(value.updatedAt),
+  });
+}
+
+export async function upsertUserFromIdentity(
+  identity: ProviderIdentity,
+): Promise<UserDocument> {
+  const existingByProvider = await UserModel.findOne({
+    authProviders: {
+      $elemMatch: {
+        provider: identity.provider,
+        providerUserId: identity.providerUserId,
+      },
+    },
+  });
+
+  if (existingByProvider) {
+    applyIdentityToUser(existingByProvider, identity);
+    await existingByProvider.save();
+    return existingByProvider;
+  }
+
+  const email = normalizeEmail(identity.email);
+  const emailIsVerified = identity.emailVerified === true;
+  const existingByEmail =
+    email && emailIsVerified
+      ? await UserModel.findOne({ email, emailVerified: true })
+      : null;
+
+  if (existingByEmail) {
+    applyIdentityToUser(existingByEmail, identity);
+    await existingByEmail.save();
+    return existingByEmail;
+  }
+
+  return UserModel.create({
+    email,
+    emailVerified: emailIsVerified,
+    displayName: identity.name,
+    avatarUrl: identity.picture,
+    authProviders: [
+      {
+        provider: identity.provider,
+        providerUserId: identity.providerUserId,
+        linkedAt: new Date(),
+      },
+    ],
+    entitlement: {
+      status: "free",
+      expiresAt: null,
+      willRenew: false,
+    },
+    onboardingComplete: false,
+  });
+}
+
+export async function linkProviderIdentityToUser(
+  userId: string,
+  identity: ProviderIdentity,
+): Promise<UserDocument> {
+  const existingByProvider = await UserModel.findOne({
+    authProviders: {
+      $elemMatch: {
+        provider: identity.provider,
+        providerUserId: identity.providerUserId,
+      },
+    },
+  });
+
+  if (existingByProvider && existingByProvider._id.toString() !== userId) {
+    throw providerConflict(
+      "This sign-in method is already linked to another Pepta account.",
+    );
+  }
+
+  const user = existingByProvider ?? (await UserModel.findById(userId));
+  if (!user) {
+    throw new NotFoundError("User not found");
+  }
+
+  const hasDifferentIdentityForProvider = user.authProviders.some(
+    (authProvider) =>
+      authProvider.provider === identity.provider &&
+      authProvider.providerUserId !== identity.providerUserId,
+  );
+
+  if (hasDifferentIdentityForProvider) {
+    throw providerConflict(
+      "This account already has that sign-in provider linked.",
+    );
+  }
+
+  applyIdentityToUser(user, identity);
+  await user.save();
+  return user;
+}
+
 export async function getCurrentUser(userId: string) {
   const user = await getOrCreateUser(userId);
 
@@ -61,7 +301,7 @@ export async function getCurrentUser(userId: string) {
     }
   }
 
-  return serializeWithSchema(userResponseSchema, user);
+  return serializeUser(user);
 }
 
 export async function updateProfileSettings(

@@ -34,6 +34,19 @@ This scaffold exists so the UI agent can build screens against typed backend con
   `UserProfileSettingsPatch` and returns `UserProfileResponse`; `PATCH
 /compounds/:id` accepts `CompoundPatch`; `PATCH /schedules/:id` accepts
   `SchedulePatch`.
+- 2026-06-22: Chunk 4 real integrations landed. `POST /auth/google` verifies
+  real Google identity tokens and returns `AuthResponse`; `POST /auth/apple`
+  returns `503 APPLE_SIGN_IN_NOT_AVAILABLE` until Apple env is configured.
+- 2026-06-22: Meal intelligence now uses OpenAI for photo and voice/text paths
+  when configured. `MealScanResponse` and meal-log scan details include an
+  optional neutral tracker `note` in addition to structured `coachContent`.
+- 2026-06-22: Progress photos now use private S3 objects. Uploads start with
+  `POST /progress-photos/upload-intent`, clients upload to the returned
+  presigned PUT URL, then call `POST /progress-photos/confirm`.
+- 2026-06-22: Added `GET /progress-photos/:id/view-url`, `DELETE
+/progress-photos/:id`, public legal pages at `/legal/terms` and
+  `/legal/privacy`, and rate limits on `/auth/*`, `/meal-scans/*`, and
+  `/insights`.
 
 ## App Shell
 
@@ -82,7 +95,7 @@ Available methods:
 | `GET /weekly-retention`               | `WeeklyRetentionResponse`                           |
 | `POST /diagnostics/stall`             | `StallDiagnosticResponse`                           |
 | `POST /meal-scans/analyze`            | `MealScanResponse`                                  |
-| `POST /meal-scans/voice`              | `MealScanResponse` or meal-log draft                |
+| `POST /meal-scans/voice`              | `MealScanResponse`                                  |
 | `GET /compounds/catalog`              | `MedicationCatalogItem[]`                           |
 | `GET/POST/PATCH /compounds`           | `CompoundResponse[]` / `CompoundResponse`           |
 | `GET/POST /cycles`                    | `CycleResponse[]` / `CycleResponse`                 |
@@ -98,7 +111,11 @@ Available methods:
 | `GET /progress-photos`                | `ProgressPhoto[]`                                   |
 | `POST /progress-photos/upload-intent` | `ProgressPhotoUploadIntentResponse`                 |
 | `POST /progress-photos/confirm`       | `ProgressPhoto`                                     |
+| `GET /progress-photos/:id/view-url`   | `{ photo, viewUrl, expiresAt }`                     |
+| `DELETE /progress-photos/:id`         | `204 No Content`                                    |
 | `GET /research-library`               | `ResearchArticle[]`                                 |
+| `GET /legal/terms`                    | Public HTML                                         |
+| `GET /legal/privacy`                  | Public HTML                                         |
 
 ## Auth Contract
 

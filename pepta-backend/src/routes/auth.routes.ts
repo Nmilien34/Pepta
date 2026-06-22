@@ -1,29 +1,33 @@
-import { Router } from 'express';
-import { appleAuthSchema, googleAuthSchema } from '@pepta/shared';
-import { appleSignInUnavailableError, isAppleSignInAvailable } from '../auth/apple';
-import { asyncHandler } from '../lib/async-handler';
-import { sendData } from '../lib/responses';
-import { validateBody } from '../middleware/validate.middleware';
+import { Router } from "express";
+import { appleAuthSchema, googleAuthSchema } from "@pepta/shared";
+import {
+  appleSignInUnavailableError,
+  isAppleSignInAvailable,
+} from "../auth/apple";
+import { asyncHandler } from "../lib/async-handler";
+import { sendData } from "../lib/responses";
+import { validateBody } from "../middleware/validate.middleware";
+import { signInWithApple, signInWithGoogle } from "../services/auth.service";
 
 const router = Router();
 
 router.post(
-  '/google',
+  "/google",
   validateBody(googleAuthSchema),
-  asyncHandler(async (_req, res) => {
-    sendData(res, { status: 'not_implemented' }, 501);
+  asyncHandler(async (req, res) => {
+    sendData(res, await signInWithGoogle(req.body.idToken));
   }),
 );
 
 router.post(
-  '/apple',
+  "/apple",
   validateBody(appleAuthSchema),
-  asyncHandler(async (_req, res) => {
+  asyncHandler(async (req, res) => {
     if (!isAppleSignInAvailable()) {
       throw appleSignInUnavailableError();
     }
 
-    sendData(res, { status: 'not_implemented' }, 501);
+    sendData(res, await signInWithApple(req.body));
   }),
 );
 

@@ -11,6 +11,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "check:integrations": "tsx src/scripts/check-integrations.ts",
     "seed:catalogs": "tsx src/scripts/seed-catalogs.ts"
   },
   "dependencies": {

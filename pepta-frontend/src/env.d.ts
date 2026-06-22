@@ -12,3 +12,6 @@ declare module '*.wav' {
   const asset: number;
   export default asset;
 }
+
+// Injected by the React Native bundler (true in development).
+declare const __DEV__: boolean;

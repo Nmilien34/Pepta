@@ -6,6 +6,7 @@ export const ERROR_CODES = {
   forbidden: "FORBIDDEN",
   internal: "INTERNAL",
   notFound: "NOT_FOUND",
+  rateLimited: "RATE_LIMITED",
   serviceUnavailable: "SERVICE_UNAVAILABLE",
   validation: "VALIDATION",
 } as const;

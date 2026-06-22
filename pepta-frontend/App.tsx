@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ThemeProvider, useAppFonts, useTheme } from './src/theme';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
@@ -9,6 +10,7 @@ import { PeptaDataProvider } from './src/context/PeptaDataContext';
 import { WelcomeScreen } from './src/screens/auth/WelcomeScreen';
 import { SignInScreen } from './src/screens/auth/SignInScreen';
 import { OnboardingNavigator } from './src/screens/onboarding/OnboardingNavigator';
+import { MainTabs } from './src/navigation/MainTabs';
 
 // Holds the first paint until the Hanken faces are ready, so text never flashes
 // in the system fallback. Renders a themed blank background meanwhile.
@@ -48,9 +50,9 @@ function AppShell() {
   }
 
   return (
-    <View>
-      <Text>Main</Text>
-    </View>
+    <NavigationContainer>
+      <MainTabs />
+    </NavigationContainer>
   );
 }
 

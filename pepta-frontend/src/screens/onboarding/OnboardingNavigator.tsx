@@ -3,11 +3,13 @@
 // schema. Built screens render real UI; the rest fall through to a placeholder so
 // the flow is fully walkable end-to-end while we implement each one.
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../../theme';
 import { AppText, Button, Mascot, OnboardingScaffold } from '../../components';
 import {
+  ONBOARDING_STEPS,
   nextStep,
   prevStep,
   progressForStep,
@@ -15,6 +17,7 @@ import {
   type FlowContext,
   type OnboardingStep,
 } from './onboardingFlow';
+import { ONBOARDING_DRAFT_KEY, parseDraft, serializeDraft } from './onboardingDraft';
 import { PrivacyScreen } from './PrivacyScreen';
 import { JourneyStageScreen, type JourneyStage } from './JourneyStageScreen';
 import { MedicationPickerScreen } from './MedicationPickerScreen';
@@ -33,10 +36,22 @@ import { DailyRoutineScreen } from './DailyRoutineScreen';
 import { TrainingScreen } from './TrainingScreen';
 import { BiggestWorryScreen } from './BiggestWorryScreen';
 import { SideEffectsScreen, type SideEffectType } from './SideEffectsScreen';
+import { MomentumScreen } from './MomentumScreen';
+import { NotificationsScreen } from './NotificationsScreen';
+import { RatingScreen } from './RatingScreen';
+import { CraftingScreen } from './CraftingScreen';
+import { RevealScreen } from './RevealScreen';
+import { PaywallScreen } from './PaywallScreen';
 import type { ActivityLevel, BiggestWorry, TrainingStatus } from '@pepta/shared';
 import type { MedicationOption } from '../../data/medicationCatalog';
 import { toDateParts, type DateParts } from '../../utils/dateParts';
 import { kgToLb, lbToKg, type BodyMeasure } from '../../utils/units';
+import { projectGoal } from '../../utils/goalProjection';
+import { craftingSteps, previewTargets, supportLine } from '../../utils/planPreview';
+import { buildOnboardingPayload } from './onboardingPayload';
+import { api } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
+import { useOnboarding } from '../../context/OnboardingContext';
 
 function defaultBirthday(): DateParts {
   return { year: new Date().getFullYear() - 30, month: 0, day: 1 };
@@ -68,6 +83,19 @@ function toggleEffect(effects: SideEffectType[], effect: SideEffectType): SideEf
   return effects.includes(effect) ? effects.filter((e) => e !== effect) : [...effects, effect];
 }
 
+// Resolve current + goal weight into the body's unit (goal weight may be in a
+// different unit if the user toggled it on screen 14).
+function resolveWeights(answers: FlowAnswers) {
+  const body = answers.body ?? DEFAULT_BODY;
+  const bodyUnit: WeightUnit = body.units === 'metric' ? 'kg' : 'lb';
+  const goalUnit = answers.goalWeightUnit ?? bodyUnit;
+  const goalRaw =
+    answers.goalWeight ?? (goalUnit === 'kg' ? Math.max(32, body.weight - 7) : Math.max(70, body.weight - 15));
+  const goalInBodyUnit =
+    goalUnit === bodyUnit ? goalRaw : Math.round(bodyUnit === 'kg' ? lbToKg(goalRaw) : kgToLb(goalRaw));
+  return { body, bodyUnit, goalInBodyUnit };
+}
+
 const DEFAULT_BODY: BodyMeasure = { units: 'imperial', height: 66, weight: 184 };
 
 // Toggle a day in/out of the multi-select set, kept sorted.
@@ -76,8 +104,41 @@ function toggleDay(days: number[], day: number): number[] {
 }
 
 export function OnboardingNavigator() {
+  const auth = useAuth();
+  const { updateDraft } = useOnboarding();
   const [step, setStep] = useState<OnboardingStep>('privacy');
   const [answers, setAnswers] = useState<FlowAnswers>({});
+  const [hydrated, setHydrated] = useState(false);
+
+  // Resume an in-progress onboarding draft on mount (a malformed/unknown step
+  // falls back to the start). Nothing renders until this resolves to avoid a flash.
+  useEffect(() => {
+    let active = true;
+    AsyncStorage.getItem(ONBOARDING_DRAFT_KEY)
+      .then(parseDraft)
+      .then((draft) => {
+        if (active && draft && (ONBOARDING_STEPS as readonly string[]).includes(draft.step)) {
+          setStep(draft.step as OnboardingStep);
+          setAnswers(draft.answers as FlowAnswers);
+        }
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (active) setHydrated(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Persist the draft as the user moves through the flow (after hydration so we
+  // don't clobber the saved draft with the initial empty state).
+  useEffect(() => {
+    if (!hydrated) return;
+    AsyncStorage.setItem(ONBOARDING_DRAFT_KEY, serializeDraft(step, answers as Record<string, unknown>)).catch(
+      () => undefined,
+    );
+  }, [hydrated, step, answers]);
 
   const progress = progressForStep(step);
   const ctx: FlowContext = {
@@ -106,6 +167,27 @@ export function OnboardingNavigator() {
     const prev = advance(step, -1);
     if (prev) setStep(prev);
   };
+
+  const handleComplete = () => {
+    try {
+      const payload = buildOnboardingPayload(answers, new Date());
+      updateDraft(payload);
+      // Real submit. The backend is deferred, so this may fail — fire & forget,
+      // never block the flow. When live, gate the step below on its result.
+      void api.completeOnboarding(payload).catch(() => undefined);
+    } catch {
+      // Payload/submit error — ignored here; the optimistic flip still advances.
+    }
+    // Draft is done — clear it so a future session starts fresh.
+    AsyncStorage.removeItem(ONBOARDING_DRAFT_KEY).catch(() => undefined);
+    // Optimistically mark complete so the app reaches Home (the main tabs).
+    auth.markOnboardingComplete();
+  };
+
+  // Hold the first frame until the saved draft (if any) has been restored.
+  if (!hydrated) {
+    return <View style={{ flex: 1 }} />;
+  }
 
   switch (step) {
     case 'privacy':
@@ -309,6 +391,66 @@ export function OnboardingNavigator() {
           onContinue={goNext}
         />
       );
+    case 'momentum': {
+      const body = answers.body ?? DEFAULT_BODY;
+      const bodyUnit: WeightUnit = body.units === 'metric' ? 'kg' : 'lb';
+      const goalUnit = answers.goalWeightUnit ?? bodyUnit;
+      const goalRaw =
+        answers.goalWeight ?? (goalUnit === 'kg' ? Math.max(32, body.weight - 7) : Math.max(70, body.weight - 15));
+      const goalInBodyUnit =
+        goalUnit === bodyUnit ? goalRaw : Math.round(bodyUnit === 'kg' ? lbToKg(goalRaw) : kgToLb(goalRaw));
+      return (
+        <MomentumScreen
+          progress={progress}
+          onBack={goBack}
+          toGo={Math.max(0, body.weight - goalInBodyUnit)}
+          lost={answers.startWeight != null ? Math.max(0, answers.startWeight - body.weight) : 0}
+          unit={bodyUnit}
+          onContinue={goNext}
+        />
+      );
+    }
+    case 'notifications':
+      return <NotificationsScreen progress={progress} onBack={goBack} onContinue={goNext} />;
+    case 'rating':
+      return <RatingScreen progress={progress} onBack={goBack} onContinue={goNext} />;
+    case 'crafting':
+      return (
+        <CraftingScreen
+          progress={progress}
+          steps={craftingSteps({ sideEffects: answers.sideEffects, biggestWorry: answers.biggestWorry })}
+          onDone={goNext}
+        />
+      );
+    case 'reveal': {
+      const { body, bodyUnit, goalInBodyUnit } = resolveWeights(answers);
+      const projection = projectGoal({
+        currentWeight: body.weight,
+        goalWeight: goalInBodyUnit,
+        pace: answers.pace ?? 0.5,
+        now: new Date(),
+      });
+      const targets = previewTargets({
+        currentWeight: body.weight,
+        unit: bodyUnit,
+        activityLevel: answers.activityLevel,
+        weeklyLoss: projection.weeklyLoss,
+      });
+      return (
+        <RevealScreen
+          progress={progress}
+          startWeight={answers.startWeight ?? body.weight}
+          goalWeight={goalInBodyUnit}
+          unit={bodyUnit}
+          targets={targets}
+          projection={projection}
+          support={supportLine(answers.sideEffects)}
+          onContinue={goNext}
+        />
+      );
+    }
+    case 'paywall':
+      return <PaywallScreen onComplete={handleComplete} />;
     default:
       return (
         <PlaceholderStep

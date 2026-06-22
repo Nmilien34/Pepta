@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   insightSchema,
+  mealLogScanDetailResponseSchema,
+  mealScanResponseSchema,
   medicationCatalogItemSchema,
   onboardingCompleteInputSchema,
   onboardingResultResponseSchema,
@@ -224,6 +226,44 @@ describe("shared profile schemas", () => {
       types: ["hair_loss", "bloating", "sulfur_burps"],
       severity: 2,
       datetime: "2026-06-21T00:00:00.000Z",
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("allows meal scan tracker notes without replacing structured coach content", () => {
+    const result = mealScanResponseSchema.safeParse({
+      scanId: "scan-1",
+      photoS3Key: "pepta/meal-scans/user-1/photo.png",
+      analysis: {
+        foodName: "Chicken rice bowl",
+        servingSize: "1 bowl",
+        protein: 42,
+        calories: 640,
+        carbs: 72,
+        fat: 18,
+        fiber: 7,
+        confidence: 0.82,
+      },
+      coachContent: {
+        mode: "affirmation",
+        callout: "Review this estimate before logging.",
+        swap: null,
+        copyVersion: "meal-scan-note-v1",
+      },
+      note: "This would put you at 96g of 120g protein today.",
+      visionEngineVersion: "meal-scan-vision-v1",
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("allows meal log scan details to return the stored tracker note", () => {
+    const result = mealLogScanDetailResponseSchema.safeParse({
+      photoViewUrl: "https://signed.example/photo.png",
+      analysis: null,
+      coachContent: null,
+      note: "Review this estimate before logging.",
     });
 
     expect(result.success).toBe(true);

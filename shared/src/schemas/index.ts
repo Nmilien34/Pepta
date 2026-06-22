@@ -601,20 +601,65 @@ export const mealVoiceInputSchema = z
   })
   .strict();
 
-export const mealScanResponseSchema = z
+export const mealScanModeSchema = z.enum(["affirmation", "swap"]);
+
+export const mealScanAnalysisSchema = z
   .object({
-    scanId: idSchema,
-    foodName: z.string().min(1),
-    servingSize: z.string().min(1),
+    foodName: z.string().trim().min(1),
+    servingSize: z.string().trim().min(1),
     protein: z.number().nonnegative(),
     calories: z.number().nonnegative(),
     carbs: z.number().nonnegative(),
     fat: z.number().nonnegative(),
     fiber: z.number().nonnegative(),
     confidence: z.number().min(0).max(1),
-    coachProse: z.string().min(1),
+  })
+  .strict();
+
+export const mealScanAdjustedMacrosSchema = z
+  .object({
+    protein: z.number().nonnegative(),
+    calories: z.number().nonnegative(),
+    carbs: z.number().nonnegative(),
+    fat: z.number().nonnegative(),
+    fiber: z.number().nonnegative(),
+  })
+  .strict();
+
+export const mealScanCoachContentSchema = z
+  .object({
+    mode: mealScanModeSchema,
+    callout: z.string().trim().min(1),
+    swap: z
+      .object({
+        description: z.string().trim().min(1),
+        additionalProtein: z.number().nonnegative(),
+        additionalCalories: z.number().nonnegative(),
+        adjustedMacros: mealScanAdjustedMacrosSchema,
+      })
+      .strict()
+      .nullable(),
+    copyVersion: z.string().trim().min(1),
+  })
+  .strict();
+
+export const mealScanResponseSchema = z
+  .object({
+    scanId: idSchema,
     photoS3Key: z.string().min(1).optional(),
-    engineVersion: z.string().min(1),
+    analysis: mealScanAnalysisSchema,
+    coachContent: mealScanCoachContentSchema.nullable(),
+    note: z.string().trim().min(1).optional(),
+    visionEngineVersion: z.string().min(1),
+  })
+  .strict();
+
+export const mealLogScanDetailResponseSchema = z
+  .object({
+    photoViewUrl: z.string().nullable(),
+    analysis: mealScanAnalysisSchema.nullable(),
+    coachContent: mealScanCoachContentSchema.nullable(),
+    note: z.string().trim().min(1).nullable(),
   })
   .strict();
 
@@ -760,6 +805,7 @@ export const errorCodeSchema = z.enum([
   ERROR_CODES.forbidden,
   ERROR_CODES.internal,
   ERROR_CODES.notFound,
+  ERROR_CODES.rateLimited,
   ERROR_CODES.serviceUnavailable,
   ERROR_CODES.validation,
 ]);

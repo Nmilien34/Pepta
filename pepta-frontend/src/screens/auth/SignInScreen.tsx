@@ -58,6 +58,12 @@ export function SignInScreen({ onBack }: SignInScreenProps) {
         signInWithApple: auth.signInWithApple,
       });
     } catch {
+      // Dev bridge: the backend is deferred, so a failed sign-in drops into a
+      // local session to keep the flow traversable. Remove when auth is live.
+      if (__DEV__) {
+        auth.devSignIn();
+        return;
+      }
       setError('We couldn’t sign you in with Apple. Please try again.');
     } finally {
       setBusy(null);
@@ -76,6 +82,10 @@ export function SignInScreen({ onBack }: SignInScreenProps) {
         signInWithGoogle: auth.signInWithGoogle,
       });
     } catch {
+      if (__DEV__) {
+        auth.devSignIn();
+        return;
+      }
       setError('We couldn’t sign you in with Google. Please try again.');
     } finally {
       setBusy(null);

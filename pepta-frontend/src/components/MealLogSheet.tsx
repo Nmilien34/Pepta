@@ -1,0 +1,443 @@
+// MealLogSheet — the "Log meal" flow opened from the QuickLog chooser. Three
+// ways in: Scan (camera/library photo → AI vision), Describe (typed/spoken text
+// → AI), or Manual entry. Scan/voice land on a result card (macros + coach
+// callout/swap) before logging. Every save optimistically folds macros into
+// today's Home totals, then POSTs /meal-logs and reconciles.
+
+import React, { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Animated, Easing, Image, Pressable, TextInput, View } from 'react-native';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import * as ImagePicker from 'expo-image-picker';
+import { RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync, useAudioRecorder, useAudioRecorderState } from 'expo-audio';
+import { File } from 'expo-file-system';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useTheme } from '../theme';
+import { AppText } from './AppText';
+import { Button } from './Button';
+import { BottomSheet } from './BottomSheet';
+import { usePeptaData } from '../context/PeptaDataContext';
+import { api } from '../services/api';
+import {
+  analysisToMealLog,
+  confidenceLabel,
+  isManualMealValid,
+  pickImageMime,
+  toManualMealLog,
+  type MealSource,
+} from '../screens/app/mealLog';
+import type { MealLogInput, MealScanResponse } from '@pepta/shared';
+
+type View_ = 'chooser' | 'voice' | 'manual' | 'analyzing' | 'result' | 'error';
+
+export interface MealLogSheetProps {
+  visible: boolean;
+  onClose(): void;
+}
+
+export function MealLogSheet({ visible, onClose }: MealLogSheetProps) {
+  const theme = useTheme();
+  const { addMeal, refreshHome } = usePeptaData();
+  const [view, setView] = useState<View_>('chooser');
+  const [result, setResult] = useState<MealScanResponse | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [source, setSource] = useState<MealSource>('scan');
+  const [errorMsg, setErrorMsg] = useState('');
+  const [transcript, setTranscript] = useState('');
+  const [manual, setManual] = useState({ foodName: '', protein: '', calories: '', carbs: '', fat: '', fiber: '' });
+
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const recorderState = useAudioRecorderState(recorder);
+  const [transcribing, setTranscribing] = useState(false);
+  const [voiceFailed, setVoiceFailed] = useState(false);
+
+  useEffect(() => {
+    if (visible) {
+      setView('chooser');
+      setResult(null);
+      setPreview(null);
+      setTranscript('');
+      setManual({ foodName: '', protein: '', calories: '', carbs: '', fat: '', fiber: '' });
+      setTranscribing(false);
+      setVoiceFailed(false);
+    }
+  }, [visible]);
+
+  const now = () => new Date().toISOString();
+
+  // Optimistic: fold macros into Home now, close, POST in background, reconcile.
+  const commit = (input: MealLogInput) => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
+    addMeal(input);
+    onClose();
+    api
+      .createMealLog(input)
+      .then(() => refreshHome())
+      .catch(() => {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => undefined);
+        return refreshHome();
+      })
+      .catch(() => undefined);
+  };
+
+  const analyzePhoto = async (from: 'camera' | 'library') => {
+    Haptics.selectionAsync().catch(() => undefined);
+    try {
+      const perm = from === 'camera' ? await ImagePicker.requestCameraPermissionsAsync() : await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        setErrorMsg('Pepta needs camera/photos access to scan meals. You can still log manually.');
+        setView('error');
+        return;
+      }
+      const res =
+        from === 'camera'
+          ? await ImagePicker.launchCameraAsync({ base64: true, quality: 0.5, mediaTypes: ['images'] })
+          : await ImagePicker.launchImageLibraryAsync({ base64: true, quality: 0.5, mediaTypes: ['images'] });
+      const asset = res.canceled ? null : res.assets[0];
+      if (!asset?.base64) return; // user cancelled
+      setPreview(asset.uri);
+      setSource('scan');
+      setView('analyzing');
+      const scan = await api.analyzeMealPhoto({ imageData: asset.base64, imageMimeType: pickImageMime(asset.mimeType, asset.uri), capturedAt: now() });
+      setResult(scan);
+      setView('result');
+    } catch {
+      setErrorMsg('Couldn’t analyze that photo. Try again, or log it manually.');
+      setView('error');
+    }
+  };
+
+  const startRecording = async () => {
+    setVoiceFailed(false);
+    try {
+      const perm = await requestRecordingPermissionsAsync();
+      if (!perm.granted) {
+        setErrorMsg('Pepta needs microphone access to log by voice. You can still type or scan.');
+        setView('error');
+        return;
+      }
+      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+      await recorder.prepareToRecordAsync();
+      recorder.record();
+      Haptics.selectionAsync().catch(() => undefined);
+    } catch {
+      setVoiceFailed(true);
+    }
+  };
+
+  // Stop recording → read the clip → transcribe server-side → fill the field.
+  const stopRecording = async () => {
+    Haptics.selectionAsync().catch(() => undefined);
+    setTranscribing(true);
+    setVoiceFailed(false);
+    try {
+      await recorder.stop();
+      const uri = recorder.uri;
+      if (!uri) return;
+      const audioData = await new File(uri).base64();
+      const { transcript: text } = await api.transcribeMealAudio({ audioData, audioMimeType: 'audio/m4a' });
+      setTranscript(text);
+    } catch {
+      // Transcription endpoint not live yet (or failed) → fall back to typing.
+      setVoiceFailed(true);
+    } finally {
+      setTranscribing(false);
+    }
+  };
+
+  const toggleRecording = () => {
+    if (recorderState.isRecording) void stopRecording();
+    else void startRecording();
+  };
+
+  const analyzeVoice = async () => {
+    if (!transcript.trim()) return;
+    Haptics.selectionAsync().catch(() => undefined);
+    setSource('voice');
+    setView('analyzing');
+    try {
+      const scan = await api.analyzeMealVoice({ transcript: transcript.trim(), recordedAt: now() });
+      setResult(scan);
+      setPreview(null);
+      setView('result');
+    } catch {
+      setErrorMsg('Couldn’t read that description. Try again, or log it manually.');
+      setView('error');
+    }
+  };
+
+  const logResult = () => {
+    if (!result) return;
+    commit(analysisToMealLog(result.analysis, source, now(), result.photoS3Key));
+  };
+
+  const logManual = () => {
+    const meal = {
+      foodName: manual.foodName,
+      protein: Number(manual.protein) || 0,
+      calories: Number(manual.calories) || 0,
+      ...(manual.carbs ? { carbs: Number(manual.carbs) } : {}),
+      ...(manual.fat ? { fat: Number(manual.fat) } : {}),
+      ...(manual.fiber ? { fiber: Number(manual.fiber) } : {}),
+    };
+    if (!isManualMealValid(meal)) return;
+    commit(toManualMealLog(meal, now()));
+  };
+
+  const back = () => {
+    Haptics.selectionAsync().catch(() => undefined);
+    if (recorderState.isRecording) recorder.stop().catch(() => undefined);
+    setView('chooser');
+  };
+
+  return (
+    <BottomSheet visible={visible} onClose={onClose}>
+      {/* header */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+        {view !== 'chooser' && view !== 'analyzing' ? (
+          <Pressable onPress={back} hitSlop={8} style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: theme.colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
+            <Ionicons name="chevron-back" size={18} color={theme.colors.textPrimary} />
+          </Pressable>
+        ) : null}
+        <View style={{ flex: 1 }}>
+          <AppText variant="cardTitle" style={{ fontSize: 17 }}>
+            {HEADINGS[view].title}
+          </AppText>
+          <AppText variant="caption" color="textSecondary">
+            {HEADINGS[view].sub}
+          </AppText>
+        </View>
+      </View>
+
+      {view === 'chooser' ? (
+        <View style={{ marginTop: 12, gap: 11 }}>
+          <Tile theme={theme} icon={<Ionicons name="camera" size={22} color={theme.colors.protein} />} title="Scan a photo" hint="Snap your plate — Pepta reads the macros" onPress={() => void analyzePhoto('camera')} />
+          <Tile theme={theme} icon={<Ionicons name="images" size={22} color={theme.colors.water} />} title="Upload from library" hint="Pick an existing photo" onPress={() => void analyzePhoto('library')} />
+          <Tile theme={theme} icon={<Ionicons name="mic" size={22} color={theme.colors.primary} />} title="Say what you ate" hint="Speak it or type — “chicken & rice”" onPress={() => { Haptics.selectionAsync().catch(() => undefined); setView('voice'); }} />
+          <Tile theme={theme} icon={<MaterialCommunityIcons name="pencil-outline" size={22} color={theme.colors.textSecondary} />} title="Enter manually" hint="Type the food + macros" onPress={() => { Haptics.selectionAsync().catch(() => undefined); setView('manual'); }} />
+        </View>
+      ) : null}
+
+      {view === 'analyzing' ? (
+        <View style={{ paddingVertical: 40, alignItems: 'center', gap: 14 }}>
+          {preview ? <Image source={{ uri: preview }} style={{ width: 120, height: 120, borderRadius: 16 }} /> : null}
+          <ActivityIndicator color={theme.colors.primary} />
+          <AppText variant="body" color="textSecondary">
+            Reading your meal…
+          </AppText>
+        </View>
+      ) : null}
+
+      {view === 'voice' ? (
+        <View style={{ marginTop: 16, gap: 14, alignItems: 'center' }}>
+          {/* mic — tap to record / stop */}
+          <Pressable onPress={toggleRecording} disabled={transcribing} hitSlop={8}>
+            <MicButton theme={theme} recording={recorderState.isRecording} busy={transcribing} />
+          </Pressable>
+          {transcribing ? (
+            <AppText variant="caption" color="textSecondary">
+              Transcribing…
+            </AppText>
+          ) : (
+            <AppText variant="caption" color="textSecondary">
+              {recorderState.isRecording ? 'Listening… tap to stop' : 'Tap to speak, or type below'}
+            </AppText>
+          )}
+          {voiceFailed ? (
+            <AppText variant="caption" color="textTertiary" align="center" style={{ maxWidth: 260 }}>
+              Couldn’t transcribe — type your meal below instead.
+            </AppText>
+          ) : null}
+          <TextInput
+            value={transcript}
+            onChangeText={setTranscript}
+            placeholder="e.g. Two eggs, avocado toast, and a black coffee"
+            placeholderTextColor={theme.colors.textTertiary}
+            multiline
+            style={{ alignSelf: 'stretch', minHeight: 80, borderRadius: 14, backgroundColor: theme.colors.surfaceAlt, padding: 14, fontSize: 16, color: theme.colors.textPrimary, textAlignVertical: 'top' }}
+          />
+          <View style={{ alignSelf: 'stretch' }}>
+            <Button label="Analyze" disabled={!transcript.trim() || transcribing} onPress={() => void analyzeVoice()} />
+          </View>
+        </View>
+      ) : null}
+
+      {view === 'result' && result ? (
+        <ResultView theme={theme} result={result} preview={preview} onLog={logResult} />
+      ) : null}
+
+      {view === 'manual' ? (
+        <ManualView theme={theme} manual={manual} setManual={setManual} onSave={logManual} />
+      ) : null}
+
+      {view === 'error' ? (
+        <View style={{ paddingVertical: 28, alignItems: 'center', gap: 12 }}>
+          <Ionicons name="alert-circle-outline" size={30} color={theme.colors.warning} />
+          <AppText variant="body" color="textSecondary" align="center" style={{ maxWidth: 280 }}>
+            {errorMsg}
+          </AppText>
+          <View style={{ width: 200 }}>
+            <Button label="Enter manually" onPress={() => setView('manual')} />
+          </View>
+        </View>
+      ) : null}
+    </BottomSheet>
+  );
+}
+
+type Theme = ReturnType<typeof useTheme>;
+
+const HEADINGS: Record<View_, { title: string; sub: string }> = {
+  chooser: { title: 'Log a meal', sub: 'Scan, describe, or enter it — macros land on Home.' },
+  voice: { title: 'Say what you ate', sub: 'Tap the mic, or type a sentence.' },
+  manual: { title: 'Enter a meal', sub: 'Food name + macros.' },
+  analyzing: { title: 'Analyzing…', sub: 'Estimating protein, calories & fiber.' },
+  result: { title: 'Here’s the estimate', sub: 'Review, then add it to today.' },
+  error: { title: 'Hmm', sub: 'That didn’t work.' },
+};
+
+function Tile({ theme, icon, title, hint, onPress }: { theme: Theme; icon: React.ReactNode; title: string; hint: string; onPress: () => void }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 13, padding: 14, borderRadius: theme.radii.card, backgroundColor: theme.colors.surface, borderWidth: 0.5, borderColor: theme.colors.border, opacity: pressed ? 0.7 : 1, ...theme.shadows.card })}
+    >
+      <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: theme.colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>{icon}</View>
+      <View style={{ flex: 1 }}>
+        <AppText variant="bodyStrong" style={{ fontWeight: '700' }}>
+          {title}
+        </AppText>
+        <AppText variant="caption" color="textSecondary" style={{ marginTop: 2 }}>
+          {hint}
+        </AppText>
+      </View>
+      <Ionicons name="chevron-forward" size={18} color={theme.colors.textTertiary} />
+    </Pressable>
+  );
+}
+
+function ResultView({ theme, result, preview, onLog }: { theme: Theme; result: MealScanResponse; preview: string | null; onLog: () => void }) {
+  const a = result.analysis;
+  const coach = result.coachContent;
+  const macros: { label: string; value: number; unit: string; color: string }[] = [
+    { label: 'Protein', value: a.protein, unit: 'g', color: theme.colors.protein },
+    { label: 'Calories', value: a.calories, unit: '', color: theme.colors.textPrimary },
+    { label: 'Carbs', value: a.carbs, unit: 'g', color: theme.colors.water },
+    { label: 'Fat', value: a.fat, unit: 'g', color: theme.colors.weight },
+    { label: 'Fiber', value: a.fiber, unit: 'g', color: theme.colors.fiber },
+  ];
+  return (
+    <View style={{ marginTop: 14 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        {preview ? <Image source={{ uri: preview }} style={{ width: 56, height: 56, borderRadius: 14 }} /> : <View style={{ width: 56, height: 56, borderRadius: 14, backgroundColor: theme.colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}><MaterialCommunityIcons name="silverware-fork-knife" size={24} color={theme.colors.textTertiary} /></View>}
+        <View style={{ flex: 1 }}>
+          <AppText variant="bodyStrong" style={{ fontWeight: '800' }}>
+            {a.foodName}
+          </AppText>
+          <AppText variant="caption" color="textSecondary">
+            {a.servingSize} · {confidenceLabel(a.confidence)}
+          </AppText>
+        </View>
+      </View>
+
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 14 }}>
+        {macros.map((m) => (
+          <View key={m.label} style={{ width: '33.3%', paddingVertical: 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 2 }}>
+              <AppText variant="cardTitle" style={{ fontSize: 19, color: m.color }}>
+                {Math.round(m.value)}
+              </AppText>
+              <AppText variant="caption" color="textTertiary">
+                {m.unit}
+              </AppText>
+            </View>
+            <AppText variant="caption" color="textSecondary">
+              {m.label}
+            </AppText>
+          </View>
+        ))}
+      </View>
+
+      {coach ? (
+        <View style={{ marginTop: 8, padding: 12, borderRadius: 14, backgroundColor: coach.mode === 'swap' ? '#FFF6E6' : '#E8F8EE', flexDirection: 'row', gap: 8 }}>
+          <Ionicons name={coach.mode === 'swap' ? 'bulb' : 'checkmark-circle'} size={18} color={coach.mode === 'swap' ? theme.colors.warning : theme.colors.success} style={{ marginTop: 1 }} />
+          <View style={{ flex: 1 }}>
+            <AppText variant="caption" color="textPrimary" style={{ fontWeight: '600' }}>
+              {coach.callout}
+            </AppText>
+            {coach.swap ? (
+              <AppText variant="caption" color="textSecondary" style={{ marginTop: 4 }}>
+                {coach.swap.description} · +{Math.round(coach.swap.additionalProtein)}g protein
+              </AppText>
+            ) : null}
+          </View>
+        </View>
+      ) : null}
+
+      <View style={{ marginTop: 16 }}>
+        <Button label="Add to today" onPress={onLog} />
+      </View>
+    </View>
+  );
+}
+
+function ManualView({ theme, manual, setManual, onSave }: { theme: Theme; manual: Record<'foodName' | 'protein' | 'calories' | 'carbs' | 'fat' | 'fiber', string>; setManual: (m: typeof manual) => void; onSave: () => void }) {
+  const set = (key: keyof typeof manual) => (v: string) => setManual({ ...manual, [key]: key === 'foodName' ? v : v.replace(/[^0-9.]/g, '') });
+  const valid = manual.foodName.trim().length > 0 && (Number(manual.protein) > 0 || Number(manual.calories) > 0);
+  const field = (key: keyof typeof manual, placeholder: string, keyboard: 'default' | 'decimal-pad', flex = 1) => (
+    <TextInput
+      key={key}
+      value={manual[key]}
+      onChangeText={set(key)}
+      placeholder={placeholder}
+      placeholderTextColor={theme.colors.textTertiary}
+      keyboardType={keyboard === 'decimal-pad' ? 'decimal-pad' : 'default'}
+      style={{ flex, borderRadius: 12, backgroundColor: theme.colors.surfaceAlt, paddingVertical: 12, paddingHorizontal: 14, fontSize: 16, color: theme.colors.textPrimary }}
+    />
+  );
+  return (
+    <View style={{ marginTop: 16, gap: 10 }}>
+      {field('foodName', 'Food name', 'default')}
+      <View style={{ flexDirection: 'row', gap: 10 }}>
+        {field('protein', 'Protein (g)', 'decimal-pad')}
+        {field('calories', 'Calories', 'decimal-pad')}
+      </View>
+      <View style={{ flexDirection: 'row', gap: 10 }}>
+        {field('carbs', 'Carbs (g)', 'decimal-pad')}
+        {field('fat', 'Fat (g)', 'decimal-pad')}
+        {field('fiber', 'Fiber (g)', 'decimal-pad')}
+      </View>
+      <View style={{ marginTop: 6 }}>
+        <Button label="Add to today" disabled={!valid} onPress={onSave} />
+      </View>
+    </View>
+  );
+}
+
+// Gradient mic with a recording pulse; swaps to a stop glyph while recording and
+// a spinner while the clip is being transcribed.
+function MicButton({ theme, recording, busy }: { theme: Theme; recording: boolean; busy: boolean }) {
+  const pulse = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!recording) {
+      pulse.setValue(0);
+      return undefined;
+    }
+    const loop = Animated.loop(Animated.timing(pulse, { toValue: 1, duration: 1100, easing: Easing.out(Easing.quad), useNativeDriver: true }));
+    loop.start();
+    return () => {
+      loop.stop();
+      pulse.setValue(0);
+    };
+  }, [recording, pulse]);
+  const scale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.8] });
+  const opacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0] });
+  return (
+    <View style={{ width: 110, height: 110, alignItems: 'center', justifyContent: 'center' }}>
+      {recording ? <Animated.View style={{ position: 'absolute', width: 78, height: 78, borderRadius: 39, backgroundColor: theme.colors.primary, transform: [{ scale }], opacity }} /> : null}
+      <LinearGradient colors={[theme.colors.primaryGradientStart, theme.colors.primaryGradientEnd] as const} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ width: 78, height: 78, borderRadius: 39, alignItems: 'center', justifyContent: 'center' }}>
+        {busy ? <ActivityIndicator color="#fff" /> : <Ionicons name={recording ? 'stop' : 'mic'} size={32} color="#fff" />}
+      </LinearGradient>
+    </View>
+  );
+}
