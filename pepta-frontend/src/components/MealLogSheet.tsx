@@ -21,14 +21,16 @@ import { api } from '../services/api';
 import {
   analysisToMealLog,
   confidenceLabel,
+  foodResultToMealLog,
   isManualMealValid,
   pickImageMime,
   toManualMealLog,
+  type FoodSearchResult,
   type MealSource,
 } from '../screens/app/mealLog';
 import type { MealLogInput, MealScanResponse } from '@pepta/shared';
 
-type View_ = 'chooser' | 'voice' | 'manual' | 'analyzing' | 'result' | 'error';
+type View_ = 'chooser' | 'voice' | 'manual' | 'search' | 'analyzing' | 'result' | 'error';
 
 export interface MealLogSheetProps {
   visible: boolean;
@@ -50,6 +52,34 @@ export function MealLogSheet({ visible, onClose }: MealLogSheetProps) {
   const recorderState = useAudioRecorderState(recorder);
   const [transcribing, setTranscribing] = useState(false);
   const [voiceFailed, setVoiceFailed] = useState(false);
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<FoodSearchResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [searchFailed, setSearchFailed] = useState(false);
+
+  // Debounced food search (only while the search view is open).
+  useEffect(() => {
+    if (view !== 'search') return undefined;
+    const q = query.trim();
+    if (q.length < 2) {
+      setResults([]);
+      setSearchFailed(false);
+      return undefined;
+    }
+    setSearching(true);
+    setSearchFailed(false);
+    const id = setTimeout(() => {
+      api
+        .searchFoods(q)
+        .then((r) => setResults(r))
+        .catch(() => {
+          setResults([]);
+          setSearchFailed(true);
+        })
+        .finally(() => setSearching(false));
+    }, 300);
+    return () => clearTimeout(id);
+  }, [view, query]);
 
   useEffect(() => {
     if (visible) {
@@ -60,6 +90,9 @@ export function MealLogSheet({ visible, onClose }: MealLogSheetProps) {
       setManual({ foodName: '', protein: '', calories: '', carbs: '', fat: '', fiber: '' });
       setTranscribing(false);
       setVoiceFailed(false);
+      setQuery('');
+      setResults([]);
+      setSearchFailed(false);
     }
   }, [visible]);
 
@@ -171,6 +204,10 @@ export function MealLogSheet({ visible, onClose }: MealLogSheetProps) {
     commit(analysisToMealLog(result.analysis, source, now(), result.photoS3Key));
   };
 
+  const logSearchResult = (r: FoodSearchResult) => {
+    commit(foodResultToMealLog(r, now()));
+  };
+
   const logManual = () => {
     const meal = {
       foodName: manual.foodName,
@@ -214,6 +251,7 @@ export function MealLogSheet({ visible, onClose }: MealLogSheetProps) {
           <Tile theme={theme} icon={<Ionicons name="camera" size={22} color={theme.colors.protein} />} title="Scan a photo" hint="Snap your plate — Pepta reads the macros" onPress={() => void analyzePhoto('camera')} />
           <Tile theme={theme} icon={<Ionicons name="images" size={22} color={theme.colors.water} />} title="Upload from library" hint="Pick an existing photo" onPress={() => void analyzePhoto('library')} />
           <Tile theme={theme} icon={<Ionicons name="mic" size={22} color={theme.colors.primary} />} title="Say what you ate" hint="Speak it or type — “chicken & rice”" onPress={() => { Haptics.selectionAsync().catch(() => undefined); setView('voice'); }} />
+          <Tile theme={theme} icon={<Ionicons name="search" size={22} color={theme.colors.fiber} />} title="Search foods" hint="Find a food and its macros" onPress={() => { Haptics.selectionAsync().catch(() => undefined); setView('search'); }} />
           <Tile theme={theme} icon={<MaterialCommunityIcons name="pencil-outline" size={22} color={theme.colors.textSecondary} />} title="Enter manually" hint="Type the food + macros" onPress={() => { Haptics.selectionAsync().catch(() => undefined); setView('manual'); }} />
         </View>
       ) : null}
@@ -270,6 +308,10 @@ export function MealLogSheet({ visible, onClose }: MealLogSheetProps) {
         <ManualView theme={theme} manual={manual} setManual={setManual} onSave={logManual} />
       ) : null}
 
+      {view === 'search' ? (
+        <SearchView theme={theme} query={query} onQuery={setQuery} results={results} searching={searching} failed={searchFailed} onPick={logSearchResult} onManual={() => setView('manual')} />
+      ) : null}
+
       {view === 'error' ? (
         <View style={{ paddingVertical: 28, alignItems: 'center', gap: 12 }}>
           <Ionicons name="alert-circle-outline" size={30} color={theme.colors.warning} />
@@ -291,6 +333,7 @@ const HEADINGS: Record<View_, { title: string; sub: string }> = {
   chooser: { title: 'Log a meal', sub: 'Scan, describe, or enter it — macros land on Home.' },
   voice: { title: 'Say what you ate', sub: 'Tap the mic, or type a sentence.' },
   manual: { title: 'Enter a meal', sub: 'Food name + macros.' },
+  search: { title: 'Search foods', sub: 'Find a food and add it.' },
   analyzing: { title: 'Analyzing…', sub: 'Estimating protein, calories & fiber.' },
   result: { title: 'Here’s the estimate', sub: 'Review, then add it to today.' },
   error: { title: 'Hmm', sub: 'That didn’t work.' },
@@ -410,6 +453,63 @@ function ManualView({ theme, manual, setManual, onSave }: { theme: Theme; manual
       <View style={{ marginTop: 6 }}>
         <Button label="Add to today" disabled={!valid} onPress={onSave} />
       </View>
+    </View>
+  );
+}
+
+function SearchView({ theme, query, onQuery, results, searching, failed, onPick, onManual }: { theme: Theme; query: string; onQuery: (v: string) => void; results: FoodSearchResult[]; searching: boolean; failed: boolean; onPick: (r: FoodSearchResult) => void; onManual: () => void }) {
+  const q = query.trim();
+  return (
+    <View style={{ marginTop: 14, gap: 12 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: theme.colors.surfaceAlt, borderRadius: 12, paddingHorizontal: 14, height: 48 }}>
+        <Ionicons name="search" size={16} color={theme.colors.textSecondary} />
+        <TextInput
+          value={query}
+          onChangeText={onQuery}
+          placeholder="Search foods — e.g. chicken"
+          placeholderTextColor={theme.colors.textTertiary}
+          autoFocus
+          autoCorrect={false}
+          style={{ flex: 1, fontSize: 16, color: theme.colors.textPrimary }}
+        />
+        {searching ? <ActivityIndicator color={theme.colors.primary} /> : null}
+      </View>
+
+      {results.map((r, i) => (
+        <Pressable
+          key={`${r.foodName}-${i}`}
+          onPress={() => onPick(r)}
+          style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 11, opacity: pressed ? 0.6 : 1, borderBottomWidth: i < results.length - 1 ? 0.5 : 0, borderBottomColor: theme.colors.border })}
+        >
+          <View style={{ flex: 1 }}>
+            <AppText variant="bodyStrong" style={{ fontWeight: '700' }}>
+              {r.foodName}
+            </AppText>
+            <AppText variant="caption" color="textSecondary">
+              {r.servingSize} · {Math.round(r.protein)}g P · {Math.round(r.calories)} cal
+            </AppText>
+          </View>
+          <View style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: theme.colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
+            <Ionicons name="add" size={18} color={theme.colors.primary} />
+          </View>
+        </Pressable>
+      ))}
+
+      {/* states */}
+      {q.length < 2 ? (
+        <AppText variant="caption" color="textTertiary" align="center" style={{ paddingVertical: 18 }}>
+          Type at least 2 letters to search.
+        </AppText>
+      ) : !searching && results.length === 0 ? (
+        <View style={{ alignItems: 'center', gap: 10, paddingVertical: 16 }}>
+          <AppText variant="body" color="textSecondary" align="center">
+            {failed ? 'Search isn’t available yet.' : `No matches for “${q}”.`}
+          </AppText>
+          <View style={{ width: 200 }}>
+            <Button label="Enter manually" variant="secondary" onPress={onManual} />
+          </View>
+        </View>
+      ) : null}
     </View>
   );
 }

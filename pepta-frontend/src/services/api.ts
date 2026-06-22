@@ -64,11 +64,28 @@ import {
 } from '@pepta/shared';
 import { z } from 'zod';
 import { API_BASE_URL } from '../config';
+import type { FoodSearchResult } from '../screens/app/mealLog';
 
 type ResponseSchema<T> = z.ZodType<T, z.ZodTypeDef, unknown>;
 
 // Frontend-defined contract for the (pending) server-side transcription endpoint.
 const mealTranscriptResponseSchema = z.object({ transcript: z.string().min(1) });
+
+// Frontend-defined contract for the (pending) food-search endpoint, backed by a
+// nutrition DB on the backend.
+const foodSearchResponseSchema = z.object({
+  results: z.array(
+    z.object({
+      foodName: z.string().min(1),
+      servingSize: z.string().min(1),
+      protein: z.number().nonnegative(),
+      calories: z.number().nonnegative(),
+      carbs: z.number().nonnegative().optional(),
+      fat: z.number().nonnegative().optional(),
+      fiber: z.number().nonnegative().optional(),
+    }),
+  ),
+});
 
 class PeptaApi {
   private authToken: string | null = null;
@@ -210,6 +227,12 @@ class PeptaApi {
       method: 'POST',
       body: JSON.stringify(body),
     });
+  }
+
+  // GET /meal-scans/foods?q= → food-database results. FRONTEND-DEFINED contract:
+  // pending on Codex's backend (needs a nutrition DB). 404s → empty until live.
+  public searchFoods(query: string): Promise<FoodSearchResult[]> {
+    return this.request(`/meal-scans/foods?q=${encodeURIComponent(query)}`, foodSearchResponseSchema).then((r) => r.results);
   }
 
   // POST /meal-logs → MealLogResponse (201). The actual logged meal.

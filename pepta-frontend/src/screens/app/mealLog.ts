@@ -53,6 +53,32 @@ export function toManualMealLog(m: ManualMeal, nowIso: string): MealLogInput {
   };
 }
 
+// A food-database search hit (frontend-defined contract; the search endpoint is
+// pending on Codex's backend — see api.searchFoods).
+export interface FoodSearchResult {
+  foodName: string;
+  servingSize: string;
+  protein: number;
+  calories: number;
+  carbs?: number;
+  fat?: number;
+  fiber?: number;
+}
+
+export function foodResultToMealLog(r: FoodSearchResult, nowIso: string): MealLogInput {
+  return {
+    foodName: r.foodName,
+    servingSize: r.servingSize,
+    protein: r.protein,
+    calories: r.calories,
+    ...(r.carbs != null ? { carbs: r.carbs } : {}),
+    ...(r.fat != null ? { fat: r.fat } : {}),
+    ...(r.fiber != null ? { fiber: r.fiber } : {}),
+    source: 'search',
+    datetime: nowIso,
+  };
+}
+
 export function confidenceLabel(confidence: number): string {
   if (confidence >= 0.8) return 'High confidence';
   if (confidence >= 0.5) return 'Good estimate';

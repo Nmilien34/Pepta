@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { MealScanAnalysis } from '@pepta/shared';
-import { analysisToMealLog, confidenceLabel, isManualMealValid, pickImageMime, toManualMealLog } from './mealLog';
+import { analysisToMealLog, confidenceLabel, foodResultToMealLog, isManualMealValid, pickImageMime, toManualMealLog } from './mealLog';
 
 const NOW = '2026-06-22T15:00:00.000Z';
 
@@ -47,6 +47,19 @@ describe('manual meal', () => {
       protein: 12,
       calories: 140,
       source: 'manual',
+      datetime: NOW,
+    });
+  });
+});
+
+describe('foodResultToMealLog', () => {
+  it('maps a search hit to a meal log with source=search, dropping empty optionals', () => {
+    expect(foodResultToMealLog({ foodName: 'Grilled chicken breast', servingSize: '100g', protein: 31, calories: 165 }, NOW)).toEqual({
+      foodName: 'Grilled chicken breast',
+      servingSize: '100g',
+      protein: 31,
+      calories: 165,
+      source: 'search',
       datetime: NOW,
     });
   });
