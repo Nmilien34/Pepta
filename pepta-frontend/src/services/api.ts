@@ -5,6 +5,8 @@ import {
   homeResponseSchema,
   activityLogInputSchema,
   activityLogResponseSchema,
+  compoundInputSchema,
+  compoundResponseSchema,
   doseLogInputSchema,
   doseLogResponseSchema,
   mealLogInputSchema,
@@ -34,6 +36,8 @@ import {
   type ActivityLogResponse,
   type AppleAuth,
   type AuthResponse,
+  type CompoundInput,
+  type CompoundResponse,
   type DoseLogInput,
   type DoseLogResponse,
   type GoogleAuth,
@@ -143,6 +147,14 @@ class PeptaApi {
 
   public getHome(): Promise<HomeResponse> {
     return this.request('/home', homeResponseSchema);
+  }
+
+  // POST /compounds → CompoundResponse (201). Adds a medication to track.
+  public createCompound(body: CompoundInput): Promise<CompoundResponse> {
+    return this.request('/compounds', compoundResponseSchema, {
+      method: 'POST',
+      body: JSON.stringify(compoundInputSchema.parse(body)),
+    });
   }
 
   public getTrack(): Promise<TrackResponse> {

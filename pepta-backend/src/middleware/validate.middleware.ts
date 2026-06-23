@@ -25,7 +25,15 @@ export function validateQuery<TSchema extends z.ZodTypeAny>(schema: TSchema): Re
       return;
     }
 
-    req.query = parsed.data as Request['query'];
+    // Express 5 exposes `req.query` as a read-only getter, so assigning to it
+    // throws (`Cannot set property query ... only a getter`) and 500s the request.
+    // Redefine the property with the validated/coerced value instead.
+    Object.defineProperty(req, 'query', {
+      value: parsed.data as Request['query'],
+      writable: true,
+      configurable: true,
+      enumerable: true,
+    });
     next();
   };
 }

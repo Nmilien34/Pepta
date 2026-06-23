@@ -2,13 +2,14 @@
 // and dose logs from /track (the injection map + dose history). Pull-to-refresh,
 // staggered entrance, mascot empty states. Renders whatever loaded (partial).
 
-import React, { useEffect } from 'react';
-import { ActivityIndicator, RefreshControl, ScrollView, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { useTheme } from '../../theme';
-import { AppText, BodyMap, Button, Card, Mascot, ProgressRing, Reveal, SectionErrorBanner } from '../../components';
+import { AddCompoundSheet, AppText, BodyMap, Button, Card, Mascot, ProgressRing, Reveal, SectionErrorBanner } from '../../components';
 import { usePeptaData } from '../../context/PeptaDataContext';
 import { formatCountdown } from './homeView';
 import {
@@ -29,6 +30,7 @@ export function TrackScreen() {
   const data = usePeptaData();
   const { home, track, homeLoading, trackLoading, homeError, trackError, trackRefreshing, refreshHome, refreshTrack } =
     data;
+  const [addOpen, setAddOpen] = useState(false);
 
   useEffect(() => {
     if (!home) void refreshHome();
@@ -120,9 +122,11 @@ export function TrackScreen() {
                 <AppText variant="sectionHeader" color="textTertiary">
                   Compounds
                 </AppText>
-                <AppText variant="caption" color="primary" style={{ fontWeight: '700' }}>
-                  + Add
-                </AppText>
+                <Pressable onPress={() => { Haptics.selectionAsync().catch(() => undefined); setAddOpen(true); }} hitSlop={8}>
+                  <AppText variant="caption" color="primary" style={{ fontWeight: '700' }}>
+                    + Add
+                  </AppText>
+                </Pressable>
               </View>
               {compounds.length > 0 ? (
                 compounds.map((c, i) => (
@@ -270,6 +274,8 @@ export function TrackScreen() {
           </Reveal>
         </ScrollView>
       </SafeAreaView>
+
+      <AddCompoundSheet visible={addOpen} onClose={() => setAddOpen(false)} />
     </View>
   );
 }

@@ -75,9 +75,15 @@ interface PeptaDataContextValue {
 const PeptaDataContext = createContext<PeptaDataContextValue | undefined>(undefined);
 
 function errorMessage(error: unknown): string {
-  return error instanceof Error && /network|fetch/i.test(error.message)
-    ? 'Couldn’t reach Pepta — check your connection.'
-    : 'Couldn’t load your data. Pull to try again.';
+  const detail = error instanceof Error ? error.message : String(error);
+  // Always log the raw cause so it shows in the Metro/device console.
+  console.warn('[PeptaData] request failed:', detail);
+  if (/network|fetch|Network request failed/i.test(detail)) {
+    return 'Couldn’t reach Pepta — check your connection.';
+  }
+  // Surface the real cause (HTTP status or a schema-parse error) instead of a
+  // generic message, so failures are diagnosable on-device.
+  return `Couldn’t load your data.\n(${detail})`;
 }
 
 export function PeptaDataProvider({ children }: { children: ReactNode }) {

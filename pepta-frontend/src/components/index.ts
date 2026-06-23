@@ -31,3 +31,4 @@ export { BottomSheet, type BottomSheetProps } from './BottomSheet';
 export { QuickLogSheet, type QuickLogSheetProps } from './QuickLogSheet';
 export { MealLogSheet, type MealLogSheetProps } from './MealLogSheet';
 export { ProgressPhotoCapture, type ProgressPhotoCaptureProps } from './ProgressPhotoCapture';
+export { AddCompoundSheet, type AddCompoundSheetProps } from './AddCompoundSheet';

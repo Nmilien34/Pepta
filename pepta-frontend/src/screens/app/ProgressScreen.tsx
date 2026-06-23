@@ -54,6 +54,11 @@ export function ProgressScreen() {
         <AppText variant="cardTitle" align="center" style={{ marginTop: theme.spacing.lg }}>
           Couldn’t load Progress
         </AppText>
+        {progressError ? (
+          <AppText variant="caption" color="textSecondary" align="center" style={{ marginTop: theme.spacing.sm, maxWidth: 300 }}>
+            {progressError}
+          </AppText>
+        ) : null}
         <View style={{ marginTop: theme.spacing.xl, width: 200 }}>
           <Button label="Try again" onPress={refreshAll} loading={progressLoading} />
         </View>

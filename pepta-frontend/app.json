@@ -5,19 +5,29 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
+    "icon": "./assets/icon.png",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "ai.boltzman.pepta",
-      "usesAppleSignIn": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "Pepta uses your camera to scan meals and capture progress photos.",
         "NSPhotoLibraryUsageDescription": "Pepta uses your photo library so you can upload progress photos and meal images.",
         "NSMicrophoneUsageDescription": "Pepta uses your microphone so you can log meals by voice."
-      }
+      },
+      "appleTeamId": "9VW984H3Q3"
     },
     "android": {
-      "package": "ai.boltzman.pepta"
+      "package": "ai.boltzman.pepta",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#EFE7FF"
+      },
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
     },
     "web": {
       "bundler": "metro"
@@ -48,7 +58,16 @@
         {
           "microphonePermission": "Pepta uses your microphone so you can log meals by voice."
         }
-      ]
+      ],
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "static"
+          }
+        }
+      ],
+      "./plugins/withoutAppleSignIn"
     ]
   }
 }
