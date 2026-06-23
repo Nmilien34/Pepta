@@ -12,13 +12,23 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../theme';
-import { AppText, Button, Card, CountUp, Mascot, ProgressRing, Reveal, SectionErrorBanner } from '../../components';
+import { AppText, Button, Card, CountUp, Mascot, ProgressBar, ProgressRing, Reveal, SectionErrorBanner } from '../../components';
 import { usePeptaData } from '../../context/PeptaDataContext';
+import { useLogSheets } from '../../context/LogSheetsContext';
 import { buildHomeView, type RingStat } from './homeView';
+import { buildGettingStarted, buildPlanSummary, type GettingStarted, type LogAction, type PlanSummary } from './planView';
 
 export function HomeScreen() {
   const theme = useTheme();
   const { home, homeLoading, homeError, homeRefreshing, refreshHome, bumpProtein, bumpWater } = usePeptaData();
+  const { openQuickLog, openMeal } = useLogSheets();
+
+  const onTask = (action: LogAction | null) => {
+    if (action === 'meal') openMeal();
+    else if (action === 'water') openQuickLog('water');
+    else if (action === 'weight') openQuickLog('weight');
+    else if (action === 'dose') openQuickLog('dose');
+  };
 
   useEffect(() => {
     if (!home) void refreshHome();
@@ -52,6 +62,8 @@ export function HomeScreen() {
 
   const view = buildHomeView(home);
   const caloriesLeft = view.calories.target ? Math.max(0, view.calories.target - view.calories.current) : null;
+  const plan = buildPlanSummary(home);
+  const gettingStarted = buildGettingStarted(home);
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.bg }}>
@@ -89,6 +101,18 @@ export function HomeScreen() {
           </View>
 
           <SectionErrorBanner errors={home.sectionErrors} style={{ marginTop: theme.spacing.md }} />
+
+          {/* day-one: personalized plan + getting-started checklist */}
+          {plan ? (
+            <Reveal delay={40} style={{ marginTop: theme.spacing.lg }}>
+              <PlanCard plan={plan} />
+            </Reveal>
+          ) : null}
+          {gettingStarted.show ? (
+            <Reveal delay={plan ? 90 : 60} style={{ marginTop: 12 }}>
+              <GettingStartedCard data={gettingStarted} onTask={onTask} />
+            </Reveal>
+          ) : null}
 
           {/* medication level */}
           <Reveal delay={60} style={{ marginTop: theme.spacing.lg }}>
@@ -296,6 +320,86 @@ export function HomeScreen() {
         </ScrollView>
       </SafeAreaView>
     </View>
+  );
+}
+
+function PlanCard({ plan }: { plan: PlanSummary }) {
+  return (
+    <Card style={{ backgroundColor: '#EFEBFF', borderWidth: 0 }}>
+      <AppText variant="caption" color="primary" style={{ fontWeight: '700' }}>
+        Your plan
+      </AppText>
+      <AppText variant="cardTitle" style={{ fontSize: 18, marginTop: 4 }}>
+        {plan.title}
+      </AppText>
+      <AppText variant="caption" color="textSecondary" style={{ marginTop: 4 }}>
+        {plan.detail}
+      </AppText>
+    </Card>
+  );
+}
+
+const TASK_ICON: Record<string, React.ComponentProps<typeof Ionicons>['name']> = {
+  account: 'checkmark',
+  shot: 'medical',
+  meal: 'restaurant',
+  water: 'water',
+  weight: 'scale',
+};
+
+function GettingStartedCard({ data, onTask }: { data: GettingStarted; onTask: (a: LogAction | null) => void }) {
+  const theme = useTheme();
+  return (
+    <Card>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+          <Ionicons name="sparkles" size={16} color={theme.colors.primary} />
+          <AppText variant="cardTitle" style={{ fontSize: 16 }}>
+            Get started
+          </AppText>
+        </View>
+        <AppText variant="caption" color="textSecondary">
+          {data.doneCount} of {data.total}
+        </AppText>
+      </View>
+      <View style={{ marginTop: 10, marginBottom: 4 }}>
+        <ProgressBar pct={data.total ? data.doneCount / data.total : 0} color={theme.colors.primary} height={6} />
+      </View>
+      {data.tasks.map((t, i) => {
+        const tappable = !t.done && !!t.action;
+        return (
+          <Pressable
+            key={t.key}
+            onPress={() => {
+              if (!tappable) return;
+              Haptics.selectionAsync().catch(() => undefined);
+              onTask(t.action);
+            }}
+            disabled={!tappable}
+            style={({ pressed }) => ({
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 11,
+              paddingVertical: 11,
+              borderTopWidth: i > 0 ? 0.5 : 0,
+              borderTopColor: theme.colors.border,
+              opacity: pressed ? 0.6 : 1,
+            })}
+          >
+            <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: t.done ? '#E8F8EE' : theme.colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name={t.done ? 'checkmark' : TASK_ICON[t.key] ?? 'ellipse-outline'} size={15} color={t.done ? theme.colors.success : theme.colors.primary} />
+            </View>
+            <AppText
+              variant="bodyStrong"
+              style={{ flex: 1, fontWeight: t.done ? '500' : '700', color: t.done ? theme.colors.textTertiary : theme.colors.textPrimary, textDecorationLine: t.done ? 'line-through' : 'none' }}
+            >
+              {t.label}
+            </AppText>
+            {tappable ? <Ionicons name="chevron-forward" size={16} color={theme.colors.textTertiary} /> : null}
+          </Pressable>
+        );
+      })}
+    </Card>
   );
 }
 

@@ -45,13 +45,7 @@ export function MealLogSheet({ visible, onClose }: MealLogSheetProps) {
   const [preview, setPreview] = useState<string | null>(null);
   const [source, setSource] = useState<MealSource>('scan');
   const [errorMsg, setErrorMsg] = useState('');
-  const [transcript, setTranscript] = useState('');
   const [manual, setManual] = useState({ foodName: '', protein: '', calories: '', carbs: '', fat: '', fiber: '' });
-
-  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
-  const recorderState = useAudioRecorderState(recorder);
-  const [transcribing, setTranscribing] = useState(false);
-  const [voiceFailed, setVoiceFailed] = useState(false);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<FoodSearchResult[]>([]);
   const [searching, setSearching] = useState(false);
@@ -86,10 +80,7 @@ export function MealLogSheet({ visible, onClose }: MealLogSheetProps) {
       setView('chooser');
       setResult(null);
       setPreview(null);
-      setTranscript('');
       setManual({ foodName: '', protein: '', calories: '', carbs: '', fat: '', fiber: '' });
-      setTranscribing(false);
-      setVoiceFailed(false);
       setQuery('');
       setResults([]);
       setSearchFailed(false);
@@ -124,14 +115,18 @@ export function MealLogSheet({ visible, onClose }: MealLogSheetProps) {
       }
       const res =
         from === 'camera'
-          ? await ImagePicker.launchCameraAsync({ base64: true, quality: 0.5, mediaTypes: ['images'] })
-          : await ImagePicker.launchImageLibraryAsync({ base64: true, quality: 0.5, mediaTypes: ['images'] });
+          ? await ImagePicker.launchCameraAsync({ quality: 0.5, mediaTypes: ['images'] })
+          : await ImagePicker.launchImageLibraryAsync({ quality: 0.5, mediaTypes: ['images'] });
       const asset = res.canceled ? null : res.assets[0];
-      if (!asset?.base64) return; // user cancelled
+      if (!asset?.uri) return; // user cancelled
       setPreview(asset.uri);
       setSource('scan');
       setView('analyzing');
-      const scan = await api.analyzeMealPhoto({ imageData: asset.base64, imageMimeType: pickImageMime(asset.mimeType, asset.uri), capturedAt: now() });
+      // Read base64 from the file AFTER the picker dismisses. Passing `base64: true`
+      // to the picker does a massive synchronous bridge transfer on a full-res photo
+      // and freezes iOS — reading via expo-file-system here is off the hot path.
+      const imageData = await new File(asset.uri).base64();
+      const scan = await api.analyzeMealPhoto({ imageData, imageMimeType: pickImageMime(asset.mimeType, asset.uri), capturedAt: now() });
       setResult(scan);
       setView('result');
     } catch {
@@ -140,56 +135,14 @@ export function MealLogSheet({ visible, onClose }: MealLogSheetProps) {
     }
   };
 
-  const startRecording = async () => {
-    setVoiceFailed(false);
-    try {
-      const perm = await requestRecordingPermissionsAsync();
-      if (!perm.granted) {
-        setErrorMsg('Pepta needs microphone access to log by voice. You can still type or scan.');
-        setView('error');
-        return;
-      }
-      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
-      await recorder.prepareToRecordAsync();
-      recorder.record();
-      Haptics.selectionAsync().catch(() => undefined);
-    } catch {
-      setVoiceFailed(true);
-    }
-  };
-
-  // Stop recording → read the clip → transcribe server-side → fill the field.
-  const stopRecording = async () => {
-    Haptics.selectionAsync().catch(() => undefined);
-    setTranscribing(true);
-    setVoiceFailed(false);
-    try {
-      await recorder.stop();
-      const uri = recorder.uri;
-      if (!uri) return;
-      const audioData = await new File(uri).base64();
-      const { transcript: text } = await api.transcribeMealAudio({ audioData, audioMimeType: 'audio/m4a' });
-      setTranscript(text);
-    } catch {
-      // Transcription endpoint not live yet (or failed) → fall back to typing.
-      setVoiceFailed(true);
-    } finally {
-      setTranscribing(false);
-    }
-  };
-
-  const toggleRecording = () => {
-    if (recorderState.isRecording) void stopRecording();
-    else void startRecording();
-  };
-
-  const analyzeVoice = async () => {
-    if (!transcript.trim()) return;
+  const analyzeVoice = async (text: string) => {
+    const transcript = text.trim();
+    if (!transcript) return;
     Haptics.selectionAsync().catch(() => undefined);
     setSource('voice');
     setView('analyzing');
     try {
-      const scan = await api.analyzeMealVoice({ transcript: transcript.trim(), recordedAt: now() });
+      const scan = await api.analyzeMealVoice({ transcript, recordedAt: now() });
       setResult(scan);
       setPreview(null);
       setView('result');
@@ -223,7 +176,6 @@ export function MealLogSheet({ visible, onClose }: MealLogSheetProps) {
 
   const back = () => {
     Haptics.selectionAsync().catch(() => undefined);
-    if (recorderState.isRecording) recorder.stop().catch(() => undefined);
     setView('chooser');
   };
 
@@ -266,39 +218,7 @@ export function MealLogSheet({ visible, onClose }: MealLogSheetProps) {
         </View>
       ) : null}
 
-      {view === 'voice' ? (
-        <View style={{ marginTop: 16, gap: 14, alignItems: 'center' }}>
-          {/* mic — tap to record / stop */}
-          <Pressable onPress={toggleRecording} disabled={transcribing} hitSlop={8}>
-            <MicButton theme={theme} recording={recorderState.isRecording} busy={transcribing} />
-          </Pressable>
-          {transcribing ? (
-            <AppText variant="caption" color="textSecondary">
-              Transcribing…
-            </AppText>
-          ) : (
-            <AppText variant="caption" color="textSecondary">
-              {recorderState.isRecording ? 'Listening… tap to stop' : 'Tap to speak, or type below'}
-            </AppText>
-          )}
-          {voiceFailed ? (
-            <AppText variant="caption" color="textTertiary" align="center" style={{ maxWidth: 260 }}>
-              Couldn’t transcribe — type your meal below instead.
-            </AppText>
-          ) : null}
-          <TextInput
-            value={transcript}
-            onChangeText={setTranscript}
-            placeholder="e.g. Two eggs, avocado toast, and a black coffee"
-            placeholderTextColor={theme.colors.textTertiary}
-            multiline
-            style={{ alignSelf: 'stretch', minHeight: 80, borderRadius: 14, backgroundColor: theme.colors.surfaceAlt, padding: 14, fontSize: 16, color: theme.colors.textPrimary, textAlignVertical: 'top' }}
-          />
-          <View style={{ alignSelf: 'stretch' }}>
-            <Button label="Analyze" disabled={!transcript.trim() || transcribing} onPress={() => void analyzeVoice()} />
-          </View>
-        </View>
-      ) : null}
+      {view === 'voice' ? <VoiceCapture theme={theme} onAnalyze={analyzeVoice} /> : null}
 
       {view === 'result' && result ? (
         <ResultView theme={theme} result={result} preview={preview} onLog={logResult} />
@@ -510,6 +430,95 @@ function SearchView({ theme, query, onQuery, results, searching, failed, onPick,
           </View>
         </View>
       ) : null}
+    </View>
+  );
+}
+
+// Voice capture — owns the recorder + its 500ms status poll, so those only run
+// while this is mounted (i.e. the voice screen), not for the whole app's lifetime.
+function VoiceCapture({ theme, onAnalyze }: { theme: Theme; onAnalyze: (text: string) => void }) {
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const recorderState = useAudioRecorderState(recorder);
+  const [transcript, setTranscript] = useState('');
+  const [transcribing, setTranscribing] = useState(false);
+  const [voiceFailed, setVoiceFailed] = useState(false);
+
+  useEffect(() => () => {
+    // Release the recorder if we leave the screen mid-recording.
+    recorder.stop().catch(() => undefined);
+  }, [recorder]);
+
+  const startRecording = async () => {
+    setVoiceFailed(false);
+    try {
+      const perm = await requestRecordingPermissionsAsync();
+      if (!perm.granted) {
+        setVoiceFailed(true);
+        return;
+      }
+      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+      await recorder.prepareToRecordAsync();
+      recorder.record();
+      Haptics.selectionAsync().catch(() => undefined);
+    } catch {
+      setVoiceFailed(true);
+    }
+  };
+
+  const stopRecording = async () => {
+    Haptics.selectionAsync().catch(() => undefined);
+    setTranscribing(true);
+    setVoiceFailed(false);
+    try {
+      await recorder.stop();
+      const uri = recorder.uri;
+      if (!uri) return;
+      const audioData = await new File(uri).base64();
+      const { transcript: text } = await api.transcribeMealAudio({ audioData, audioMimeType: 'audio/m4a' });
+      setTranscript(text);
+    } catch {
+      // Transcription endpoint not live yet (or failed) → fall back to typing.
+      setVoiceFailed(true);
+    } finally {
+      setTranscribing(false);
+    }
+  };
+
+  const toggle = () => {
+    if (recorderState.isRecording) void stopRecording();
+    else void startRecording();
+  };
+
+  return (
+    <View style={{ marginTop: 16, gap: 14, alignItems: 'center' }}>
+      <Pressable onPress={toggle} disabled={transcribing} hitSlop={8}>
+        <MicButton theme={theme} recording={recorderState.isRecording} busy={transcribing} />
+      </Pressable>
+      {transcribing ? (
+        <AppText variant="caption" color="textSecondary">
+          Transcribing…
+        </AppText>
+      ) : (
+        <AppText variant="caption" color="textSecondary">
+          {recorderState.isRecording ? 'Listening… tap to stop' : 'Tap to speak, or type below'}
+        </AppText>
+      )}
+      {voiceFailed ? (
+        <AppText variant="caption" color="textTertiary" align="center" style={{ maxWidth: 260 }}>
+          Couldn’t transcribe — type your meal below instead.
+        </AppText>
+      ) : null}
+      <TextInput
+        value={transcript}
+        onChangeText={setTranscript}
+        placeholder="e.g. Two eggs, avocado toast, and a black coffee"
+        placeholderTextColor={theme.colors.textTertiary}
+        multiline
+        style={{ alignSelf: 'stretch', minHeight: 80, borderRadius: 14, backgroundColor: theme.colors.surfaceAlt, padding: 14, fontSize: 16, color: theme.colors.textPrimary, textAlignVertical: 'top' }}
+      />
+      <View style={{ alignSelf: 'stretch' }}>
+        <Button label="Analyze" disabled={!transcript.trim() || transcribing} onPress={() => onAnalyze(transcript)} />
+      </View>
     </View>
   );
 }

@@ -150,7 +150,9 @@ export function latestMeasurements(measurements: MeasurementResponse[]): LatestM
 export function formatShortDate(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '—';
-  return `${MONTHS_SHORT[d.getMonth()] ?? ''} ${d.getDate()}`;
+  // UTC components so a date-only string (midnight UTC) renders on its calendar
+  // day regardless of the device timezone.
+  return `${MONTHS_SHORT[d.getUTCMonth()] ?? ''} ${d.getUTCDate()}`;
 }
 
 export function summary(progress: ProgressResponse, profile: UserProfileResponse | null) {

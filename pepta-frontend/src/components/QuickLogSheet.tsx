@@ -41,15 +41,18 @@ const MEASUREMENTS: MeasurementType[] = ['waist', 'hips', 'chest', 'arm', 'thigh
 const WATER_OZ = [8, 12, 16, 20];
 const PROTEIN_G = [10, 20, 30, 40];
 
-type Mode = 'chooser' | 'dose' | 'weight' | 'protein' | 'water' | 'sideEffect' | 'measurement' | 'activity';
+export type QuickLogMode = 'chooser' | 'dose' | 'weight' | 'protein' | 'water' | 'sideEffect' | 'measurement' | 'activity';
+type Mode = QuickLogMode;
 
 export interface QuickLogSheetProps {
   visible: boolean;
   onClose(): void;
   onMeal(): void;
+  // Open straight to a specific entry form (used by the getting-started checklist).
+  initialMode?: QuickLogMode;
 }
 
-export function QuickLogSheet({ visible, onClose, onMeal }: QuickLogSheetProps) {
+export function QuickLogSheet({ visible, onClose, onMeal, initialMode }: QuickLogSheetProps) {
   const theme = useTheme();
   const { home, track, refreshHome, refreshTrack, refreshProgress, bumpProtein, bumpWater, addDoseLog, addWeightLog, addMeasurement, addSideEffectLog } = usePeptaData();
   const [render, setRender] = useState(visible);
@@ -77,7 +80,8 @@ export function QuickLogSheet({ visible, onClose, onMeal }: QuickLogSheetProps) 
   useEffect(() => {
     if (visible) {
       setRender(true);
-      setMode('chooser');
+      setMode(initialMode ?? 'chooser');
+      if (initialMode === 'dose') setDose(defaultDoseDraft(home, track));
       setSeTypes([]);
       setSeNote('');
       setMeasureNote('');

@@ -69,11 +69,27 @@ import {
 import { z } from 'zod';
 import { API_BASE_URL } from '../config';
 import type { FoodSearchResult } from '../screens/app/mealLog';
+import type { CompanionNote } from '../screens/app/companionNotes';
 
 type ResponseSchema<T> = z.ZodType<T, z.ZodTypeDef, unknown>;
 
 // Frontend-defined contract for the (pending) server-side transcription endpoint.
 const mealTranscriptResponseSchema = z.object({ transcript: z.string().min(1) });
+
+// Frontend-defined contract for the (pending) AI companion-notes endpoint
+// (backend /coach → OpenAI, key server-side). See docs/coach-endpoint.md.
+const coachNotesResponseSchema = z.object({
+  notes: z.array(
+    z.object({
+      id: z.string().min(1),
+      text: z.string().min(1),
+      emoji: z.string().optional(),
+      cta: z.string().optional(),
+      action: z.enum(['dose', 'meal', 'water', 'weight']).optional(),
+      tone: z.enum(['nudge', 'win']),
+    }),
+  ),
+});
 
 // Frontend-defined contract for the (pending) food-search endpoint, backed by a
 // nutrition DB on the backend.
@@ -239,6 +255,13 @@ class PeptaApi {
       method: 'POST',
       body: JSON.stringify(body),
     });
+  }
+
+  // GET /coach → AI companion notes (CompanionNote[]). FRONTEND-DEFINED contract,
+  // pending on Codex's backend (OpenAI server-side). 404s → [] until live, so Pep
+  // falls back to the deterministic local notes. See docs/coach-endpoint.md.
+  public getCoachNotes(): Promise<CompanionNote[]> {
+    return this.request('/coach', coachNotesResponseSchema).then((r) => r.notes);
   }
 
   // GET /meal-scans/foods?q= → food-database results. FRONTEND-DEFINED contract:
