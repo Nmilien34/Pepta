@@ -89,14 +89,30 @@ export function TabBar({ state, navigation, onQuickLog }: TabBarProps) {
             borderRadius: 18,
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: theme.colors.surface,
-            borderWidth: 1.4,
-            borderColor: '#D8CCF7',
+            backgroundColor: 'rgba(255,255,255,0.62)',
+            borderWidth: 0.8,
+            borderColor: 'rgba(129,101,193,0.16)',
             opacity: pressed ? 0.82 : 1,
             transform: [{ scale: pressed ? 0.97 : 1 }],
-            ...theme.shadows.card,
           })}
         >
+          <View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              top: 4,
+              right: 4,
+              bottom: 4,
+              left: 4,
+              borderRadius: 15,
+              borderWidth: 1,
+              borderTopColor: 'rgba(255,255,255,0.8)',
+              borderLeftColor: 'rgba(255,255,255,0.62)',
+              borderRightColor: 'rgba(88,64,145,0.08)',
+              borderBottomColor: 'rgba(88,64,145,0.1)',
+              backgroundColor: 'rgba(255,255,255,0.16)',
+            }}
+          />
           <LinearGradient
             colors={[theme.colors.primaryGradientStart, theme.colors.primaryGradientEnd] as const}
             start={{ x: 0, y: 0 }}

@@ -133,9 +133,9 @@ export function PepCompanion() {
       ) : null}
 
       <Pressable onPress={tapPep} accessibilityRole="button" accessibilityLabel="Pep — tips and next steps">
-        <View style={[{ width: 56, height: 56, borderRadius: 28, backgroundColor: theme.colors.surface, borderWidth: 0.5, borderColor: theme.colors.border, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }, theme.shadows.card]}>
-          <Float>
-            <Mascot pose="idle" size={44} />
+        <View style={[{ width: 58, height: 58, borderRadius: 29, backgroundColor: theme.colors.surface, borderWidth: 0.5, borderColor: theme.colors.border, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', paddingTop: 3 }, theme.shadows.card]}>
+          <Float amplitude={3} duration={3200}>
+            <Mascot pose="idle" size={42} />
           </Float>
         </View>
         {!open ? (
