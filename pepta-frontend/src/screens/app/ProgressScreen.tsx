@@ -5,8 +5,9 @@
 
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, RefreshControl, ScrollView, View } from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Icon } from "../../components/Icon";
 import * as Haptics from 'expo-haptics';
+import { useNavigation, type NavigationProp } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../theme';
 import {
@@ -19,9 +20,12 @@ import {
   ProgressPhotoCapture,
   ProgressRing,
   Reveal,
+  ScreenHeader,
   SectionErrorBanner,
   WeightChart,
 } from '../../components';
+
+type TabsNav = NavigationProp<Record<'Home' | 'Track' | 'Progress' | 'Account', undefined>>;
 import { usePeptaData } from '../../context/PeptaDataContext';
 import {
   RANGE_KEYS,
@@ -35,6 +39,7 @@ import {
 
 export function ProgressScreen() {
   const theme = useTheme();
+  const navigation = useNavigation<TabsNav>();
   const { home, progress, progressLoading, progressRefreshing, progressError, refreshProgress, refreshHome } =
     usePeptaData();
   const [range, setRange] = useState<RangeKey>('90d');
@@ -101,9 +106,7 @@ export function ProgressScreen() {
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={progressRefreshing} onRefresh={refreshAll} tintColor={theme.colors.primary} />}
         >
-          <AppText variant="screenTitle" style={{ paddingTop: 4 }}>
-            Progress
-          </AppText>
+          <ScreenHeader title="Progress" onAdjust={() => navigation.navigate('Account')} />
 
           <SectionErrorBanner errors={sectionErrors} style={{ marginTop: theme.spacing.md }} />
 
@@ -127,8 +130,8 @@ export function ProgressScreen() {
               <Card>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <Ionicons name="scale" size={18} color={theme.colors.weight} />
-                    <AppText variant="sectionHeader" color="textTertiary">
+                    <Icon name="scale" size={18} color={theme.colors.weight} />
+                    <AppText variant="cardTitle" style={{ fontSize: 15 }}>
                       Weight ({s.weight.unit})
                     </AppText>
                   </View>
@@ -158,13 +161,13 @@ export function ProgressScreen() {
           <Reveal delay={140} style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
             <Card style={{ flex: 1, alignItems: 'center' }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, alignSelf: 'flex-start' }}>
-                <MaterialCommunityIcons name="target" size={16} color={theme.colors.weight} />
+                <Icon name="target" size={16} color={theme.colors.weight} />
                 <AppText variant="cardTitle" style={{ fontSize: 15 }}>
                   To goal
                 </AppText>
               </View>
               <View style={{ marginVertical: 10 }}>
-                <ProgressRing size={116} pct={s.weight.toGoalPct} color={theme.colors.weight}>
+                <ProgressRing size={120} pct={s.weight.toGoalPct} color={theme.colors.weight}>
                   <View style={{ alignItems: 'center' }}>
                     <CountUp value={Math.round(s.weight.toGoalPct * 100)} format={(n) => `${Math.round(n)}%`} variant="statMedium" />
                     <AppText variant="caption" color="textTertiary" style={{ fontSize: 10 }}>
@@ -178,10 +181,11 @@ export function ProgressScreen() {
             <View style={{ flex: 1, gap: 12 }}>
               <Card>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
-                  <MaterialCommunityIcons name="heart-pulse" size={16} color={theme.colors.primary} />
+                  <Icon name="heart-pulse" size={16} color={theme.colors.primary} />
                   <AppText variant="cardTitle" style={{ fontSize: 15 }}>
                     BMI
                   </AppText>
+                  <Icon name="information-circle-outline" size={14} color={theme.colors.textTertiary} />
                 </View>
                 {s.bmi ? (
                   <>
@@ -198,9 +202,9 @@ export function ProgressScreen() {
               </Card>
               <Card>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
-                  <MaterialCommunityIcons name="arrow-down-right" size={16} color={theme.colors.fiber} />
+                  <Icon name="arrow-down-right" size={16} color={theme.colors.fiber} />
                   <AppText variant="cardTitle" style={{ fontSize: 15 }}>
-                    Change
+                    Difference
                   </AppText>
                 </View>
                 {s.weight.difference != null ? (
@@ -233,10 +237,11 @@ export function ProgressScreen() {
               <Card>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <MaterialCommunityIcons name="shield-check" size={18} color={theme.colors.fiber} />
-                    <AppText variant="sectionHeader" color="textTertiary">
+                    <Icon name="shield-check" size={18} color={theme.colors.fiber} />
+                    <AppText variant="cardTitle" style={{ fontSize: 15 }}>
                       Muscle protection
                     </AppText>
+                    <Icon name="information-circle-outline" size={14} color={theme.colors.textTertiary} />
                   </View>
                   <View style={{ width: 34, height: 34, borderRadius: theme.radii.pill, backgroundColor: theme.colors.surfaceAlt, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
                     <Mascot pose="idle" size={26} />
@@ -273,8 +278,8 @@ export function ProgressScreen() {
               <Card>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <Ionicons name="flag" size={18} color={theme.colors.weight} />
-                    <AppText variant="sectionHeader" color="textTertiary">
+                    <Icon name="flag" size={18} color={theme.colors.weight} />
+                    <AppText variant="cardTitle" style={{ fontSize: 15 }}>
                       Timeline
                     </AppText>
                   </View>
@@ -300,7 +305,7 @@ export function ProgressScreen() {
           {s.measurements.length > 0 ? (
             <Reveal delay={360} style={{ marginTop: 12 }}>
               <Card>
-                <AppText variant="sectionHeader" color="textTertiary">
+                <AppText variant="cardTitle" style={{ fontSize: 15 }}>
                   Measurements
                 </AppText>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: theme.spacing.sm }}>
@@ -329,8 +334,8 @@ export function ProgressScreen() {
             <Card>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Ionicons name="camera" size={18} color={theme.colors.textSecondary} />
-                  <AppText variant="sectionHeader" color="textTertiary">
+                  <Icon name="camera" size={18} color={theme.colors.textSecondary} />
+                  <AppText variant="cardTitle" style={{ fontSize: 15 }}>
                     Progress photos
                   </AppText>
                 </View>
@@ -351,13 +356,13 @@ export function ProgressScreen() {
                     </View>
                   </View>
                 ))}
-                {Array.from({ length: Math.max(0, 3 - photos.length) }).map((_, i) => (
+                {Array.from({ length: Math.max(1, 4 - photos.length) }).map((_, i) => (
                   <Pressable
                     key={`add-${i}`}
                     onPress={() => { Haptics.selectionAsync().catch(() => undefined); setPhotoOpen(true); }}
                     style={{ flex: 1, aspectRatio: 3 / 4, borderRadius: 12, borderWidth: 1.5, borderColor: theme.colors.border, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' }}
                   >
-                    <Ionicons name="add" size={20} color={theme.colors.textTertiary} />
+                    <Icon name="add" size={20} color={theme.colors.textTertiary} />
                   </Pressable>
                 ))}
               </View>
@@ -386,7 +391,7 @@ function VerdictPill({ tone, label }: { tone: RetentionTone; label: string }) {
   const bg = tone === 'bad' ? '#FDECEC' : tone === 'warn' ? '#FFF6E6' : '#E8F8EE';
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: bg, paddingVertical: 4, paddingHorizontal: 10, borderRadius: theme.radii.pill }}>
-      <Ionicons name="checkmark-circle" size={13} color={color} />
+      <Icon name="checkmark-circle" size={13} color={color} />
       <AppText variant="caption" style={{ color, fontWeight: '700' }}>
         {label}
       </AppText>

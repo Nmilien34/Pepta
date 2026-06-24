@@ -383,7 +383,7 @@
 				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_DEBUG";
 				PRODUCT_BUNDLE_IDENTIFIER = ai.boltzman.pepta;
-				PRODUCT_NAME = "Pepta";
+				PRODUCT_NAME = Pepta;
 				SWIFT_OBJC_BRIDGING_HEADER = "Pepta/Pepta-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -415,7 +415,7 @@
 				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_RELEASE";
 				PRODUCT_BUNDLE_IDENTIFIER = ai.boltzman.pepta;
-				PRODUCT_NAME = "Pepta";
+				PRODUCT_NAME = Pepta;
 				SWIFT_OBJC_BRIDGING_HEADER = "Pepta/Pepta-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";

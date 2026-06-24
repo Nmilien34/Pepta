@@ -5,7 +5,7 @@
 
 import React from 'react';
 import { View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from "../../components/Icon";
 import Svg, { Circle, Defs, LinearGradient, Path, Stop } from 'react-native-svg';
 import { useTheme } from '../../theme';
 import { AppText, Button, Card, Confetti, Mascot, OnboardingScaffold } from '../../components';
@@ -83,7 +83,7 @@ export function RevealScreen({
                 borderRadius: theme.radii.pill,
               }}
             >
-              <Ionicons name="flag" size={12} color="#A8327D" />
+              <Icon name="flag" size={12} color="#A8327D" />
               <AppText variant="caption" style={{ color: '#A8327D', fontWeight: '700' }}>
                 {dateChip}
               </AppText>
@@ -123,7 +123,7 @@ export function RevealScreen({
             </View>
           ))}
           <View style={{ flexBasis: '31%', flexGrow: 1, backgroundColor: theme.colors.surfaceAlt, borderRadius: 14, padding: 12, alignItems: 'center', justifyContent: 'center' }}>
-            <Ionicons name="sparkles" size={20} color={theme.colors.primary} />
+            <Icon name="sparkles" size={20} color={theme.colors.primary} />
           </View>
         </View>
       </View>

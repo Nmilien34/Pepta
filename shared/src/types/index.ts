@@ -52,6 +52,8 @@ import type {
   progressResponseSchema,
   proteinLogInputSchema,
   proteinLogResponseSchema,
+  fiberLogInputSchema,
+  fiberLogResponseSchema,
   researchArticleSchema,
   revenueCatWebhookSchema,
   scheduleInputSchema,
@@ -142,6 +144,8 @@ export type ProgressPhotoUploadIntentResponse = z.infer<
 export type ProgressResponse = z.infer<typeof progressResponseSchema>;
 export type ProteinLogInput = z.infer<typeof proteinLogInputSchema>;
 export type ProteinLogResponse = z.infer<typeof proteinLogResponseSchema>;
+export type FiberLogInput = z.infer<typeof fiberLogInputSchema>;
+export type FiberLogResponse = z.infer<typeof fiberLogResponseSchema>;
 export type ResearchArticle = z.infer<typeof researchArticleSchema>;
 export type RevenueCatWebhook = z.infer<typeof revenueCatWebhookSchema>;
 export type ScheduleInput = z.infer<typeof scheduleInputSchema>;

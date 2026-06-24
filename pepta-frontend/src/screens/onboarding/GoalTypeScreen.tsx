@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { View } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Icon } from "../../components/Icon";
 import type { UserProfileInput } from '@pepta/shared';
 import { useTheme } from '../../theme';
 import { AppText, Button, OnboardingScaffold, OptionCard } from '../../components';
@@ -52,7 +52,7 @@ export function GoalTypeScreen({ progress, onBack, value, onChange, onContinue }
             key={goal.value}
             title={goal.title}
             subtitle={goal.subtitle}
-            icon={<MaterialCommunityIcons name={goal.icon} size={22} color={goal.color} />}
+            icon={<Icon name={goal.icon} size={22} color={goal.color} />}
             selected={value === goal.value}
             onPress={() => onChange(goal.value)}
           />

@@ -5,7 +5,11 @@
 
 import React from 'react';
 import { Pressable, View } from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import IconHome2 from '@tabler/icons-react-native/IconHome2';
+import IconVaccine from '@tabler/icons-react-native/IconVaccine';
+import IconChartLine from '@tabler/icons-react-native/IconChartLine';
+import IconUserCircle from '@tabler/icons-react-native/IconUserCircle';
+import IconPlus from '@tabler/icons-react-native/IconPlus';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,11 +17,13 @@ import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useTheme } from '../theme';
 import { AppText } from '../components';
 
+// Exact Tabler icons from the design lab (ti-home-2 / ti-vaccine / ti-chart-line /
+// ti-user-circle). Focused = a slightly heavier stroke + brand purple.
 const ICONS: Record<string, (focused: boolean, color: string) => React.ReactNode> = {
-  Home: (f, c) => <Ionicons name={f ? 'home' : 'home-outline'} size={23} color={c} />,
-  Track: (_f, c) => <MaterialCommunityIcons name="needle" size={23} color={c} />,
-  Progress: (f, c) => <Ionicons name={f ? 'stats-chart' : 'stats-chart-outline'} size={22} color={c} />,
-  Account: (f, c) => <Ionicons name={f ? 'person-circle' : 'person-circle-outline'} size={25} color={c} />,
+  Home: (f, c) => <IconHome2 size={24} color={c} strokeWidth={f ? 2.4 : 1.9} />,
+  Track: (f, c) => <IconVaccine size={24} color={c} strokeWidth={f ? 2.4 : 1.9} />,
+  Progress: (f, c) => <IconChartLine size={24} color={c} strokeWidth={f ? 2.4 : 1.9} />,
+  Account: (f, c) => <IconUserCircle size={25} color={c} strokeWidth={f ? 2.4 : 1.9} />,
 };
 
 export interface TabBarProps extends BottomTabBarProps {
@@ -88,7 +94,7 @@ export function TabBar({ state, navigation, onQuickLog }: TabBarProps) {
               theme.shadows.floating,
             ]}
           >
-            <Ionicons name="add" size={26} color="#FFFFFF" />
+            <IconPlus size={26} color="#FFFFFF" strokeWidth={2.5} />
           </LinearGradient>
         </Pressable>
       </View>

@@ -4,7 +4,7 @@
 
 import React from 'react';
 import { Linking, Pressable, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from "../../components/Icon";
 import { PRIVACY_URL, TERMS_URL } from '../../config';
 import { useTheme } from '../../theme';
 import { AppText, Button, Mascot, OnboardingScaffold } from '../../components';
@@ -36,12 +36,12 @@ export function PrivacyScreen({ progress, showBack, onBack, onAccept }: PrivacyS
         </AppText>
         <View style={{ width: '100%', gap: theme.spacing.sm, marginTop: theme.spacing.sm }}>
           <LinkRow
-            icon={<Ionicons name="document-text-outline" size={18} color={theme.colors.textSecondary} />}
+            icon={<Icon name="document-text-outline" size={18} color={theme.colors.textSecondary} />}
             label="Terms of Service"
             onPress={() => Linking.openURL(TERMS_URL)}
           />
           <LinkRow
-            icon={<Ionicons name="lock-closed-outline" size={18} color={theme.colors.primary} />}
+            icon={<Icon name="lock-closed-outline" size={18} color={theme.colors.primary} />}
             label="Privacy Policy"
             onPress={() => Linking.openURL(PRIVACY_URL)}
           />
@@ -89,7 +89,7 @@ function LinkRow({ icon, label, onPress }: LinkRowProps) {
       <AppText variant="bodyStrong" style={{ flex: 1, fontWeight: '700' }}>
         {label}
       </AppText>
-      <Ionicons name="chevron-forward" size={18} color={theme.colors.textTertiary} />
+      <Icon name="chevron-forward" size={18} color={theme.colors.textTertiary} />
     </Pressable>
   );
 }

@@ -8,7 +8,7 @@
 
 import React from 'react';
 import { View } from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Icon } from "../../components/Icon";
 import { useTheme } from '../../theme';
 import { AppText, Button, OnboardingScaffold, OptionCard } from '../../components';
 
@@ -46,21 +46,21 @@ export function JourneyStageScreen({
         <OptionCard
           title="Already on a GLP-1"
           subtitle="Tracking shots & progress"
-          icon={<MaterialCommunityIcons name="needle" size={22} color={theme.colors.primary} />}
+          icon={<Icon name="needle" size={22} color={theme.colors.primary} />}
           selected={value === 'active'}
           onPress={() => onChange('active')}
         />
         <OptionCard
           title="Starting soon"
           subtitle="Prescription on the way"
-          icon={<MaterialCommunityIcons name="calendar-plus" size={22} color={theme.colors.fiber} />}
+          icon={<Icon name="calendar-plus" size={22} color={theme.colors.fiber} />}
           selected={value === 'starting_soon'}
           onPress={() => onChange('starting_soon')}
         />
         <OptionCard
           title="Just exploring"
           subtitle="Not on one yet"
-          icon={<Ionicons name="compass-outline" size={22} color={theme.colors.warning} />}
+          icon={<Icon name="compass-outline" size={22} color={theme.colors.warning} />}
           selected={value === 'none'}
           onPress={() => onChange('none')}
         />

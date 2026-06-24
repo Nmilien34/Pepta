@@ -4,7 +4,7 @@
 
 import React from 'react';
 import { Pressable, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from "../../components/Icon";
 import { useTheme } from '../../theme';
 import { AppText, Button, OnboardingScaffold } from '../../components';
 
@@ -49,7 +49,7 @@ export function AppleHealthScreen({ progress, onBack, onContinue }: AppleHealthS
             justifyContent: 'center',
           }}
         >
-          <Ionicons name="heart" size={42} color="#A32D2D" />
+          <Icon name="heart" size={42} color="#A32D2D" />
         </View>
         <View style={{ alignItems: 'center', gap: theme.spacing.md }}>
           <AppText variant="obTitle" align="center">

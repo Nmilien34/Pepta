@@ -5,6 +5,7 @@
 // the first insight.
 
 import type { HomeResponse, Insight, MedicationLevelResponse } from '@pepta/shared';
+import { formatShortDate } from './progressView';
 
 export interface MedicationView {
   name: string;
@@ -28,6 +29,13 @@ export interface SetupView {
   unlocked: boolean;
 }
 
+export interface GoalView {
+  pct: number; // 0..1 toward goal
+  value: number; // latest weight
+  unit: string;
+  dateLabel: string;
+}
+
 export interface HomeView {
   medication: MedicationView | null;
   calories: RingStat;
@@ -37,6 +45,7 @@ export interface HomeView {
   streakDays: number;
   setup: SetupView | null; // null once the dashboard is unlocked
   weight: { value: number; unit: string } | null;
+  goal: GoalView | null;
   insight: Insight | null;
 }
 
@@ -80,6 +89,18 @@ export function buildHomeView(home: HomeResponse): HomeView {
   const nextDoseHours = home.nextDose?.hoursUntilNextDose ?? ml?.hoursUntilNextDose ?? null;
 
   const setup = home.setupProgress;
+
+  // Goal progress: baseline (profile.currentWeight) → latest → goalWeight.
+  const start = profile?.currentWeight ?? null;
+  const current = home.latestWeight?.value ?? start;
+  const goalWeight = profile?.goalWeight ?? null;
+  let goal: GoalView | null = null;
+  if (current != null && goalWeight != null && home.latestWeight) {
+    let pct = 0;
+    if (start != null && start !== goalWeight) pct = Math.max(0, Math.min(1, (start - current) / (start - goalWeight)));
+    goal = { pct, value: home.latestWeight.value, unit: home.latestWeight.unit, dateLabel: formatShortDate(home.latestWeight.datetime) };
+  }
+
   return {
     medication: ml
       ? {
@@ -106,6 +127,7 @@ export function buildHomeView(home: HomeResponse): HomeView {
           }
         : null,
     weight: home.latestWeight ? { value: home.latestWeight.value, unit: home.latestWeight.unit } : null,
+    goal,
     insight: home.insights[0] ?? null,
   };
 }

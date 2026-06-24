@@ -8,19 +8,20 @@
 
 import React, { useEffect } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, View } from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Icon } from "../../components/Icon";
 import * as Haptics from 'expo-haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../theme';
-import { AppText, Button, Card, CountUp, Mascot, ProgressBar, ProgressRing, Reveal, SectionErrorBanner } from '../../components';
+import { AppText, Button, Card, CountUp, Mascot, ProgressBar, ProgressRing, Reveal, SectionErrorBanner, WaterCup } from '../../components';
 import { usePeptaData } from '../../context/PeptaDataContext';
 import { useLogSheets } from '../../context/LogSheetsContext';
-import { buildHomeView, type RingStat } from './homeView';
+import { buildHomeView, type GoalView, type RingStat } from './homeView';
+import { buildActivity, buildTodaysLog, type ActivitySummary, type LogChip, type LogKind } from './homeExtras';
 import { buildGettingStarted, buildPlanSummary, type GettingStarted, type LogAction, type PlanSummary } from './planView';
 
 export function HomeScreen() {
   const theme = useTheme();
-  const { home, homeLoading, homeError, homeRefreshing, refreshHome, bumpProtein, bumpWater } = usePeptaData();
+  const { home, track, homeLoading, homeError, homeRefreshing, refreshHome, refreshTrack, bumpProtein, bumpWater, bumpFiber } = usePeptaData();
   const { openQuickLog, openMeal } = useLogSheets();
 
   const onTask = (action: LogAction | null) => {
@@ -32,7 +33,8 @@ export function HomeScreen() {
 
   useEffect(() => {
     if (!home) void refreshHome();
-  }, [home, refreshHome]);
+    if (!track) void refreshTrack();
+  }, [home, track, refreshHome, refreshTrack]);
 
   if (!home && homeError) {
     return (
@@ -61,9 +63,10 @@ export function HomeScreen() {
   }
 
   const view = buildHomeView(home);
-  const caloriesLeft = view.calories.target ? Math.max(0, view.calories.target - view.calories.current) : null;
   const plan = buildPlanSummary(home);
   const gettingStarted = buildGettingStarted(home);
+  const activity = buildActivity(track, home.profile, new Date());
+  const todaysLog = buildTodaysLog(track, home, new Date());
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.bg }}>
@@ -86,16 +89,29 @@ export function HomeScreen() {
               </AppText>
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
+              <Pressable
+                onPress={() => Haptics.selectionAsync().catch(() => undefined)}
+                style={[
+                  { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 7, paddingHorizontal: 11, borderRadius: theme.radii.pill, backgroundColor: theme.colors.surface, borderWidth: 0.5, borderColor: theme.colors.border },
+                  theme.shadows.card,
+                ]}
+              >
+                <Icon name="calendar" size={14} color={theme.colors.textSecondary} stroke={2.1} />
+                <AppText variant="caption" style={{ fontWeight: '700', fontSize: 13 }}>
+                  Today
+                </AppText>
+                <Icon name="chevron-down" size={13} color={theme.colors.textTertiary} stroke={2.2} />
+              </Pressable>
               {view.streakDays > 0 ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 7, paddingHorizontal: 11, borderRadius: theme.radii.pill, backgroundColor: '#FFF1E8' }}>
-                  <MaterialCommunityIcons name="fire" size={14} color={theme.colors.streak} />
+                  <Icon name="fire" size={14} color={theme.colors.streak} />
                   <AppText variant="caption" style={{ fontWeight: '700', color: theme.colors.streak }}>
                     {view.streakDays}
                   </AppText>
                 </View>
               ) : null}
               <View style={{ width: 34, height: 34, borderRadius: theme.radii.pill, backgroundColor: theme.colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
-                <Ionicons name="sparkles" size={18} color={theme.colors.primary} />
+                <Icon name="sparkles" size={18} color={theme.colors.primary} />
               </View>
             </View>
           </View>
@@ -120,10 +136,11 @@ export function HomeScreen() {
               <Card>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <MaterialCommunityIcons name="needle" size={18} color={theme.colors.primary} />
-                    <AppText variant="sectionHeader" color="primary">
-                      Medication level
+                    <Icon name="needle" size={18} color={theme.colors.primary} />
+                    <AppText variant="cardTitle" style={{ fontSize: 15 }}>
+                      Medication Level
                     </AppText>
+                    <Icon name="information-circle-outline" size={14} color={theme.colors.textTertiary} />
                   </View>
                   <View style={{ backgroundColor: theme.colors.surfaceAlt, paddingVertical: 5, paddingHorizontal: 11, borderRadius: theme.radii.pill }}>
                     <AppText variant="caption" color="textSecondary" style={{ fontWeight: '600' }}>
@@ -159,7 +176,7 @@ export function HomeScreen() {
                 </View>
                 {view.medication.countdown ? (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: theme.spacing.md, paddingTop: theme.spacing.sm, borderTopWidth: 0.5, borderTopColor: theme.colors.border }}>
-                    <Ionicons name="time-outline" size={14} color={theme.colors.textSecondary} />
+                    <Icon name="time-outline" size={14} color={theme.colors.textSecondary} />
                     <AppText variant="caption" color="textSecondary">
                       Next shot in {view.medication.countdown}
                     </AppText>
@@ -167,136 +184,78 @@ export function HomeScreen() {
                 ) : null}
               </Card>
             ) : (
-              <EmptyCard
-                icon={<MaterialCommunityIcons name="needle" size={22} color={theme.colors.primary} />}
-                line="Tap + to log your first shot — I’ll start tracking your levels."
-              />
+              <Card>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Icon name="needle" size={18} color={theme.colors.primary} />
+                    <AppText variant="cardTitle" style={{ fontSize: 15 }}>
+                      Medication Level
+                    </AppText>
+                    <Icon name="information-circle-outline" size={14} color={theme.colors.textTertiary} />
+                  </View>
+                  <View style={{ backgroundColor: theme.colors.surfaceAlt, paddingVertical: 5, paddingHorizontal: 11, borderRadius: theme.radii.pill }}>
+                    <AppText variant="caption" color="textTertiary" style={{ fontWeight: '600' }}>
+                      No doses yet
+                    </AppText>
+                  </View>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginTop: theme.spacing.md }}>
+                  <View>
+                    <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 5 }}>
+                      <AppText variant="statBig" color="textTertiary">
+                        —
+                      </AppText>
+                      <AppText variant="caption" color="textTertiary">
+                        mg
+                      </AppText>
+                    </View>
+                    <AppText variant="caption" color="textTertiary" style={{ marginTop: 6 }}>
+                      Current estimate
+                    </AppText>
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 6, height: 46 }}>
+                    {[20, 26, 22, 30, 26, 24, 32].map((h, i) => (
+                      <View key={i} style={{ width: 7, height: h, borderRadius: 4, backgroundColor: '#E7E1FF' }} />
+                    ))}
+                  </View>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: theme.spacing.md, paddingTop: theme.spacing.sm, borderTopWidth: 0.5, borderTopColor: theme.colors.border }}>
+                  <Icon name="time-outline" size={14} color={theme.colors.textSecondary} />
+                  <AppText variant="caption" color="textSecondary">
+                    Log your first shot to start tracking levels.
+                  </AppText>
+                </View>
+              </Card>
             )}
           </Reveal>
 
-          {/* calories */}
-          <Reveal delay={120} style={{ marginTop: 12 }}>
-            <Card style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.lg }}>
-              <ProgressRing size={96} pct={view.calories.pct} color={theme.colors.textPrimary}>
-                <View style={{ alignItems: 'center' }}>
-                  <CountUp value={view.calories.current} variant="statMedium" />
-                  <AppText variant="caption" color="textTertiary" style={{ fontSize: 11 }}>
-                    eaten
-                  </AppText>
-                </View>
-              </ProgressRing>
-              <View style={{ flex: 1 }}>
-                <AppText variant="cardTitle" style={{ fontSize: 16 }}>
-                  Calories
-                </AppText>
-                {caloriesLeft != null ? (
-                  <>
-                    <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 5, marginTop: 6 }}>
-                      <CountUp value={caloriesLeft} variant="statBig" />
-                      <AppText variant="caption" color="textSecondary">
-                        kcal left
-                      </AppText>
-                    </View>
-                    <AppText variant="caption" color="textTertiary" style={{ marginTop: 4 }}>
-                      of {view.calories.target?.toLocaleString()} target
-                    </AppText>
-                  </>
-                ) : (
-                  <AppText variant="caption" color="textSecondary" style={{ marginTop: 6 }}>
-                    {view.calories.current.toLocaleString()} kcal today
-                  </AppText>
-                )}
-              </View>
-            </Card>
-          </Reveal>
-
-          {/* protein + water */}
+          {/* macros + goal — column-stack grid (fiber/protein | water/goal) */}
           <Reveal delay={200} style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
-            <MacroRingCard
-              title="Protein"
-              icon={<MaterialCommunityIcons name="food-drumstick" size={17} color={theme.colors.protein} />}
-              stat={view.protein}
-              unit="g"
-              color={theme.colors.protein}
-              stepper={<Stepper label="5 g" color={theme.colors.protein} onMinus={() => bumpProtein(-5)} onPlus={() => bumpProtein(5)} />}
-            />
-            <MacroRingCard
-              title="Water"
-              icon={<Ionicons name="water" size={17} color={theme.colors.water} />}
-              stat={view.water}
-              unit="oz"
-              color={theme.colors.water}
-              stepper={<Stepper label="8 oz" color={theme.colors.water} onMinus={() => bumpWater(-8)} onPlus={() => bumpWater(8)} />}
-            />
+            <View style={{ flex: 1, gap: 12 }}>
+              <FiberCard stat={view.fiber} onMinus={() => bumpFiber(-1)} onPlus={() => bumpFiber(1)} />
+              <MacroRingCard
+                title="Protein"
+                icon={<Icon name="food-drumstick" size={18} color={theme.colors.protein} stroke={2.3} />}
+                stat={view.protein}
+                unit="g"
+                color={theme.colors.protein}
+                stepper={<Stepper label="5 g" color={theme.colors.protein} onMinus={() => bumpProtein(-5)} onPlus={() => bumpProtein(5)} />}
+              />
+            </View>
+            <View style={{ flex: 1, gap: 12 }}>
+              <WaterCard stat={view.water} onMinus={() => bumpWater(-8)} onPlus={() => bumpWater(8)} />
+              <GoalCard goal={view.goal} />
+            </View>
           </Reveal>
 
-          {/* fiber + streak */}
-          <Reveal delay={280} style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
-            <MacroRingCard
-              title="Fiber"
-              icon={<MaterialCommunityIcons name="grain" size={17} color={theme.colors.fiber} />}
-              stat={view.fiber}
-              unit="g"
-              color={theme.colors.fiber}
-            />
-            <Card style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-              <MaterialCommunityIcons name="fire" size={26} color={theme.colors.streak} />
-              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
-                <CountUp value={view.streakDays} variant="statBig" color="streak" />
-                <AppText variant="caption" color="textSecondary">
-                  days
-                </AppText>
-              </View>
-              <AppText variant="caption" color="textTertiary">
-                {view.streakDays > 0 ? 'Logging streak' : 'Start your streak'}
-              </AppText>
-            </Card>
+          {/* activity */}
+          <Reveal delay={280} style={{ marginTop: 12 }}>
+            <ActivityCard activity={activity} />
           </Reveal>
 
-          {/* setup progress */}
-          {view.setup ? (
-            <Reveal delay={340} style={{ marginTop: 12 }}>
-              <Card style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                <View style={{ width: 44, height: 44, borderRadius: theme.radii.pill, backgroundColor: '#EFEBFF', alignItems: 'center', justifyContent: 'center' }}>
-                  <Ionicons name="rocket" size={20} color={theme.colors.primary} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <AppText variant="bodyStrong" style={{ fontWeight: '700' }}>
-                    Finish setup
-                  </AppText>
-                  <AppText variant="caption" color="textSecondary" style={{ marginTop: 2 }}>
-                    {view.setup.loggedItems} of {view.setup.required} logged to unlock your full dashboard
-                  </AppText>
-                  <View style={{ height: 6, borderRadius: 3, backgroundColor: theme.colors.surfaceAlt, marginTop: 8, overflow: 'hidden' }}>
-                    <View style={{ width: `${Math.round(view.setup.pct * 100)}%`, height: 6, borderRadius: 3, backgroundColor: theme.colors.primary }} />
-                  </View>
-                </View>
-              </Card>
-            </Reveal>
-          ) : null}
-
-          {/* weight */}
-          <Reveal delay={400} style={{ marginTop: 12 }}>
-            <Card>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Ionicons name="scale" size={18} color={theme.colors.weight} />
-                <AppText variant="cardTitle" style={{ fontSize: 16 }}>
-                  Weight
-                </AppText>
-              </View>
-              {view.weight ? (
-                <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 5, marginTop: theme.spacing.md }}>
-                  <CountUp value={view.weight.value} variant="statBig" />
-                  <AppText variant="caption" color="textSecondary">
-                    {view.weight.unit}
-                  </AppText>
-                </View>
-              ) : (
-                <AppText variant="body" color="textSecondary" style={{ marginTop: theme.spacing.md }}>
-                  Log your weight to track progress.
-                </AppText>
-              )}
-            </Card>
+          {/* today's log */}
+          <Reveal delay={340} style={{ marginTop: 12 }}>
+            <TodaysLogCard chips={todaysLog} />
           </Reveal>
 
           {/* insight */}
@@ -339,7 +298,7 @@ function PlanCard({ plan }: { plan: PlanSummary }) {
   );
 }
 
-const TASK_ICON: Record<string, React.ComponentProps<typeof Ionicons>['name']> = {
+const TASK_ICON: Record<string, string> = {
   account: 'checkmark',
   shot: 'medical',
   meal: 'restaurant',
@@ -353,7 +312,7 @@ function GettingStartedCard({ data, onTask }: { data: GettingStarted; onTask: (a
     <Card>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
-          <Ionicons name="sparkles" size={16} color={theme.colors.primary} />
+          <Icon name="sparkles" size={16} color={theme.colors.primary} />
           <AppText variant="cardTitle" style={{ fontSize: 16 }}>
             Get started
           </AppText>
@@ -387,7 +346,7 @@ function GettingStartedCard({ data, onTask }: { data: GettingStarted; onTask: (a
             })}
           >
             <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: t.done ? '#E8F8EE' : theme.colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
-              <Ionicons name={t.done ? 'checkmark' : TASK_ICON[t.key] ?? 'ellipse-outline'} size={15} color={t.done ? theme.colors.success : theme.colors.primary} />
+              <Icon name={t.done ? 'checkmark' : TASK_ICON[t.key] ?? 'ellipse-outline'} size={15} color={t.done ? theme.colors.success : theme.colors.primary} />
             </View>
             <AppText
               variant="bodyStrong"
@@ -395,10 +354,186 @@ function GettingStartedCard({ data, onTask }: { data: GettingStarted; onTask: (a
             >
               {t.label}
             </AppText>
-            {tappable ? <Ionicons name="chevron-forward" size={16} color={theme.colors.textTertiary} /> : null}
+            {tappable ? <Icon name="chevron-forward" size={16} color={theme.colors.textTertiary} /> : null}
           </Pressable>
         );
       })}
+    </Card>
+  );
+}
+
+function FiberCard({ stat, onMinus, onPlus }: { stat: RingStat; onMinus: () => void; onPlus: () => void }) {
+  const theme = useTheme();
+  return (
+    <Card style={{ flex: 1 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+        <Icon name="leaf" size={18} color={theme.colors.fiber} stroke={2.3} />
+        <AppText variant="cardTitle" style={{ fontSize: 15 }}>
+          Fiber
+        </AppText>
+      </View>
+      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4, marginTop: 12 }}>
+        <CountUp value={stat.current} variant="statBig" />
+        <AppText variant="caption" color="textTertiary">
+          {stat.target ? `/ ${stat.target} g` : 'g'}
+        </AppText>
+      </View>
+      <View style={{ marginTop: 10 }}>
+        <ProgressBar pct={stat.pct} color={theme.colors.fiber} height={6} />
+      </View>
+      <View style={{ marginTop: 'auto', paddingTop: 14 }}>
+        <Stepper label="1 g" color={theme.colors.fiber} onMinus={onMinus} onPlus={onPlus} />
+      </View>
+    </Card>
+  );
+}
+
+function WaterCard({ stat, onMinus, onPlus }: { stat: RingStat; onMinus: () => void; onPlus: () => void }) {
+  const theme = useTheme();
+  return (
+    <Card style={{ flex: 1 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+        <Icon name="water" size={18} color={theme.colors.water} stroke={2.3} />
+        <AppText variant="cardTitle" style={{ fontSize: 15 }}>
+          Water
+        </AppText>
+      </View>
+      <View style={{ alignItems: 'center', marginVertical: 6 }}>
+        <WaterCup value={stat.current} target={stat.target} color={theme.colors.water} size={120} />
+        <AppText variant="caption" color="textTertiary" style={{ fontSize: 11, marginTop: 2 }}>
+          {stat.target ? `/ ${stat.target} oz` : ''}
+        </AppText>
+      </View>
+      <Stepper label="8 oz" color={theme.colors.water} onMinus={onMinus} onPlus={onPlus} />
+    </Card>
+  );
+}
+
+function GoalCard({ goal }: { goal: GoalView | null }) {
+  const theme = useTheme();
+  return (
+    <Card>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+        <Icon name="scale" size={18} color={theme.colors.weight} stroke={2.3} />
+        <AppText variant="cardTitle" style={{ fontSize: 15 }}>
+          Goal
+        </AppText>
+      </View>
+      {goal ? (
+        <>
+          <View style={{ marginTop: 12, alignSelf: 'flex-start', backgroundColor: '#FBEAF6', paddingVertical: 4, paddingHorizontal: 10, borderRadius: theme.radii.pill }}>
+            <AppText variant="caption" style={{ color: '#A8327D', fontWeight: '700' }}>
+              {Math.round(goal.pct * 100)}% of goal
+            </AppText>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4, marginTop: 12 }}>
+            <CountUp value={goal.value} variant="statBig" />
+            <AppText variant="caption" color="textSecondary">
+              {goal.unit}
+            </AppText>
+          </View>
+          <AppText variant="caption" color="textTertiary" style={{ marginTop: 6 }}>
+            {goal.dateLabel}
+          </AppText>
+        </>
+      ) : (
+        <AppText variant="caption" color="textSecondary" style={{ marginTop: 12 }}>
+          Log your weight to track progress.
+        </AppText>
+      )}
+    </Card>
+  );
+}
+
+function ActivityCard({ activity }: { activity: ActivitySummary }) {
+  const theme = useTheme();
+  const stepsPct = activity.stepTarget > 0 ? Math.min(1, activity.steps / activity.stepTarget) : 0;
+  const workoutPct = activity.workoutTarget > 0 ? Math.min(1, activity.workoutMin / activity.workoutTarget) : 0;
+  return (
+    <Card>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <Icon name="run" size={18} color={theme.colors.fiber} />
+        <AppText variant="cardTitle" style={{ fontSize: 16 }}>
+          Activity
+        </AppText>
+      </View>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 14 }}>
+        <AppText variant="caption" color="textSecondary">
+          Steps
+        </AppText>
+        <AppText variant="caption" style={{ fontWeight: '700' }}>
+          {activity.steps.toLocaleString()}{' '}
+          <AppText variant="caption" color="textTertiary">
+            / {activity.stepTarget.toLocaleString()}
+          </AppText>
+        </AppText>
+      </View>
+      <View style={{ marginTop: 8 }}>
+        <ProgressBar pct={stepsPct} color={theme.colors.fiber} height={6} />
+      </View>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 12 }}>
+        <AppText variant="caption" color="textSecondary">
+          Workout
+        </AppText>
+        <AppText variant="caption" style={{ fontWeight: '700' }}>
+          {activity.workoutMin}{' '}
+          <AppText variant="caption" color="textTertiary">
+            / {activity.workoutTarget} min
+          </AppText>
+        </AppText>
+      </View>
+      <View style={{ marginTop: 8 }}>
+        <ProgressBar pct={workoutPct} color={theme.colors.fiber} height={6} />
+      </View>
+    </Card>
+  );
+}
+
+const LOG_META: Record<LogKind, { icon: string; color: string }> = {
+  shot: { icon: 'needle', color: '#7C5CFC' },
+  meal: { icon: 'nutrition', color: '#FF8A3D' },
+  water: { icon: 'water', color: '#2FA8FF' },
+  protein: { icon: 'nutrition', color: '#FF8A3D' },
+  weight: { icon: 'scale', color: '#E25CC4' },
+  sideEffect: { icon: 'sad', color: '#FFB020' },
+  measurement: { icon: 'resize', color: '#E25CC4' },
+  activity: { icon: 'walk', color: '#34C759' },
+};
+
+function TodaysLogCard({ chips }: { chips: LogChip[] }) {
+  const theme = useTheme();
+  return (
+    <Card>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Icon name="list" size={18} color={theme.colors.textSecondary} />
+          <AppText variant="cardTitle" style={{ fontSize: 16 }}>
+            Today’s Log ({chips.length})
+          </AppText>
+        </View>
+        <AppText variant="caption" color="primary" style={{ fontWeight: '700' }}>
+          See all
+        </AppText>
+      </View>
+      {chips.length > 0 ? (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
+          {chips.slice(0, 12).map((c, i) => {
+            const meta = LOG_META[c.kind];
+            return (
+              <View key={`${c.kind}-${i}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: theme.colors.surfaceAlt, paddingVertical: 6, paddingHorizontal: 10, borderRadius: theme.radii.pill }}>
+                <Icon name={meta.icon} size={13} color={meta.color} />
+                <AppText variant="caption" style={{ fontWeight: '600' }}>
+                  {c.label}
+                </AppText>
+              </View>
+            );
+          })}
+        </View>
+      ) : (
+        <AppText variant="caption" color="textTertiary" style={{ marginTop: 12 }}>
+          Nothing logged yet — tap + to add your first entry today.
+        </AppText>
+      )}
     </Card>
   );
 }
@@ -419,7 +554,7 @@ function MacroRingCard({
   stepper?: React.ReactNode;
 }) {
   return (
-    <Card style={{ flex: 1 }}>
+    <Card>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
         {icon}
         <AppText variant="cardTitle" style={{ fontSize: 15 }}>
@@ -427,7 +562,7 @@ function MacroRingCard({
         </AppText>
       </View>
       <View style={{ alignItems: 'center', marginVertical: 10 }}>
-        <ProgressRing size={104} pct={stat.pct} color={color}>
+        <ProgressRing size={108} pct={stat.pct} color={color}>
           <View style={{ alignItems: 'center' }}>
             <CountUp value={stat.current} variant="statMedium" />
             <AppText variant="caption" color="textTertiary" style={{ fontSize: 11 }}>
@@ -452,21 +587,6 @@ function CenteredState({ children }: { children: React.ReactNode }) {
   );
 }
 
-function EmptyCard({ icon, line }: { icon: React.ReactNode; line: string }) {
-  const theme = useTheme();
-  return (
-    <Card style={{ alignItems: 'center', paddingVertical: theme.spacing['2xl'], gap: theme.spacing.md }}>
-      <Mascot pose="idle" size={80} />
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        {icon}
-        <AppText variant="bodyStrong" color="textSecondary" align="center" style={{ flexShrink: 1 }}>
-          {line}
-        </AppText>
-      </View>
-    </Card>
-  );
-}
-
 function Stepper({ label, color, onMinus, onPlus }: { label: string; color: string; onMinus(): void; onPlus(): void }) {
   const theme = useTheme();
   const btn = (name: 'remove' | 'add', onPress: () => void, tint: string) => (
@@ -476,15 +596,30 @@ function Stepper({ label, color, onMinus, onPlus }: { label: string; color: stri
         onPress();
       }}
       hitSlop={6}
-      style={{ width: 30, height: 30, borderRadius: theme.radii.pill, backgroundColor: theme.colors.surface, borderWidth: 0.5, borderColor: theme.colors.border, alignItems: 'center', justifyContent: 'center' }}
+      style={{
+        width: 30,
+        height: 30,
+        borderRadius: theme.radii.pill,
+        backgroundColor: theme.colors.surface,
+        borderWidth: 0.5,
+        borderColor: theme.colors.border,
+        alignItems: 'center',
+        justifyContent: 'center',
+        // raised "button" depth (lab .sbtn: 0 1px 2px rgba(17,17,26,.05))
+        shadowColor: '#11111A',
+        shadowOpacity: 0.06,
+        shadowRadius: 2,
+        shadowOffset: { width: 0, height: 1 },
+        elevation: 1,
+      }}
     >
-      <Ionicons name={name} size={16} color={tint} />
+      <Icon name={name} size={17} color={tint} stroke={2.1} />
     </Pressable>
   );
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: theme.colors.surfaceAlt, borderRadius: theme.radii.pill, padding: 4 }}>
-      {btn('remove', onMinus, theme.colors.textPrimary)}
-      <AppText variant="caption" style={{ fontWeight: '700' }}>
+      {btn('remove', onMinus, theme.colors.textSecondary)}
+      <AppText style={{ fontWeight: '700', fontSize: 13 }}>
         {label}
       </AppText>
       {btn('add', onPlus, color)}

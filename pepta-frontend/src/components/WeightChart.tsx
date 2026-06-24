@@ -152,6 +152,14 @@ export function WeightChart({
               {unit}
             </AppText>
           </AppText>
+          <AppText
+            variant="caption"
+            color="textTertiary"
+            align="center"
+            style={{ fontSize: 10, marginTop: 1 }}
+          >
+            {formatDate(latest.iso)}
+          </AppText>
         </Animated.View>
 
         <Svg

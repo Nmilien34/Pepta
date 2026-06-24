@@ -5,7 +5,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { Pressable } from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Icon } from "../../components/Icon";
 import { useTheme } from '../../theme';
 import {
   AppText,
@@ -80,7 +80,7 @@ export function StartWeightScreen({
         Starting weight
       </AppText>
       <PickerField
-        icon={<MaterialCommunityIcons name="scale-bathroom" size={18} color={theme.colors.textSecondary} />}
+        icon={<Icon name="scale-bathroom" size={18} color={theme.colors.textSecondary} />}
         value={`${startWeight} ${unitLabel}`}
         open={open === 'weight'}
         onPress={() => toggle('weight')}
@@ -95,7 +95,7 @@ export function StartWeightScreen({
         Start date
       </AppText>
       <PickerField
-        icon={<Ionicons name="calendar-outline" size={18} color={theme.colors.textSecondary} />}
+        icon={<Icon name="calendar-outline" size={18} color={theme.colors.textSecondary} />}
         value={formatLongDate(startDate)}
         open={open === 'date'}
         onPress={() => toggle('date')}
@@ -143,7 +143,7 @@ function PickerField({ icon, value, open, onPress }: PickerFieldProps) {
       <AppText variant="bodyStrong" style={{ flex: 1, fontWeight: '700' }}>
         {value}
       </AppText>
-      <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={18} color={theme.colors.textTertiary} />
+      <Icon name={open ? 'chevron-up' : 'chevron-down'} size={18} color={theme.colors.textTertiary} />
     </Pressable>
   );
 }

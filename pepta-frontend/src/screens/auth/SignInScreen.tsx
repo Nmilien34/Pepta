@@ -5,7 +5,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Platform, Pressable, StatusBar, StyleSheet, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from "../../components/Icon";
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as Haptics from 'expo-haptics';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
@@ -109,7 +109,7 @@ export function SignInScreen({ onBack }: SignInScreenProps) {
             accessibilityLabel="Back"
             style={{ width: 40, height: 40, justifyContent: 'center' }}
           >
-            <Ionicons name="chevron-back" size={26} color={theme.colors.textSecondary} />
+            <Icon name="chevron-back" size={26} color={theme.colors.textSecondary} />
           </Pressable>
         </View>
 
@@ -236,7 +236,7 @@ function ProviderButton({ variant, label, busy, disabled, onPress }: ProviderBut
           <ActivityIndicator color={fg} />
         ) : (
           <>
-            <Ionicons name={isApple ? 'logo-apple' : 'logo-google'} size={20} color={isApple ? '#FFFFFF' : '#4285F4'} />
+            <Icon name={isApple ? 'logo-apple' : 'logo-google'} size={20} color={isApple ? '#FFFFFF' : '#4285F4'} />
             <AppText variant="button" style={{ color: fg }}>
               {label}
             </AppText>

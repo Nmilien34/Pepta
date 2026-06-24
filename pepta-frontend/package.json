@@ -22,6 +22,7 @@
     "@react-navigation/bottom-tabs": "^7.18.2",
     "@react-navigation/native": "^7.3.3",
     "@react-navigation/native-stack": "^7.17.5",
+    "@tabler/icons-react-native": "^3.44.0",
     "expo": "^54.0.0",
     "expo-apple-authentication": "~8.0.8",
     "expo-audio": "~1.1.1",

@@ -12,6 +12,7 @@ import {
   DoseLogModel,
   MealLogModel,
   ProteinLogModel,
+  FiberLogModel,
   UserProfileModel,
   WaterLogModel,
   WeightLogModel,
@@ -38,9 +39,10 @@ async function getActiveCompounds(userId: string) {
 async function getTodayTotals(userId: string, now: Date) {
   const start = startOfUtcDay(now);
   const end = addUtcDays(start, 1);
-  const [meals, proteins, waterLogs] = await Promise.all([
+  const [meals, proteins, fibers, waterLogs] = await Promise.all([
     MealLogModel.find({ userId, datetime: { $gte: start, $lt: end } }),
     ProteinLogModel.find({ userId, datetime: { $gte: start, $lt: end } }),
+    FiberLogModel.find({ userId, datetime: { $gte: start, $lt: end } }),
     WaterLogModel.find({ userId, datetime: { $gte: start, $lt: end } }),
   ]);
 
@@ -48,10 +50,12 @@ async function getTodayTotals(userId: string, now: Date) {
     protein:
       meals.reduce((sum, meal) => sum + meal.protein, 0) +
       proteins.reduce((sum, protein) => sum + protein.grams, 0),
-    fiber: meals.reduce((sum, meal) => sum + (meal.fiber ?? 0), 0),
+    fiber:
+      meals.reduce((sum, meal) => sum + (meal.fiber ?? 0), 0) +
+      fibers.reduce((sum, fiber) => sum + fiber.grams, 0),
     calories: meals.reduce((sum, meal) => sum + meal.calories, 0),
     waterOz: waterLogs.reduce((sum, water) => sum + water.amountOz, 0),
-    hasLog: meals.length + proteins.length + waterLogs.length > 0,
+    hasLog: meals.length + proteins.length + fibers.length + waterLogs.length > 0,
   };
 }
 

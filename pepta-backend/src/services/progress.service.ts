@@ -27,7 +27,14 @@ function serializeWeeklyRetention(document: {
     score: document.score,
     verdict: document.verdict,
     verdictProse: document.verdictProse,
-    drivers: document.drivers,
+    // `drivers` are Mongoose subdocuments — pick only the schema fields so their
+    // internal keys (_doc, $__, …) don't trip the strict driver schema (→ 500).
+    drivers: (document.drivers as Array<{ type: unknown; label: unknown; score: unknown; contribution: unknown }>).map((driver) => ({
+      type: driver.type,
+      label: driver.label,
+      score: driver.score,
+      contribution: driver.contribution,
+    })),
     penaltyApplied: document.penaltyApplied,
     engineVersion: document.engineVersion,
     copyVersion: document.copyVersion,

@@ -14,6 +14,7 @@ import {
   doseLogInputSchema,
   measurementInputSchema,
   proteinLogInputSchema,
+  fiberLogInputSchema,
   sideEffectLogInputSchema,
   waterLogInputSchema,
   weightLogInputSchema,
@@ -23,6 +24,7 @@ import {
   doseLogService,
   measurementService,
   proteinLogService,
+  fiberLogService,
   sideEffectLogService,
   waterLogService,
   weightLogService,
@@ -154,6 +156,10 @@ export function createApp(options: CreateAppOptions = {}): Express {
   app.use(
     "/protein-logs",
     createLogRouter(proteinLogInputSchema, proteinLogService),
+  );
+  app.use(
+    "/fiber-logs",
+    createLogRouter(fiberLogInputSchema, fiberLogService),
   );
   app.use(
     "/activity-logs",

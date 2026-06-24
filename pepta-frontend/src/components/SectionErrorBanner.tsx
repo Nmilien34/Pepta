@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from "./Icon";
 import { useTheme } from '../theme';
 import { AppText } from './AppText';
 
@@ -33,7 +33,7 @@ export function SectionErrorBanner({ errors, style }: SectionErrorBannerProps) {
         style,
       ]}
     >
-      <Ionicons name="warning" size={18} color={theme.colors.warning} style={{ marginTop: 1 }} />
+      <Icon name="warning" size={18} color={theme.colors.warning} style={{ marginTop: 1 }} />
       <View style={{ flex: 1 }}>
         <AppText variant="bodyStrong" style={{ fontWeight: '700' }}>
           Some data couldn’t load

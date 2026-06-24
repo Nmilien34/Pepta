@@ -7,7 +7,7 @@
 
 import React from 'react';
 import { View } from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Icon } from "../../components/Icon";
 import { useTheme } from '../../theme';
 import { AppText, Button, OnboardingScaffold, SelectTile } from '../../components';
 
@@ -54,7 +54,7 @@ export function SexGenderScreen({ progress, onBack, value, onChange, onContinue 
               align="center"
               selected={value === option.value}
               onPress={() => onChange(option.value)}
-              icon={<MaterialCommunityIcons name={option.icon} size={24} color={option.color} />}
+              icon={<Icon name={option.icon} size={24} color={option.color} />}
             />
           </View>
         ))}
@@ -71,7 +71,7 @@ export function SexGenderScreen({ progress, onBack, value, onChange, onContinue 
           backgroundColor: theme.colors.surfaceAlt,
         }}
       >
-        <Ionicons name="information-circle-outline" size={18} color={theme.colors.textSecondary} />
+        <Icon name="information-circle-outline" size={18} color={theme.colors.textSecondary} />
         <AppText variant="caption" color="textSecondary" style={{ flex: 1 }}>
           Sex is only used to estimate your calorie needs.
         </AppText>

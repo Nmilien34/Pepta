@@ -4,6 +4,7 @@ import type {
   MealLogInput,
   MeasurementInput,
   ProteinLogInput,
+  FiberLogInput,
   SideEffectLogInput,
   WaterLogInput,
   WeightLogInput,
@@ -44,6 +45,9 @@ export interface WaterLogDocument
 
 export interface ProteinLogDocument
   extends Omit<ProteinLogInput, "datetime">, LogDocumentBase {}
+
+export interface FiberLogDocument
+  extends Omit<FiberLogInput, "datetime">, LogDocumentBase {}
 
 export interface ActivityLogDocument
   extends Omit<ActivityLogInput, "datetime">, LogDocumentBase {}
@@ -232,6 +236,25 @@ const proteinLogSchema = new Schema<ProteinLogDocument>(
   },
 );
 
+const fiberLogSchema = new Schema<FiberLogDocument>(
+  {
+    ...logBaseFields,
+    grams: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+    source: {
+      type: String,
+      trim: true,
+    },
+  },
+  {
+    timestamps: true,
+    versionKey: false,
+  },
+);
+
 const activityLogSchema = new Schema<ActivityLogDocument>(
   {
     ...logBaseFields,
@@ -338,6 +361,7 @@ const logSchemas = [
   { schema: mealLogSchema, hasIdempotencyKey: true },
   { schema: waterLogSchema, hasIdempotencyKey: true },
   { schema: proteinLogSchema, hasIdempotencyKey: true },
+  { schema: fiberLogSchema, hasIdempotencyKey: true },
   { schema: activityLogSchema, hasIdempotencyKey: true },
   { schema: sideEffectLogSchema, hasIdempotencyKey: true },
   { schema: measurementSchema, hasIdempotencyKey: true },
@@ -368,6 +392,10 @@ export const WaterLogModel = mongoose.model<WaterLogDocument>(
 export const ProteinLogModel = mongoose.model<ProteinLogDocument>(
   "ProteinLog",
   proteinLogSchema,
+);
+export const FiberLogModel = mongoose.model<FiberLogDocument>(
+  "FiberLog",
+  fiberLogSchema,
 );
 export const ActivityLogModel = mongoose.model<ActivityLogDocument>(
   "ActivityLog",

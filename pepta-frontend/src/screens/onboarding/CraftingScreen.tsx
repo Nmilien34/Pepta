@@ -4,7 +4,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from "../../components/Icon";
 import Svg, { Circle } from 'react-native-svg';
 import { useTheme } from '../../theme';
 import { AppText, Mascot, OnboardingScaffold } from '../../components';
@@ -98,7 +98,7 @@ export function CraftingScreen({ progress, steps, onDone }: CraftingScreenProps)
                 }}
               >
                 {isDone ? (
-                  <Ionicons name="checkmark" size={14} color={theme.colors.fiber} />
+                  <Icon name="checkmark" size={14} color={theme.colors.fiber} />
                 ) : isActive ? (
                   <ActivityIndicator size="small" color={theme.colors.textTertiary} />
                 ) : null}

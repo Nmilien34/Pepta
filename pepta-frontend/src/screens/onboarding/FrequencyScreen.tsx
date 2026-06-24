@@ -4,7 +4,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Icon } from "../../components/Icon";
 import { useTheme } from '../../theme';
 import { AppText, Button, Card, DateWheel, OnboardingScaffold, SelectTile } from '../../components';
 import { formatLongDate, recentYears, type DateParts } from '../../utils/dateParts';
@@ -69,7 +69,7 @@ export function FrequencyScreen({
                 selected={selected}
                 onPress={() => onFrequencyChange(option.value)}
                 icon={
-                  <MaterialCommunityIcons
+                  <Icon
                     name={option.icon}
                     size={21}
                     color={selected ? theme.colors.primary : theme.colors.textSecondary}
@@ -97,11 +97,11 @@ export function FrequencyScreen({
           backgroundColor: theme.colors.surfaceAlt,
         }}
       >
-        <Ionicons name="calendar-outline" size={18} color={theme.colors.textSecondary} />
+        <Icon name="calendar-outline" size={18} color={theme.colors.textSecondary} />
         <AppText variant="bodyStrong" style={{ flex: 1, fontWeight: '700' }}>
           {formatLongDate(lastShot)}
         </AppText>
-        <Ionicons name={pickerOpen ? 'chevron-up' : 'chevron-down'} size={18} color={theme.colors.textTertiary} />
+        <Icon name={pickerOpen ? 'chevron-up' : 'chevron-down'} size={18} color={theme.colors.textTertiary} />
       </Pressable>
 
       {pickerOpen ? (

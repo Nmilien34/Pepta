@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { Pressable, TextInput, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from "./Icon";
 import { useTheme } from '../theme';
 
 export interface SearchFieldProps {
@@ -27,7 +27,7 @@ export function SearchField({ value, onChangeText, placeholder = 'Search', autoF
         backgroundColor: theme.colors.surfaceAlt,
       }}
     >
-      <Ionicons name="search" size={18} color={theme.colors.textSecondary} />
+      <Icon name="search" size={18} color={theme.colors.textSecondary} />
       <TextInput
         value={value}
         onChangeText={onChangeText}
@@ -43,7 +43,7 @@ export function SearchField({ value, onChangeText, placeholder = 'Search', autoF
       />
       {value.length > 0 ? (
         <Pressable onPress={() => onChangeText('')} hitSlop={theme.sizes.hitSlop} accessibilityLabel="Clear search">
-          <Ionicons name="close-circle" size={18} color={theme.colors.textTertiary} />
+          <Icon name="close-circle" size={18} color={theme.colors.textTertiary} />
         </Pressable>
       ) : null}
     </View>

@@ -5,7 +5,7 @@
 
 import React, { useEffect } from 'react';
 import { Animated, Easing, Pressable, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from "../Icon";
 import { useTheme } from '../../theme';
 
 // Persists across screen mounts — intentionally module-level (single instance).
@@ -60,7 +60,7 @@ export function OnboardingHeader({ progress, onBack, showBack = true }: Onboardi
             justifyContent: 'center',
           }}
         >
-          <Ionicons name="chevron-back" size={22} color={theme.colors.textSecondary} />
+          <Icon name="chevron-back" size={22} color={theme.colors.textSecondary} />
         </Pressable>
       ) : (
         <View style={{ width: 38, height: 38 }} />

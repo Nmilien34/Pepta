@@ -2,19 +2,23 @@
 // and dose logs from /track (the injection map + dose history). Pull-to-refresh,
 // staggered entrance, mascot empty states. Renders whatever loaded (partial).
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, View } from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Icon } from "../../components/Icon";
 import * as Haptics from 'expo-haptics';
+import { useNavigation, type NavigationProp } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { useTheme } from '../../theme';
-import { AddCompoundSheet, AppText, BodyMap, Button, Card, Mascot, ProgressRing, Reveal, SectionErrorBanner } from '../../components';
+import { AddCompoundSheet, AppText, BodyMap, Button, Card, Mascot, ProgressRing, Reveal, ScreenHeader, SectionErrorBanner } from '../../components';
 import { usePeptaData } from '../../context/PeptaDataContext';
 import { formatCountdown } from './homeView';
 import {
+  compoundIconName,
+  compoundStatusLabel,
   formatDoseAmount,
   formatDoseRelative,
+  formatNextDoseAt,
   siteLabel,
   sideEffectSummary,
   sortDoses,
@@ -23,14 +27,19 @@ import {
   usedSites,
 } from './trackView';
 
+type TabsNav = NavigationProp<Record<'Home' | 'Track' | 'Progress' | 'Account', undefined>>;
+
 const RANGES = ['7d', '30d', '90d', '1y'];
 
 export function TrackScreen() {
   const theme = useTheme();
+  const navigation = useNavigation<TabsNav>();
   const data = usePeptaData();
   const { home, track, homeLoading, trackLoading, homeError, trackError, trackRefreshing, refreshHome, refreshTrack } =
     data;
   const [addOpen, setAddOpen] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
+  const doseHistoryY = useRef(0);
 
   useEffect(() => {
     if (!home) void refreshHome();
@@ -79,13 +88,12 @@ export function TrackScreen() {
     <View style={{ flex: 1, backgroundColor: theme.colors.bg }}>
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: 28 }}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={trackRefreshing} onRefresh={refreshAll} tintColor={theme.colors.primary} />}
         >
-          <AppText variant="screenTitle" style={{ paddingTop: 4 }}>
-            Track
-          </AppText>
+          <ScreenHeader title="Track" onAdjust={() => navigation.navigate('Account')} />
 
           <SectionErrorBanner errors={sectionErrors} style={{ marginTop: theme.spacing.md }} />
 
@@ -94,14 +102,16 @@ export function TrackScreen() {
             {ml ? (
               <Card style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <View>
-                  <AppText variant="sectionHeader" color="textTertiary">
+                  <AppText variant="sectionHeader" color="textTertiary" style={{ textTransform: 'uppercase' }}>
                     Next dose
                   </AppText>
                   <AppText variant="statBig" style={{ marginTop: 8 }}>
                     {formatCountdown(nextDoseHours) ?? '—'}
                   </AppText>
                   <AppText variant="caption" color="textSecondary" style={{ marginTop: 6 }}>
-                    {nextDoseName}
+                    {home?.nextDose?.nextDoseAt
+                      ? `${nextDoseName ? `${nextDoseName} · ` : ''}${formatNextDoseAt(home.nextDose.nextDoseAt)}`
+                      : nextDoseName || 'No dose scheduled'}
                   </AppText>
                 </View>
                 <ProgressRing size={74} pct={levelPct} color={theme.colors.primary}>
@@ -118,40 +128,53 @@ export function TrackScreen() {
           {/* compounds */}
           <Reveal delay={140} style={{ marginTop: 12 }}>
             <Card>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                <AppText variant="sectionHeader" color="textTertiary">
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <AppText variant="sectionHeader" color="textTertiary" style={{ textTransform: 'uppercase' }}>
                   Compounds
                 </AppText>
-                <Pressable onPress={() => { Haptics.selectionAsync().catch(() => undefined); setAddOpen(true); }} hitSlop={8}>
+                <Pressable onPress={() => { Haptics.selectionAsync().catch(() => undefined); setAddOpen(true); }} hitSlop={8} style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                  <Icon name="add" size={13} color={theme.colors.primary} />
                   <AppText variant="caption" color="primary" style={{ fontWeight: '700' }}>
-                    + Add
+                    Add
                   </AppText>
                 </Pressable>
               </View>
               {compounds.length > 0 ? (
-                compounds.map((c, i) => (
-                  <View
-                    key={c.id}
-                    style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: i < compounds.length - 1 ? 0.5 : 0, borderBottomColor: theme.colors.border }}
-                  >
-                    <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: '#EFEBFF', alignItems: 'center', justifyContent: 'center' }}>
-                      <MaterialCommunityIcons name="needle" size={18} color={theme.colors.primary} />
+                compounds.map((c, i) => {
+                  const peptide = c.drugClass === 'peptide';
+                  const chipBg = peptide ? '#E1F5EE' : '#EFEBFF';
+                  const chipFg = peptide ? '#0F6E56' : theme.colors.primary;
+                  const active = c.status === 'active';
+                  return (
+                    <View
+                      key={c.id}
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: i < compounds.length - 1 ? 0.5 : 0, borderBottomColor: theme.colors.border }}
+                    >
+                      <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: chipBg, alignItems: 'center', justifyContent: 'center' }}>
+                        <Icon name={compoundIconName(c)} size={18} color={chipFg} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <AppText variant="bodyStrong" style={{ fontWeight: '700' }}>
+                          {c.name}
+                        </AppText>
+                        <AppText variant="caption" color="textSecondary">
+                          {c.plannedDose ? `${c.plannedDose} ${c.doseUnit}` : c.doseUnit} · half-life {c.halfLifeDays}d
+                        </AppText>
+                      </View>
+                      {active ? (
+                        <View style={{ backgroundColor: '#E8F8EE', paddingVertical: 4, paddingHorizontal: 10, borderRadius: theme.radii.pill }}>
+                          <AppText variant="caption" style={{ color: '#1E8E40', fontWeight: '700' }}>
+                            Active
+                          </AppText>
+                        </View>
+                      ) : (
+                        <AppText variant="caption" color="textTertiary" style={{ fontWeight: '600' }}>
+                          {compoundStatusLabel(c.status)}
+                        </AppText>
+                      )}
                     </View>
-                    <View style={{ flex: 1 }}>
-                      <AppText variant="bodyStrong" style={{ fontWeight: '700' }}>
-                        {c.name}
-                      </AppText>
-                      <AppText variant="caption" color="textSecondary">
-                        {c.plannedDose ? `${c.plannedDose} ${c.doseUnit}` : c.doseUnit} · half-life {c.halfLifeDays}d
-                      </AppText>
-                    </View>
-                    <View style={{ backgroundColor: '#E8F8EE', paddingVertical: 4, paddingHorizontal: 10, borderRadius: theme.radii.pill }}>
-                      <AppText variant="caption" style={{ color: '#1E8E40', fontWeight: '700' }}>
-                        {c.status}
-                      </AppText>
-                    </View>
-                  </View>
-                ))
+                  );
+                })
               ) : (
                 <AppText variant="body" color="textSecondary" style={{ marginTop: theme.spacing.md }}>
                   Add a medication to start tracking levels.
@@ -163,11 +186,18 @@ export function TrackScreen() {
           {/* injection sites */}
           <Reveal delay={220} style={{ marginTop: 12 }}>
             <Card>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <MaterialCommunityIcons name="target" size={18} color={theme.colors.primary} />
-                <AppText variant="sectionHeader" color="textTertiary">
-                  Injection sites
-                </AppText>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Icon name="current-location" size={18} color={theme.colors.primary} />
+                  <AppText variant="cardTitle" style={{ fontSize: 15 }}>
+                    Injection sites
+                  </AppText>
+                </View>
+                <Pressable onPress={() => { Haptics.selectionAsync().catch(() => undefined); scrollRef.current?.scrollTo({ y: Math.max(0, doseHistoryY.current - 8), animated: true }); }} hitSlop={8}>
+                  <AppText variant="caption" color="primary" style={{ fontWeight: '700' }}>
+                    History
+                  </AppText>
+                </Pressable>
               </View>
               <View style={{ marginTop: theme.spacing.md }}>
                 <BodyMap used={used} next={next} />
@@ -184,8 +214,8 @@ export function TrackScreen() {
             <Reveal delay={300} style={{ marginTop: 12 }}>
               <Card>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Ionicons name="pulse" size={18} color={theme.colors.primary} />
-                  <AppText variant="sectionHeader" color="textTertiary">
+                  <Icon name="chart-line" size={18} color={theme.colors.primary} />
+                  <AppText variant="cardTitle" style={{ fontSize: 15 }}>
                     Medication level
                   </AppText>
                 </View>
@@ -199,19 +229,28 @@ export function TrackScreen() {
                   ))}
                 </View>
                 <LevelChart levels={ml.curve.map((p) => p.level)} color={theme.colors.primary} />
-                <AppText variant="caption" color="textSecondary" style={{ marginTop: 4 }}>
-                  Current {ml.currentEstimate} · peak {ml.peakEstimate} · trough {ml.troughEstimate}
-                </AppText>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
+                  <AppText variant="caption" color="textSecondary">
+                    Current {ml.currentEstimate}
+                  </AppText>
+                  <AppText variant="caption" color="textSecondary">
+                    Peak {ml.peakEstimate} · Trough {ml.troughEstimate}
+                  </AppText>
+                </View>
               </Card>
             </Reveal>
           ) : null}
 
           {/* dose history */}
+          <View onLayout={(e) => { doseHistoryY.current = e.nativeEvent.layout.y; }}>
           <Reveal delay={360} style={{ marginTop: 12 }}>
             <Card>
-              <AppText variant="sectionHeader" color="textTertiary">
-                Dose history
-              </AppText>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Icon name="history" size={18} color={theme.colors.textSecondary} />
+                <AppText variant="cardTitle" style={{ fontSize: 15 }}>
+                  Dose history
+                </AppText>
+              </View>
               {doses.length > 0 ? (
                 doses.slice(0, 8).map((d, i) => (
                   <View
@@ -227,7 +266,7 @@ export function TrackScreen() {
                         {d.injectionSite ? ` · ${siteLabel(d.injectionSite)}` : ''}
                       </AppText>
                     </View>
-                    <Ionicons name="chevron-forward" size={16} color={theme.colors.textTertiary} />
+                    <Icon name="chevron-forward" size={16} color={theme.colors.textTertiary} />
                   </View>
                 ))
               ) : (
@@ -237,13 +276,14 @@ export function TrackScreen() {
               )}
             </Card>
           </Reveal>
+          </View>
 
           {/* side effects */}
           <Reveal delay={420} style={{ marginTop: 12 }}>
             <Card>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <MaterialCommunityIcons name="alert-circle-outline" size={18} color={theme.colors.warning} />
-                <AppText variant="sectionHeader" color="textTertiary">
+                <Icon name="alert-circle-outline" size={18} color={theme.colors.warning} />
+                <AppText variant="cardTitle" style={{ fontSize: 15 }}>
                   Side effects
                 </AppText>
               </View>

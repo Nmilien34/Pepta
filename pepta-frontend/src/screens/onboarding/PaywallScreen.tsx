@@ -5,7 +5,7 @@
 
 import React, { useState } from 'react';
 import { Pressable, ScrollView, StatusBar, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from "../../components/Icon";
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../theme';
 import { AppText, Button, Mascot } from '../../components';
@@ -40,7 +40,7 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
       <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: theme.spacing.xl, paddingTop: theme.spacing.sm }}>
           <Pressable onPress={onComplete} hitSlop={theme.sizes.hitSlop} accessibilityRole="button" accessibilityLabel="Close">
-            <Ionicons name="close" size={24} color={theme.colors.textSecondary} />
+            <Icon name="close" size={24} color={theme.colors.textSecondary} />
           </Pressable>
           <Pressable hitSlop={theme.sizes.hitSlop} accessibilityRole="button">
             <AppText variant="caption" color="textSecondary">
@@ -67,7 +67,7 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: 9, marginTop: theme.spacing.lg }}>
             {FEATURES.map((f) => (
               <View key={f} style={{ flexBasis: '50%', flexDirection: 'row', alignItems: 'center', gap: 7 }}>
-                <Ionicons name="checkmark-circle" size={16} color={theme.colors.fiber} />
+                <Icon name="checkmark-circle" size={16} color={theme.colors.fiber} />
                 <AppText variant="caption" color="textPrimary" style={{ flex: 1 }}>
                   {f}
                 </AppText>
@@ -144,7 +144,7 @@ function PlanCard({ selected, onPress, title, sub, price, per, badge }: PlanCard
         </View>
       ) : null}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-        <Ionicons
+        <Icon
           name={selected ? 'checkmark-circle' : 'ellipse-outline'}
           size={20}
           color={selected ? theme.colors.primary : theme.colors.textTertiary}

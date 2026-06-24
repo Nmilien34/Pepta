@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from "../../components/Icon";
 import { useTheme } from '../../theme';
 import { AppText, Button, Card, OnboardingScaffold } from '../../components';
 
@@ -27,7 +27,7 @@ function Stars({ size = 13 }: { size?: number }) {
   return (
     <View style={{ flexDirection: 'row', gap: 3 }}>
       {[0, 1, 2, 3, 4].map((i) => (
-        <Ionicons key={i} name="star" size={size} color="#F5A623" />
+        <Icon key={i} name="star" size={size} color="#F5A623" />
       ))}
     </View>
   );

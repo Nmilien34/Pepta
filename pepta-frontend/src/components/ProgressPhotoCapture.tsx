@@ -5,7 +5,7 @@
 
 import React, { useState } from 'react';
 import { ActivityIndicator, Image, Modal, Pressable, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from "./Icon";
 import { CameraView, useCameraPermissions, type CameraType } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -66,7 +66,7 @@ export function ProgressPhotoCapture({ visible, onClose, onSaved, recentPhotos }
         {/* permission gate */}
         {!permission?.granted ? (
           <SafeAreaView style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28, gap: 16 }}>
-            <Ionicons name="camera-outline" size={40} color="#fff" />
+            <Icon name="camera-outline" size={40} color="#fff" />
             <AppText variant="cardTitle" align="center" style={{ color: '#fff' }}>
               Camera access
             </AppText>
@@ -91,7 +91,7 @@ export function ProgressPhotoCapture({ visible, onClose, onSaved, recentPhotos }
               {/* top bar */}
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 8 }}>
                 <Pressable onPress={onClose} hitSlop={10}>
-                  <Ionicons name="close" size={26} color="#fff" />
+                  <Icon name="close" size={26} color="#fff" />
                 </Pressable>
                 <View style={{ backgroundColor: 'rgba(0,0,0,0.4)', paddingVertical: 5, paddingHorizontal: 12, borderRadius: 999 }}>
                   <AppText variant="caption" style={{ color: '#fff', fontWeight: '700' }}>
@@ -99,7 +99,7 @@ export function ProgressPhotoCapture({ visible, onClose, onSaved, recentPhotos }
                   </AppText>
                 </View>
                 <Pressable onPress={() => setFacing((f) => (f === 'back' ? 'front' : 'back'))} hitSlop={10}>
-                  <Ionicons name="camera-reverse-outline" size={24} color="#fff" />
+                  <Icon name="camera-reverse-outline" size={24} color="#fff" />
                 </Pressable>
               </View>
 
@@ -143,7 +143,7 @@ export function ProgressPhotoCapture({ visible, onClose, onSaved, recentPhotos }
               <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: theme.colors.surface, borderTopLeftRadius: 28, borderTopRightRadius: 28 }}>
                 <SafeAreaView edges={['bottom']}>
                   <View style={{ padding: 20, alignItems: 'center', gap: 12 }}>
-                    <Ionicons name="cloud-offline-outline" size={30} color={theme.colors.warning} />
+                    <Icon name="cloud-offline-outline" size={30} color={theme.colors.warning} />
                     <AppText variant="cardTitle" align="center">
                       Couldn’t save the photo
                     </AppText>
@@ -177,7 +177,7 @@ function SavedCard({ theme, recentPhotos, onDone }: { theme: ReturnType<typeof u
         <View style={{ padding: 20, alignItems: 'center' }}>
           <View style={{ width: 38, height: 5, borderRadius: 999, backgroundColor: theme.colors.border, marginBottom: 14 }} />
           <View style={{ width: 54, height: 54, borderRadius: 27, backgroundColor: '#E8F8EE', alignItems: 'center', justifyContent: 'center' }}>
-            <Ionicons name="checkmark" size={28} color="#1E8E40" />
+            <Icon name="checkmark" size={28} color="#1E8E40" />
           </View>
           <AppText variant="cardTitle" style={{ fontSize: 17, marginTop: 10 }}>
             Added to your gallery

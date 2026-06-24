@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { View } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Icon } from "../../components/Icon";
 import type { ActivityLevel } from '@pepta/shared';
 import { useTheme } from '../../theme';
 import { AppText, Button, OnboardingScaffold, OptionCard } from '../../components';
@@ -49,7 +49,7 @@ export function DailyRoutineScreen({ progress, onBack, value, onChange, onContin
             key={option.value}
             title={option.title}
             subtitle={option.subtitle}
-            icon={<MaterialCommunityIcons name={option.icon} size={22} color={option.color} />}
+            icon={<Icon name={option.icon} size={22} color={option.color} />}
             selected={value === option.value}
             onPress={() => onChange(option.value)}
           />

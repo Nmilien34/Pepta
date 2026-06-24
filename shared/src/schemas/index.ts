@@ -378,6 +378,23 @@ export const proteinLogResponseSchema = proteinLogInputSchema.extend({
   updatedAt: isoDateTimeSchema,
 });
 
+export const fiberLogInputSchema = z
+  .object({
+    grams: z.number().positive(),
+    source: z.string().trim().min(1).optional(),
+    datetime: isoDateTimeSchema,
+    idempotencyKey: z.string().trim().min(1).optional(),
+  })
+  .strict();
+
+export const fiberLogResponseSchema = fiberLogInputSchema.extend({
+  id: idSchema,
+  userId: idSchema,
+  deletedAt: isoDateTimeSchema.nullable(),
+  createdAt: isoDateTimeSchema,
+  updatedAt: isoDateTimeSchema,
+});
+
 export const activityLogInputSchema = z
   .object({
     steps: z.number().int().nonnegative().optional(),

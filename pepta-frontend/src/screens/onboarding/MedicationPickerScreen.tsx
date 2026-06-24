@@ -5,7 +5,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { View } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Icon } from "../../components/Icon";
 import { useTheme } from '../../theme';
 import { AppText, Button, OnboardingScaffold, OptionCard, SearchField } from '../../components';
 import { MEDICATION_CATALOG, searchMedications, type MedicationOption } from '../../data/medicationCatalog';
@@ -71,5 +71,5 @@ function MedIcon({ item }: { item: MedicationOption }) {
   }
   const name: 'pill' | 'flask-outline' | 'dots-horizontal' =
     item.kind === 'oral' ? 'pill' : item.kind === 'compound' ? 'flask-outline' : 'dots-horizontal';
-  return <MaterialCommunityIcons name={name} size={22} color={item.tintColor} />;
+  return <Icon name={name} size={22} color={item.tintColor} />;
 }

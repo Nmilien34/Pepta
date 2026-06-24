@@ -15,3 +15,17 @@ declare module '*.wav' {
 
 // Injected by the React Native bundler (true in development).
 declare const __DEV__: boolean;
+
+// Tabler icons (matching the design lab) are deep-imported per icon to avoid
+// bundling all 5,800: `import IconHome2 from '@tabler/icons-react-native/IconHome2'`.
+declare module '@tabler/icons-react-native/*' {
+  import type { ComponentType } from 'react';
+  import type { SvgProps } from 'react-native-svg';
+  export interface TablerIconProps extends SvgProps {
+    size?: number | string;
+    color?: string;
+    stroke?: number | string;
+  }
+  const Icon: ComponentType<TablerIconProps>;
+  export default Icon;
+}

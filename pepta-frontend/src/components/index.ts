@@ -1,6 +1,8 @@
 // Pepta component kit barrel. Import primitives from one place:
 //   import { Screen, Card, Button, AppText } from '../components';
 
+export { Icon, type IconProps } from './Icon';
+export { ScreenHeader, type ScreenHeaderProps } from './ScreenHeader';
 export { AppText, type AppTextProps } from './AppText';
 export { Screen, type ScreenProps } from './Screen';
 export { Card, InsetCard, type CardProps } from './Card';
@@ -27,6 +29,7 @@ export { BodyMap, type BodyMapProps } from './BodyMap';
 export { SectionErrorBanner, type SectionErrorBannerProps } from './SectionErrorBanner';
 export { ProgressBar, type ProgressBarProps } from './ProgressBar';
 export { WeightChart, type WeightChartPoint, type WeightChartProps } from './WeightChart';
+export { WaterCup, type WaterCupProps } from './WaterCup';
 export { BottomSheet, type BottomSheetProps } from './BottomSheet';
 export { QuickLogSheet, type QuickLogSheetProps } from './QuickLogSheet';
 export { MealLogSheet, type MealLogSheetProps } from './MealLogSheet';

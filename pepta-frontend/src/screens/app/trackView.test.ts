@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { DoseLogResponse } from '@pepta/shared';
 import {
+  compoundIconName,
+  compoundStatusLabel,
   formatDoseAmount,
   formatDoseRelative,
+  formatNextDoseAt,
   siteLabel,
   sideEffectSummary,
   sideEffectTypeLabel,
@@ -108,5 +111,23 @@ describe('side effects', () => {
       se({ id: 'c', datetime: '2026-06-15T00:00:00.000Z', deletedAt: '2026-06-16T00:00:00.000Z' }),
     ];
     expect(sortSideEffects(logs).map((l) => l.id)).toEqual(['b', 'a']);
+  });
+
+  it('formats the next-dose datetime in 12h time', () => {
+    expect(formatNextDoseAt('2026-06-27T20:00:00')).toBe('Sat, Jun 27 · 8:00 PM');
+    expect(formatNextDoseAt('2026-06-27T00:05:00')).toBe('Sat, Jun 27 · 12:05 AM');
+    expect(formatNextDoseAt('not-a-date')).toBe('—');
+  });
+
+  it('picks compound icon by route then drug class', () => {
+    expect(compoundIconName({ route: 'oral', drugClass: 'glp_1' })).toBe('pill');
+    expect(compoundIconName({ route: 'injection', drugClass: 'peptide' })).toBe('flask');
+    expect(compoundIconName({ route: 'injection', drugClass: 'glp_1' })).toBe('needle');
+  });
+
+  it('capitalizes the compound status label', () => {
+    expect(compoundStatusLabel('active')).toBe('Active');
+    expect(compoundStatusLabel('paused')).toBe('Paused');
+    expect(compoundStatusLabel('completed')).toBe('Completed');
   });
 });

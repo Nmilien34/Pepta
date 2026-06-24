@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { Pressable, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from "../../components/Icon";
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../../theme';
 import { AppText, Button, OnboardingScaffold } from '../../components';
@@ -45,7 +45,7 @@ export function NotificationsScreen({ progress, onBack, onContinue }: Notificati
           end={{ x: 1, y: 1 }}
           style={{ width: 96, height: 96, borderRadius: 26, alignItems: 'center', justifyContent: 'center' }}
         >
-          <Ionicons name="notifications" size={44} color="#FFFFFF" />
+          <Icon name="notifications" size={44} color="#FFFFFF" />
         </LinearGradient>
         <View style={{ alignItems: 'center', gap: theme.spacing.md }}>
           <AppText variant="obTitle" align="center">

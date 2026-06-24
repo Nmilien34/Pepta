@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from "../../components/Icon";
 import { useTheme } from '../../theme';
 import { AppText, Button, Mascot, OnboardingScaffold } from '../../components';
 
@@ -53,7 +53,7 @@ export function MomentumScreen({ progress, onBack, toGo, lost, unit, onContinue 
             borderRadius: theme.radii.pill,
           }}
         >
-          <Ionicons name="checkmark" size={14} color="#1E8E40" />
+          <Icon name="checkmark" size={14} color="#1E8E40" />
           <AppText variant="caption" style={{ color: '#1E8E40', fontWeight: '700' }}>
             Works with any GLP-1
           </AppText>

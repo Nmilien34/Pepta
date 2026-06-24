@@ -5,9 +5,10 @@
 // exist (so they don't pretend to do something).
 
 import React, { useEffect } from 'react';
-import { Alert, Linking, Pressable, ScrollView, View, type ColorValue } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Alert, Linking, Pressable, ScrollView, View } from 'react-native';
+import { Icon } from "../../components/Icon";
 import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../theme';
 import { AppText, Card, Mascot, Reveal } from '../../components';
@@ -17,7 +18,7 @@ import { PRIVACY_URL, TERMS_URL } from '../../config';
 import { displayName, doseUnitLabel, entitlementView, profileSubtitle, unitsLabel } from './accountView';
 
 interface Row {
-  icon: React.ComponentProps<typeof Ionicons>['name'];
+  icon: string;
   iconBg: string;
   iconColor: string;
   label: string;
@@ -53,23 +54,23 @@ export function AccountScreen() {
 
   const preferences: Row[] = [
     { icon: 'resize', iconBg: '#F1EFE8', iconColor: '#5F5E5A', label: 'Units', value: unitsLabel(profile), chevron: true },
-    { icon: 'medkit', iconBg: '#EFEBFF', iconColor: theme.colors.primary, label: 'Dose units', value: doseUnitLabel(profile), chevron: true },
+    { icon: 'needle', iconBg: '#EFEBFF', iconColor: theme.colors.primary, label: 'Dose units', value: doseUnitLabel(profile), chevron: true },
     { icon: 'notifications', iconBg: '#FFF1E7', iconColor: '#C75B16', label: 'Notifications', chevron: true },
     { icon: 'heart', iconBg: '#FCEBEB', iconColor: '#D14343', label: 'Apple Health', badge: { text: 'Not connected', color: theme.colors.textSecondary, bg: theme.colors.surfaceAlt }, chevron: true },
     { icon: 'language', iconBg: '#E7F4FF', iconColor: '#1E7FCC', label: 'Language', value: 'English', chevron: true },
   ];
   const dataReports: Row[] = [
-    { icon: 'download-outline', iconBg: '#E8F8EE', iconColor: '#1E8E40', label: 'Export report', chevron: true },
-    { icon: 'apps', iconBg: '#EFEBFF', iconColor: theme.colors.primary, label: 'Add widgets', chevron: true },
+    { icon: 'file-export', iconBg: '#E8F8EE', iconColor: '#1E8E40', label: 'Export report', chevron: true },
+    { icon: 'layout-grid-add', iconBg: '#EFEBFF', iconColor: theme.colors.primary, label: 'Add widgets', chevron: true },
   ];
   const support: Row[] = [
     { icon: 'bulb', iconBg: '#FBEAF6', iconColor: '#A8327D', label: 'Feature requests', chevron: true },
-    { icon: 'flag', iconBg: '#FFF6E5', iconColor: '#B5790B', label: 'Report a problem', chevron: true },
+    { icon: 'flag-2', iconBg: '#FFF6E5', iconColor: '#B5790B', label: 'Report a problem', chevron: true },
     { icon: 'help-circle', iconBg: '#F1EFE8', iconColor: '#5F5E5A', label: 'Help', chevron: true },
   ];
   const about: Row[] = [
-    { icon: 'document-text', iconBg: '#F1EFE8', iconColor: '#5F5E5A', label: 'Terms', onPress: openUrl(TERMS_URL), chevron: true },
-    { icon: 'lock-closed', iconBg: '#F1EFE8', iconColor: '#5F5E5A', label: 'Privacy', onPress: openUrl(PRIVACY_URL), chevron: true },
+    { icon: 'document-text-outline', iconBg: '#F1EFE8', iconColor: '#5F5E5A', label: 'Terms', onPress: openUrl(TERMS_URL), chevron: true },
+    { icon: 'lock-closed-outline', iconBg: '#F1EFE8', iconColor: '#5F5E5A', label: 'Privacy', onPress: openUrl(PRIVACY_URL), chevron: true },
   ];
 
   return (
@@ -94,18 +95,31 @@ export function AccountScreen() {
                   {profileSubtitle(profile, user, home, new Date())}
                 </AppText>
               </View>
-              <Ionicons name="chevron-forward" size={18} color={theme.colors.textTertiary} />
+              <Icon name="chevron-forward" size={18} color={theme.colors.textTertiary} />
             </Card>
           </Reveal>
 
           {/* subscription */}
           <Reveal delay={120} style={{ marginTop: 12 }}>
             <Pressable onPress={() => Haptics.selectionAsync().catch(() => undefined)}>
-              <Card style={ent.premium ? { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#F6F1FF', borderWidth: 0.5, borderColor: '#E7DEFB' } : { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <LinearGradient
+                colors={['#F3EFFF', '#FBF4FF'] as const}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={[
+                  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: theme.sizes.card.borderRadius, padding: 16, borderWidth: 0.5, borderColor: '#E7DEFB' },
+                  theme.shadows.card,
+                ]}
+              >
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 11, flex: 1 }}>
-                  <View style={{ width: 38, height: 38, borderRadius: 11, backgroundColor: theme.colors.primary, alignItems: 'center', justifyContent: 'center' }}>
-                    <Ionicons name="sparkles" size={19} color="#fff" />
-                  </View>
+                  <LinearGradient
+                    colors={[theme.colors.primaryGradientStart, theme.colors.primaryGradientEnd] as const}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={{ width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' }}
+                  >
+                    <Icon name="sparkles" size={18} color="#fff" />
+                  </LinearGradient>
                   <View style={{ flex: 1 }}>
                     <AppText variant="bodyStrong" style={{ fontWeight: '800' }}>
                       {ent.title}
@@ -118,7 +132,7 @@ export function AccountScreen() {
                 <AppText variant="caption" color="primary" style={{ fontWeight: '800' }}>
                   {ent.cta}
                 </AppText>
-              </Card>
+              </LinearGradient>
             </Pressable>
           </Reveal>
 
@@ -150,7 +164,7 @@ export function AccountScreen() {
 function Section({ title, rows, delay }: { title: string; rows: Row[]; delay: number }) {
   return (
     <Reveal delay={delay} style={{ marginTop: 20 }}>
-      <AppText variant="sectionHeader" color="textTertiary" style={{ paddingLeft: 6, marginBottom: 8 }}>
+      <AppText variant="sectionHeader" color="textTertiary" style={{ paddingLeft: 6, marginBottom: 8, textTransform: 'uppercase' }}>
         {title}
       </AppText>
       <Card style={{ paddingVertical: 2, paddingHorizontal: 14 }}>
@@ -184,7 +198,7 @@ function SettingRow({ row, last }: { row: Row; last: boolean }) {
       })}
     >
       <View style={{ width: 30, height: 30, borderRadius: 9, backgroundColor: row.iconBg, alignItems: 'center', justifyContent: 'center' }}>
-        <Ionicons name={row.icon} size={16} color={row.iconColor as ColorValue} />
+        <Icon name={row.icon} size={16} color={row.iconColor as string} />
       </View>
       <AppText variant="bodyStrong" style={{ flex: 1, fontWeight: '600' }}>
         {row.label}
@@ -201,7 +215,7 @@ function SettingRow({ row, last }: { row: Row; last: boolean }) {
           </AppText>
         </View>
       ) : null}
-      {row.chevron ? <Ionicons name="chevron-forward" size={16} color={theme.colors.textTertiary} style={{ marginLeft: 4 }} /> : null}
+      {row.chevron ? <Icon name="chevron-forward" size={16} color={theme.colors.textTertiary} style={{ marginLeft: 4 }} /> : null}
     </Pressable>
   );
 }

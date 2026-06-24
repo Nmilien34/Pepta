@@ -6,7 +6,7 @@
 
 import React, { useEffect, useRef, type ReactNode } from 'react';
 import { Animated, Easing, Pressable, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from "../Icon";
 import { useTheme } from '../../theme';
 import { AppText } from '../AppText';
 
@@ -103,7 +103,7 @@ export function OptionCard({ title, subtitle, icon, selected, onPress, multi = f
             }}
           >
             <Animated.View style={{ opacity: sel }}>
-              <Ionicons name="checkmark" size={14} color={theme.colors.onPrimary} />
+              <Icon name="checkmark" size={14} color={theme.colors.onPrimary} />
             </Animated.View>
           </Animated.View>
         </Animated.View>

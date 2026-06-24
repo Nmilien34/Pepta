@@ -5,7 +5,7 @@
 
 import React, { useMemo } from 'react';
 import { View } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Icon } from "../../components/Icon";
 import { useTheme } from '../../theme';
 import { AppText, Button, OnboardingScaffold, Slider } from '../../components';
 import { formatShortDate } from '../../utils/dateParts';
@@ -77,7 +77,7 @@ export function GoalPaceScreen({
               borderRadius: theme.radii.pill,
             }}
           >
-            <MaterialCommunityIcons name="flag-outline" size={14} color="#5B45C9" />
+            <Icon name="flag-outline" size={14} color="#5B45C9" />
             <AppText variant="caption" style={{ color: '#5B45C9', fontWeight: '700' }}>
               {chipLabel}
             </AppText>
@@ -86,7 +86,7 @@ export function GoalPaceScreen({
 
         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
           {ICONS.map((icon, i) => (
-            <MaterialCommunityIcons
+            <Icon
               key={icon}
               name={icon}
               size={24}

@@ -79,6 +79,16 @@ function document(value: Record<string, unknown>) {
   };
 }
 
+function mongooseLikeSubdocument(value: Record<string, unknown>) {
+  return {
+    ...value,
+    _doc: value,
+    $__: {},
+    parentArray: () => [],
+    toObject: () => value,
+  };
+}
+
 describe("meal scan service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -275,5 +285,39 @@ describe("meal scan service", () => {
       coachContent: null,
       note: "Saved scan note",
     });
+  });
+
+  it("serializes saved scan detail subdocuments before schema validation", async () => {
+    const coachContent = {
+      mode: "affirmation",
+      callout: "Strong protein choice.",
+      swap: null,
+      copyVersion: "meal-scan-coach-v1",
+    };
+    mocks.mealLogFindOne.mockResolvedValue({
+      _id: "meal-1",
+      userId: "user-1",
+      photoS3Key: "pepta/meal-scans/user-1/scan.png",
+    });
+    mocks.mealScanFindOne.mockResolvedValue({
+      _id: "scan-1",
+      analysis: mongooseLikeSubdocument(analysis),
+      coachContent: mongooseLikeSubdocument(coachContent),
+      note: "Saved scan note",
+      toObject: () => ({
+        id: "scan-1",
+        analysis: mongooseLikeSubdocument(analysis),
+        coachContent: mongooseLikeSubdocument(coachContent),
+        note: "Saved scan note",
+      }),
+    });
+
+    const result = await getMealLogScanDetail(
+      "user-1",
+      "507f1f77bcf86cd799439011",
+    );
+
+    expect(result.analysis).toEqual(analysis);
+    expect(result.coachContent).toEqual(coachContent);
   });
 });

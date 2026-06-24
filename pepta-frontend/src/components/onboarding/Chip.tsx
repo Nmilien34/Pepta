@@ -4,7 +4,7 @@
 
 import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, Pressable } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from "../Icon";
 import { useTheme } from '../../theme';
 import { AppText } from '../AppText';
 
@@ -70,7 +70,7 @@ export function Chip({ label, selected, onPress, multi = false }: ChipProps) {
           <AppText variant="bodyStrong" style={{ fontWeight: '600' }}>
             {label}
           </AppText>
-          {selected ? <Ionicons name="checkmark" size={14} color={theme.colors.textPrimary} /> : null}
+          {selected ? <Icon name="checkmark" size={14} color={theme.colors.textPrimary} /> : null}
         </Animated.View>
       </Pressable>
     </Animated.View>

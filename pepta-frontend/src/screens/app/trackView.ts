@@ -2,7 +2,7 @@
 // helpers, adapted to Pepta's DoseLogResponse fields: `datetime`, `amount`,
 // `unit`, `deletedAt`). No RN imports → testable.
 
-import type { DoseLogResponse, SideEffectLogResponse } from '@pepta/shared';
+import type { CompoundResponse, DoseLogResponse, SideEffectLogResponse } from '@pepta/shared';
 import { MONTHS_SHORT } from '../../utils/dateParts';
 
 export type InjectionSite = NonNullable<DoseLogResponse['injectionSite']>;
@@ -88,6 +88,32 @@ export function formatDoseRelative(iso: string, now: Date): string {
 
 export function formatDoseAmount(dose: Pick<DoseLogResponse, 'amount' | 'unit'>): string {
   return `${dose.amount} ${dose.unit}`;
+}
+
+// "Fri, Jun 27 · 8:00 PM" — the next-dose sub-line on the Track screen.
+export function formatNextDoseAt(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  let h = d.getHours();
+  const min = d.getMinutes().toString().padStart(2, '0');
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  const day = `${WEEKDAYS_SHORT[d.getDay()] ?? ''}, ${MONTHS_SHORT[d.getMonth()] ?? ''} ${d.getDate()}`;
+  return `${day} · ${h}:${min} ${ampm}`;
+}
+
+// Compound visuals (mirrors the lab: GLP-1 → vaccine/purple, peptide → flask/teal,
+// oral → pill). Pure so it's unit-testable.
+export function compoundIconName(c: Pick<CompoundResponse, 'route' | 'drugClass'>): string {
+  if (c.route === 'oral') return 'pill';
+  if (c.drugClass === 'peptide') return 'flask';
+  return 'needle';
+}
+
+export type CompoundStatus = CompoundResponse['status'];
+
+export function compoundStatusLabel(status: CompoundStatus): string {
+  return status.charAt(0).toUpperCase() + status.slice(1);
 }
 
 // Side effects (medication-related, so they live on Track). Drop deleted, newest first.

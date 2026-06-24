@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { View } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Icon } from "../../components/Icon";
 import type { BiggestWorry } from '@pepta/shared';
 import { useTheme } from '../../theme';
 import { AppText, Button, OnboardingScaffold, SelectTile } from '../../components';
@@ -50,7 +50,7 @@ export function BiggestWorryScreen({ progress, onBack, value, onChange, onContin
               label={option.label}
               selected={value === option.value}
               onPress={() => onChange(option.value)}
-              icon={<MaterialCommunityIcons name={option.icon} size={21} color={theme.colors.textSecondary} />}
+              icon={<Icon name={option.icon} size={21} color={theme.colors.textSecondary} />}
             />
           </View>
         ))}

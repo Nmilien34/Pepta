@@ -290,14 +290,37 @@ async function resolveTrackerNote(input: {
   return fallbackNote(input.analysis, input.snapshot);
 }
 
+function toPlainValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(toPlainValue);
+  }
+
+  if (value && typeof value === "object") {
+    const maybeDocument = value as { toObject?: unknown };
+    if (typeof maybeDocument.toObject === "function") {
+      return toPlainValue(maybeDocument.toObject());
+    }
+
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, entry]) => [
+        key,
+        toPlainValue(entry),
+      ]),
+    );
+  }
+
+  return value;
+}
+
+function toPlainRecord(value: unknown): Record<string, unknown> {
+  const plain = toPlainValue(value);
+  return plain && typeof plain === "object"
+    ? (plain as Record<string, unknown>)
+    : {};
+}
+
 function serializeScan(scan: MealScanDocument | Record<string, unknown>) {
-  const value =
-    typeof scan === "object" &&
-    scan !== null &&
-    "toObject" in scan &&
-    typeof scan.toObject === "function"
-      ? (scan.toObject() as Record<string, unknown>)
-      : (scan as Record<string, unknown>);
+  const value = toPlainRecord(scan);
 
   const analysis = value.analysis as MealScanAnalysis | null | undefined;
   if (!analysis) {
@@ -469,11 +492,14 @@ export async function getMealLogScanDetail(userId: string, mealLogId: string) {
     createPresignedGetUrl({ key: log.photoS3Key }),
     MealScanModel.findOne({ userId, photoS3Key: log.photoS3Key }),
   ]);
+  const scanValue = scan ? toPlainRecord(scan) : null;
 
   return mealLogScanDetailResponseSchema.parse({
     photoViewUrl,
-    analysis: scan?.analysis ?? null,
-    coachContent: scan?.coachContent ?? null,
-    note: scan?.note ?? null,
+    analysis: (scanValue?.analysis as MealScanAnalysis | null | undefined) ?? null,
+    coachContent:
+      (scanValue?.coachContent as MealScanCoachContent | null | undefined) ??
+      null,
+    note: (scanValue?.note as string | null | undefined) ?? null,
   });
 }

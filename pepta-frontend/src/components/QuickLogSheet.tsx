@@ -5,7 +5,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Modal, Pressable, ScrollView, TextInput, View } from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Icon } from "./Icon";
 import * as Haptics from 'expo-haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../theme';
@@ -205,7 +205,7 @@ export function QuickLogSheet({ visible, onClose, onMeal, initialMode }: QuickLo
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 4 }}>
               {mode !== 'chooser' ? (
                 <Pressable onPress={back} hitSlop={8} style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: theme.colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
-                  <Ionicons name="chevron-back" size={18} color={theme.colors.textPrimary} />
+                  <Icon name="chevron-back" size={18} color={theme.colors.textPrimary} />
                 </Pressable>
               ) : null}
               <View style={{ flex: 1 }}>
@@ -297,7 +297,7 @@ export function QuickLogSheet({ visible, onClose, onMeal, initialMode }: QuickLo
             {/* footer CTA */}
             {mode === 'chooser' && isDoseValid(quickShot) ? (
               <View style={{ marginTop: 14 }}>
-                <Button label="Log a shot · 1 tap" leading={<MaterialCommunityIcons name="needle" size={17} color={theme.colors.onPrimary} />} onPress={logQuickShot} />
+                <Button label="Log a shot · 1 tap" leading={<Icon name="needle" size={17} color={theme.colors.onPrimary} />} onPress={logQuickShot} />
               </View>
             ) : null}
             {mode !== 'chooser' ? (
@@ -321,7 +321,7 @@ const HEADINGS: Record<Mode, { title: string; sub: string }> = {
   protein: { title: 'Log protein', sub: 'Add to today’s total.' },
   water: { title: 'Log water', sub: 'Add to today’s total.' },
   sideEffect: { title: 'How are you feeling?', sub: 'What you’re feeling, and how strong.' },
-  measurement: { title: 'Measurement', sub: 'Track inches alongside the scale.' },
+  measurement: { title: 'Log measurement', sub: 'Track inches alongside the scale.' },
   activity: { title: 'Log activity', sub: 'Steps, a workout, or resistance training.' },
 };
 
@@ -332,7 +332,7 @@ const CTA: Record<Mode, string> = {
   protein: 'Add protein',
   water: 'Add water',
   sideEffect: 'Save',
-  measurement: 'Save',
+  measurement: 'Save measurement',
   activity: 'Save activity',
 };
 
@@ -356,14 +356,14 @@ function canSave(
 
 function Chooser({ theme, dose, latestWeight, onPick, onMeal }: { theme: Theme; dose: DoseDraft | null; latestWeight: { value: number; unit: string } | null; onPick: (m: Mode) => void; onMeal: () => void }) {
   const cards: { key: string; icon: React.ReactNode; label: string; hint: string; action: () => void }[] = [
-    { key: 'dose', icon: <MaterialCommunityIcons name="needle" size={22} color={theme.colors.primary} />, label: 'Log a shot', hint: dose ? `${dose.compoundName} · ${dose.amount} ${dose.unit}` : 'Add a medication', action: () => onPick('dose') },
-    { key: 'meal', icon: <MaterialCommunityIcons name="silverware-fork-knife" size={22} color={theme.colors.protein} />, label: 'Log meal', hint: 'Scan · describe · manual', action: onMeal },
-    { key: 'weight', icon: <Ionicons name="scale" size={22} color={theme.colors.weight} />, label: 'Log weight', hint: latestWeight ? `${latestWeight.value} ${latestWeight.unit} ±` : 'Today’s weigh-in', action: () => onPick('weight') },
-    { key: 'water', icon: <Ionicons name="water" size={22} color={theme.colors.water} />, label: 'Water', hint: '+8 oz', action: () => onPick('water') },
-    { key: 'protein', icon: <MaterialCommunityIcons name="food-drumstick" size={22} color={theme.colors.protein} />, label: 'Protein', hint: 'Add grams', action: () => onPick('protein') },
-    { key: 'activity', icon: <MaterialCommunityIcons name="dumbbell" size={22} color={theme.colors.fiber} />, label: 'Activity', hint: 'Steps · workout', action: () => onPick('activity') },
-    { key: 'sideEffect', icon: <Ionicons name="sad-outline" size={22} color={theme.colors.warning} />, label: 'Side effects', hint: 'How you feel', action: () => onPick('sideEffect') },
-    { key: 'measurement', icon: <Ionicons name="resize" size={22} color={theme.colors.weight} />, label: 'Measurement', hint: 'Waist, hips…', action: () => onPick('measurement') },
+    { key: 'dose', icon: <Icon name="needle" size={22} color={theme.colors.primary} />, label: 'Log a shot', hint: dose ? `${dose.compoundName} · ${dose.amount} ${dose.unit}` : 'Add a medication', action: () => onPick('dose') },
+    { key: 'weight', icon: <Icon name="scale" size={22} color={theme.colors.weight} />, label: 'Log weight', hint: latestWeight ? `${latestWeight.value} ${latestWeight.unit} ±` : 'Today’s weigh-in', action: () => onPick('weight') },
+    { key: 'meal', icon: <Icon name="nutrition" size={22} color={theme.colors.protein} />, label: 'Log meal', hint: 'Scan · Search · Voice', action: onMeal },
+    { key: 'water', icon: <Icon name="water" size={22} color={theme.colors.water} />, label: 'Water', hint: '+8 oz', action: () => onPick('water') },
+    { key: 'activity', icon: <Icon name="dumbbell" size={22} color={theme.colors.fiber} />, label: 'Activity', hint: 'Steps · workout', action: () => onPick('activity') },
+    { key: 'sideEffect', icon: <Icon name="sad-outline" size={22} color={theme.colors.warning} />, label: 'Side effects', hint: 'How you feel', action: () => onPick('sideEffect') },
+    { key: 'protein', icon: <Icon name="food-drumstick" size={22} color={theme.colors.protein} />, label: 'Protein', hint: 'Add grams', action: () => onPick('protein') },
+    { key: 'measurement', icon: <Icon name="resize" size={22} color={theme.colors.weight} />, label: 'Measurement', hint: 'Waist, hips…', action: () => onPick('measurement') },
   ];
   return (
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginTop: 12 }}>
@@ -426,7 +426,7 @@ function DoseForm({
   if (!dose) {
     return (
       <View style={{ paddingVertical: 28, alignItems: 'center', gap: 8 }}>
-        <MaterialCommunityIcons name="needle" size={28} color={theme.colors.textTertiary} />
+        <Icon name="needle" size={28} color={theme.colors.textTertiary} />
         <AppText variant="body" color="textSecondary" align="center">
           Add a medication on the Track tab first, then you can log shots here.
         </AppText>
@@ -489,7 +489,7 @@ function DoseForm({
 
       {/* time */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 14, marginBottom: 8 }}>
-        <Ionicons name="time-outline" size={15} color={theme.colors.textSecondary} />
+        <Icon name="time-outline" size={15} color={theme.colors.textSecondary} />
         <AppText variant="caption" color="textSecondary">
           Today · {clockLabel(shotTime)}
         </AppText>
@@ -619,7 +619,7 @@ function MeasurementForm({ theme, type, onType, value, onStep, unit, onUnit, not
 function NoteField({ theme, value, onChange }: { theme: Theme; value: string; onChange: (v: string) => void }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 16, backgroundColor: theme.colors.surfaceAlt, borderRadius: 12, paddingHorizontal: 14, height: 50 }}>
-      <Ionicons name="create-outline" size={16} color={theme.colors.textSecondary} />
+      <Icon name="create-outline" size={16} color={theme.colors.textSecondary} />
       <TextInput
         value={value}
         onChangeText={onChange}
@@ -651,8 +651,8 @@ function ActivityForm({ theme, activity, setActivity }: { theme: Theme; activity
   );
   return (
     <View style={{ marginTop: 16, gap: 11 }}>
-      {row('Steps', <Ionicons name="walk" size={18} color={theme.colors.fiber} />, activity.steps, (v) => setActivity({ ...activity, steps: v }), '8000')}
-      {row('Workout min', <Ionicons name="time-outline" size={18} color={theme.colors.water} />, activity.workoutMinutes, (v) => setActivity({ ...activity, workoutMinutes: v }), '30')}
+      {row('Steps', <Icon name="walk" size={18} color={theme.colors.fiber} />, activity.steps, (v) => setActivity({ ...activity, steps: v }), '8000')}
+      {row('Workout min', <Icon name="time-outline" size={18} color={theme.colors.water} />, activity.workoutMinutes, (v) => setActivity({ ...activity, workoutMinutes: v }), '30')}
       <Pressable
         onPress={() => {
           Haptics.selectionAsync().catch(() => undefined);
@@ -661,7 +661,7 @@ function ActivityForm({ theme, activity, setActivity }: { theme: Theme; activity
         style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: theme.colors.surfaceAlt, borderRadius: 14, paddingHorizontal: 14, height: 56 }}
       >
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <MaterialCommunityIcons name="weight-lifter" size={18} color={theme.colors.primary} />
+          <Icon name="weight-lifter" size={18} color={theme.colors.primary} />
           <AppText variant="bodyStrong" style={{ fontWeight: '600' }}>
             Resistance training
           </AppText>
@@ -677,7 +677,7 @@ function ActivityForm({ theme, activity, setActivity }: { theme: Theme; activity
 function RoundBtn({ theme, icon, onPress }: { theme: Theme; icon: 'add' | 'remove'; onPress: () => void }) {
   return (
     <Pressable onPress={onPress} hitSlop={8} style={{ width: 46, height: 46, borderRadius: 23, backgroundColor: theme.colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
-      <Ionicons name={icon} size={22} color={theme.colors.textPrimary} />
+      <Icon name={icon} size={22} color={theme.colors.textPrimary} />
     </Pressable>
   );
 }

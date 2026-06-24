@@ -6,7 +6,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Pressable, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from "./Icon";
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../theme';
 import { AppText } from './AppText';
@@ -110,7 +110,7 @@ export function PepCompanion() {
           ]}
         >
           <Pressable onPress={() => setOpen(false)} hitSlop={8} style={{ position: 'absolute', top: 6, right: 6, zIndex: 1 }}>
-            <Ionicons name="close" size={14} color={theme.colors.textTertiary} />
+            <Icon name="close" size={14} color={theme.colors.textTertiary} />
           </Pressable>
           <AppText variant="bodyStrong" style={{ fontWeight: '700', paddingRight: 12, lineHeight: 20 }}>
             {note.emoji ? `${note.emoji}  ` : ''}
@@ -121,7 +121,7 @@ export function PepCompanion() {
               <AppText variant="caption" color="primary" style={{ fontWeight: '700' }}>
                 {note.cta}
               </AppText>
-              <Ionicons name="arrow-forward" size={13} color={theme.colors.primary} />
+              <Icon name="arrow-forward" size={13} color={theme.colors.primary} />
             </Pressable>
           ) : null}
           {notes.length > 1 ? (

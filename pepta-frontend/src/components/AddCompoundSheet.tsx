@@ -4,7 +4,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Icon } from "./Icon";
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../theme';
 import { AppText } from './AppText';
@@ -71,7 +71,7 @@ export function AddCompoundSheet({ visible, onClose }: AddCompoundSheetProps) {
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 4 }}>
         {selected ? (
           <Pressable onPress={() => setSelected(null)} hitSlop={8} style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: theme.colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
-            <Ionicons name="chevron-back" size={18} color={theme.colors.textPrimary} />
+            <Icon name="chevron-back" size={18} color={theme.colors.textPrimary} />
           </Pressable>
         ) : null}
         <View style={{ flex: 1 }}>
@@ -94,7 +94,7 @@ export function AddCompoundSheet({ visible, onClose }: AddCompoundSheetProps) {
               style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11, opacity: pressed ? 0.6 : 1 })}
             >
               <View style={{ width: 38, height: 38, borderRadius: 11, backgroundColor: '#EFEBFF', alignItems: 'center', justifyContent: 'center' }}>
-                <MaterialCommunityIcons name={m.route === 'oral' ? 'pill' : 'needle'} size={18} color={theme.colors.primary} />
+                <Icon name={m.route === 'oral' ? 'pill' : 'needle'} size={18} color={theme.colors.primary} />
               </View>
               <View style={{ flex: 1 }}>
                 <AppText variant="bodyStrong" style={{ fontWeight: '700' }}>
@@ -104,7 +104,7 @@ export function AddCompoundSheet({ visible, onClose }: AddCompoundSheetProps) {
                   {m.subtitle}
                 </AppText>
               </View>
-              <Ionicons name="chevron-forward" size={18} color={theme.colors.textTertiary} />
+              <Icon name="chevron-forward" size={18} color={theme.colors.textTertiary} />
             </Pressable>
           ))}
         </View>
@@ -112,7 +112,7 @@ export function AddCompoundSheet({ visible, onClose }: AddCompoundSheetProps) {
         <View style={{ marginTop: 14, gap: 14 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
             <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: '#EFEBFF', alignItems: 'center', justifyContent: 'center' }}>
-              <MaterialCommunityIcons name={selected.route === 'oral' ? 'pill' : 'needle'} size={20} color={theme.colors.primary} />
+              <Icon name={selected.route === 'oral' ? 'pill' : 'needle'} size={20} color={theme.colors.primary} />
             </View>
             <View style={{ flex: 1 }}>
               <AppText variant="bodyStrong" style={{ fontWeight: '800' }}>
