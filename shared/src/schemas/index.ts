@@ -273,6 +273,7 @@ export const compoundInputSchema = z
 export const compoundResponseSchema = compoundInputSchema.extend({
   id: idSchema,
   userId: idSchema,
+  deletedAt: isoDateTimeSchema.nullable(),
   createdAt: isoDateTimeSchema,
   updatedAt: isoDateTimeSchema,
 });

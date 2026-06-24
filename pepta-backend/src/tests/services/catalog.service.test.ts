@@ -48,6 +48,7 @@ describe("catalog edit services", () => {
         startDate: "2026-06-21",
         status: "active",
         notes: "Updated",
+        deletedAt: null,
         createdAt: "2026-06-21T00:00:00.000Z",
         updatedAt: "2026-06-21T00:00:00.000Z",
       }),

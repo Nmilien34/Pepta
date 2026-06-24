@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  compoundResponseSchema,
   insightSchema,
   mealLogScanDetailResponseSchema,
   mealScanResponseSchema,
@@ -136,6 +137,27 @@ describe("shared profile schemas", () => {
       doseUnit: "mg",
       defaultDose: 3,
       active: true,
+      createdAt: "2026-06-21T00:00:00.000Z",
+      updatedAt: "2026-06-21T00:00:00.000Z",
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("allows compound responses to include soft-delete metadata", () => {
+    const result = compoundResponseSchema.safeParse({
+      id: "compound-1",
+      userId: "user-1",
+      medicationCatalogId: "catalog-1",
+      name: "Mounjaro",
+      drugClass: "glp_1",
+      route: "injection",
+      halfLifeDays: 5,
+      doseUnit: "mg",
+      plannedDose: 2.5,
+      startDate: "2026-06-21",
+      status: "active",
+      deletedAt: null,
       createdAt: "2026-06-21T00:00:00.000Z",
       updatedAt: "2026-06-21T00:00:00.000Z",
     });
