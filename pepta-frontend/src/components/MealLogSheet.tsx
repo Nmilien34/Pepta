@@ -80,6 +80,7 @@ export function MealLogSheet({ visible, onClose }: MealLogSheetProps) {
   const [results, setResults] = useState<FoodSearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [searchFailed, setSearchFailed] = useState(false);
+  const [cameraRequested, setCameraRequested] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
 
   // Debounced food search (only while the search view is open).
@@ -123,6 +124,7 @@ export function MealLogSheet({ visible, onClose }: MealLogSheetProps) {
       setQuery("");
       setResults([]);
       setSearchFailed(false);
+      setCameraRequested(false);
       setCameraOpen(false);
     }
   }, [visible]);
@@ -281,7 +283,15 @@ export function MealLogSheet({ visible, onClose }: MealLogSheetProps) {
 
   return (
     <>
-      <BottomSheet visible={visible} onClose={onClose}>
+      <BottomSheet
+        visible={visible && !cameraRequested && !cameraOpen}
+        onClose={onClose}
+        onDismissed={() => {
+          if (cameraRequested) setCameraOpen(true);
+        }}
+        height={view === "chooser" ? "84%" : undefined}
+        scrollable
+      >
         {/* header */}
         <View
           style={{
@@ -322,63 +332,26 @@ export function MealLogSheet({ visible, onClose }: MealLogSheetProps) {
         </View>
 
         {view === "chooser" ? (
-          <View style={{ marginTop: 12, gap: 11 }}>
-            <Tile
-              theme={theme}
-              icon={
-                <Icon name="camera" size={22} color={theme.colors.protein} />
-              }
-              title="Scan a photo"
-              hint="Snap your plate — Pepta reads the macros"
-              onPress={() => {
-                Haptics.selectionAsync().catch(() => undefined);
-                setCameraOpen(true);
-              }}
-            />
-            <Tile
-              theme={theme}
-              icon={<Icon name="images" size={22} color={theme.colors.water} />}
-              title="Upload from library"
-              hint="Pick an existing photo"
-              onPress={() => void pickFromLibrary()}
-            />
-            <Tile
-              theme={theme}
-              icon={<Icon name="mic" size={22} color={theme.colors.primary} />}
-              title="Say what you ate"
-              hint="Speak it or type — “chicken & rice”"
-              onPress={() => {
-                Haptics.selectionAsync().catch(() => undefined);
-                setView("voice");
-              }}
-            />
-            <Tile
-              theme={theme}
-              icon={<Icon name="search" size={22} color={theme.colors.fiber} />}
-              title="Search foods"
-              hint="Find a food and its macros"
-              onPress={() => {
-                Haptics.selectionAsync().catch(() => undefined);
-                setView("search");
-              }}
-            />
-            <Tile
-              theme={theme}
-              icon={
-                <Icon
-                  name="pencil-outline"
-                  size={22}
-                  color={theme.colors.textSecondary}
-                />
-              }
-              title="Enter manually"
-              hint="Type the food + macros"
-              onPress={() => {
-                Haptics.selectionAsync().catch(() => undefined);
-                setView("manual");
-              }}
-            />
-          </View>
+          <MealChooser
+            theme={theme}
+            onScan={() => {
+              Haptics.selectionAsync().catch(() => undefined);
+              setCameraRequested(true);
+            }}
+            onLibrary={() => void pickFromLibrary()}
+            onVoice={() => {
+              Haptics.selectionAsync().catch(() => undefined);
+              setView("voice");
+            }}
+            onSearch={() => {
+              Haptics.selectionAsync().catch(() => undefined);
+              setView("search");
+            }}
+            onManual={() => {
+              Haptics.selectionAsync().catch(() => undefined);
+              setView("manual");
+            }}
+          />
         ) : null}
 
         {view === "analyzing" ? (
@@ -459,22 +432,30 @@ export function MealLogSheet({ visible, onClose }: MealLogSheetProps) {
           </View>
         ) : null}
       </BottomSheet>
-      <MealCamera
-        visible={cameraOpen}
-        onClose={() => setCameraOpen(false)}
-        onCapture={(uri) => {
-          setCameraOpen(false);
-          void analyzeUri(uri);
-        }}
-        onSearch={() => {
-          setCameraOpen(false);
-          setView("search");
-        }}
-        onVoice={() => {
-          setCameraOpen(false);
-          setView("voice");
-        }}
-      />
+      {cameraOpen ? (
+        <MealCamera
+          visible={cameraOpen}
+          onClose={() => {
+            setCameraOpen(false);
+            setCameraRequested(false);
+          }}
+          onCapture={(uri) => {
+            setCameraOpen(false);
+            setCameraRequested(false);
+            void analyzeUri(uri);
+          }}
+          onSearch={() => {
+            setCameraOpen(false);
+            setCameraRequested(false);
+            setView("search");
+          }}
+          onVoice={() => {
+            setCameraOpen(false);
+            setCameraRequested(false);
+            setView("voice");
+          }}
+        />
+      ) : null}
     </>
   );
 }
@@ -500,6 +481,144 @@ const HEADINGS: Record<View_, { title: string; sub: string }> = {
   error: { title: "Hmm", sub: "That didn’t work." },
 };
 
+function MealChooser({
+  theme,
+  onScan,
+  onLibrary,
+  onVoice,
+  onSearch,
+  onManual,
+}: {
+  theme: Theme;
+  onScan: () => void;
+  onLibrary: () => void;
+  onVoice: () => void;
+  onSearch: () => void;
+  onManual: () => void;
+}) {
+  return (
+    <View style={{ marginTop: 14, gap: 10 }}>
+      <Pressable
+        onPress={onScan}
+        style={({ pressed }) => ({
+          minHeight: 108,
+          borderRadius: 24,
+          padding: 16,
+          backgroundColor: "#FFF7EE",
+          borderWidth: 1,
+          borderColor: "rgba(255,138,61,0.16)",
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 14,
+          opacity: pressed ? 0.72 : 1,
+        })}
+      >
+        <View
+          style={{
+            width: 54,
+            height: 54,
+            borderRadius: 20,
+            backgroundColor: theme.colors.surface,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Icon name="camera" size={27} color={theme.colors.protein} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <AppText variant="cardTitle" style={{ fontSize: 20 }}>
+            Scan a photo
+          </AppText>
+          <AppText variant="body" color="textSecondary" style={{ marginTop: 4, lineHeight: 21 }}>
+            Snap your plate and Pepta reads the macros.
+          </AppText>
+        </View>
+        <Icon name="chevron-forward" size={19} color={theme.colors.textTertiary} />
+      </Pressable>
+
+      <View style={{ flexDirection: "row", gap: 10 }}>
+        <CompactMealAction theme={theme} icon="images" color={theme.colors.water} title="Library" hint="Pick photo" onPress={onLibrary} />
+        <CompactMealAction theme={theme} icon="mic" color={theme.colors.primary} title="Voice" hint="Say it" onPress={onVoice} />
+      </View>
+      <View style={{ flexDirection: "row", gap: 10 }}>
+        <CompactMealAction theme={theme} icon="search" color={theme.colors.fiber} title="Search" hint="Find food" onPress={onSearch} />
+        <CompactMealAction theme={theme} icon="pencil-outline" color={theme.colors.textSecondary} title="Manual" hint="Type macros" onPress={onManual} />
+      </View>
+
+      <View style={{ paddingTop: 4, paddingBottom: 4 }}>
+        <View
+          style={{
+            borderRadius: 18,
+            backgroundColor: theme.colors.surfaceAlt,
+            paddingVertical: 10,
+            paddingHorizontal: 12,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 8,
+          }}
+        >
+          <Icon name="sparkles" size={16} color={theme.colors.primary} />
+          <AppText variant="caption" color="textSecondary" style={{ flex: 1, lineHeight: 16 }}>
+            Every meal you log updates protein, calories, fiber, and your Home totals.
+          </AppText>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function CompactMealAction({
+  theme,
+  icon,
+  color,
+  title,
+  hint,
+  onPress,
+}: {
+  theme: Theme;
+  icon: string;
+  color: string;
+  title: string;
+  hint: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => ({
+        flex: 1,
+        minHeight: 94,
+        borderRadius: 22,
+        backgroundColor: theme.colors.surface,
+        borderWidth: 0.5,
+        borderColor: theme.colors.border,
+        padding: 13,
+        opacity: pressed ? 0.7 : 1,
+        ...theme.shadows.card,
+      })}
+    >
+      <View
+        style={{
+          width: 38,
+          height: 38,
+          borderRadius: 15,
+          backgroundColor: theme.colors.surfaceAlt,
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Icon name={icon} size={22} color={color} />
+      </View>
+      <AppText variant="bodyStrong" style={{ fontWeight: "800", marginTop: 11 }} numberOfLines={1}>
+        {title}
+      </AppText>
+      <AppText variant="caption" color="textSecondary" style={{ marginTop: 2 }} numberOfLines={1}>
+        {hint}
+      </AppText>
+    </Pressable>
+  );
+}
+
 function Tile({
   theme,
   icon,
@@ -520,8 +639,9 @@ function Tile({
         flexDirection: "row",
         alignItems: "center",
         gap: 13,
-        padding: 14,
-        borderRadius: theme.radii.card,
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+        borderRadius: 18,
         backgroundColor: theme.colors.surface,
         borderWidth: 0.5,
         borderColor: theme.colors.border,
@@ -531,9 +651,9 @@ function Tile({
     >
       <View
         style={{
-          width: 40,
-          height: 40,
-          borderRadius: 12,
+          width: 36,
+          height: 36,
+          borderRadius: 13,
           backgroundColor: theme.colors.surfaceAlt,
           alignItems: "center",
           justifyContent: "center",
@@ -542,20 +662,20 @@ function Tile({
         {icon}
       </View>
       <View style={{ flex: 1 }}>
-        <AppText variant="bodyStrong" style={{ fontWeight: "700" }}>
+        <AppText variant="bodyStrong" style={{ fontWeight: "800", fontSize: 15 }}>
           {title}
         </AppText>
         <AppText
           variant="caption"
           color="textSecondary"
-          style={{ marginTop: 2 }}
+          style={{ marginTop: 1, lineHeight: 17 }}
         >
           {hint}
         </AppText>
       </View>
       <Icon
         name="chevron-forward"
-        size={18}
+        size={17}
         color={theme.colors.textTertiary}
       />
     </Pressable>

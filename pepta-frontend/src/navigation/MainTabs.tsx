@@ -5,6 +5,7 @@
 import React from 'react';
 import { View } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useTheme } from '../theme';
 import { LogSheetsProvider, useLogSheets } from '../context/LogSheetsContext';
 import { PepCompanion } from '../components/PepCompanion';
@@ -13,13 +14,22 @@ import { HomeScreen } from '../screens/app/HomeScreen';
 import { TrackScreen } from '../screens/app/TrackScreen';
 import { ProgressScreen } from '../screens/app/ProgressScreen';
 import { AccountScreen } from '../screens/app/AccountScreen';
+import { DoseSettingsScreen } from '../screens/app/DoseSettingsScreen';
+import { FoodHistoryScreen } from '../screens/app/FoodHistoryScreen';
+import { WeightDetailScreen } from '../screens/app/WeightDetailScreen';
 
 const Tab = createBottomTabNavigator();
+const Stack = createNativeStackNavigator();
 
 export function MainTabs() {
   return (
     <LogSheetsProvider>
-      <Tabs />
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="Tabs" component={Tabs} />
+        <Stack.Screen name="DoseSettings" component={DoseSettingsScreen} />
+        <Stack.Screen name="FoodHistory" component={FoodHistoryScreen} />
+        <Stack.Screen name="WeightDetail" component={WeightDetailScreen} />
+      </Stack.Navigator>
     </LogSheetsProvider>
   );
 }

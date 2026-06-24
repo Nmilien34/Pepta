@@ -109,6 +109,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     persistAuth(null);
   }, []);
 
+  // A 401 from any API call means the session is dead — sign the UI out so we
+  // don't loop on a stale token (mirrors Leanient's unauthorized interceptor).
+  useEffect(() => {
+    api.setUnauthorizedHandler(() => logout());
+    return () => api.setUnauthorizedHandler(undefined);
+  }, [logout]);
+
   const value = useMemo<AuthContextValue>(
     () => ({
       user: auth?.user ?? null,

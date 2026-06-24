@@ -9,7 +9,7 @@ import { Modal, Pressable, View } from 'react-native';
 import { Icon } from './Icon';
 import { CameraView, useCameraPermissions, type CameraType } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppText } from './AppText';
 import { Button } from './Button';
 
@@ -22,6 +22,7 @@ export interface MealCameraProps {
 }
 
 export function MealCamera({ visible, onClose, onCapture, onSearch, onVoice }: MealCameraProps) {
+  const insets = useSafeAreaInsets();
   const [permission, requestPermission] = useCameraPermissions();
   const [facing] = useState<CameraType>('back');
   const [torch, setTorch] = useState(false);
@@ -60,11 +61,45 @@ export function MealCamera({ visible, onClose, onCapture, onSearch, onVoice }: M
 
             <SafeAreaView style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} pointerEvents="box-none">
               {/* top bar: close + flash */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 8 }}>
-                <Pressable onPress={onClose} hitSlop={10}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  paddingHorizontal: 16,
+                  paddingTop: Math.max(insets.top + 10, 34),
+                }}
+              >
+                <Pressable
+                  onPress={onClose}
+                  hitSlop={10}
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 22,
+                    backgroundColor: 'rgba(0,0,0,0.32)',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Close camera"
+                >
                   <Icon name="close" size={24} color="#fff" />
                 </Pressable>
-                <Pressable onPress={() => { Haptics.selectionAsync().catch(() => undefined); setTorch((t) => !t); }} hitSlop={10}>
+                <Pressable
+                  onPress={() => { Haptics.selectionAsync().catch(() => undefined); setTorch((t) => !t); }}
+                  hitSlop={10}
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 22,
+                    backgroundColor: 'rgba(0,0,0,0.32)',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={torch ? 'Turn flash off' : 'Turn flash on'}
+                >
                   <Icon name={torch ? 'bolt' : 'bolt-off'} size={22} color={torch ? '#FFD54A' : '#fff'} />
                 </Pressable>
               </View>

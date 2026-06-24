@@ -3,8 +3,8 @@
 // Same motion the QuickLog sheet uses, factored out for reuse.
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Modal, Pressable, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Animated, Easing, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, View, useWindowDimensions, type ViewStyle } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../theme';
 
 const OFFSCREEN = 600;
@@ -12,14 +12,25 @@ const OFFSCREEN = 600;
 export interface BottomSheetProps {
   visible: boolean;
   onClose(): void;
+  onDismissed?: () => void;
+  scrollable?: boolean;
+  height?: ViewStyle['height'];
   children: React.ReactNode;
 }
 
-export function BottomSheet({ visible, onClose, children }: BottomSheetProps) {
+export function BottomSheet({ visible, onClose, onDismissed, scrollable, height, children }: BottomSheetProps) {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
+  const window = useWindowDimensions();
   const [render, setRender] = useState(visible);
   const backdrop = useRef(new Animated.Value(0)).current;
   const slide = useRef(new Animated.Value(OFFSCREEN)).current;
+
+  const resolvedHeight =
+    typeof height === 'string' && height.endsWith('%')
+      ? Math.round((window.height * Number.parseFloat(height)) / 100) + insets.bottom
+      : height;
+  const resolvedMaxHeight = Math.round(window.height * 0.88) + insets.bottom;
 
   useEffect(() => {
     if (visible) {
@@ -32,7 +43,10 @@ export function BottomSheet({ visible, onClose, children }: BottomSheetProps) {
       Animated.parallel([
         Animated.timing(backdrop, { toValue: 0, duration: 180, useNativeDriver: true }),
         Animated.timing(slide, { toValue: OFFSCREEN, duration: 200, easing: Easing.in(Easing.quad), useNativeDriver: true }),
-      ]).start(() => setRender(false));
+      ]).start(() => {
+        setRender(false);
+        onDismissed?.();
+      });
     }
   }, [visible]);
 
@@ -41,26 +55,41 @@ export function BottomSheet({ visible, onClose, children }: BottomSheetProps) {
       <Animated.View style={{ flex: 1, backgroundColor: 'rgba(14,14,18,0.45)', opacity: backdrop }}>
         <Pressable style={{ flex: 1 }} onPress={onClose} />
       </Animated.View>
-      <Animated.View
-        style={{
-          position: 'absolute',
-          left: 0,
-          right: 0,
-          bottom: 0,
-          transform: [{ translateY: slide }],
-          backgroundColor: theme.colors.surface,
-          borderTopLeftRadius: 28,
-          borderTopRightRadius: 28,
-          maxHeight: '88%',
-        }}
+      <KeyboardAvoidingView
+        pointerEvents="box-none"
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={{ position: 'absolute', left: 0, right: 0, bottom: -insets.bottom }}
       >
-        <SafeAreaView edges={['bottom']}>
-          <View style={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 22 }}>
-            <View style={{ width: 38, height: 5, borderRadius: 999, backgroundColor: theme.colors.border, alignSelf: 'center', marginBottom: 14 }} />
-            {children}
-          </View>
-        </SafeAreaView>
-      </Animated.View>
+        <Animated.View
+          style={{
+            transform: [{ translateY: slide }],
+            backgroundColor: theme.colors.surface,
+            borderTopLeftRadius: 28,
+            borderTopRightRadius: 28,
+            overflow: 'hidden',
+            ...(resolvedHeight ? { height: resolvedHeight } : { maxHeight: resolvedMaxHeight }),
+          }}
+        >
+          <SafeAreaView edges={['bottom']} style={resolvedHeight ? { flex: 1 } : { maxHeight: '100%' }}>
+            {scrollable ? (
+              <ScrollView
+                style={resolvedHeight ? { flex: 1 } : undefined}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 22 }}
+              >
+                <View style={{ width: 38, height: 5, borderRadius: 999, backgroundColor: theme.colors.border, alignSelf: 'center', marginBottom: 14 }} />
+                {children}
+              </ScrollView>
+            ) : (
+              <View style={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 22 }}>
+                <View style={{ width: 38, height: 5, borderRadius: 999, backgroundColor: theme.colors.border, alignSelf: 'center', marginBottom: 14 }} />
+                {children}
+              </View>
+            )}
+          </SafeAreaView>
+        </Animated.View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

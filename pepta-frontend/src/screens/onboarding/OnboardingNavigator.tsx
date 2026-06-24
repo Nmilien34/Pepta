@@ -168,19 +168,13 @@ export function OnboardingNavigator() {
     if (prev) setStep(prev);
   };
 
-  const handleComplete = () => {
-    try {
-      const payload = buildOnboardingPayload(answers, new Date());
-      updateDraft(payload);
-      // Real submit. The backend is deferred, so this may fail — fire & forget,
-      // never block the flow. When live, gate the step below on its result.
-      void api.completeOnboarding(payload).catch(() => undefined);
-    } catch {
-      // Payload/submit error — ignored here; the optimistic flip still advances.
-    }
+  const handleComplete = async () => {
+    const payload = buildOnboardingPayload(answers, new Date());
+    updateDraft(payload);
+    await api.completeOnboarding(payload);
     // Draft is done — clear it so a future session starts fresh.
-    AsyncStorage.removeItem(ONBOARDING_DRAFT_KEY).catch(() => undefined);
-    // Optimistically mark complete so the app reaches Home (the main tabs).
+    await AsyncStorage.removeItem(ONBOARDING_DRAFT_KEY).catch(() => undefined);
+    // Only enter the app after profile + medication setup have persisted.
     auth.markOnboardingComplete();
   };
 

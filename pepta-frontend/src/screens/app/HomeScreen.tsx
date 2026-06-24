@@ -10,6 +10,7 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { Icon } from "../../components/Icon";
 import * as Haptics from 'expo-haptics';
+import { useNavigation, type NavigationProp } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { HomeRangeKey } from '@pepta/shared';
 import { useTheme } from '../../theme';
@@ -29,6 +30,7 @@ const HOME_RANGES: { key: HomeRangeKey; label: string; short: string }[] = [
 
 export function HomeScreen() {
   const theme = useTheme();
+  const navigation = useNavigation<NavigationProp<Record<string, undefined>>>();
   const { home, track, homeLoading, homeError, homeRefreshing, homeRange, refreshHome, refreshTrack, bumpProtein, bumpWater, bumpFiber } = usePeptaData();
   const { openQuickLog, openMeal } = useLogSheets();
   const [rangeOpen, setRangeOpen] = useState(false);
@@ -95,6 +97,20 @@ export function HomeScreen() {
             <RefreshControl refreshing={homeRefreshing} onRefresh={refreshHome} tintColor={theme.colors.primary} />
           }
         >
+          {rangeOpen ? (
+            <Pressable
+              onPress={() => setRangeOpen(false)}
+              style={{
+                position: 'absolute',
+                top: 0,
+                right: 0,
+                bottom: 0,
+                left: 0,
+                minHeight: 1200,
+                zIndex: 10,
+              }}
+            />
+          ) : null}
           {/* header */}
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 4, zIndex: 20 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
@@ -344,7 +360,7 @@ export function HomeScreen() {
 
           {/* today's log */}
           <Reveal delay={340} style={{ marginTop: 12 }}>
-            <TodaysLogCard chips={todaysLog} rangeLabel={view.rangeLabel} />
+            <TodaysLogCard chips={todaysLog} rangeLabel={view.rangeLabel} onSeeAll={() => navigation.navigate('FoodHistory')} />
           </Reveal>
 
           {/* insight */}
@@ -673,7 +689,7 @@ const LOG_META: Record<LogKind, { icon: string; color: string }> = {
   activity: { icon: 'walk', color: '#34C759' },
 };
 
-function TodaysLogCard({ chips, rangeLabel }: { chips: LogChip[]; rangeLabel: string }) {
+function TodaysLogCard({ chips, rangeLabel, onSeeAll }: { chips: LogChip[]; rangeLabel: string; onSeeAll(): void }) {
   const theme = useTheme();
   const title = rangeLabel === 'Today' ? 'Today’s Log' : `${rangeLabel} Log`;
   return (
@@ -685,9 +701,17 @@ function TodaysLogCard({ chips, rangeLabel }: { chips: LogChip[]; rangeLabel: st
             {title} ({chips.length})
           </AppText>
         </View>
-        <AppText variant="caption" color="primary" style={{ fontWeight: '700' }}>
-          See all
-        </AppText>
+        <Pressable
+          onPress={() => {
+            Haptics.selectionAsync().catch(() => undefined);
+            onSeeAll();
+          }}
+          hitSlop={8}
+        >
+          <AppText variant="caption" color="primary" style={{ fontWeight: '700' }}>
+            See all
+          </AppText>
+        </Pressable>
       </View>
       {chips.length > 0 ? (
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>

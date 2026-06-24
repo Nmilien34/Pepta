@@ -72,3 +72,52 @@ describe("PeptaApi onboarding", () => {
     );
   });
 });
+
+describe("PeptaApi resilience", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    api.setAuthToken(null);
+    api.setUnauthorizedHandler(undefined);
+  });
+
+  const json401 = () =>
+    new Response(JSON.stringify({ error: { code: "UNAUTHORIZED" } }), {
+      status: 401,
+      headers: { "content-type": "application/json" },
+    });
+
+  it("signs the user out (calls the handler + clears the token) on a 401", async () => {
+    const onUnauthorized = vi.fn();
+    api.setUnauthorizedHandler(onUnauthorized);
+    api.setAuthToken("stale-token");
+    const fetchMock = vi.fn(async () => json401());
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(api.getHome()).rejects.toThrow();
+    expect(onUnauthorized).toHaveBeenCalledTimes(1);
+    // 401 is a deterministic 4xx → not retried.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries an idempotent GET once on a transient network failure", async () => {
+    const fetchMock = vi.fn(async () => {
+      throw new TypeError("Network request failed");
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(api.getHome()).rejects.toThrow();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("does NOT retry a POST on failure (avoids double-writes)", async () => {
+    const fetchMock = vi.fn(async () => {
+      throw new TypeError("Network request failed");
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      api.createWaterLog({ amountOz: 8, datetime: NOW.toISOString() }),
+    ).rejects.toThrow();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});

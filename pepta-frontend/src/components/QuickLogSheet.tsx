@@ -4,10 +4,10 @@
 // affected screens. No fakery — drafts → typed inputs via quickLog builders.
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Modal, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { Animated, Easing, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, TextInput, View, useWindowDimensions } from 'react-native';
 import { Icon } from "./Icon";
 import * as Haptics from 'expo-haptics';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../theme';
 import { AppText } from './AppText';
 import { Button } from './Button';
@@ -20,6 +20,7 @@ import { usePeptaData } from '../context/PeptaDataContext';
 import { api } from '../services/api';
 import { sideEffectTypeLabel, siteLabel, usedSites, type InjectionSite } from '../screens/app/trackView';
 import { BodyMap } from './BodyMap';
+import { AddCompoundSheet } from './AddCompoundSheet';
 import { measurementLabel } from '../screens/app/progressView';
 import {
   defaultDoseDraft,
@@ -49,13 +50,16 @@ export interface QuickLogSheetProps {
   visible: boolean;
   onClose(): void;
   onMeal(): void;
+  onDismissed?: () => void;
   // Open straight to a specific entry form (used by the getting-started checklist).
   initialMode?: QuickLogMode;
 }
 
-export function QuickLogSheet({ visible, onClose, onMeal, initialMode }: QuickLogSheetProps) {
+export function QuickLogSheet({ visible, onClose, onMeal, onDismissed, initialMode }: QuickLogSheetProps) {
   const theme = useTheme();
-  const { home, track, refreshHome, refreshTrack, refreshProgress, bumpProtein, bumpWater, addDoseLog, addWeightLog, addMeasurement, addSideEffectLog } = usePeptaData();
+  const insets = useSafeAreaInsets();
+  const window = useWindowDimensions();
+  const { home, homeLoading, track, refreshHome, refreshTrack, refreshProgress, bumpProtein, bumpWater, addDoseLog, addWeightLog, addMeasurement, addSideEffectLog } = usePeptaData();
   const [render, setRender] = useState(visible);
   const [mode, setMode] = useState<Mode>('chooser');
 
@@ -74,9 +78,11 @@ export function QuickLogSheet({ visible, onClose, onMeal, initialMode }: QuickLo
   const [measureNote, setMeasureNote] = useState('');
   const [activity, setActivity] = useState({ steps: '', workoutMinutes: '', resistance: false });
   const [doseOffsetH, setDoseOffsetH] = useState(0); // hours before now for the shot time
+  const [addMedicationOpen, setAddMedicationOpen] = useState(false);
 
   const backdrop = useRef(new Animated.Value(0)).current;
   const slide = useRef(new Animated.Value(OFFSCREEN)).current;
+  const sheetMaxHeight = Math.round(window.height * 0.88) + insets.bottom;
 
   useEffect(() => {
     if (visible) {
@@ -88,6 +94,7 @@ export function QuickLogSheet({ visible, onClose, onMeal, initialMode }: QuickLo
       setMeasureNote('');
       setActivity({ steps: '', workoutMinutes: '', resistance: false });
       setDoseOffsetH(0);
+      setAddMedicationOpen(false);
       const wu = home?.profile?.weightUnit ?? 'lb';
       setWeightUnit(wu);
       setWeight(home?.latestWeight?.value ?? (wu === 'kg' ? 80 : 180));
@@ -102,7 +109,10 @@ export function QuickLogSheet({ visible, onClose, onMeal, initialMode }: QuickLo
       Animated.parallel([
         Animated.timing(backdrop, { toValue: 0, duration: 180, useNativeDriver: true }),
         Animated.timing(slide, { toValue: OFFSCREEN, duration: 200, easing: Easing.in(Easing.quad), useNativeDriver: true }),
-      ]).start(() => setRender(false));
+      ]).start(() => {
+        setRender(false);
+        onDismissed?.();
+      });
     }
   }, [visible]);
 
@@ -196,20 +206,21 @@ export function QuickLogSheet({ visible, onClose, onMeal, initialMode }: QuickLo
       <Animated.View style={{ flex: 1, backgroundColor: 'rgba(14,14,18,0.45)', opacity: backdrop }}>
         <Pressable style={{ flex: 1 }} onPress={close} />
       </Animated.View>
-      <Animated.View
-        style={{
-          position: 'absolute',
-          left: 0,
-          right: 0,
-          bottom: 0,
-          transform: [{ translateY: slide }],
-          backgroundColor: theme.colors.surface,
-          borderTopLeftRadius: 28,
-          borderTopRightRadius: 28,
-          maxHeight: '88%',
-        }}
+      <KeyboardAvoidingView
+        pointerEvents="box-none"
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={{ position: 'absolute', left: 0, right: 0, bottom: -insets.bottom }}
       >
-        <SafeAreaView edges={['bottom']}>
+        <Animated.View
+          style={{
+            transform: [{ translateY: slide }],
+            backgroundColor: theme.colors.surface,
+            borderTopLeftRadius: 28,
+            borderTopRightRadius: 28,
+            maxHeight: sheetMaxHeight,
+          }}
+        >
+        <SafeAreaView edges={['bottom']} style={{ maxHeight: '100%' }}>
           <View style={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 22 }}>
             <View style={{ width: 38, height: 5, borderRadius: 999, backgroundColor: theme.colors.border, alignSelf: 'center', marginBottom: 14 }} />
 
@@ -230,7 +241,7 @@ export function QuickLogSheet({ visible, onClose, onMeal, initialMode }: QuickLo
               </View>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 4 }}>
               {mode === 'chooser' ? (
                 <Chooser theme={theme} dose={defaultDoseDraft(home, track)} latestWeight={home?.latestWeight ?? null} onPick={openMode} onMeal={onMeal} />
               ) : null}
@@ -241,9 +252,11 @@ export function QuickLogSheet({ visible, onClose, onMeal, initialMode }: QuickLo
                   dose={dose}
                   setDose={setDose}
                   compounds={home?.activeCompounds ?? []}
+                  loading={homeLoading}
                   used={usedSites(track?.doseLogs ?? [])}
                   offsetH={doseOffsetH}
                   setOffsetH={setDoseOffsetH}
+                  onAddMedication={() => setAddMedicationOpen(true)}
                 />
               ) : null}
 
@@ -323,7 +336,15 @@ export function QuickLogSheet({ visible, onClose, onMeal, initialMode }: QuickLo
             ) : null}
           </View>
         </SafeAreaView>
-      </Animated.View>
+        </Animated.View>
+      </KeyboardAvoidingView>
+      <AddCompoundSheet
+        visible={addMedicationOpen}
+        onClose={() => {
+          setAddMedicationOpen(false);
+          void refreshHome();
+        }}
+      />
     </Modal>
   );
 }
@@ -427,25 +448,43 @@ function DoseForm({
   dose,
   setDose,
   compounds,
+  loading,
   used,
   offsetH,
   setOffsetH,
+  onAddMedication,
 }: {
   theme: Theme;
   dose: DoseDraft | null;
   setDose: (d: DoseDraft) => void;
   compounds: DoseCompound[];
+  loading: boolean;
   used: Set<InjectionSite>;
   offsetH: number;
   setOffsetH: (n: number) => void;
+  onAddMedication: () => void;
 }) {
   if (!dose) {
     return (
-      <View style={{ paddingVertical: 28, alignItems: 'center', gap: 8 }}>
+      <View style={{ paddingVertical: 28, alignItems: 'center', gap: 10 }}>
         <Icon name="needle" size={28} color={theme.colors.textTertiary} />
-        <AppText variant="body" color="textSecondary" align="center">
-          Add a medication on the Track tab first, then you can log shots here.
+        <AppText variant="bodyStrong" align="center" style={{ fontWeight: '800' }}>
+          {loading ? 'Checking your medication setup…' : 'Set up your medication to log shots'}
         </AppText>
+        <AppText variant="caption" color="textSecondary" align="center" style={{ maxWidth: 280, lineHeight: 18 }}>
+          {loading
+            ? 'Pepta is looking for the medication you added during onboarding.'
+            : 'If onboarding did not finish saving it, add it here once and your shot log will be ready.'}
+        </AppText>
+        {!loading ? (
+          <View style={{ width: 220, marginTop: 6 }}>
+            <Button
+              label="Add medication"
+              leading={<Icon name="needle" size={17} color={theme.colors.onPrimary} />}
+              onPress={onAddMedication}
+            />
+          </View>
+        ) : null}
       </View>
     );
   }
@@ -603,11 +642,11 @@ function SheetSaveButton({ label, disabled, onPress }: { label: string; disabled
 function QuickAmount({ options, value, onChange, unit, color }: { options: number[]; value: number; onChange: (n: number) => void; unit: string; color: string }) {
   return (
     <View style={{ marginTop: 18, alignItems: 'center' }}>
-      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 5 }}>
-        <AppText variant="statBig" style={{ color, fontSize: 40 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 5, paddingTop: 4, minHeight: 54 }}>
+        <AppText variant="statBig" style={{ color, fontSize: 40, lineHeight: 48 }}>
           +{value}
         </AppText>
-        <AppText variant="cardTitle" color="textSecondary">
+        <AppText variant="cardTitle" color="textSecondary" style={{ lineHeight: 28, paddingBottom: 6 }}>
           {unit}
         </AppText>
       </View>

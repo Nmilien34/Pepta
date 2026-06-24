@@ -28,13 +28,11 @@ import {
   usedSites,
 } from './trackView';
 
-type TabsNav = NavigationProp<Record<'Home' | 'Track' | 'Progress' | 'Account', undefined>>;
-
 const RANGES = ['7d', '30d', '90d', '1y'];
 
 export function TrackScreen() {
   const theme = useTheme();
-  const navigation = useNavigation<TabsNav>();
+  const navigation = useNavigation<NavigationProp<Record<string, undefined>>>();
   const { openQuickLog } = useLogSheets();
   const data = usePeptaData();
   const { home, track, homeLoading, trackLoading, homeError, trackError, trackRefreshing, refreshHome, refreshTrack } =
@@ -223,6 +221,7 @@ export function TrackScreen() {
                   ml={ml}
                   compoundName={ml?.compoundName ?? compounds[0]?.name ?? 'Medication'}
                   onLogDose={() => openQuickLog('dose')}
+                  onOpenSettings={() => navigation.navigate('DoseSettings')}
                 />
               </Card>
             </Reveal>
@@ -333,10 +332,12 @@ function MedicationLevelCardContent({
   ml,
   compoundName,
   onLogDose,
+  onOpenSettings,
 }: {
   ml: NonNullable<ReturnType<typeof usePeptaData>['home']>['medicationLevels'][number] | null;
   compoundName: string;
   onLogDose: () => void;
+  onOpenSettings: () => void;
 }) {
   const theme = useTheme();
   const hasCurve = !!ml && ml.curve.length > 1;
@@ -351,11 +352,27 @@ function MedicationLevelCardContent({
           </AppText>
         </View>
         {ml ? (
-          <View style={{ backgroundColor: theme.colors.surfaceAlt, paddingVertical: 4, paddingHorizontal: 9, borderRadius: theme.radii.pill }}>
+          <Pressable
+            onPress={() => {
+              Haptics.selectionAsync().catch(() => undefined);
+              onOpenSettings();
+            }}
+            style={({ pressed }) => ({
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 5,
+              backgroundColor: theme.colors.surfaceAlt,
+              paddingVertical: 4,
+              paddingHorizontal: 9,
+              borderRadius: theme.radii.pill,
+              opacity: pressed ? 0.7 : 1,
+            })}
+          >
             <AppText variant="caption" color="primary" style={{ fontWeight: '800' }}>
               {Math.round((ml.currentEstimate / Math.max(ml.peakEstimate, 1)) * 100)}%
             </AppText>
-          </View>
+            <Icon name="chevron-forward" size={13} color={theme.colors.primary} stroke={2.3} />
+          </Pressable>
         ) : null}
       </View>
 

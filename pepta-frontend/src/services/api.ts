@@ -3,6 +3,7 @@ import {
   authResponseSchema,
   googleAuthSchema,
   homeResponseSchema,
+  userProfileSettingsPatchSchema,
   activityLogInputSchema,
   activityLogResponseSchema,
   compoundInputSchema,
@@ -45,6 +46,7 @@ import {
   type GoogleAuth,
   type HomeRangeKey,
   type HomeResponse,
+  type UserProfileSettingsPatch,
   type MealLogInput,
   type MealLogResponse,
   type MealScanInput,
@@ -114,11 +116,78 @@ const foodSearchResponseSchema = z.object({
   ),
 });
 
+// Abort a request that hangs (slow/dead network) so the UI never spins forever.
+const REQUEST_TIMEOUT_MS = 15_000;
+// Transient failures get one retry after a short backoff (the first request to a
+// cold endpoint can be slow; by the retry it's usually warm).
+const RETRY_DELAY_MS = 400;
+
+// Carries the HTTP status so callers (and the retry logic) can branch on it.
+class ApiError extends Error {
+  constructor(
+    public readonly status: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
+const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
 class PeptaApi {
   private authToken: string | null = null;
+  private onUnauthorized?: () => void;
+
+  // AuthContext registers this so a 401 from any request signs the user out of
+  // the UI (not just clears the token) — prevents a stale-session 401 loop.
+  public setUnauthorizedHandler(handler: (() => void) | undefined): void {
+    this.onUnauthorized = handler;
+  }
 
   public setAuthToken(token: string | null): void {
     this.authToken = token;
+  }
+
+  private async fetchOnce<T>(
+    path: string,
+    schema: ResponseSchema<T>,
+    options: RequestInit,
+  ): Promise<T> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    let response: Response;
+    try {
+      response = await fetch(`${API_BASE_URL}${path}`, {
+        ...options,
+        signal: controller.signal,
+        headers: {
+          "Content-Type": "application/json",
+          ...(this.authToken
+            ? { Authorization: `Bearer ${this.authToken}` }
+            : {}),
+          ...options.headers,
+        },
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+
+    // 401 → the session is dead. Clear the token and tell AuthContext to sign the
+    // UI out so we don't loop on a stale token.
+    if (response.status === 401) {
+      this.authToken = null;
+      this.onUnauthorized?.();
+      throw new ApiError(401, `Pepta API request failed: 401`);
+    }
+
+    const json = (await response.json()) as unknown;
+    if (!response.ok) {
+      throw new ApiError(response.status, `Pepta API request failed: ${response.status}`);
+    }
+
+    const envelope = z.object({ data: z.unknown() }).parse(json);
+    return schema.parse(envelope.data);
   }
 
   private async request<T>(
@@ -126,24 +195,21 @@ class PeptaApi {
     schema: ResponseSchema<T>,
     options: RequestInit = {},
   ): Promise<T> {
-    const response = await fetch(`${API_BASE_URL}${path}`, {
-      ...options,
-      headers: {
-        "Content-Type": "application/json",
-        ...(this.authToken
-          ? { Authorization: `Bearer ${this.authToken}` }
-          : {}),
-        ...options.headers,
-      },
-    });
-    const json = (await response.json()) as unknown;
-
-    if (!response.ok) {
-      throw new Error(`Pepta API request failed: ${response.status}`);
+    // Only retry idempotent reads — retrying a POST/PATCH could double-write.
+    const method = (options.method ?? "GET").toUpperCase();
+    const idempotent = method === "GET";
+    try {
+      return await this.fetchOnce(path, schema, options);
+    } catch (error) {
+      // Retry once on a transient failure (network drop / timeout / 5xx), never
+      // on a deterministic 4xx (a bad request won't succeed on retry).
+      const is4xx = error instanceof ApiError && error.status >= 400 && error.status < 500;
+      if (idempotent && !is4xx) {
+        await delay(RETRY_DELAY_MS);
+        return this.fetchOnce(path, schema, options);
+      }
+      throw error;
     }
-
-    const envelope = z.object({ data: z.unknown() }).parse(json);
-    return schema.parse(envelope.data);
   }
 
   public signInWithGoogle(body: GoogleAuth): Promise<AuthResponse> {
@@ -178,6 +244,15 @@ class PeptaApi {
   public getHome(range?: HomeRangeKey): Promise<HomeResponse> {
     const suffix = range && range !== "today" ? `?range=${encodeURIComponent(range)}` : "";
     return this.request(`/home${suffix}`, homeResponseSchema);
+  }
+
+  // PATCH /me → updated profile settings. Used by Account preferences (units,
+  // dose units). We don't need the response shape — callers refreshHome() after.
+  public updateProfileSettings(body: UserProfileSettingsPatch): Promise<unknown> {
+    return this.request("/me", z.unknown(), {
+      method: "PATCH",
+      body: JSON.stringify(userProfileSettingsPatchSchema.parse(body)),
+    });
   }
 
   // POST /compounds → CompoundResponse (201). Adds a medication to track.

@@ -11,7 +11,7 @@ import { useTheme } from '../../theme';
 import { AppText, Button, Mascot } from '../../components';
 
 export interface PaywallScreenProps {
-  onComplete(): void;
+  onComplete(): void | Promise<void>;
 }
 
 type Plan = 'yearly' | 'monthly';
@@ -28,10 +28,25 @@ const FEATURES = [
 export function PaywallScreen({ onComplete }: PaywallScreenProps) {
   const theme = useTheme();
   const [plan, setPlan] = useState<Plan>('yearly');
+  const [completing, setCompleting] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  const handleComplete = async () => {
+    if (completing) return;
+    setCompleting(true);
+    setFailed(false);
+    try {
+      await onComplete();
+    } catch {
+      setFailed(true);
+    } finally {
+      setCompleting(false);
+    }
+  };
 
   const handleStart = () => {
     // TODO: present the RevenueCat purchase flow when the integration lands.
-    onComplete();
+    void handleComplete();
   };
 
   return (
@@ -39,7 +54,7 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
       <StatusBar barStyle="dark-content" />
       <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: theme.spacing.xl, paddingTop: theme.spacing.sm }}>
-          <Pressable onPress={onComplete} hitSlop={theme.sizes.hitSlop} accessibilityRole="button" accessibilityLabel="Close">
+          <Pressable onPress={() => void handleComplete()} hitSlop={theme.sizes.hitSlop} accessibilityRole="button" accessibilityLabel="Close">
             <Icon name="close" size={24} color={theme.colors.textSecondary} />
           </Pressable>
           <Pressable hitSlop={theme.sizes.hitSlop} accessibilityRole="button">
@@ -97,7 +112,12 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
         </ScrollView>
 
         <View style={{ paddingHorizontal: theme.spacing.xl, paddingTop: theme.spacing.sm, paddingBottom: theme.spacing.xs }}>
-          <Button label="Start 7-day free trial" onPress={handleStart} />
+          {failed ? (
+            <AppText variant="caption" color="danger" align="center" style={{ marginBottom: theme.spacing.sm }}>
+              We couldn’t save your setup. Check your connection and try again.
+            </AppText>
+          ) : null}
+          <Button label={completing ? 'Saving setup…' : 'Start 7-day free trial'} onPress={handleStart} disabled={completing} />
           <AppText variant="caption" color="textTertiary" align="center" style={{ fontSize: 10, marginTop: theme.spacing.sm }}>
             7 days free, then {plan === 'yearly' ? '$40/yr ($3.33/mo)' : '$9/mo'}. Cancel anytime · Terms & Privacy
           </AppText>

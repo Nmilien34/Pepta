@@ -75,7 +75,7 @@ export function TabBar({ state, navigation, onQuickLog }: TabBarProps) {
       }}
     >
       {routes.slice(0, 2).map(renderTab)}
-      <View style={{ width: 74, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ width: 58, alignItems: 'center', justifyContent: 'center' }}>
         <Pressable
           onPress={() => {
             Haptics.selectionAsync().catch(() => undefined);
@@ -84,69 +84,40 @@ export function TabBar({ state, navigation, onQuickLog }: TabBarProps) {
           accessibilityRole="button"
           accessibilityLabel="Log something"
           style={({ pressed }) => ({
-            width: 58,
-            height: 58,
-            borderRadius: 18,
+            width: 52,
+            height: 52,
+            borderRadius: 16,
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: 'rgba(255,255,255,0.52)',
+            marginTop: -8,
+            shadowColor: theme.colors.primary,
+            shadowOpacity: 0.34,
+            shadowRadius: 16,
+            shadowOffset: { width: 0, height: 7 },
+            elevation: 5,
             opacity: pressed ? 0.82 : 1,
             transform: [{ scale: pressed ? 0.97 : 1 }],
           })}
         >
-          <View
-            pointerEvents="none"
-            style={{
-              position: 'absolute',
-              top: 4,
-              right: 4,
-              bottom: 4,
-              left: 4,
-              borderRadius: 15,
-              backgroundColor: 'rgba(255,255,255,0.12)',
-            }}
-          />
-          <CornerMark corner="topLeft" />
-          <CornerMark corner="topRight" />
-          <CornerMark corner="bottomLeft" />
-          <CornerMark corner="bottomRight" />
           <LinearGradient
             colors={[theme.colors.primaryGradientStart, theme.colors.primaryGradientEnd] as const}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={{ width: 42, height: 42, borderRadius: 13, alignItems: 'center', justifyContent: 'center' }}
+            style={{
+              width: 52,
+              height: 52,
+              borderRadius: 16,
+              borderWidth: 4,
+              borderColor: theme.colors.surface,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
           >
-            <IconPlus size={24} color="#FFFFFF" strokeWidth={2.6} />
+            <IconPlus size={23} color="#FFFFFF" strokeWidth={2.6} />
           </LinearGradient>
         </Pressable>
       </View>
       {routes.slice(2).map(renderTab)}
     </View>
-  );
-}
-
-function CornerMark({ corner }: { corner: 'topLeft' | 'topRight' | 'bottomLeft' | 'bottomRight' }) {
-  const vertical = corner.includes('top') ? { top: 8 } : { bottom: 8 };
-  const horizontal = corner.includes('Left') ? { left: 8 } : { right: 8 };
-  return (
-    <View
-      pointerEvents="none"
-      style={{
-        position: 'absolute',
-        width: 12,
-        height: 12,
-        ...vertical,
-        ...horizontal,
-        borderColor: 'rgba(106,79,176,0.16)',
-        borderTopWidth: corner.includes('top') ? 1 : 0,
-        borderBottomWidth: corner.includes('bottom') ? 1 : 0,
-        borderLeftWidth: corner.includes('Left') ? 1 : 0,
-        borderRightWidth: corner.includes('Right') ? 1 : 0,
-        borderTopLeftRadius: corner === 'topLeft' ? 5 : 0,
-        borderTopRightRadius: corner === 'topRight' ? 5 : 0,
-        borderBottomLeftRadius: corner === 'bottomLeft' ? 5 : 0,
-        borderBottomRightRadius: corner === 'bottomRight' ? 5 : 0,
-      }}
-    />
   );
 }

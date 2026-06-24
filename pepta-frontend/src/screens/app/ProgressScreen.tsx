@@ -25,7 +25,6 @@ import {
   WeightChart,
 } from '../../components';
 
-type TabsNav = NavigationProp<Record<'Home' | 'Track' | 'Progress' | 'Account', undefined>>;
 import { usePeptaData } from '../../context/PeptaDataContext';
 import {
   RANGE_KEYS,
@@ -40,7 +39,7 @@ import {
 
 export function ProgressScreen() {
   const theme = useTheme();
-  const navigation = useNavigation<TabsNav>();
+  const navigation = useNavigation<NavigationProp<Record<string, undefined>>>();
   const { home, progress, progressLoading, progressRefreshing, progressError, refreshProgress, refreshHome } =
     usePeptaData();
   const [range, setRange] = useState<RangeKey>('90d');
@@ -139,21 +138,32 @@ export function ProgressScreen() {
                       Weight ({s.weight.unit})
                     </AppText>
                   </View>
-                  <View style={{ flexDirection: 'row', backgroundColor: theme.colors.surfaceAlt, borderRadius: theme.radii.pill, padding: 3 }}>
-                    {RANGE_KEYS.map((r) => {
-                      const active = r === range;
-                      return (
-                        <Pressable
-                          key={r}
-                          onPress={() => pickRange(r)}
-                          style={[{ paddingVertical: 5, paddingHorizontal: 9, borderRadius: theme.radii.pill }, active ? { backgroundColor: theme.colors.surface, ...theme.shadows.card } : null]}
-                        >
-                          <AppText variant="caption" color={active ? 'textPrimary' : 'textSecondary'} style={{ fontWeight: '700', fontSize: 11 }}>
-                            {r}
-                          </AppText>
-                        </Pressable>
-                      );
-                    })}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+                    <View style={{ flexDirection: 'row', backgroundColor: theme.colors.surfaceAlt, borderRadius: theme.radii.pill, padding: 3 }}>
+                      {RANGE_KEYS.map((r) => {
+                        const active = r === range;
+                        return (
+                          <Pressable
+                            key={r}
+                            onPress={() => pickRange(r)}
+                            style={[{ paddingVertical: 5, paddingHorizontal: 9, borderRadius: theme.radii.pill }, active ? { backgroundColor: theme.colors.surface, ...theme.shadows.card } : null]}
+                          >
+                            <AppText variant="caption" color={active ? 'textPrimary' : 'textSecondary'} style={{ fontWeight: '700', fontSize: 11 }}>
+                              {r}
+                            </AppText>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                    <Pressable
+                      onPress={() => {
+                        Haptics.selectionAsync().catch(() => undefined);
+                        navigation.navigate('WeightDetail');
+                      }}
+                      hitSlop={8}
+                    >
+                      <Icon name="chevron-forward" size={17} color={theme.colors.textTertiary} />
+                    </Pressable>
                   </View>
                 </View>
                 <WeightChart key={range} points={series} color={theme.colors.weight} unit={s.weight.unit} formatDate={formatShortDate} />
