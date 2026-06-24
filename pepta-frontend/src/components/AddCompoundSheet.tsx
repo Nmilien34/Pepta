@@ -13,7 +13,6 @@ import { BottomSheet } from './BottomSheet';
 import { Chip } from './onboarding/Chip';
 import { SearchField } from './SearchField';
 import { usePeptaData } from '../context/PeptaDataContext';
-import { api } from '../services/api';
 import { MEDICATION_CATALOG, searchMedications, type MedicationOption } from '../data/medicationCatalog';
 import { buildCompoundInput, todayDateOnly } from '../screens/app/addCompound';
 
@@ -24,7 +23,7 @@ export interface AddCompoundSheetProps {
 
 export function AddCompoundSheet({ visible, onClose }: AddCompoundSheetProps) {
   const theme = useTheme();
-  const { refreshHome, refreshTrack } = usePeptaData();
+  const { addCompound } = usePeptaData();
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<MedicationOption | null>(null);
   const [dose, setDose] = useState<number | null>(null);
@@ -54,9 +53,8 @@ export function AddCompoundSheet({ visible, onClose }: AddCompoundSheetProps) {
     setSaving(true);
     setFailed(false);
     try {
-      await api.createCompound(buildCompoundInput(selected, dose, todayDateOnly(new Date())));
+      await addCompound(buildCompoundInput(selected, dose, todayDateOnly(new Date())));
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
-      await Promise.all([refreshHome(), refreshTrack()]).catch(() => undefined);
       onClose();
     } catch {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => undefined);

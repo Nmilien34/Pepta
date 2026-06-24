@@ -1,6 +1,6 @@
 // Custom bottom tab bar (mirrors Leanient's react-navigation tabBar pattern, but
-// Pepta visuals): white bar + hairline, 4 tabs with a center gradient squircle
-// FAB that opens quick-log. Active = brand purple, inactive = tertiary. Haptic on
+// Pepta visuals): white bar + hairline, 4 tabs with a centered square-ring plus
+// button that opens quick-log. Active = brand purple, inactive = tertiary. Haptic on
 // every press; safe-area aware.
 
 import React from 'react';
@@ -65,17 +65,17 @@ export function TabBar({ state, navigation, onQuickLog }: TabBarProps) {
     <View
       style={{
         flexDirection: 'row',
-        alignItems: 'flex-start',
+        alignItems: 'center',
         backgroundColor: theme.colors.surface,
         borderTopWidth: 0.5,
         borderTopColor: theme.colors.border,
-        paddingTop: 11,
+        paddingTop: 10,
         paddingBottom: Math.max(insets.bottom, 12),
-        paddingHorizontal: 18,
+        paddingHorizontal: 16,
       }}
     >
       {routes.slice(0, 2).map(renderTab)}
-      <View style={{ width: 60, alignItems: 'center' }}>
+      <View style={{ width: 74, alignItems: 'center', justifyContent: 'center' }}>
         <Pressable
           onPress={() => {
             Haptics.selectionAsync().catch(() => undefined);
@@ -83,18 +83,27 @@ export function TabBar({ state, navigation, onQuickLog }: TabBarProps) {
           }}
           accessibilityRole="button"
           accessibilityLabel="Log something"
-          style={{ marginTop: -10 }}
+          style={({ pressed }) => ({
+            width: 58,
+            height: 58,
+            borderRadius: 18,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: theme.colors.surface,
+            borderWidth: 1.4,
+            borderColor: '#D8CCF7',
+            opacity: pressed ? 0.82 : 1,
+            transform: [{ scale: pressed ? 0.97 : 1 }],
+            ...theme.shadows.card,
+          })}
         >
           <LinearGradient
             colors={[theme.colors.primaryGradientStart, theme.colors.primaryGradientEnd] as const}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={[
-              { width: 54, height: 54, borderRadius: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 4, borderColor: theme.colors.surface },
-              theme.shadows.floating,
-            ]}
+            style={{ width: 42, height: 42, borderRadius: 13, alignItems: 'center', justifyContent: 'center' }}
           >
-            <IconPlus size={26} color="#FFFFFF" strokeWidth={2.5} />
+            <IconPlus size={24} color="#FFFFFF" strokeWidth={2.6} />
           </LinearGradient>
         </Pressable>
       </View>

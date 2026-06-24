@@ -15,6 +15,8 @@ import React, {
   type ReactNode,
 } from "react";
 import type {
+  CompoundInput,
+  CompoundResponse,
   DoseLogInput,
   DoseLogResponse,
   HomeResponse,
@@ -65,6 +67,7 @@ interface PeptaDataContextValue {
   progressRefreshing: boolean;
   progressError: string | null;
   refreshProgress(): Promise<void>;
+  addCompound(input: CompoundInput): Promise<CompoundResponse>;
   // Optimistic inserts for the QuickLog sheet (prepend a temp row; the next
   // refresh reconciles to server truth).
   addDoseLog(input: DoseLogInput): void;
@@ -78,6 +81,22 @@ interface PeptaDataContextValue {
 const PeptaDataContext = createContext<PeptaDataContextValue | undefined>(
   undefined,
 );
+
+export function homeWithAddedCompound(
+  home: HomeResponse | null,
+  compound: CompoundResponse,
+): HomeResponse | null {
+  if (!home) return home;
+
+  const withoutExisting = home.activeCompounds.filter(
+    (item) => item.id !== compound.id,
+  );
+
+  return {
+    ...home,
+    activeCompounds: [compound, ...withoutExisting],
+  };
+}
 
 function errorMessage(error: unknown): string {
   const detail = error instanceof Error ? error.message : String(error);
@@ -251,6 +270,16 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
     );
   }, []);
 
+  const addCompound = useCallback(
+    async (input: CompoundInput) => {
+      const compound = await api.createCompound(input);
+      setHome((h) => homeWithAddedCompound(h, compound));
+      await Promise.all([refreshHome(), refreshTrack()]).catch(() => undefined);
+      return compound;
+    },
+    [refreshHome, refreshTrack],
+  );
+
   const refreshProgress = useCallback(async () => {
     setProgressError(null);
     if (hasProgress.current) setProgressRefreshing(true);
@@ -287,6 +316,7 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
       progressRefreshing,
       progressError,
       refreshProgress,
+      addCompound,
       addDoseLog,
       addWeightLog,
       addMeasurement,
@@ -312,6 +342,7 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
       progressRefreshing,
       progressError,
       refreshProgress,
+      addCompound,
       addDoseLog,
       addWeightLog,
       addMeasurement,
