@@ -22,6 +22,8 @@ import type {
   goalTypeSchema,
   goalPaceSchema,
   heightUnitSchema,
+  homeRangeKeySchema,
+  homeRangeTotalsSchema,
   homeResponseSchema,
   insightSchema,
   legalAcceptanceSchema,
@@ -102,6 +104,8 @@ export type GoogleAuth = z.infer<typeof googleAuthSchema>;
 export type GoalType = z.infer<typeof goalTypeSchema>;
 export type GoalPace = z.infer<typeof goalPaceSchema>;
 export type HeightUnit = z.infer<typeof heightUnitSchema>;
+export type HomeRangeKey = z.infer<typeof homeRangeKeySchema>;
+export type HomeRangeTotals = z.infer<typeof homeRangeTotalsSchema>;
 export type HomeResponse = z.infer<typeof homeResponseSchema>;
 export type Insight = z.infer<typeof insightSchema>;
 export type LegalAcceptance = z.infer<typeof legalAcceptanceSchema>;

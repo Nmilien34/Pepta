@@ -87,12 +87,40 @@ describe('buildHomeView', () => {
     expect(view.streakDays).toBe(7);
     expect(view.setup).toMatchObject({ loggedItems: 2, required: 4, pct: 0.5 });
     expect(view.weight).toEqual({ value: 184, unit: 'lb' });
+    expect(view.weightPulse).toMatchObject({
+      title: 'Today’s weigh-in?',
+      latestLabel: '184 lb',
+      actionLabel: 'Log weight',
+    });
     expect(view.insight?.id).toBe('i1');
   });
 
   it('falls back to the level engine countdown when nextDose is absent', () => {
     const view = buildHomeView(buildHome({ nextDose: null }));
     expect(view.medication?.countdown).toBe('5d 9h');
+  });
+
+  it('scales targets for the selected range', () => {
+    const view = buildHomeView(
+      buildHome({
+        selectedRange: 'week',
+        rangeTotals: {
+          key: 'week',
+          label: 'Weekly',
+          proteinGrams: 420,
+          fiberGrams: 105,
+          calories: 7000,
+          waterOz: 224,
+          dayCount: 7,
+          hasData: true,
+        },
+      }),
+    );
+    expect(view.rangeLabel).toBe('Weekly');
+    expect(view.protein.target).toBe(840);
+    expect(view.protein.pct).toBeCloseTo(0.5, 5);
+    expect(view.calories.target).toBe(14000);
+    expect(view.water.target).toBe(448);
   });
 
   it('hides setup once the dashboard is unlocked', () => {
@@ -104,5 +132,14 @@ describe('buildHomeView', () => {
     const view = buildHomeView(buildHome({ profile: null }));
     expect(view.protein.target).toBeNull();
     expect(view.protein.pct).toBe(0);
+  });
+
+  it('asks for a first scale check when there is no logged weight', () => {
+    const view = buildHomeView(buildHome({ latestWeight: null }));
+    expect(view.weightPulse).toMatchObject({
+      title: 'Add your first scale check',
+      latestLabel: null,
+      actionLabel: 'Add weight',
+    });
   });
 });

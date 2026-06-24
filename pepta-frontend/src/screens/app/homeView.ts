@@ -36,7 +36,16 @@ export interface GoalView {
   dateLabel: string;
 }
 
+export interface HomeWeightPulseView {
+  title: string;
+  detail: string;
+  latestLabel: string | null;
+  actionLabel: string;
+}
+
 export interface HomeView {
+  rangeLabel: string;
+  rangeDayCount: number;
   medication: MedicationView | null;
   calories: RingStat;
   protein: RingStat;
@@ -45,6 +54,7 @@ export interface HomeView {
   streakDays: number;
   setup: SetupView | null; // null once the dashboard is unlocked
   weight: { value: number; unit: string } | null;
+  weightPulse: HomeWeightPulseView;
   goal: GoalView | null;
   insight: Insight | null;
 }
@@ -89,6 +99,12 @@ export function buildHomeView(home: HomeResponse): HomeView {
   const nextDoseHours = home.nextDose?.hoursUntilNextDose ?? ml?.hoursUntilNextDose ?? null;
 
   const setup = home.setupProgress;
+  const rangeLabel = home.rangeTotals?.label ?? 'Today';
+  const rangeDayCount = Math.max(1, home.rangeTotals?.dayCount ?? 1);
+  const caloriesTarget = profile?.dailyCalorieTarget ? profile.dailyCalorieTarget * rangeDayCount : null;
+  const proteinTarget = profile?.dailyProteinTargetGrams ? profile.dailyProteinTargetGrams * rangeDayCount : null;
+  const fiberTarget = profile?.dailyFiberTargetGrams ? profile.dailyFiberTargetGrams * rangeDayCount : null;
+  const waterTarget = profile?.dailyWaterTargetOz ? profile.dailyWaterTargetOz * rangeDayCount : null;
 
   // Goal progress: baseline (profile.currentWeight) → latest → goalWeight.
   const start = profile?.currentWeight ?? null;
@@ -100,8 +116,24 @@ export function buildHomeView(home: HomeResponse): HomeView {
     if (start != null && start !== goalWeight) pct = Math.max(0, Math.min(1, (start - current) / (start - goalWeight)));
     goal = { pct, value: home.latestWeight.value, unit: home.latestWeight.unit, dateLabel: formatShortDate(home.latestWeight.datetime) };
   }
+  const latestWeight = home.latestWeight;
+  const weightPulse: HomeWeightPulseView = latestWeight
+    ? {
+        title: 'Today’s weigh-in?',
+        detail: `Last check was ${formatShortDate(latestWeight.datetime)}. Update it in a few seconds.`,
+        latestLabel: `${latestWeight.value} ${latestWeight.unit}`,
+        actionLabel: 'Log weight',
+      }
+    : {
+        title: 'Add your first scale check',
+        detail: 'A baseline weight makes your progress timeline useful from day one.',
+        latestLabel: null,
+        actionLabel: 'Add weight',
+      };
 
   return {
+    rangeLabel,
+    rangeDayCount,
     medication: ml
       ? {
           name: ml.compoundName,
@@ -112,10 +144,10 @@ export function buildHomeView(home: HomeResponse): HomeView {
           countdown: formatCountdown(nextDoseHours),
         }
       : null,
-    calories: ring(home.todayCalories, profile?.dailyCalorieTarget),
-    protein: ring(home.todayProteinGrams, profile?.dailyProteinTargetGrams),
-    fiber: ring(home.todayFiberGrams, profile?.dailyFiberTargetGrams),
-    water: ring(home.todayWaterOz, profile?.dailyWaterTargetOz),
+    calories: ring(home.rangeTotals?.calories ?? home.todayCalories, caloriesTarget),
+    protein: ring(home.rangeTotals?.proteinGrams ?? home.todayProteinGrams, proteinTarget),
+    fiber: ring(home.rangeTotals?.fiberGrams ?? home.todayFiberGrams, fiberTarget),
+    water: ring(home.rangeTotals?.waterOz ?? home.todayWaterOz, waterTarget),
     streakDays: home.streakDays,
     setup:
       setup && !setup.unlocked
@@ -127,6 +159,7 @@ export function buildHomeView(home: HomeResponse): HomeView {
           }
         : null,
     weight: home.latestWeight ? { value: home.latestWeight.value, unit: home.latestWeight.unit } : null,
+    weightPulse,
     goal,
     insight: home.insights[0] ?? null,
   };

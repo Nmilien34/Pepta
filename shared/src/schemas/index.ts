@@ -584,6 +584,21 @@ export const weeklyRetentionResponseSchema = z
   })
   .strict();
 
+export const homeRangeKeySchema = z.enum(["today", "week", "month", "year"]);
+
+export const homeRangeTotalsSchema = z
+  .object({
+    key: homeRangeKeySchema,
+    label: z.string().min(1),
+    proteinGrams: z.number().nonnegative(),
+    fiberGrams: z.number().nonnegative(),
+    calories: z.number().nonnegative(),
+    waterOz: z.number().nonnegative(),
+    dayCount: z.number().int().positive(),
+    hasData: z.boolean(),
+  })
+  .strict();
+
 export const stallDiagnosticInputSchema = z
   .object({
     lookbackDays: z.number().int().min(14).max(90).default(30),
@@ -739,6 +754,9 @@ export const homeResponseSchema = z
     profile: userProfileResponseSchema.nullable(),
     activeCompounds: z.array(compoundResponseSchema),
     medicationLevels: z.array(medicationLevelResponseSchema),
+    selectedRange: homeRangeKeySchema.default("today"),
+    rangeTotals: homeRangeTotalsSchema.optional(),
+    rangeAvailability: z.record(homeRangeKeySchema, z.boolean()).optional(),
     todayProteinGrams: z.number().nonnegative(),
     todayFiberGrams: z.number().nonnegative(),
     todayCalories: z.number().nonnegative(),

@@ -44,14 +44,15 @@ export function RulerPicker({ value, onChange, min, max }: RulerPickerProps) {
     setAudioModeAsync({ playsInSilentMode: true }).catch(() => undefined);
   }, []);
 
-  // Park on the initial value once the width is known.
+  // Keep the centered tick aligned with the controlled value. Scrolling drives
+  // value during drag; parent-driven changes like unit conversion should move
+  // the ruler too.
   useEffect(() => {
     if (width === 0) return;
     const x = (value - min) * TICK;
     const id = setTimeout(() => scrollRef.current?.scrollTo({ x, animated: false }), 0);
     return () => clearTimeout(id);
-    // park on mount / width change; scrolling drives value afterwards
-  }, [width]);
+  }, [value, min, width]);
 
   const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const x = e.nativeEvent.contentOffset.x;

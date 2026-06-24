@@ -89,9 +89,7 @@ export function TabBar({ state, navigation, onQuickLog }: TabBarProps) {
             borderRadius: 18,
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: 'rgba(255,255,255,0.62)',
-            borderWidth: 0.8,
-            borderColor: 'rgba(129,101,193,0.16)',
+            backgroundColor: 'rgba(255,255,255,0.52)',
             opacity: pressed ? 0.82 : 1,
             transform: [{ scale: pressed ? 0.97 : 1 }],
           })}
@@ -105,14 +103,13 @@ export function TabBar({ state, navigation, onQuickLog }: TabBarProps) {
               bottom: 4,
               left: 4,
               borderRadius: 15,
-              borderWidth: 1,
-              borderTopColor: 'rgba(255,255,255,0.8)',
-              borderLeftColor: 'rgba(255,255,255,0.62)',
-              borderRightColor: 'rgba(88,64,145,0.08)',
-              borderBottomColor: 'rgba(88,64,145,0.1)',
-              backgroundColor: 'rgba(255,255,255,0.16)',
+              backgroundColor: 'rgba(255,255,255,0.12)',
             }}
           />
+          <CornerMark corner="topLeft" />
+          <CornerMark corner="topRight" />
+          <CornerMark corner="bottomLeft" />
+          <CornerMark corner="bottomRight" />
           <LinearGradient
             colors={[theme.colors.primaryGradientStart, theme.colors.primaryGradientEnd] as const}
             start={{ x: 0, y: 0 }}
@@ -125,5 +122,31 @@ export function TabBar({ state, navigation, onQuickLog }: TabBarProps) {
       </View>
       {routes.slice(2).map(renderTab)}
     </View>
+  );
+}
+
+function CornerMark({ corner }: { corner: 'topLeft' | 'topRight' | 'bottomLeft' | 'bottomRight' }) {
+  const vertical = corner.includes('top') ? { top: 8 } : { bottom: 8 };
+  const horizontal = corner.includes('Left') ? { left: 8 } : { right: 8 };
+  return (
+    <View
+      pointerEvents="none"
+      style={{
+        position: 'absolute',
+        width: 12,
+        height: 12,
+        ...vertical,
+        ...horizontal,
+        borderColor: 'rgba(106,79,176,0.16)',
+        borderTopWidth: corner.includes('top') ? 1 : 0,
+        borderBottomWidth: corner.includes('bottom') ? 1 : 0,
+        borderLeftWidth: corner.includes('Left') ? 1 : 0,
+        borderRightWidth: corner.includes('Right') ? 1 : 0,
+        borderTopLeftRadius: corner === 'topLeft' ? 5 : 0,
+        borderTopRightRadius: corner === 'topRight' ? 5 : 0,
+        borderBottomLeftRadius: corner === 'bottomLeft' ? 5 : 0,
+        borderBottomRightRadius: corner === 'bottomRight' ? 5 : 0,
+      }}
+    />
   );
 }

@@ -19,6 +19,7 @@ import type {
   CompoundResponse,
   DoseLogInput,
   DoseLogResponse,
+  HomeRangeKey,
   HomeResponse,
   MealLogInput,
   MeasurementInput,
@@ -31,6 +32,13 @@ import type {
   WeightLogResponse,
 } from "@pepta/shared";
 import { api } from "../services/api";
+
+type RangeTotalPatch = Partial<
+  Pick<
+    NonNullable<HomeResponse["rangeTotals"]>,
+    "proteinGrams" | "fiberGrams" | "waterOz" | "calories"
+  >
+>;
 
 // Build a throwaway optimistic record from a log input (temp id; replaced by the
 // real row on the next refresh). Cast is safe — it's local-only, never validated.
@@ -52,7 +60,8 @@ interface PeptaDataContextValue {
   homeLoading: boolean; // first load (no data yet)
   homeRefreshing: boolean; // pull-to-refresh (data already shown)
   homeError: string | null;
-  refreshHome(): Promise<void>;
+  homeRange: HomeRangeKey;
+  refreshHome(range?: HomeRangeKey): Promise<void>;
   // Optimistic inline-stepper updates (Home water/protein).
   bumpProtein(grams: number): void;
   bumpWater(oz: number): void;
@@ -130,6 +139,7 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
   const [homeLoading, setHomeLoading] = useState(false);
   const [homeRefreshing, setHomeRefreshing] = useState(false);
   const [homeError, setHomeError] = useState<string | null>(null);
+  const [homeRange, setHomeRange] = useState<HomeRangeKey>("today");
   const [track, setTrack] = useState<TrackResponse | null>(null);
   const [trackLoading, setTrackLoading] = useState(false);
   const [trackRefreshing, setTrackRefreshing] = useState(false);
@@ -142,12 +152,14 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
   const hasTrack = useRef(false);
   const hasProgress = useRef(false);
 
-  const refreshHome = useCallback(async () => {
+  const refreshHome = useCallback(async (range?: HomeRangeKey) => {
+    const nextRange = range ?? homeRange;
+    if (range) setHomeRange(range);
     setHomeError(null);
     if (hasData.current) setHomeRefreshing(true);
     else setHomeLoading(true);
     try {
-      const data = await api.getHome();
+      const data = await api.getHome(nextRange);
       setHome(data);
       hasData.current = true;
     } catch (error) {
@@ -156,7 +168,22 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
       setHomeLoading(false);
       setHomeRefreshing(false);
     }
-  }, []);
+  }, [homeRange]);
+
+  const updateRangeTotals = useCallback(
+    (homeValue: HomeResponse, patch: RangeTotalPatch) => {
+      if (!homeValue.rangeTotals) return homeValue;
+      return {
+        ...homeValue,
+        rangeTotals: {
+          ...homeValue.rangeTotals,
+          ...patch,
+          hasData: true,
+        },
+      };
+    },
+    [],
+  );
 
   // Optimistic inline-stepper bumps. We update the on-screen total immediately,
   // then persist a positive delta as a new log (the backend log model is
@@ -165,7 +192,10 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
   const bumpProtein = useCallback((grams: number) => {
     setHome((h) =>
       h
-        ? { ...h, todayProteinGrams: Math.max(0, h.todayProteinGrams + grams) }
+        ? updateRangeTotals(
+            { ...h, todayProteinGrams: Math.max(0, h.todayProteinGrams + grams) },
+            { proteinGrams: Math.max(0, (h.rangeTotals?.proteinGrams ?? h.todayProteinGrams) + grams) },
+          )
         : h,
     );
     if (grams <= 0) return;
@@ -174,30 +204,48 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
       .catch(() => {
         setHome((h) =>
           h
-            ? {
-                ...h,
-                todayProteinGrams: Math.max(0, h.todayProteinGrams - grams),
-              }
+            ? updateRangeTotals(
+                {
+                  ...h,
+                  todayProteinGrams: Math.max(0, h.todayProteinGrams - grams),
+                },
+                { proteinGrams: Math.max(0, (h.rangeTotals?.proteinGrams ?? h.todayProteinGrams) - grams) },
+              )
             : h,
         );
       });
-  }, []);
+  }, [updateRangeTotals]);
   const bumpWater = useCallback((oz: number) => {
     setHome((h) =>
-      h ? { ...h, todayWaterOz: Math.max(0, h.todayWaterOz + oz) } : h,
+      h
+        ? updateRangeTotals(
+            { ...h, todayWaterOz: Math.max(0, h.todayWaterOz + oz) },
+            { waterOz: Math.max(0, (h.rangeTotals?.waterOz ?? h.todayWaterOz) + oz) },
+          )
+        : h,
     );
     if (oz <= 0) return;
     api
       .createWaterLog({ amountOz: oz, datetime: new Date().toISOString() })
       .catch(() => {
         setHome((h) =>
-          h ? { ...h, todayWaterOz: Math.max(0, h.todayWaterOz - oz) } : h,
+          h
+            ? updateRangeTotals(
+                { ...h, todayWaterOz: Math.max(0, h.todayWaterOz - oz) },
+                { waterOz: Math.max(0, (h.rangeTotals?.waterOz ?? h.todayWaterOz) - oz) },
+              )
+            : h,
         );
       });
-  }, []);
+  }, [updateRangeTotals]);
   const bumpFiber = useCallback((grams: number) => {
     setHome((h) =>
-      h ? { ...h, todayFiberGrams: Math.max(0, h.todayFiberGrams + grams) } : h,
+      h
+        ? updateRangeTotals(
+            { ...h, todayFiberGrams: Math.max(0, h.todayFiberGrams + grams) },
+            { fiberGrams: Math.max(0, (h.rangeTotals?.fiberGrams ?? h.todayFiberGrams) + grams) },
+          )
+        : h,
     );
     if (grams <= 0) return;
     api
@@ -205,11 +253,14 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
       .catch(() => {
         setHome((h) =>
           h
-            ? { ...h, todayFiberGrams: Math.max(0, h.todayFiberGrams - grams) }
+            ? updateRangeTotals(
+                { ...h, todayFiberGrams: Math.max(0, h.todayFiberGrams - grams) },
+                { fiberGrams: Math.max(0, (h.rangeTotals?.fiberGrams ?? h.todayFiberGrams) - grams) },
+              )
             : h,
         );
       });
-  }, []);
+  }, [updateRangeTotals]);
 
   const refreshTrack = useCallback(async () => {
     setTrackError(null);
@@ -277,15 +328,22 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
   const addMeal = useCallback((input: MealLogInput) => {
     setHome((h) =>
       h
-        ? {
-            ...h,
-            todayProteinGrams: h.todayProteinGrams + input.protein,
-            todayCalories: h.todayCalories + input.calories,
-            todayFiberGrams: h.todayFiberGrams + (input.fiber ?? 0),
-          }
+        ? updateRangeTotals(
+            {
+              ...h,
+              todayProteinGrams: h.todayProteinGrams + input.protein,
+              todayCalories: h.todayCalories + input.calories,
+              todayFiberGrams: h.todayFiberGrams + (input.fiber ?? 0),
+            },
+            {
+              proteinGrams: (h.rangeTotals?.proteinGrams ?? h.todayProteinGrams) + input.protein,
+              calories: (h.rangeTotals?.calories ?? h.todayCalories) + input.calories,
+              fiberGrams: (h.rangeTotals?.fiberGrams ?? h.todayFiberGrams) + (input.fiber ?? 0),
+            },
+          )
         : h,
     );
-  }, []);
+  }, [updateRangeTotals]);
 
   const addCompound = useCallback(
     async (input: CompoundInput) => {
@@ -319,6 +377,7 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
       homeLoading,
       homeRefreshing,
       homeError,
+      homeRange,
       refreshHome,
       bumpProtein,
       bumpWater,
@@ -345,6 +404,7 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
       homeLoading,
       homeRefreshing,
       homeError,
+      homeRange,
       refreshHome,
       bumpProtein,
       bumpWater,

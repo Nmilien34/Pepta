@@ -35,6 +35,19 @@ export function weightSeries(weights: WeightLogResponse[], range: RangeKey, now:
     .map((w) => ({ t: new Date(w.datetime).getTime(), value: w.value, iso: w.datetime }));
 }
 
+export function mergeWeightsWithLatest(
+  weights: WeightLogResponse[],
+  latestWeight: WeightLogResponse | null | undefined,
+): WeightLogResponse[] {
+  if (!latestWeight) return weights;
+  const withoutSameRow = weights.filter((w) => w.id !== latestWeight.id);
+  const newestProgress = sortWeights(withoutSameRow)[withoutSameRow.length - 1];
+  const latestTime = new Date(latestWeight.datetime).getTime();
+  const progressTime = newestProgress ? new Date(newestProgress.datetime).getTime() : -Infinity;
+  if (Number.isNaN(latestTime) || latestTime < progressTime) return weights;
+  return [...withoutSameRow, latestWeight];
+}
+
 export interface WeightSummary {
   current: number | null;
   start: number | null; // earliest logged (baseline), falls back to profile

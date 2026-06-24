@@ -43,6 +43,7 @@ import {
   type DoseLogInput,
   type DoseLogResponse,
   type GoogleAuth,
+  type HomeRangeKey,
   type HomeResponse,
   type MealLogInput,
   type MealLogResponse,
@@ -174,8 +175,9 @@ class PeptaApi {
     );
   }
 
-  public getHome(): Promise<HomeResponse> {
-    return this.request("/home", homeResponseSchema);
+  public getHome(range?: HomeRangeKey): Promise<HomeResponse> {
+    const suffix = range && range !== "today" ? `?range=${encodeURIComponent(range)}` : "";
+    return this.request(`/home${suffix}`, homeResponseSchema);
   }
 
   // POST /compounds → CompoundResponse (201). Adds a medication to track.

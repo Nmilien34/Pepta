@@ -5,6 +5,7 @@ import { buildActivity, buildTodaysLog } from './homeExtras';
 const now = new Date(2026, 5, 23, 14, 0, 0);
 const todayIso = new Date(2026, 5, 23, 9, 0, 0).toISOString();
 const yesterdayIso = new Date(2026, 5, 22, 9, 0, 0).toISOString();
+const lastMonthIso = new Date(2026, 4, 30, 9, 0, 0).toISOString();
 
 function track(p: Partial<TrackResponse> = {}): TrackResponse {
   return {
@@ -33,6 +34,19 @@ describe('buildActivity', () => {
     expect(a.stepTarget).toBe(3000);
     expect(a.workoutTarget).toBe(30);
   });
+
+  it('sums the selected range and scales targets', () => {
+    const t = track({ activityLogs: [
+      { steps: 4000, workoutMinutes: 10, datetime: todayIso, deletedAt: null },
+      { steps: 2240, workoutMinutes: 12, datetime: yesterdayIso, deletedAt: null },
+      { steps: 9999, workoutMinutes: 99, datetime: lastMonthIso, deletedAt: null },
+    ] as unknown as TrackResponse['activityLogs'] });
+    const a = buildActivity(t, { dailyStepTarget: 3000 } as unknown as UserProfileResponse, now, 'week');
+    expect(a.steps).toBe(6240);
+    expect(a.workoutMin).toBe(22);
+    expect(a.stepTarget).toBe(9000);
+    expect(a.workoutTarget).toBe(90);
+  });
 });
 
 describe('buildTodaysLog', () => {
@@ -50,5 +64,16 @@ describe('buildTodaysLog', () => {
   });
   it('returns empty with no logs', () => {
     expect(buildTodaysLog(track(), { activeCompounds: [], latestWeight: null } as unknown as HomeResponse, now)).toEqual([]);
+  });
+
+  it('collects logs for the selected range', () => {
+    const t = track({
+      waterLogs: [
+        { amountOz: 16, datetime: yesterdayIso, deletedAt: null },
+        { amountOz: 8, datetime: lastMonthIso, deletedAt: null },
+      ] as unknown as TrackResponse['waterLogs'],
+    });
+    const chips = buildTodaysLog(t, { activeCompounds: [], latestWeight: null } as unknown as HomeResponse, now, 'week');
+    expect(chips).toEqual([{ kind: 'water', label: '16 oz' }]);
   });
 });

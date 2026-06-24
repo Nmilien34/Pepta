@@ -11,7 +11,7 @@ router.use(requireAuth);
 router.get(
   '/',
   asyncHandler(async (req, res) => {
-    sendData(res, await getHome(req.user!.id));
+    sendData(res, await getHome(req.user!.id, new Date(), req.query.range));
   }),
 );
 

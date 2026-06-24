@@ -12,6 +12,7 @@ import { useTheme } from '../theme';
 import { AppText } from './AppText';
 import { Button } from './Button';
 import { Chip } from './onboarding/Chip';
+import { ProgressBar } from './ProgressBar';
 import { RulerPicker } from './RulerPicker';
 import { SegmentedToggle } from './onboarding/SegmentedToggle';
 import { cmToInches, inchesToCm, kgToLb, lbToKg } from '../utils/units';
@@ -313,7 +314,11 @@ export function QuickLogSheet({ visible, onClose, onMeal, initialMode }: QuickLo
             ) : null}
             {mode !== 'chooser' ? (
               <View style={{ marginTop: 14 }}>
-                <Button label={CTA[mode]} disabled={!canSave(mode, { dose, weight, seTypes, measureValue, activity })} onPress={onSave} />
+                {mode === 'weight' ? (
+                  <SheetSaveButton label={CTA[mode]} disabled={!canSave(mode, { dose, weight, seTypes, measureValue, activity })} onPress={onSave} />
+                ) : (
+                  <Button label={CTA[mode]} disabled={!canSave(mode, { dose, weight, seTypes, measureValue, activity })} onPress={onSave} />
+                )}
               </View>
             ) : null}
           </View>
@@ -524,19 +529,74 @@ const WEIGHT_UNITS: { label: string; value: WeightUnit }[] = [
 function WeightForm({ theme, value, onChange, unit, onUnit }: { theme: Theme; value: number; onChange: (v: number) => void; unit: WeightUnit; onUnit: (u: WeightUnit) => void }) {
   const min = unit === 'kg' ? 32 : 70;
   const max = unit === 'kg' ? 320 : 700;
+  const progressMin = unit === 'kg' ? 45 : 100;
+  const progressMax = unit === 'kg' ? 180 : 400;
+  const pct = Math.max(0, Math.min(1, (value - progressMin) / (progressMax - progressMin)));
   return (
     <View style={{ marginTop: 18, alignItems: 'center', gap: 16 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8 }}>
-        <AppText style={{ fontWeight: '800', fontSize: 52, letterSpacing: -2, color: theme.colors.textPrimary }}>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8, minHeight: 64 }}>
+        <AppText style={{ fontWeight: '800', fontSize: 52, lineHeight: 60, letterSpacing: -1, color: theme.colors.textPrimary }}>
           {value.toFixed(1)}
         </AppText>
-        <AppText variant="cardTitle" color="textSecondary">
+        <AppText variant="cardTitle" color="textSecondary" style={{ lineHeight: 28, paddingBottom: 8 }}>
           {unit}
         </AppText>
+      </View>
+      <View style={{ width: '82%', gap: 6 }}>
+        <ProgressBar pct={pct} color={theme.colors.weight} trackColor="rgba(226,92,196,0.11)" height={5} />
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+          <AppText variant="caption" color="textTertiary" style={{ fontSize: 10 }}>
+            {progressMin} {unit}
+          </AppText>
+          <AppText variant="caption" color="textTertiary" style={{ fontSize: 10 }}>
+            {progressMax} {unit}
+          </AppText>
+        </View>
       </View>
       <RulerPicker key={unit} value={value} onChange={onChange} min={min} max={max} />
       <SegmentedToggle options={WEIGHT_UNITS} value={unit} onChange={onUnit} />
     </View>
+  );
+}
+
+function SheetSaveButton({ label, disabled, onPress }: { label: string; disabled?: boolean; onPress(): void }) {
+  const theme = useTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: Boolean(disabled) }}
+      style={({ pressed }) => ({
+        height: 52,
+        borderRadius: 18,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: theme.colors.primary,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.34)',
+        opacity: disabled ? 0.5 : pressed ? 0.86 : 1,
+        transform: [{ scale: pressed && !disabled ? 0.985 : 1 }],
+        overflow: 'hidden',
+      })}
+    >
+      <View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          top: 1,
+          left: 1,
+          right: 1,
+          height: 24,
+          borderTopLeftRadius: 17,
+          borderTopRightRadius: 17,
+          backgroundColor: 'rgba(255,255,255,0.1)',
+        }}
+      />
+      <AppText variant="button" style={{ color: theme.colors.onPrimary, fontWeight: '800' }}>
+        {label}
+      </AppText>
+    </Pressable>
   );
 }
 

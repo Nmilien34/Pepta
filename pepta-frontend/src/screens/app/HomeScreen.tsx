@@ -6,23 +6,32 @@
 // calories / protein / fiber / water vs. their profile targets, logging streak,
 // setup progress, latest weight, and the first insight.
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { Icon } from "../../components/Icon";
 import * as Haptics from 'expo-haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import type { HomeRangeKey } from '@pepta/shared';
 import { useTheme } from '../../theme';
 import { AppText, Button, Card, CountUp, Mascot, ProgressBar, ProgressRing, Reveal, SectionErrorBanner, WaterCup } from '../../components';
 import { usePeptaData } from '../../context/PeptaDataContext';
 import { useLogSheets } from '../../context/LogSheetsContext';
-import { buildHomeView, type GoalView, type RingStat } from './homeView';
+import { buildHomeView, type GoalView, type HomeWeightPulseView, type RingStat } from './homeView';
 import { buildActivity, buildTodaysLog, type ActivitySummary, type LogChip, type LogKind } from './homeExtras';
 import { buildGettingStarted, buildPlanSummary, type GettingStarted, type LogAction, type PlanSummary } from './planView';
 
+const HOME_RANGES: { key: HomeRangeKey; label: string; short: string }[] = [
+  { key: 'today', label: 'Today', short: 'Day' },
+  { key: 'week', label: 'Weekly', short: 'Week' },
+  { key: 'month', label: 'Monthly', short: 'Month' },
+  { key: 'year', label: 'Yearly', short: 'Year' },
+];
+
 export function HomeScreen() {
   const theme = useTheme();
-  const { home, track, homeLoading, homeError, homeRefreshing, refreshHome, refreshTrack, bumpProtein, bumpWater, bumpFiber } = usePeptaData();
+  const { home, track, homeLoading, homeError, homeRefreshing, homeRange, refreshHome, refreshTrack, bumpProtein, bumpWater, bumpFiber } = usePeptaData();
   const { openQuickLog, openMeal } = useLogSheets();
+  const [rangeOpen, setRangeOpen] = useState(false);
 
   const onTask = (action: LogAction | null) => {
     if (action === 'meal') openMeal();
@@ -65,8 +74,16 @@ export function HomeScreen() {
   const view = buildHomeView(home);
   const plan = buildPlanSummary(home);
   const gettingStarted = buildGettingStarted(home);
-  const activity = buildActivity(track, home.profile, new Date());
-  const todaysLog = buildTodaysLog(track, home, new Date());
+  const selectedRange = home.selectedRange ?? homeRange;
+  const rangeAvailability = home.rangeAvailability ?? { today: true, week: false, month: false, year: false };
+  const activity = buildActivity(track, home.profile, new Date(), selectedRange);
+  const todaysLog = buildTodaysLog(track, home, new Date(), selectedRange);
+  const selectRange = (range: HomeRangeKey) => {
+    if (!rangeAvailability[range]) return;
+    Haptics.selectionAsync().catch(() => undefined);
+    setRangeOpen(false);
+    void refreshHome(range);
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.bg }}>
@@ -79,7 +96,7 @@ export function HomeScreen() {
           }
         >
           {/* header */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 4 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 4, zIndex: 20 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
               <View style={{ width: 34, height: 34, borderRadius: theme.radii.pill, backgroundColor: '#EFEBFF', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
                 <Mascot pose="idle" size={29} />
@@ -89,19 +106,87 @@ export function HomeScreen() {
               </AppText>
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
-              <Pressable
-                onPress={() => Haptics.selectionAsync().catch(() => undefined)}
-                style={[
-                  { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 7, paddingHorizontal: 11, borderRadius: theme.radii.pill, backgroundColor: theme.colors.surface, borderWidth: 0.5, borderColor: theme.colors.border },
-                  theme.shadows.card,
-                ]}
-              >
-                <Icon name="calendar" size={14} color={theme.colors.textSecondary} stroke={2.1} />
-                <AppText variant="caption" style={{ fontWeight: '700', fontSize: 13 }}>
-                  Today
-                </AppText>
-                <Icon name="chevron-down" size={13} color={theme.colors.textTertiary} stroke={2.2} />
-              </Pressable>
+              <View style={{ position: 'relative' }}>
+                <Pressable
+                  onPress={() => {
+                    Haptics.selectionAsync().catch(() => undefined);
+                    setRangeOpen((open) => !open);
+                  }}
+                  style={[
+                    { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 7, paddingHorizontal: 11, borderRadius: theme.radii.pill, backgroundColor: theme.colors.surface, borderWidth: 0.5, borderColor: theme.colors.border },
+                    theme.shadows.card,
+                  ]}
+                >
+                  <Icon name="calendar" size={14} color={theme.colors.textSecondary} stroke={2.1} />
+                  <AppText variant="caption" style={{ fontWeight: '700', fontSize: 13 }}>
+                    {HOME_RANGES.find((range) => range.key === selectedRange)?.label ?? view.rangeLabel}
+                  </AppText>
+                  <Icon name={rangeOpen ? 'chevron-up' : 'chevron-down'} size={13} color={theme.colors.textTertiary} stroke={2.2} />
+                </Pressable>
+                {rangeOpen ? (
+                  <View
+                    style={[
+                      {
+                        position: 'absolute',
+                        top: 42,
+                        right: 0,
+                        width: 176,
+                        borderRadius: 22,
+                        backgroundColor: theme.colors.surface,
+                        borderWidth: 0.5,
+                        borderColor: 'rgba(17,17,26,0.08)',
+                        padding: 6,
+                        shadowColor: '#11111A',
+                        shadowOpacity: 0.08,
+                        shadowRadius: 18,
+                        shadowOffset: { width: 0, height: 10 },
+                        elevation: 5,
+                      },
+                    ]}
+                  >
+                    {HOME_RANGES.map((range) => {
+                      const active = selectedRange === range.key;
+                      const enabled = rangeAvailability[range.key] ?? range.key === 'today';
+                      return (
+                        <Pressable
+                          key={range.key}
+                          disabled={!enabled}
+                          onPress={() => selectRange(range.key)}
+                          style={({ pressed }) => ({
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            paddingVertical: 10,
+                            paddingHorizontal: 11,
+                            borderRadius: 16,
+                            backgroundColor: active ? '#EFEBFF' : 'transparent',
+                            opacity: !enabled ? 0.38 : pressed ? 0.68 : 1,
+                          })}
+                        >
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            <Icon
+                              name={range.key === 'today' ? 'calendar' : range.key === 'week' ? 'calendar-week' : 'calendar-range'}
+                              size={15}
+                              color={active ? theme.colors.primary : enabled ? theme.colors.textSecondary : theme.colors.textTertiary}
+                              stroke={2.1}
+                            />
+                            <AppText
+                              variant="caption"
+                              style={{
+                                fontWeight: active ? '800' : '700',
+                                color: active ? theme.colors.primary : enabled ? theme.colors.textPrimary : theme.colors.textTertiary,
+                              }}
+                            >
+                              {range.label}
+                            </AppText>
+                          </View>
+                          {active ? <Icon name="checkmark" size={14} color={theme.colors.primary} stroke={2.4} /> : null}
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                ) : null}
+              </View>
               {view.streakDays > 0 ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 7, paddingHorizontal: 11, borderRadius: theme.radii.pill, backgroundColor: '#FFF1E8' }}>
                   <Icon name="fire" size={14} color={theme.colors.streak} />
@@ -248,6 +333,10 @@ export function HomeScreen() {
             </View>
           </Reveal>
 
+          <Reveal delay={250} style={{ marginTop: 12 }}>
+            <HomeWeightPulseCard pulse={view.weightPulse} onLog={() => openQuickLog('weight')} />
+          </Reveal>
+
           {/* activity */}
           <Reveal delay={280} style={{ marginTop: 12 }}>
             <ActivityCard activity={activity} />
@@ -255,7 +344,7 @@ export function HomeScreen() {
 
           {/* today's log */}
           <Reveal delay={340} style={{ marginTop: 12 }}>
-            <TodaysLogCard chips={todaysLog} />
+            <TodaysLogCard chips={todaysLog} rangeLabel={view.rangeLabel} />
           </Reveal>
 
           {/* insight */}
@@ -445,6 +534,90 @@ function GoalCard({ goal }: { goal: GoalView | null }) {
   );
 }
 
+function HomeWeightPulseCard({ pulse, onLog }: { pulse: HomeWeightPulseView; onLog(): void }) {
+  const theme = useTheme();
+  const hasWeight = pulse.latestLabel != null;
+  return (
+    <Card style={{ overflow: 'hidden' }}>
+      <View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          top: -34,
+          right: -18,
+          width: 120,
+          height: 120,
+          borderRadius: 60,
+          backgroundColor: 'rgba(226,92,196,0.08)',
+        }}
+      />
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        <View
+          style={{
+            width: 42,
+            height: 42,
+            borderRadius: 18,
+            backgroundColor: '#FBEAF6',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Icon name="scale" size={20} color={theme.colors.weight} stroke={2.4} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <AppText variant="caption" color="textTertiary" style={{ fontWeight: '800', fontSize: 10, textTransform: 'uppercase' }}>
+            Scale check
+          </AppText>
+          <AppText variant="cardTitle" style={{ fontSize: 16, marginTop: 2 }}>
+            {pulse.title}
+          </AppText>
+          <AppText variant="caption" color="textSecondary" style={{ marginTop: 4, lineHeight: 17 }}>
+            {pulse.detail}
+          </AppText>
+        </View>
+        {hasWeight ? (
+          <View style={{ alignItems: 'flex-end' }}>
+            <AppText variant="statMedium" style={{ color: theme.colors.weight }}>
+              {pulse.latestLabel}
+            </AppText>
+            <AppText variant="caption" color="textTertiary" style={{ fontSize: 10 }}>
+              latest
+            </AppText>
+          </View>
+        ) : null}
+      </View>
+      <View style={{ marginTop: 14, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <Pressable
+          onPress={() => {
+            Haptics.selectionAsync().catch(() => undefined);
+            onLog();
+          }}
+          style={({ pressed }) => ({
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 7,
+            paddingVertical: 9,
+            paddingHorizontal: 13,
+            borderRadius: theme.radii.pill,
+            backgroundColor: '#FBEAF6',
+            borderWidth: 1,
+            borderColor: 'rgba(226,92,196,0.16)',
+            opacity: pressed ? 0.72 : 1,
+          })}
+        >
+          <Icon name="add" size={15} color={theme.colors.weight} stroke={2.6} />
+          <AppText variant="caption" style={{ color: theme.colors.weight, fontWeight: '800' }}>
+            {pulse.actionLabel}
+          </AppText>
+        </Pressable>
+        <AppText variant="caption" color="textTertiary" style={{ flex: 1, lineHeight: 16 }}>
+          No pressure. One quick check-in keeps your trend honest.
+        </AppText>
+      </View>
+    </Card>
+  );
+}
+
 function ActivityCard({ activity }: { activity: ActivitySummary }) {
   const theme = useTheme();
   const stepsPct = activity.stepTarget > 0 ? Math.min(1, activity.steps / activity.stepTarget) : 0;
@@ -500,15 +673,16 @@ const LOG_META: Record<LogKind, { icon: string; color: string }> = {
   activity: { icon: 'walk', color: '#34C759' },
 };
 
-function TodaysLogCard({ chips }: { chips: LogChip[] }) {
+function TodaysLogCard({ chips, rangeLabel }: { chips: LogChip[]; rangeLabel: string }) {
   const theme = useTheme();
+  const title = rangeLabel === 'Today' ? 'Today’s Log' : `${rangeLabel} Log`;
   return (
     <Card>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <Icon name="list" size={18} color={theme.colors.textSecondary} />
           <AppText variant="cardTitle" style={{ fontSize: 16 }}>
-            Today’s Log ({chips.length})
+            {title} ({chips.length})
           </AppText>
         </View>
         <AppText variant="caption" color="primary" style={{ fontWeight: '700' }}>
@@ -531,7 +705,7 @@ function TodaysLogCard({ chips }: { chips: LogChip[] }) {
         </View>
       ) : (
         <AppText variant="caption" color="textTertiary" style={{ marginTop: 12 }}>
-          Nothing logged yet — tap + to add your first entry today.
+          Nothing logged yet — tap + to add your first entry.
         </AppText>
       )}
     </Card>

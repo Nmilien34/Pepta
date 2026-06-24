@@ -7,6 +7,7 @@ import {
   weightPulse,
   latestMeasurements,
   latestRetention,
+  mergeWeightsWithLatest,
   weightSeries,
   weightSummary,
 } from './progressView';
@@ -53,6 +54,23 @@ describe('weightSummary', () => {
     const s = weightSummary([], profile);
     expect(s.current).toBe(196);
     expect(s.difference).toBe(0);
+  });
+});
+
+describe('mergeWeightsWithLatest', () => {
+  it('adds a newer home latest weight when progress rows are stale', () => {
+    const latest = w(182.5, '2026-06-23T08:00:00.000Z');
+    const merged = mergeWeightsWithLatest(weights, latest);
+
+    expect(merged).toHaveLength(4);
+    expect(weightSummary(merged, profile).current).toBe(182.5);
+  });
+
+  it('does not duplicate the same latest weight row', () => {
+    const latest = weights[2]!;
+    const merged = mergeWeightsWithLatest(weights, latest);
+
+    expect(merged).toHaveLength(3);
   });
 });
 
