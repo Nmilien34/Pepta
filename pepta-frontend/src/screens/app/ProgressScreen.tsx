@@ -10,6 +10,7 @@ import * as Haptics from 'expo-haptics';
 import { useNavigation, type NavigationProp } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../theme';
+import { useLogSheets } from '../../context/LogSheetsContext';
 import {
   AppText,
   Button,
@@ -27,23 +28,29 @@ import {
 
 type TabsNav = NavigationProp<Record<'Home' | 'Track' | 'Progress' | 'Account', undefined>>;
 import { usePeptaData } from '../../context/PeptaDataContext';
+import { api } from '../../services/api';
+import { toWeightInput, type WeightUnit } from './quickLog';
 import {
   RANGE_KEYS,
   formatShortDate,
   sortWeights,
   summary,
+  weightPulse,
   weightSeries,
   type RangeKey,
   type RetentionTone,
+  type WeightPulseView,
 } from './progressView';
 
 export function ProgressScreen() {
   const theme = useTheme();
   const navigation = useNavigation<TabsNav>();
-  const { home, progress, progressLoading, progressRefreshing, progressError, refreshProgress, refreshHome } =
+  const { openQuickLog } = useLogSheets();
+  const { home, progress, progressLoading, progressRefreshing, progressError, refreshProgress, refreshHome, addWeightLog } =
     usePeptaData();
   const [range, setRange] = useState<RangeKey>('90d');
   const [photoOpen, setPhotoOpen] = useState(false);
+  const [pulseSaving, setPulseSaving] = useState(false);
 
   useEffect(() => {
     if (!progress) void refreshProgress();
@@ -81,8 +88,10 @@ export function ProgressScreen() {
   }
 
   const profile = home?.profile ?? null;
+  const nowDate = new Date();
   const s = summary(progress, profile);
-  const series = weightSeries(progress.weights, range, new Date());
+  const pulse = weightPulse(progress.weights, profile, nowDate);
+  const series = weightSeries(progress.weights, range, nowDate);
   const sortedW = sortWeights(progress.weights);
   const startDate = sortedW[0]?.datetime ?? null;
   const sectionErrors = { ...(progress.sectionErrors ?? {}), ...(home?.sectionErrors ?? {}) };
@@ -96,6 +105,27 @@ export function ProgressScreen() {
   const pickRange = (r: RangeKey) => {
     Haptics.selectionAsync().catch(() => undefined);
     setRange(r);
+  };
+
+  const saveWeightPulse = (delta: number) => {
+    const last = pulse.lastWeight;
+    if (!last || pulseSaving) {
+      openQuickLog('weight');
+      return;
+    }
+    const nextValue = Math.max(0, Math.round((last.value + delta) * 10) / 10);
+    const input = toWeightInput(nextValue, last.unit as WeightUnit, new Date().toISOString());
+    setPulseSaving(true);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
+    addWeightLog(input);
+    api
+      .createWeightLog(input)
+      .then(refreshAll)
+      .catch(() => {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => undefined);
+        return refreshAll();
+      })
+      .finally(() => setPulseSaving(false));
   };
 
   return (
@@ -297,6 +327,13 @@ export function ProgressScreen() {
                 <View style={{ marginTop: 10 }}>
                   <ProgressBar pct={s.weight.toGoalPct} color={theme.colors.weight} delay={340} height={8} />
                 </View>
+                <WeightPulseCard
+                  pulse={pulse}
+                  saving={pulseSaving}
+                  onSame={() => saveWeightPulse(0)}
+                  onStep={saveWeightPulse}
+                  onEdit={() => openQuickLog('weight')}
+                />
               </Card>
             </Reveal>
           ) : null}
@@ -396,6 +433,100 @@ function VerdictPill({ tone, label }: { tone: RetentionTone; label: string }) {
         {label}
       </AppText>
     </View>
+  );
+}
+
+function WeightPulseCard({
+  pulse,
+  saving,
+  onSame,
+  onStep,
+  onEdit,
+}: {
+  pulse: WeightPulseView;
+  saving: boolean;
+  onSame(): void;
+  onStep(delta: number): void;
+  onEdit(): void;
+}) {
+  const theme = useTheme();
+  const showPulse = pulse.state !== 'fresh';
+  if (!showPulse) return null;
+
+  const lastLabel = pulse.lastWeight ? `${pulse.lastWeight.value} ${pulse.lastWeight.unit}` : 'No scale weight yet';
+
+  return (
+    <View
+      style={{
+        marginTop: 14,
+        paddingTop: 12,
+        borderTopWidth: 1,
+        borderTopColor: theme.colors.border,
+        gap: 10,
+      }}
+    >
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
+        <View
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: 16,
+            backgroundColor: 'rgba(226,92,196,0.1)',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Icon name="scale" size={17} color={theme.colors.weight} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <AppText variant="caption" color="textTertiary" style={{ fontWeight: '800', textTransform: 'uppercase', fontSize: 10 }}>
+            Weight pulse
+          </AppText>
+          <AppText variant="bodyStrong" style={{ marginTop: 2 }}>
+            {lastLabel}
+          </AppText>
+          <AppText variant="caption" color="textSecondary" style={{ marginTop: 3, lineHeight: 17 }}>
+            {pulse.copy}
+          </AppText>
+        </View>
+      </View>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+        <PulseAction label={pulse.actionLabel} primary disabled={saving} onPress={onSame} />
+        {pulse.lastWeight ? (
+          <>
+            <PulseAction label="-0.5" disabled={saving} onPress={() => onStep(-0.5)} />
+            <PulseAction label="+0.5" disabled={saving} onPress={() => onStep(0.5)} />
+          </>
+        ) : null}
+        <PulseAction label="Edit" disabled={saving} onPress={onEdit} />
+      </View>
+    </View>
+  );
+}
+
+function PulseAction({ label, onPress, disabled, primary }: { label: string; onPress(): void; disabled?: boolean; primary?: boolean }) {
+  const theme = useTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      hitSlop={6}
+      style={{
+        minHeight: 32,
+        paddingHorizontal: 12,
+        borderRadius: theme.radii.pill,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: primary ? 'rgba(226,92,196,0.13)' : 'rgba(255,255,255,0.68)',
+        borderWidth: 1,
+        borderColor: primary ? 'rgba(226,92,196,0.2)' : theme.colors.border,
+        opacity: disabled ? 0.55 : 1,
+      }}
+    >
+      <AppText variant="caption" style={{ color: primary ? theme.colors.weight : theme.colors.textPrimary, fontWeight: '800' }}>
+        {label}
+      </AppText>
+    </Pressable>
   );
 }
 

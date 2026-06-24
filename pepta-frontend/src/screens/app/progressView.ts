@@ -60,6 +60,69 @@ export function weightSummary(weights: WeightLogResponse[], profile: UserProfile
   return { current, start, unit, difference, goalWeight, toGoalPct };
 }
 
+export type WeightPulseState = 'missing' | 'fresh' | 'stale';
+
+export interface WeightPulseView {
+  state: WeightPulseState;
+  daysSince: number | null;
+  lastWeight: { value: number; unit: string } | null;
+  copy: string;
+  actionLabel: string;
+}
+
+const WEIGHT_PULSE_STALE_DAYS = 7;
+
+function calendarDayStamp(date: Date): number {
+  return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+export function weightPulse(
+  weights: WeightLogResponse[],
+  profile: UserProfileResponse | null,
+  now: Date,
+): WeightPulseView {
+  const sorted = sortWeights(weights);
+  const latest = sorted[sorted.length - 1];
+  const fallbackWeight =
+    profile?.currentWeight != null
+      ? { value: profile.currentWeight, unit: profile.weightUnit ?? 'lb' }
+      : null;
+
+  if (!latest) {
+    return {
+      state: 'missing',
+      daysSince: null,
+      lastWeight: fallbackWeight,
+      copy: 'Add a quick baseline so your trend has something real to follow.',
+      actionLabel: 'Add weight',
+    };
+  }
+
+  const latestTime = new Date(latest.datetime).getTime();
+  const daysSince = Number.isNaN(latestTime)
+    ? null
+    : Math.max(0, Math.round((calendarDayStamp(now) - calendarDayStamp(new Date(latest.datetime))) / 86_400_000));
+  const lastWeight = { value: latest.value, unit: latest.unit };
+
+  if (daysSince != null && daysSince >= WEIGHT_PULSE_STALE_DAYS) {
+    return {
+      state: 'stale',
+      daysSince,
+      lastWeight,
+      copy: `Last weigh-in was ${daysSince} days ago. Want a 5-second check?`,
+      actionLabel: 'Same',
+    };
+  }
+
+  return {
+    state: 'fresh',
+    daysSince,
+    lastWeight,
+    copy: daysSince === 0 ? 'Logged today. Tiny win.' : 'Recent weigh-in is in your timeline.',
+    actionLabel: 'Same',
+  };
+}
+
 export interface BmiView {
   value: number;
   category: string;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CompoundResponse, HomeResponse } from '@pepta/shared';
-import { homeWithAddedCompound } from './PeptaDataContext';
+import { homeWithAddedCompound, homeWithLatestWeight } from './PeptaDataContext';
 
 const baseHome = {
   activeCompounds: [
@@ -52,5 +52,19 @@ describe('homeWithAddedCompound', () => {
 
     expect(next?.activeCompounds).toHaveLength(1);
     expect(next?.activeCompounds[0]?.plannedDose).toBe(7.5);
+  });
+});
+
+describe('homeWithLatestWeight', () => {
+  it('updates the home latest weight after an optimistic weight log', () => {
+    const next = homeWithLatestWeight(baseHome, {
+      value: 183.5,
+      unit: 'lb',
+      datetime: '2026-06-23T12:00:00.000Z',
+    });
+
+    expect(next?.latestWeight?.value).toBe(183.5);
+    expect(next?.latestWeight?.unit).toBe('lb');
+    expect(next?.latestWeight?.datetime).toBe('2026-06-23T12:00:00.000Z');
   });
 });

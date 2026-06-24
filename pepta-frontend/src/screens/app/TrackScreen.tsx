@@ -12,6 +12,7 @@ import Svg, { Circle, Path } from 'react-native-svg';
 import { useTheme } from '../../theme';
 import { AddCompoundSheet, AppText, BodyMap, Button, Card, Mascot, ProgressRing, Reveal, ScreenHeader, SectionErrorBanner } from '../../components';
 import { usePeptaData } from '../../context/PeptaDataContext';
+import { useLogSheets } from '../../context/LogSheetsContext';
 import { formatCountdown } from './homeView';
 import {
   compoundIconName,
@@ -34,6 +35,7 @@ const RANGES = ['7d', '30d', '90d', '1y'];
 export function TrackScreen() {
   const theme = useTheme();
   const navigation = useNavigation<TabsNav>();
+  const { openQuickLog } = useLogSheets();
   const data = usePeptaData();
   const { home, track, homeLoading, trackLoading, homeError, trackError, trackRefreshing, refreshHome, refreshTrack } =
     data;
@@ -121,7 +123,11 @@ export function TrackScreen() {
                 </ProgressRing>
               </Card>
             ) : (
-              <EmptyCard line="Tap + to log your first shot — I’ll track your next dose." />
+              <EmptyCard
+                line="Log your first shot — I’ll track your next dose."
+                actionLabel="Log first shot"
+                onAction={() => openQuickLog('dose')}
+              />
             )}
           </Reveal>
 
@@ -210,33 +216,14 @@ export function TrackScreen() {
           </Reveal>
 
           {/* medication level chart */}
-          {ml && ml.curve.length > 1 ? (
+          {ml || compounds.length > 0 ? (
             <Reveal delay={300} style={{ marginTop: 12 }}>
               <Card>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Icon name="chart-line" size={18} color={theme.colors.primary} />
-                  <AppText variant="cardTitle" style={{ fontSize: 15 }}>
-                    Medication level
-                  </AppText>
-                </View>
-                <View style={{ flexDirection: 'row', alignSelf: 'flex-start', backgroundColor: theme.colors.surfaceAlt, borderRadius: theme.radii.pill, padding: 3, marginTop: theme.spacing.md }}>
-                  {RANGES.map((r, i) => (
-                    <View key={r} style={[{ paddingVertical: 5, paddingHorizontal: 11, borderRadius: theme.radii.pill }, i === 0 ? { backgroundColor: theme.colors.surface } : null]}>
-                      <AppText variant="caption" color={i === 0 ? 'textPrimary' : 'textSecondary'} style={{ fontWeight: '700' }}>
-                        {r}
-                      </AppText>
-                    </View>
-                  ))}
-                </View>
-                <LevelChart levels={ml.curve.map((p) => p.level)} color={theme.colors.primary} />
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
-                  <AppText variant="caption" color="textSecondary">
-                    Current {ml.currentEstimate}
-                  </AppText>
-                  <AppText variant="caption" color="textSecondary">
-                    Peak {ml.peakEstimate} · Trough {ml.troughEstimate}
-                  </AppText>
-                </View>
+                <MedicationLevelCardContent
+                  ml={ml}
+                  compoundName={ml?.compoundName ?? compounds[0]?.name ?? 'Medication'}
+                  onLogDose={() => openQuickLog('dose')}
+                />
               </Card>
             </Reveal>
           ) : null}
@@ -342,6 +329,96 @@ function LevelChart({ levels, color }: { levels: number[]; color: string }) {
   );
 }
 
+function MedicationLevelCardContent({
+  ml,
+  compoundName,
+  onLogDose,
+}: {
+  ml: NonNullable<ReturnType<typeof usePeptaData>['home']>['medicationLevels'][number] | null;
+  compoundName: string;
+  onLogDose: () => void;
+}) {
+  const theme = useTheme();
+  const hasCurve = !!ml && ml.curve.length > 1;
+
+  return (
+    <>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Icon name="chart-line" size={18} color={theme.colors.primary} />
+          <AppText variant="cardTitle" style={{ fontSize: 15 }}>
+            Medication level
+          </AppText>
+        </View>
+        {ml ? (
+          <View style={{ backgroundColor: theme.colors.surfaceAlt, paddingVertical: 4, paddingHorizontal: 9, borderRadius: theme.radii.pill }}>
+            <AppText variant="caption" color="primary" style={{ fontWeight: '800' }}>
+              {Math.round((ml.currentEstimate / Math.max(ml.peakEstimate, 1)) * 100)}%
+            </AppText>
+          </View>
+        ) : null}
+      </View>
+
+      {hasCurve ? (
+        <>
+          <View style={{ flexDirection: 'row', alignSelf: 'flex-start', backgroundColor: theme.colors.surfaceAlt, borderRadius: theme.radii.pill, padding: 3, marginTop: theme.spacing.md }}>
+            {RANGES.map((r, i) => (
+              <View key={r} style={[{ paddingVertical: 5, paddingHorizontal: 11, borderRadius: theme.radii.pill }, i === 0 ? { backgroundColor: theme.colors.surface } : null]}>
+                <AppText variant="caption" color={i === 0 ? 'textPrimary' : 'textSecondary'} style={{ fontWeight: '700' }}>
+                  {r}
+                </AppText>
+              </View>
+            ))}
+          </View>
+          <LevelChart levels={ml.curve.map((p) => p.level)} color={theme.colors.primary} />
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
+            <AppText variant="caption" color="textSecondary">
+              Current {ml.currentEstimate}
+            </AppText>
+            <AppText variant="caption" color="textSecondary">
+              Peak {ml.peakEstimate} · Trough {ml.troughEstimate}
+            </AppText>
+          </View>
+        </>
+      ) : (
+        <View style={{ marginTop: theme.spacing.md, backgroundColor: theme.colors.surfaceAlt, borderRadius: theme.radii.card, padding: 14, gap: 10 }}>
+          <AppText variant="bodyStrong" style={{ fontWeight: '800' }}>
+            {compoundName}
+          </AppText>
+          <AppText variant="body" color="textSecondary">
+            Log your first shot to start building your medication level curve.
+          </AppText>
+          <Pressable
+            onPress={() => {
+              Haptics.selectionAsync().catch(() => undefined);
+              onLogDose();
+            }}
+            style={({ pressed }) => ({
+              alignSelf: 'flex-start',
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 7,
+              paddingVertical: 8,
+              paddingHorizontal: 12,
+              borderRadius: theme.radii.pill,
+              backgroundColor: 'rgba(126, 87, 194, 0.08)',
+              borderWidth: 0.5,
+              borderColor: 'rgba(126, 87, 194, 0.16)',
+              opacity: pressed ? 0.72 : 1,
+            })}
+            accessibilityRole="button"
+          >
+            <Icon name="add" size={14} color={theme.colors.primary} />
+            <AppText variant="caption" color="primary" style={{ fontWeight: '800' }}>
+              Log shot
+            </AppText>
+          </Pressable>
+        </View>
+      )}
+    </>
+  );
+}
+
 function SeverityDots({ level }: { level: number }) {
   const theme = useTheme();
   // 1-2 mild (success), 3 moderate (warning), 4-5 strong (danger).
@@ -379,7 +456,7 @@ function Legend({ dotColor, ring, label }: { dotColor?: string; ring?: boolean; 
   );
 }
 
-function EmptyCard({ line }: { line: string }) {
+function EmptyCard({ line, actionLabel, onAction }: { line: string; actionLabel?: string; onAction?: () => void }) {
   const theme = useTheme();
   return (
     <Card style={{ alignItems: 'center', paddingVertical: theme.spacing['2xl'], gap: theme.spacing.md }}>
@@ -387,6 +464,35 @@ function EmptyCard({ line }: { line: string }) {
       <AppText variant="bodyStrong" color="textSecondary" align="center">
         {line}
       </AppText>
+      {actionLabel && onAction ? (
+        <Pressable
+          onPress={() => {
+            Haptics.selectionAsync().catch(() => undefined);
+            onAction();
+          }}
+          style={({ pressed }) => ({
+            marginTop: 2,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 7,
+            paddingVertical: 9,
+            paddingHorizontal: 13,
+            borderRadius: theme.radii.pill,
+            backgroundColor: 'rgba(126, 87, 194, 0.08)',
+            borderWidth: 0.5,
+            borderColor: 'rgba(126, 87, 194, 0.16)',
+            opacity: pressed ? 0.72 : 1,
+          })}
+          accessibilityRole="button"
+        >
+          <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: theme.colors.primary, alignItems: 'center', justifyContent: 'center' }}>
+            <Icon name="add" size={13} color={theme.colors.onPrimary} />
+          </View>
+          <AppText variant="caption" color="primary" style={{ fontWeight: '800' }}>
+            {actionLabel}
+          </AppText>
+        </Pressable>
+      ) : null}
     </Card>
   );
 }

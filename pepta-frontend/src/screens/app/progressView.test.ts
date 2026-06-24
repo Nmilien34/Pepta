@@ -4,6 +4,7 @@ import {
   bmiView,
   computeBmi,
   formatShortDate,
+  weightPulse,
   latestMeasurements,
   latestRetention,
   weightSeries,
@@ -52,6 +53,33 @@ describe('weightSummary', () => {
     const s = weightSummary([], profile);
     expect(s.current).toBe(196);
     expect(s.difference).toBe(0);
+  });
+});
+
+describe('weightPulse', () => {
+  it('asks for a first check-in when no weight has been logged', () => {
+    const pulse = weightPulse([], profile, now);
+
+    expect(pulse.state).toBe('missing');
+    expect(pulse.actionLabel).toBe('Add weight');
+    expect(pulse.lastWeight).toEqual({ value: 196, unit: 'lb' });
+  });
+
+  it('stays quiet when the last weigh-in is fresh', () => {
+    const pulse = weightPulse(weights, profile, now);
+
+    expect(pulse.state).toBe('fresh');
+    expect(pulse.daysSince).toBe(1);
+    expect(pulse.actionLabel).toBe('Same');
+  });
+
+  it('nudges when the last weigh-in is stale', () => {
+    const staleNow = new Date(2026, 6, 4);
+    const pulse = weightPulse(weights, profile, staleNow);
+
+    expect(pulse.state).toBe('stale');
+    expect(pulse.daysSince).toBe(13);
+    expect(pulse.copy).toContain('13 days');
   });
 });
 

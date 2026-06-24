@@ -105,6 +105,16 @@ export function QuickLogSheet({ visible, onClose, onMeal, initialMode }: QuickLo
     }
   }, [visible]);
 
+  useEffect(() => {
+    if (!visible || mode !== 'dose' || dose) return;
+    const nextDose = defaultDoseDraft(home, track);
+    if (nextDose) {
+      setDose(nextDose);
+      return;
+    }
+    void refreshHome();
+  }, [visible, mode, dose, home, track, refreshHome]);
+
   const close = () => onClose();
 
   // Optimistic commit: apply the local update + close instantly, then POST in the
@@ -125,6 +135,7 @@ export function QuickLogSheet({ visible, onClose, onMeal, initialMode }: QuickLo
 
   const now = () => new Date().toISOString();
   const refreshHomeTrack = () => Promise.all([refreshHome(), refreshTrack()]).then(() => undefined);
+  const refreshHomeProgress = () => Promise.all([refreshHome(), refreshProgress()]).then(() => undefined);
 
   const onSave = () => {
     const ts = now();
@@ -134,7 +145,7 @@ export function QuickLogSheet({ visible, onClose, onMeal, initialMode }: QuickLo
       commit(() => addDoseLog(input), () => api.createDoseLog(input), refreshHomeTrack);
     } else if (mode === 'weight') {
       const input = toWeightInput(weight, weightUnit, ts);
-      commit(() => addWeightLog(input), () => api.createWeightLog(input), refreshProgress);
+      commit(() => addWeightLog(input), () => api.createWeightLog(input), refreshHomeProgress);
     } else if (mode === 'protein') {
       // bumpProtein is already optimistic + persists its own POST.
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);

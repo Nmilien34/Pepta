@@ -98,6 +98,21 @@ export function homeWithAddedCompound(
   };
 }
 
+export function homeWithLatestWeight(
+  home: HomeResponse | null,
+  latestWeight: WeightLogInput | WeightLogResponse,
+): HomeResponse | null {
+  if (!home) return home;
+  const row =
+    "id" in latestWeight
+      ? latestWeight
+      : optimisticRow<WeightLogResponse>(latestWeight);
+  return {
+    ...home,
+    latestWeight: row,
+  };
+}
+
 function errorMessage(error: unknown): string {
   const detail = error instanceof Error ? error.message : String(error);
   // Always log the raw cause so it shows in the Metro/device console.
@@ -235,14 +250,16 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
     );
   }, []);
   const addWeightLog = useCallback((input: WeightLogInput) => {
+    const row = optimisticRow<WeightLogResponse>(input);
     setProgress((p) =>
       p
         ? {
             ...p,
-            weights: [...p.weights, optimisticRow<WeightLogResponse>(input)],
+            weights: [...p.weights, row],
           }
         : p,
     );
+    setHome((h) => homeWithLatestWeight(h, row));
   }, []);
   const addMeasurement = useCallback((input: MeasurementInput) => {
     setProgress((p) =>
