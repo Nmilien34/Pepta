@@ -29,7 +29,7 @@
       <dict>
         <key>CFBundleURLSchemes</key>
         <array>
-          <string>ai.boltzman.pepta</string>
+          <string>ai.boltzman.peptaapp</string>
         </array>
       </dict>
       <dict>

@@ -16,6 +16,8 @@ import {
   mealLogResponseSchema,
   mealScanInputSchema,
   mealScanResponseSchema,
+  mealTranscriptResponseSchema,
+  mealTranscriptionInputSchema,
   mealVoiceInputSchema,
   measurementInputSchema,
   measurementResponseSchema,
@@ -53,6 +55,8 @@ import {
   type MealLogResponse,
   type MealScanInput,
   type MealScanResponse,
+  type MealTranscriptResponse,
+  type MealTranscriptionInput,
   type MealVoiceInput,
   type MeasurementInput,
   type MeasurementResponse,
@@ -83,11 +87,6 @@ import type { FoodSearchResult } from "../screens/app/mealLog";
 import type { CompanionNote } from "../screens/app/companionNotes";
 
 type ResponseSchema<T> = z.ZodType<T, z.ZodTypeDef, unknown>;
-
-// Frontend-defined contract for the (pending) server-side transcription endpoint.
-const mealTranscriptResponseSchema = z.object({
-  transcript: z.string().min(1),
-});
 
 // Frontend-defined contract for the (pending) AI companion-notes endpoint
 // (backend /coach → OpenAI, key server-side). See docs/coach-endpoint.md.
@@ -304,6 +303,10 @@ class PeptaApi {
     });
   }
 
+  public getCurrentUser(): Promise<User> {
+    return this.request("/me", userResponseSchema);
+  }
+
   public updateAccount(body: UserAccountPatch): Promise<User> {
     return this.request("/me/account", userResponseSchema, {
       method: "PATCH",
@@ -409,19 +412,17 @@ class PeptaApi {
     });
   }
 
-  // POST /meal-scans/transcribe → { transcript }. Server-side speech-to-text is
-  // intentionally deferred in the backend today (501), so the voice flow falls
-  // back to typed entry while still keeping the OpenAI key server-side.
-  public transcribeMealAudio(body: {
-    audioData: string;
-    audioMimeType: string;
-  }): Promise<{ transcript: string }> {
+  // POST /meal-scans/transcribe → { transcript }. Server-side speech-to-text
+  // keeps the OpenAI key out of the app bundle.
+  public transcribeMealAudio(
+    body: MealTranscriptionInput,
+  ): Promise<MealTranscriptResponse> {
     return this.request(
       "/meal-scans/transcribe",
       mealTranscriptResponseSchema,
       {
         method: "POST",
-        body: JSON.stringify(body),
+        body: JSON.stringify(mealTranscriptionInputSchema.parse(body)),
       },
     );
   }

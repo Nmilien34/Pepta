@@ -10,6 +10,7 @@ import React, {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { AppleAuth, AuthResponse, User } from "@pepta/shared";
 import { api } from "../services/api";
+import { revenueCat } from "../services/revenueCat";
 import {
   AUTH_STORAGE_KEY,
   parseStoredAuth,
@@ -145,6 +146,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     api.setUnauthorizedHandler(() => logout());
     return () => api.setUnauthorizedHandler(undefined);
   }, [logout]);
+
+  useEffect(() => {
+    const userId = auth?.user.id;
+    if (!userId) {
+      revenueCat.reset().catch(() => undefined);
+      return;
+    }
+    revenueCat.identify(userId).catch(() => undefined);
+  }, [auth?.user.id]);
 
   const value = useMemo<AuthContextValue>(
     () => ({

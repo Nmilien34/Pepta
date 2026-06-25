@@ -1,20 +1,28 @@
 // Onboarding screen 25 — Paywall. Value-forward, with an interactive plan
-// selector (yearly is the hero at 63% off). RevenueCat is DEFERRED: "Start free
-// trial" is a safe stub that completes onboarding; the X also skips. Custom chrome
-// (X + Restore) rather than the progress scaffold, matching the design lab.
+// selector. Custom chrome (X + Restore) rather than the progress scaffold,
+// matching the design lab.
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StatusBar, View } from 'react-native';
 import { Icon } from "../../components/Icon";
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../theme';
 import { AppText, Button, Mascot } from '../../components';
+import { useAuth } from '../../context/AuthContext';
+import { api } from '../../services/api';
+import {
+  isRevenueCatPurchaseCancelled,
+  type PaywallPackages,
+  revenueCat,
+  type RevenueCatPlan,
+} from '../../services/revenueCat';
+import { buildPaywallPricing } from './paywallPricing';
 
 export interface PaywallScreenProps {
   onComplete(): void | Promise<void>;
 }
 
-type Plan = 'yearly' | 'monthly';
+type Plan = RevenueCatPlan;
 
 const FEATURES = [
   'Medication level & curve',
@@ -27,16 +35,74 @@ const FEATURES = [
 
 export function PaywallScreen({ onComplete }: PaywallScreenProps) {
   const theme = useTheme();
+  const auth = useAuth();
   const [plan, setPlan] = useState<Plan>('yearly');
   const [completing, setCompleting] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [paywallPackages, setPaywallPackages] = useState<PaywallPackages | null>(null);
+  const pricing = buildPaywallPricing(paywallPackages);
 
-  const handleComplete = async () => {
-    if (completing) return;
-    setCompleting(true);
-    setFailed(false);
+  useEffect(() => {
+    let mounted = true;
+
+    if (!auth.user?.id) {
+      setPaywallPackages(null);
+      return () => {
+        mounted = false;
+      };
+    }
+
+    revenueCat
+      .getPaywallPackages(auth.user.id)
+      .then((packages) => {
+        if (mounted) setPaywallPackages(packages);
+      })
+      .catch(() => {
+        if (mounted) setPaywallPackages(null);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [auth.user?.id]);
+
+  const refreshEntitlement = async (optimisticActive: boolean) => {
+    if (!auth.user) return;
+
+    if (optimisticActive) {
+      auth.updateCachedUser({
+        ...auth.user,
+        entitlement: {
+          ...auth.user.entitlement,
+          status: 'active',
+          willRenew: true,
+          revenueCatCustomerId: auth.user.id,
+          revenueCatEntitlement: 'pro',
+        },
+      });
+    }
+
     try {
-      await onComplete();
+      auth.updateCachedUser(await api.getCurrentUser());
+    } catch {
+      // The webhook can trail the SDK result by a moment; the optimistic state
+      // keeps the UI unlocked while the backend catches up.
+    }
+  };
+
+  const completeSetup = async (optimisticActive: boolean) => {
+    await refreshEntitlement(optimisticActive);
+    await onComplete();
+  };
+
+  const handleSkip = async () => {
+    if (completing) return;
+    setMessage(null);
+    setFailed(false);
+    setCompleting(true);
+    try {
+      await completeSetup(false);
     } catch {
       setFailed(true);
     } finally {
@@ -44,9 +110,41 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
     }
   };
 
-  const handleStart = () => {
-    // TODO: present the RevenueCat purchase flow when the integration lands.
-    void handleComplete();
+  const handleStart = async () => {
+    if (!auth.user?.id || completing) return;
+    setMessage(null);
+    setFailed(false);
+    setCompleting(true);
+    try {
+      const result = await revenueCat.purchasePlan(auth.user.id, plan);
+      await completeSetup(result.entitlementActive);
+    } catch (error) {
+      if (isRevenueCatPurchaseCancelled(error)) return;
+      setFailed(true);
+      setMessage('Purchase could not be completed. Check your connection and try again.');
+    } finally {
+      setCompleting(false);
+    }
+  };
+
+  const handleRestore = async () => {
+    if (!auth.user?.id || completing) return;
+    setMessage(null);
+    setFailed(false);
+    setCompleting(true);
+    try {
+      const result = await revenueCat.restore(auth.user.id);
+      if (!result.entitlementActive) {
+        setMessage('No active Pepta Pro purchase was found for this Apple ID.');
+        return;
+      }
+      await completeSetup(true);
+    } catch {
+      setFailed(true);
+      setMessage('Restore could not be completed. Check your connection and try again.');
+    } finally {
+      setCompleting(false);
+    }
   };
 
   return (
@@ -54,12 +152,12 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
       <StatusBar barStyle="dark-content" />
       <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: theme.spacing.xl, paddingTop: theme.spacing.sm }}>
-          <Pressable onPress={() => void handleComplete()} hitSlop={theme.sizes.hitSlop} accessibilityRole="button" accessibilityLabel="Close">
+          <Pressable onPress={() => void handleSkip()} hitSlop={theme.sizes.hitSlop} accessibilityRole="button" accessibilityLabel="Close">
             <Icon name="close" size={24} color={theme.colors.textSecondary} />
           </Pressable>
-          <Pressable hitSlop={theme.sizes.hitSlop} accessibilityRole="button">
+          <Pressable onPress={() => void handleRestore()} hitSlop={theme.sizes.hitSlop} accessibilityRole="button">
             <AppText variant="caption" color="textSecondary">
-              Restore
+              {completing ? 'Working…' : 'Restore'}
             </AppText>
           </Pressable>
         </View>
@@ -94,32 +192,32 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
             <PlanCard
               selected={plan === 'yearly'}
               onPress={() => setPlan('yearly')}
-              title="Yearly"
-              sub="$40.00/yr · just $0.11 a day"
-              price="$3.33"
-              per="/mo"
-              badge="SAVE 63%"
+              title={pricing.yearly.title}
+              sub={pricing.yearly.sub}
+              price={pricing.yearly.price}
+              per={pricing.yearly.per}
+              badge={pricing.yearly.badge}
             />
             <PlanCard
               selected={plan === 'monthly'}
               onPress={() => setPlan('monthly')}
-              title="Monthly"
-              sub="billed monthly"
-              price="$9.00"
-              per="/mo"
+              title={pricing.monthly.title}
+              sub={pricing.monthly.sub}
+              price={pricing.monthly.price}
+              per={pricing.monthly.per}
             />
           </View>
         </ScrollView>
 
         <View style={{ paddingHorizontal: theme.spacing.xl, paddingTop: theme.spacing.sm, paddingBottom: theme.spacing.xs }}>
-          {failed ? (
+          {failed || message ? (
             <AppText variant="caption" color="danger" align="center" style={{ marginBottom: theme.spacing.sm }}>
-              We couldn’t save your setup. Check your connection and try again.
+              {message ?? 'We couldn’t save your setup. Check your connection and try again.'}
             </AppText>
           ) : null}
-          <Button label={completing ? 'Saving setup…' : 'Start 7-day free trial'} onPress={handleStart} disabled={completing} />
+          <Button label={completing ? 'Working…' : 'Start 7-day free trial'} onPress={() => void handleStart()} disabled={completing} />
           <AppText variant="caption" color="textTertiary" align="center" style={{ fontSize: 10, marginTop: theme.spacing.sm }}>
-            7 days free, then {plan === 'yearly' ? '$40/yr ($3.33/mo)' : '$9/mo'}. Cancel anytime · Terms & Privacy
+            {pricing.footer[plan]}
           </AppText>
         </View>
       </SafeAreaView>

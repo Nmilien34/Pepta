@@ -4,6 +4,7 @@ export const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://loca
 // GOOGLE_CLIENT_ID (the audience it verifies). See .env.example.
 export const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? '';
 export const GOOGLE_IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ?? '';
+export const REVENUECAT_IOS_API_KEY = process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY ?? '';
 
 // Legal pages (served by the backend once deployed; placeholders for now).
 export const TERMS_URL = process.env.EXPO_PUBLIC_TERMS_URL ?? 'https://pepta.app/terms';

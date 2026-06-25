@@ -1,7 +1,23 @@
 import React from "react";
 import TestRenderer, { act } from "react-test-renderer";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MealLogSheet } from "./MealLogSheet";
+import { api } from "../services/api";
+
+const audioMocks = vi.hoisted(() => ({
+  fileBase64: vi.fn(),
+  recorder: {
+    prepareToRecordAsync: vi.fn(),
+    record: vi.fn(),
+    stop: vi.fn(),
+    uri: null as string | null,
+  },
+  recorderState: {
+    isRecording: false,
+  },
+  requestRecordingPermissionsAsync: vi.fn(),
+  setAudioModeAsync: vi.fn(),
+}));
 
 vi.mock("react-native", () => ({
   ActivityIndicator: "ActivityIndicator",
@@ -51,19 +67,16 @@ vi.mock("expo-image-picker", () => ({
 
 vi.mock("expo-audio", () => ({
   RecordingPresets: { HIGH_QUALITY: {} },
-  requestRecordingPermissionsAsync: vi.fn(),
-  setAudioModeAsync: vi.fn(),
-  useAudioRecorder: () => ({
-    prepareToRecordAsync: vi.fn(),
-    record: vi.fn(),
-    stop: vi.fn(),
-    uri: null,
-  }),
-  useAudioRecorderState: () => ({ isRecording: false }),
+  requestRecordingPermissionsAsync: audioMocks.requestRecordingPermissionsAsync,
+  setAudioModeAsync: audioMocks.setAudioModeAsync,
+  useAudioRecorder: () => audioMocks.recorder,
+  useAudioRecorderState: () => audioMocks.recorderState,
 }));
 
 vi.mock("expo-file-system", () => ({
-  File: vi.fn(),
+  File: vi.fn(() => ({
+    base64: audioMocks.fileBase64,
+  })),
 }));
 
 vi.mock("expo-linear-gradient", () => ({
@@ -117,7 +130,19 @@ vi.mock("./AppText", () => ({
 }));
 
 vi.mock("./Button", () => ({
-  Button: () => null,
+  Button: ({
+    disabled,
+    label,
+    onPress,
+  }: {
+    disabled?: boolean;
+    label: string;
+    onPress?: () => void;
+  }) => (
+    <button disabled={disabled} onClick={onPress}>
+      {label}
+    </button>
+  ),
 }));
 
 vi.mock("./Icon", () => ({
@@ -129,6 +154,28 @@ vi.mock("./MealCamera", () => ({
 }));
 
 describe("MealLogSheet", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    audioMocks.fileBase64.mockResolvedValue("base64-meal-audio");
+    audioMocks.recorder.prepareToRecordAsync.mockResolvedValue(undefined);
+    audioMocks.recorder.record.mockImplementation(() => {
+      audioMocks.recorderState.isRecording = true;
+    });
+    audioMocks.recorder.stop.mockImplementation(async () => {
+      audioMocks.recorderState.isRecording = false;
+      audioMocks.recorder.uri = "file://meal.m4a";
+    });
+    audioMocks.recorder.uri = null;
+    audioMocks.recorderState.isRecording = false;
+    audioMocks.requestRecordingPermissionsAsync.mockResolvedValue({
+      granted: true,
+    });
+    audioMocks.setAudioModeAsync.mockResolvedValue(undefined);
+    vi.mocked(api.transcribeMealAudio).mockResolvedValue({
+      transcript: "two eggs and avocado toast",
+    });
+  });
+
   it("lets users close the meal chooser if they change their mind", async () => {
     const onClose = vi.fn();
     let tree: TestRenderer.ReactTestRenderer | undefined;
@@ -173,5 +220,46 @@ describe("MealLogSheet", () => {
 
     expect(onBack).toHaveBeenCalledTimes(1);
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("records voice meal audio, transcribes it, and shows the transcript in the box", async () => {
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+
+    await act(async () => {
+      tree = TestRenderer.create(
+        <MealLogSheet visible={true} onClose={vi.fn()} />,
+      );
+    });
+
+    await act(async () => {
+      tree!.root
+        .findByProps({ accessibilityLabel: "Voice meal log" })
+        .props.onPress();
+    });
+
+    await act(async () => {
+      tree!.root
+        .findByProps({ accessibilityLabel: "Start voice meal recording" })
+        .props.onPress();
+    });
+
+    await act(async () => {
+      tree!.update(<MealLogSheet visible={true} onClose={vi.fn()} />);
+    });
+
+    await act(async () => {
+      await tree!.root
+        .findByProps({ accessibilityLabel: "Stop voice meal recording" })
+        .props.onPress();
+    });
+
+    expect(api.transcribeMealAudio).toHaveBeenCalledWith({
+      audioData: "base64-meal-audio",
+      audioMimeType: "audio/m4a",
+    });
+    expect(
+      tree!.root.findByProps({ accessibilityLabel: "Meal voice transcript" })
+        .props.value,
+    ).toBe("two eggs and avocado toast");
   });
 });

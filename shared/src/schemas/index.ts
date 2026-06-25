@@ -644,6 +644,27 @@ export const mealVoiceInputSchema = z
   })
   .strict();
 
+export const mealTranscriptionInputSchema = z
+  .object({
+    audioData: z.string().trim().min(1),
+    audioMimeType: z.enum([
+      "audio/m4a",
+      "audio/mp4",
+      "audio/mpeg",
+      "audio/mp3",
+      "audio/wav",
+      "audio/webm",
+      "audio/x-m4a",
+    ]),
+  })
+  .strict();
+
+export const mealTranscriptResponseSchema = z
+  .object({
+    transcript: z.string().trim().min(1),
+  })
+  .strict();
+
 export const mealScanModeSchema = z.enum(["affirmation", "swap"]);
 
 export const mealScanAnalysisSchema = z

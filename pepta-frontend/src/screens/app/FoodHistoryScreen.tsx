@@ -17,8 +17,8 @@ export function FoodHistoryScreen() {
   const { track, trackLoading, trackError, refreshTrack } = usePeptaData();
 
   useEffect(() => {
-    if (!track) void refreshTrack();
-  }, [track, refreshTrack]);
+    void refreshTrack();
+  }, [refreshTrack]);
 
   const meals = useMemo(
     () =>

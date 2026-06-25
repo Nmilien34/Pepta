@@ -114,6 +114,47 @@ describe("PeptaApi account", () => {
     );
   });
 
+  it("fetches the current user for entitlement refreshes", async () => {
+    const responseBody = {
+      data: {
+        id: "user-1",
+        email: "nick@pepta.app",
+        emailVerified: true,
+        displayName: "Nico Pepta",
+        authProviders: [],
+        entitlement: {
+          status: "active",
+          expiresAt: "2026-08-01T00:00:00.000Z",
+          willRenew: true,
+          revenueCatCustomerId: "user-1",
+          revenueCatEntitlement: "pro",
+        },
+        onboardingComplete: true,
+        createdAt: NOW.toISOString(),
+        updatedAt: NOW.toISOString(),
+      },
+    };
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify(responseBody), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await api.getCurrentUser();
+
+    expect(result.entitlement.status).toBe("active");
+    expect(result.entitlement.revenueCatEntitlement).toBe("pro");
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [
+      string,
+      RequestInit,
+    ];
+    expect(url).toBe("http://localhost:8080/me");
+    expect(init).not.toHaveProperty("method");
+  });
+
   it("deletes the account through the account endpoint", async () => {
     const fetchMock = vi.fn(
       async () =>

@@ -73,7 +73,7 @@ Required production variables:
 Optional Apple variables:
 
 - `APPLE_TEAM_ID`
-- `APPLE_CLIENT_ID=ai.boltzman.pepta`
+- `APPLE_CLIENT_ID=ai.boltzman.peptaapp`
 - `APPLE_KEY_ID`
 - `APPLE_PRIVATE_KEY_BASE64`
 

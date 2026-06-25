@@ -121,4 +121,4 @@ Available methods:
 
 The backend returns `{ token, user }` from native Google or Apple identity-token sign-in. The frontend sends `Authorization: Bearer <token>` for every route except `/auth/*`, `/webhooks/*`, and `/healthz`.
 
-Apple token audience is the native iOS bundle ID: `ai.boltzman.pepta`.
+Apple token audience is the native iOS bundle ID: `ai.boltzman.peptaapp`.

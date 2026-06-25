@@ -37,6 +37,8 @@ import type {
   mealScanInputSchema,
   mealScanModeSchema,
   mealScanResponseSchema,
+  mealTranscriptResponseSchema,
+  mealTranscriptionInputSchema,
   mealVoiceInputSchema,
   medicationCatalogItemSchema,
   medicationFrequencySchema,
@@ -122,6 +124,12 @@ export type MealScanCoachContent = z.infer<typeof mealScanCoachContentSchema>;
 export type MealScanInput = z.infer<typeof mealScanInputSchema>;
 export type MealScanMode = z.infer<typeof mealScanModeSchema>;
 export type MealScanResponse = z.infer<typeof mealScanResponseSchema>;
+export type MealTranscriptResponse = z.infer<
+  typeof mealTranscriptResponseSchema
+>;
+export type MealTranscriptionInput = z.infer<
+  typeof mealTranscriptionInputSchema
+>;
 export type MealVoiceInput = z.infer<typeof mealVoiceInputSchema>;
 export type MedicationCatalogItem = z.infer<typeof medicationCatalogItemSchema>;
 export type MedicationFrequency = z.infer<typeof medicationFrequencySchema>;

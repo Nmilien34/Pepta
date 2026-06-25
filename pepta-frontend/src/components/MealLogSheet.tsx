@@ -68,7 +68,7 @@ export function MealLogSheet({
   onDismissed,
 }: MealLogSheetProps) {
   const theme = useTheme();
-  const { addMeal, refreshHome } = usePeptaData();
+  const { addMeal, refreshHome, refreshTrack } = usePeptaData();
   const [view, setView] = useState<View_>("chooser");
   const [result, setResult] = useState<MealScanResponse | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -147,12 +147,16 @@ export function MealLogSheet({
     onClose();
     api
       .createMealLog(input)
-      .then(() => refreshHome())
+      .then(() => {
+        void refreshHome();
+        void refreshTrack();
+      })
       .catch(() => {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(
           () => undefined,
         );
-        return refreshHome();
+        void refreshHome();
+        void refreshTrack();
       })
       .catch(() => undefined);
   };
@@ -658,6 +662,8 @@ function CompactMealAction({
 }) {
   return (
     <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${title} meal log`}
       onPress={onPress}
       style={({ pressed }) => ({
         flex: 1,
@@ -1210,6 +1216,7 @@ function VoiceCapture({
 
   const startRecording = async () => {
     setVoiceFailed(false);
+    setTranscript("");
     try {
       const perm = await requestRecordingPermissionsAsync();
       if (!perm.granted) {
@@ -1235,15 +1242,23 @@ function VoiceCapture({
     try {
       await recorder.stop();
       const uri = recorder.uri;
-      if (!uri) return;
+      if (!uri) {
+        setVoiceFailed(true);
+        return;
+      }
       const audioData = await new File(uri).base64();
       const { transcript: text } = await api.transcribeMealAudio({
         audioData,
         audioMimeType: "audio/m4a",
       });
-      setTranscript(text);
+      const heard = text.trim();
+      if (!heard) {
+        setVoiceFailed(true);
+        return;
+      }
+      setTranscript(heard);
     } catch {
-      // Transcription endpoint not live yet (or failed) → fall back to typing.
+      // Let the user keep going with typed input if transcription fails.
       setVoiceFailed(true);
     } finally {
       setTranscribing(false);
@@ -1257,7 +1272,17 @@ function VoiceCapture({
 
   return (
     <View style={{ marginTop: 16, gap: 14, alignItems: "center" }}>
-      <Pressable onPress={toggle} disabled={transcribing} hitSlop={8}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={
+          recorderState.isRecording
+            ? "Stop voice meal recording"
+            : "Start voice meal recording"
+        }
+        onPress={toggle}
+        disabled={transcribing}
+        hitSlop={8}
+      >
         <MicButton
           theme={theme}
           recording={recorderState.isRecording}
@@ -1285,23 +1310,33 @@ function VoiceCapture({
           Couldn’t transcribe — type your meal below instead.
         </AppText>
       ) : null}
-      <TextInput
-        value={transcript}
-        onChangeText={setTranscript}
-        placeholder="e.g. Two eggs, avocado toast, and a black coffee"
-        placeholderTextColor={theme.colors.textTertiary}
-        multiline
-        style={{
-          alignSelf: "stretch",
-          minHeight: 80,
-          borderRadius: 14,
-          backgroundColor: theme.colors.surfaceAlt,
-          padding: 14,
-          fontSize: 16,
-          color: theme.colors.textPrimary,
-          textAlignVertical: "top",
-        }}
-      />
+      <View style={{ alignSelf: "stretch", gap: 8 }}>
+        <AppText variant="caption" color="textSecondary">
+          What Pepta heard
+        </AppText>
+        <TextInput
+          accessibilityLabel="Meal voice transcript"
+          value={transcript}
+          onChangeText={setTranscript}
+          placeholder={
+            recorderState.isRecording
+              ? "Listening… your transcript will appear here after you stop."
+              : "e.g. Two eggs, avocado toast, and a black coffee"
+          }
+          placeholderTextColor={theme.colors.textTertiary}
+          multiline
+          style={{
+            alignSelf: "stretch",
+            minHeight: 80,
+            borderRadius: 14,
+            backgroundColor: theme.colors.surfaceAlt,
+            padding: 14,
+            fontSize: 16,
+            color: theme.colors.textPrimary,
+            textAlignVertical: "top",
+          }}
+        />
+      </View>
       <View style={{ alignSelf: "stretch" }}>
         <Button
           label="Analyze"

@@ -22,6 +22,7 @@ import type {
   HomeRangeKey,
   HomeResponse,
   MealLogInput,
+  MealLogResponse,
   MeasurementInput,
   MeasurementResponse,
   ProgressResponse,
@@ -146,6 +147,17 @@ export function trackWithAddedSideEffect(
       optimisticRow<SideEffectLogResponse>(input),
       ...current.sideEffectLogs,
     ],
+  };
+}
+
+export function trackWithAddedMeal(
+  track: TrackResponse | null,
+  input: MealLogInput,
+): TrackResponse {
+  const current = track ?? emptyTrackResponse();
+  return {
+    ...current,
+    mealLogs: [optimisticRow<MealLogResponse>(input), ...current.mealLogs],
   };
 }
 
@@ -393,6 +405,7 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
   }, []);
   const addMeal = useCallback(
     (input: MealLogInput) => {
+      setTrack((t) => trackWithAddedMeal(t, input));
       setHome((h) =>
         h
           ? updateRangeTotals(

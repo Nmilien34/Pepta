@@ -25,3 +25,23 @@ vi.mock("react-native", () => ({
     select: (specs: Record<string, unknown>) => specs.ios ?? specs.default,
   },
 }));
+
+vi.mock("react-native-purchases", () => ({
+  LOG_LEVEL: {
+    VERBOSE: "VERBOSE",
+    DEBUG: "DEBUG",
+    INFO: "INFO",
+    WARN: "WARN",
+    ERROR: "ERROR",
+  },
+  default: {
+    configure: vi.fn(),
+    getOfferings: vi.fn(),
+    logIn: vi.fn(),
+    logOut: vi.fn(),
+    purchasePackage: vi.fn(),
+    restorePurchases: vi.fn(),
+    setLogHandler: vi.fn(),
+    setLogLevel: vi.fn(),
+  },
+}));
