@@ -8,8 +8,22 @@ import { env } from "../config/env";
 import { AppError } from "../lib/errors";
 
 const MEAL_TRANSCRIPTION_MODEL = "gpt-4o-mini-transcribe";
+const MEAL_TRANSCRIPT_CLEANUP_MODEL = "gpt-4o-mini";
 const MEAL_TRANSCRIPTION_TIMEOUT_MS = 15_000;
 const MAX_AUDIO_BYTES = 10 * 1024 * 1024;
+
+const MEAL_TRANSCRIPT_CLEANUP_SYSTEM_PROMPT = `
+You clean spoken meal logs for Pepta.
+
+Extract only the foods, drinks, portions, amounts, brands, and meal descriptors that are relevant to what the user ate or drank.
+Remove conversational filler, intros, outros, laughter, hesitation words, and non-food phrases like "I ate", "that's it", "thank you", "haha", or "for dinner".
+
+Be permissive with unusual dish names, restaurant items, cultural foods, brand names, slang, and misspellings. If a phrase might be a food, keep it.
+Do not invent foods or nutrition facts. Do not rewrite into a sentence. Return a short comma-separated meal phrase.
+
+Return JSON only:
+{ "transcript": string }
+`.trim();
 
 const AUDIO_EXTENSIONS: Record<MealTranscriptionInput["audioMimeType"], string> =
   {
@@ -70,6 +84,46 @@ export function decodeAndValidateAudio(audioData: string): Buffer {
   return bytes;
 }
 
+function parseCleanTranscriptJson(content: string): string | null {
+  try {
+    const parsed = JSON.parse(content) as Record<string, unknown>;
+    const transcript =
+      typeof parsed.transcript === "string" ? parsed.transcript.trim() : "";
+    return transcript || null;
+  } catch {
+    return null;
+  }
+}
+
+async function cleanMealTranscript(
+  openai: OpenAI,
+  rawTranscript: string,
+): Promise<string> {
+  try {
+    const completion = await openai.chat.completions.create({
+      model: MEAL_TRANSCRIPT_CLEANUP_MODEL,
+      messages: [
+        {
+          role: "system",
+          content: MEAL_TRANSCRIPT_CLEANUP_SYSTEM_PROMPT,
+        },
+        {
+          role: "user",
+          content: rawTranscript,
+        },
+      ],
+      max_tokens: 120,
+      response_format: { type: "json_object" },
+    });
+
+    const content = completion.choices[0]?.message?.content?.trim();
+    const cleaned = content ? parseCleanTranscriptJson(content) : null;
+    return cleaned ?? rawTranscript;
+  } catch {
+    return rawTranscript;
+  }
+}
+
 export async function transcribeMealAudio(
   input: MealTranscriptionInput,
 ): Promise<MealTranscriptResponse> {
@@ -104,7 +158,9 @@ export async function transcribeMealAudio(
       throw transcriptionFailed("OpenAI returned an empty transcript");
     }
 
-    return mealTranscriptResponseSchema.parse({ transcript });
+    const cleanedTranscript = await cleanMealTranscript(openai, transcript);
+
+    return mealTranscriptResponseSchema.parse({ transcript: cleanedTranscript });
   } catch (error) {
     if (error instanceof AppError) {
       throw error;

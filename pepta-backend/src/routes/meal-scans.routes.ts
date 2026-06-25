@@ -7,6 +7,7 @@ import { Router } from "express";
 import { asyncHandler } from "../lib/async-handler";
 import { sendData } from "../lib/responses";
 import { validateBody } from "../middleware/validate.middleware";
+import { searchFoods } from "../services/food-search.service";
 import { analyzeMealScan, parseVoiceMeal } from "../services/meal-scan.service";
 import { transcribeMealAudio } from "../services/meal-scan-transcription.service";
 
@@ -36,13 +37,17 @@ router.post(
   }),
 );
 
-// Pending integration — defined so the client gets a clean, intentional response
-// (and falls back gracefully) instead of a 404. Replace with a nutrition DB search
-// implementation (USDA / Nutritionix / Edamam).
 router.get(
   "/foods",
-  asyncHandler(async (_req, res) => {
-    sendData(res, { results: [] });
+  asyncHandler(async (req, res) => {
+    const query =
+      typeof req.query.q === "string"
+        ? req.query.q
+        : typeof req.query.query === "string"
+          ? req.query.query
+          : "";
+
+    sendData(res, await searchFoods(query));
   }),
 );
 

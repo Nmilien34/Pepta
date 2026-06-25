@@ -436,8 +436,7 @@ class PeptaApi {
     );
   }
 
-  // GET /meal-scans/foods?q= → food-database results. The backend route exists
-  // but returns an empty list until a nutrition database is wired.
+  // GET /meal-scans/foods?q= → nutrition search results for the meal picker.
   public searchFoods(query: string): Promise<FoodSearchResult[]> {
     return this.request(
       `/meal-scans/foods?q=${encodeURIComponent(query)}`,
