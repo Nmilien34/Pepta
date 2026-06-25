@@ -89,9 +89,31 @@ describe("AuthContext", () => {
     expect(testStorage.snapshot()).toEqual({});
   });
 
+  it("updates and persists the cached user", async () => {
+    mockApi.signInWithGoogle.mockResolvedValue(makeAuthResponse());
+    const harness = await renderAuthHarness();
+    await act(async () => {
+      await harness.value().signInWithGoogle("id-token");
+    });
+
+    await act(async () => {
+      harness.value().updateCachedUser({
+        ...harness.value().user!,
+        displayName: "Nico Pepta",
+      });
+    });
+
+    expect(harness.value().user?.displayName).toBe("Nico Pepta");
+    const saved = JSON.parse(testStorage.snapshot()[AUTH_STORAGE_KEY]!);
+    expect(saved.user.displayName).toBe("Nico Pepta");
+  });
+
   it("hydrates a saved session on launch", async () => {
     testStorage.snapshot(); // noop, ensures store exists
-    await testStorage.setItem(AUTH_STORAGE_KEY, serializeAuth(mockAuthResponse));
+    await testStorage.setItem(
+      AUTH_STORAGE_KEY,
+      serializeAuth(mockAuthResponse),
+    );
 
     const harness = await renderAuthHarness();
 
@@ -111,7 +133,9 @@ describe("AuthContext", () => {
     expect(mockApi.setUnauthorizedHandler).toHaveBeenCalled();
 
     // Fire the registered handler as the api would on a 401.
-    const handler = mockApi.setUnauthorizedHandler.mock.calls.at(-1)?.[0] as (() => void) | undefined;
+    const handler = mockApi.setUnauthorizedHandler.mock.calls.at(-1)?.[0] as
+      | (() => void)
+      | undefined;
     expect(typeof handler).toBe("function");
     await act(async () => {
       handler?.();

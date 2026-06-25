@@ -3,7 +3,9 @@ import {
   authResponseSchema,
   googleAuthSchema,
   homeResponseSchema,
+  userAccountPatchSchema,
   userProfileSettingsPatchSchema,
+  userResponseSchema,
   activityLogInputSchema,
   activityLogResponseSchema,
   compoundInputSchema,
@@ -68,6 +70,8 @@ import {
   type SideEffectLogInput,
   type SideEffectLogResponse,
   type TrackResponse,
+  type User,
+  type UserAccountPatch,
   type WaterLogInput,
   type WaterLogResponse,
   type WeightLogInput,
@@ -129,11 +133,12 @@ class ApiError extends Error {
     message: string,
   ) {
     super(message);
-    this.name = 'ApiError';
+    this.name = "ApiError";
   }
 }
 
-const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+const delay = (ms: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, ms));
 
 class PeptaApi {
   private authToken: string | null = null;
@@ -183,11 +188,51 @@ class PeptaApi {
 
     const json = (await response.json()) as unknown;
     if (!response.ok) {
-      throw new ApiError(response.status, `Pepta API request failed: ${response.status}`);
+      throw new ApiError(
+        response.status,
+        `Pepta API request failed: ${response.status}`,
+      );
     }
 
     const envelope = z.object({ data: z.unknown() }).parse(json);
     return schema.parse(envelope.data);
+  }
+
+  private async fetchNoContent(
+    path: string,
+    options: RequestInit,
+  ): Promise<void> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    let response: Response;
+    try {
+      response = await fetch(`${API_BASE_URL}${path}`, {
+        ...options,
+        signal: controller.signal,
+        headers: {
+          "Content-Type": "application/json",
+          ...(this.authToken
+            ? { Authorization: `Bearer ${this.authToken}` }
+            : {}),
+          ...options.headers,
+        },
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+
+    if (response.status === 401) {
+      this.authToken = null;
+      this.onUnauthorized?.();
+      throw new ApiError(401, `Pepta API request failed: 401`);
+    }
+
+    if (!response.ok) {
+      throw new ApiError(
+        response.status,
+        `Pepta API request failed: ${response.status}`,
+      );
+    }
   }
 
   private async request<T>(
@@ -203,7 +248,8 @@ class PeptaApi {
     } catch (error) {
       // Retry once on a transient failure (network drop / timeout / 5xx), never
       // on a deterministic 4xx (a bad request won't succeed on retry).
-      const is4xx = error instanceof ApiError && error.status >= 400 && error.status < 500;
+      const is4xx =
+        error instanceof ApiError && error.status >= 400 && error.status < 500;
       if (idempotent && !is4xx) {
         await delay(RETRY_DELAY_MS);
         return this.fetchOnce(path, schema, options);
@@ -242,17 +288,31 @@ class PeptaApi {
   }
 
   public getHome(range?: HomeRangeKey): Promise<HomeResponse> {
-    const suffix = range && range !== "today" ? `?range=${encodeURIComponent(range)}` : "";
+    const suffix =
+      range && range !== "today" ? `?range=${encodeURIComponent(range)}` : "";
     return this.request(`/home${suffix}`, homeResponseSchema);
   }
 
   // PATCH /me → updated profile settings. Used by Account preferences (units,
   // dose units). We don't need the response shape — callers refreshHome() after.
-  public updateProfileSettings(body: UserProfileSettingsPatch): Promise<unknown> {
+  public updateProfileSettings(
+    body: UserProfileSettingsPatch,
+  ): Promise<unknown> {
     return this.request("/me", z.unknown(), {
       method: "PATCH",
       body: JSON.stringify(userProfileSettingsPatchSchema.parse(body)),
     });
+  }
+
+  public updateAccount(body: UserAccountPatch): Promise<User> {
+    return this.request("/me/account", userResponseSchema, {
+      method: "PATCH",
+      body: JSON.stringify(userAccountPatchSchema.parse(body)),
+    });
+  }
+
+  public deleteAccount(): Promise<void> {
+    return this.fetchNoContent("/me/account", { method: "DELETE" });
   }
 
   // POST /compounds → CompoundResponse (201). Adds a medication to track.

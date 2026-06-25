@@ -4,13 +4,36 @@ import {
   userProfileResponseSchema,
   userResponseSchema,
   type AuthProvider,
+  type UserAccountPatch,
   type UserProfileSettingsPatch,
   type User,
 } from "@pepta/shared";
 import type { ProviderIdentity } from "../auth/google";
 import { AppError, NotFoundError } from "../lib/errors";
 import { computeProfileTargets } from "../lib/profile-targets";
-import { UserModel, UserProfileModel, type UserDocument } from "../models";
+import {
+  ActivityLogModel,
+  CompoundModel,
+  CycleModel,
+  DoseLogModel,
+  FiberLogModel,
+  InsightModel,
+  MealLogModel,
+  MealScanModel,
+  MeasurementModel,
+  ProcessedWebhookEventModel,
+  ProgressPhotoModel,
+  ProteinLogModel,
+  ScheduleModel,
+  SideEffectLogModel,
+  UserModel,
+  UserProfileModel,
+  WaterLogModel,
+  WeeklyRetentionModel,
+  WeightLogModel,
+  type UserDocument,
+} from "../models";
+import { deleteS3Object } from "./s3.service";
 import { serializeWithSchema } from "./serializers";
 
 function documentObject(document: unknown): Record<string, unknown> {
@@ -302,6 +325,92 @@ export async function getCurrentUser(userId: string) {
   }
 
   return serializeUser(user);
+}
+
+export async function updateCurrentUser(
+  userId: string,
+  patch: UserAccountPatch,
+): Promise<User> {
+  const update: Record<string, unknown> = {};
+  if ("displayName" in patch) {
+    update.displayName = patch.displayName;
+  }
+  if ("avatarUrl" in patch) {
+    update.avatarUrl = patch.avatarUrl;
+  }
+
+  const user = await UserModel.findByIdAndUpdate(
+    userId,
+    { $set: update },
+    { new: true, runValidators: true },
+  );
+
+  if (!user) {
+    throw new NotFoundError("User not found");
+  }
+
+  return serializeUser(user);
+}
+
+function optionalS3Key(value: unknown): string | null {
+  return typeof value === "string" && value.trim().length > 0 ? value : null;
+}
+
+async function collectAccountS3Keys(userId: string): Promise<string[]> {
+  const [progressPhotos, mealScans, mealLogs] = await Promise.all([
+    ProgressPhotoModel.find({ userId }),
+    MealScanModel.find({ userId }),
+    MealLogModel.find({ userId, deletedAt: { $exists: true } }),
+  ]);
+  const keys = new Set<string>();
+
+  for (const photo of progressPhotos) {
+    const key = optionalS3Key(documentObject(photo).s3Key);
+    if (key) keys.add(key);
+  }
+  for (const scan of mealScans) {
+    const key = optionalS3Key(documentObject(scan).photoS3Key);
+    if (key) keys.add(key);
+  }
+  for (const meal of mealLogs) {
+    const key = optionalS3Key(documentObject(meal).photoS3Key);
+    if (key) keys.add(key);
+  }
+
+  return [...keys];
+}
+
+export async function deleteCurrentUser(userId: string): Promise<void> {
+  const user = await UserModel.findById(userId);
+  if (!user) {
+    throw new NotFoundError("User not found");
+  }
+
+  const s3Keys = await collectAccountS3Keys(userId);
+  await Promise.all(s3Keys.map((key) => deleteS3Object(key)));
+
+  await Promise.all([
+    UserProfileModel.deleteMany({ userId }),
+    CompoundModel.deleteMany({ userId }),
+    ScheduleModel.deleteMany({ userId }),
+    CycleModel.deleteMany({ userId }),
+    WeightLogModel.deleteMany({ userId }),
+    DoseLogModel.deleteMany({ userId }),
+    MealLogModel.deleteMany({ userId }),
+    WaterLogModel.deleteMany({ userId }),
+    ProteinLogModel.deleteMany({ userId }),
+    FiberLogModel.deleteMany({ userId }),
+    ActivityLogModel.deleteMany({ userId }),
+    SideEffectLogModel.deleteMany({ userId }),
+    MeasurementModel.deleteMany({ userId }),
+    ProgressPhotoModel.deleteMany({ userId }),
+    MealScanModel.deleteMany({ userId }),
+    InsightModel.deleteMany({ userId }),
+    WeeklyRetentionModel.deleteMany({ userId }),
+    ProcessedWebhookEventModel.deleteMany({ appUserId: userId }),
+  ]);
+
+  await UserModel.deleteOne({ _id: userId });
 }
 
 export async function updateProfileSettings(

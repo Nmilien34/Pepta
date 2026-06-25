@@ -1,8 +1,20 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { AppleAuth, AuthResponse, User } from '@pepta/shared';
-import { api } from '../services/api';
-import { AUTH_STORAGE_KEY, parseStoredAuth, serializeAuth } from './authPersistence';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import type { AppleAuth, AuthResponse, User } from "@pepta/shared";
+import { api } from "../services/api";
+import {
+  AUTH_STORAGE_KEY,
+  parseStoredAuth,
+  serializeAuth,
+} from "./authPersistence";
 
 interface AuthContextValue {
   user: User | null;
@@ -18,6 +30,7 @@ interface AuthContextValue {
   // onboarding submit attempt). When the backend lands this is the optimistic
   // half; the server response confirms it.
   markOnboardingComplete(): void;
+  updateCachedUser(user: User): void;
   logout(): void;
 }
 
@@ -27,7 +40,9 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 // never block the UI; the in-memory state stays the source of truth this session.
 function persistAuth(next: AuthResponse | null): void {
   if (next) {
-    AsyncStorage.setItem(AUTH_STORAGE_KEY, serializeAuth(next)).catch(() => undefined);
+    AsyncStorage.setItem(AUTH_STORAGE_KEY, serializeAuth(next)).catch(
+      () => undefined,
+    );
   } else {
     AsyncStorage.removeItem(AUTH_STORAGE_KEY).catch(() => undefined);
   }
@@ -66,24 +81,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signInWithGoogle = useCallback(
-    async (idToken: string): Promise<User> => finalizeAuth(await api.signInWithGoogle({ idToken })),
+    async (idToken: string): Promise<User> =>
+      finalizeAuth(await api.signInWithGoogle({ idToken })),
     [finalizeAuth],
   );
 
   const signInWithApple = useCallback(
-    async (body: AppleAuth): Promise<User> => finalizeAuth(await api.signInWithApple(body)),
+    async (body: AppleAuth): Promise<User> =>
+      finalizeAuth(await api.signInWithApple(body)),
     [finalizeAuth],
   );
 
   const devSignIn = useCallback(() => {
     const now = new Date().toISOString();
     finalizeAuth({
-      token: 'dev-token',
+      token: "dev-token",
       user: {
-        id: 'dev-user',
+        id: "dev-user",
         emailVerified: false,
         authProviders: [],
-        entitlement: { status: 'free', expiresAt: null, willRenew: false },
+        entitlement: { status: "free", expiresAt: null, willRenew: false },
         onboardingComplete: false,
         createdAt: now,
         updatedAt: now,
@@ -96,8 +113,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!current) return current;
       const next: AuthResponse = {
         ...current,
-        user: { ...current.user, onboardingComplete: true, onboardingCompletedAt: new Date().toISOString() },
+        user: {
+          ...current.user,
+          onboardingComplete: true,
+          onboardingCompletedAt: new Date().toISOString(),
+        },
       };
+      persistAuth(next);
+      return next;
+    });
+  }, []);
+
+  const updateCachedUser = useCallback((user: User) => {
+    setAuth((current) => {
+      if (!current) return current;
+      const next: AuthResponse = { ...current, user };
       persistAuth(next);
       return next;
     });
@@ -126,9 +156,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signInWithApple,
       devSignIn,
       markOnboardingComplete,
+      updateCachedUser,
       logout,
     }),
-    [auth, isLoading, logout, signInWithApple, signInWithGoogle, devSignIn, markOnboardingComplete],
+    [
+      auth,
+      isLoading,
+      logout,
+      signInWithApple,
+      signInWithGoogle,
+      devSignIn,
+      markOnboardingComplete,
+      updateCachedUser,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -137,7 +177,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 export function useAuth(): AuthContextValue {
   const value = useContext(AuthContext);
   if (!value) {
-    throw new Error('useAuth must be used within AuthProvider');
+    throw new Error("useAuth must be used within AuthProvider");
   }
 
   return value;

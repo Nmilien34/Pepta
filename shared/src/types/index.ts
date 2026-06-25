@@ -70,6 +70,7 @@ import type {
   subscriptionStatusSchema,
   trackResponseSchema,
   trainingStatusSchema,
+  userAccountPatchSchema,
   userProfileInputSchema,
   userProfileSettingsPatchSchema,
   userProfileResponseSchema,
@@ -167,6 +168,7 @@ export type SubscriptionStatus = z.infer<typeof subscriptionStatusSchema>;
 export type TrackResponse = z.infer<typeof trackResponseSchema>;
 export type TrainingStatus = z.infer<typeof trainingStatusSchema>;
 export type User = z.infer<typeof userResponseSchema>;
+export type UserAccountPatch = z.infer<typeof userAccountPatchSchema>;
 export type UserProfileInput = z.infer<typeof userProfileInputSchema>;
 export type UserProfileSettingsPatch = z.infer<
   typeof userProfileSettingsPatchSchema

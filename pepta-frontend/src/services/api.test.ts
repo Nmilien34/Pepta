@@ -73,6 +73,65 @@ describe("PeptaApi onboarding", () => {
   });
 });
 
+describe("PeptaApi account", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    api.setAuthToken(null);
+  });
+
+  it("patches account identity and parses the updated user", async () => {
+    const responseBody = {
+      data: {
+        id: "user-1",
+        email: "nick@pepta.app",
+        emailVerified: true,
+        displayName: "Nico Pepta",
+        authProviders: [],
+        entitlement: { status: "free", expiresAt: null, willRenew: false },
+        onboardingComplete: true,
+        createdAt: NOW.toISOString(),
+        updatedAt: NOW.toISOString(),
+      },
+    };
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify(responseBody), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await api.updateAccount({ displayName: "Nico Pepta" });
+
+    expect(result.displayName).toBe("Nico Pepta");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:8080/me/account",
+      expect.objectContaining({
+        method: "PATCH",
+        body: JSON.stringify({ displayName: "Nico Pepta" }),
+      }),
+    );
+  });
+
+  it("deletes the account through the account endpoint", async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(null, {
+          status: 204,
+        }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await api.deleteAccount();
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:8080/me/account",
+      expect.objectContaining({ method: "DELETE" }),
+    );
+  });
+});
+
 describe("PeptaApi resilience", () => {
   afterEach(() => {
     vi.unstubAllGlobals();

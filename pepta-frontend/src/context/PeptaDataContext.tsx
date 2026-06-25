@@ -122,6 +122,33 @@ export function homeWithLatestWeight(
   };
 }
 
+function emptyTrackResponse(): TrackResponse {
+  return {
+    doseLogs: [],
+    mealLogs: [],
+    waterLogs: [],
+    proteinLogs: [],
+    activityLogs: [],
+    sideEffectLogs: [],
+    measurements: [],
+    sectionErrors: {},
+  };
+}
+
+export function trackWithAddedSideEffect(
+  track: TrackResponse | null,
+  input: SideEffectLogInput,
+): TrackResponse {
+  const current = track ?? emptyTrackResponse();
+  return {
+    ...current,
+    sideEffectLogs: [
+      optimisticRow<SideEffectLogResponse>(input),
+      ...current.sideEffectLogs,
+    ],
+  };
+}
+
 function errorMessage(error: unknown): string {
   const detail = error instanceof Error ? error.message : String(error);
   // Always log the raw cause so it shows in the Metro/device console.
@@ -152,23 +179,26 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
   const hasTrack = useRef(false);
   const hasProgress = useRef(false);
 
-  const refreshHome = useCallback(async (range?: HomeRangeKey) => {
-    const nextRange = range ?? homeRange;
-    if (range) setHomeRange(range);
-    setHomeError(null);
-    if (hasData.current) setHomeRefreshing(true);
-    else setHomeLoading(true);
-    try {
-      const data = await api.getHome(nextRange);
-      setHome(data);
-      hasData.current = true;
-    } catch (error) {
-      setHomeError(errorMessage(error));
-    } finally {
-      setHomeLoading(false);
-      setHomeRefreshing(false);
-    }
-  }, [homeRange]);
+  const refreshHome = useCallback(
+    async (range?: HomeRangeKey) => {
+      const nextRange = range ?? homeRange;
+      if (range) setHomeRange(range);
+      setHomeError(null);
+      if (hasData.current) setHomeRefreshing(true);
+      else setHomeLoading(true);
+      try {
+        const data = await api.getHome(nextRange);
+        setHome(data);
+        hasData.current = true;
+      } catch (error) {
+        setHomeError(errorMessage(error));
+      } finally {
+        setHomeLoading(false);
+        setHomeRefreshing(false);
+      }
+    },
+    [homeRange],
+  );
 
   const updateRangeTotals = useCallback(
     (homeValue: HomeResponse, patch: RangeTotalPatch) => {
@@ -189,78 +219,124 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
   // then persist a positive delta as a new log (the backend log model is
   // append-only, so a negative "− " is treated as a local correction that the
   // next refresh reconciles to server truth). On a failed POST we revert.
-  const bumpProtein = useCallback((grams: number) => {
-    setHome((h) =>
-      h
-        ? updateRangeTotals(
-            { ...h, todayProteinGrams: Math.max(0, h.todayProteinGrams + grams) },
-            { proteinGrams: Math.max(0, (h.rangeTotals?.proteinGrams ?? h.todayProteinGrams) + grams) },
-          )
-        : h,
-    );
-    if (grams <= 0) return;
-    api
-      .createProteinLog({ grams, datetime: new Date().toISOString() })
-      .catch(() => {
-        setHome((h) =>
-          h
-            ? updateRangeTotals(
-                {
-                  ...h,
-                  todayProteinGrams: Math.max(0, h.todayProteinGrams - grams),
-                },
-                { proteinGrams: Math.max(0, (h.rangeTotals?.proteinGrams ?? h.todayProteinGrams) - grams) },
-              )
-            : h,
-        );
-      });
-  }, [updateRangeTotals]);
-  const bumpWater = useCallback((oz: number) => {
-    setHome((h) =>
-      h
-        ? updateRangeTotals(
-            { ...h, todayWaterOz: Math.max(0, h.todayWaterOz + oz) },
-            { waterOz: Math.max(0, (h.rangeTotals?.waterOz ?? h.todayWaterOz) + oz) },
-          )
-        : h,
-    );
-    if (oz <= 0) return;
-    api
-      .createWaterLog({ amountOz: oz, datetime: new Date().toISOString() })
-      .catch(() => {
-        setHome((h) =>
-          h
-            ? updateRangeTotals(
-                { ...h, todayWaterOz: Math.max(0, h.todayWaterOz - oz) },
-                { waterOz: Math.max(0, (h.rangeTotals?.waterOz ?? h.todayWaterOz) - oz) },
-              )
-            : h,
-        );
-      });
-  }, [updateRangeTotals]);
-  const bumpFiber = useCallback((grams: number) => {
-    setHome((h) =>
-      h
-        ? updateRangeTotals(
-            { ...h, todayFiberGrams: Math.max(0, h.todayFiberGrams + grams) },
-            { fiberGrams: Math.max(0, (h.rangeTotals?.fiberGrams ?? h.todayFiberGrams) + grams) },
-          )
-        : h,
-    );
-    if (grams <= 0) return;
-    api
-      .createFiberLog({ grams, datetime: new Date().toISOString() })
-      .catch(() => {
-        setHome((h) =>
-          h
-            ? updateRangeTotals(
-                { ...h, todayFiberGrams: Math.max(0, h.todayFiberGrams - grams) },
-                { fiberGrams: Math.max(0, (h.rangeTotals?.fiberGrams ?? h.todayFiberGrams) - grams) },
-              )
-            : h,
-        );
-      });
-  }, [updateRangeTotals]);
+  const bumpProtein = useCallback(
+    (grams: number) => {
+      setHome((h) =>
+        h
+          ? updateRangeTotals(
+              {
+                ...h,
+                todayProteinGrams: Math.max(0, h.todayProteinGrams + grams),
+              },
+              {
+                proteinGrams: Math.max(
+                  0,
+                  (h.rangeTotals?.proteinGrams ?? h.todayProteinGrams) + grams,
+                ),
+              },
+            )
+          : h,
+      );
+      if (grams <= 0) return;
+      api
+        .createProteinLog({ grams, datetime: new Date().toISOString() })
+        .catch(() => {
+          setHome((h) =>
+            h
+              ? updateRangeTotals(
+                  {
+                    ...h,
+                    todayProteinGrams: Math.max(0, h.todayProteinGrams - grams),
+                  },
+                  {
+                    proteinGrams: Math.max(
+                      0,
+                      (h.rangeTotals?.proteinGrams ?? h.todayProteinGrams) -
+                        grams,
+                    ),
+                  },
+                )
+              : h,
+          );
+        });
+    },
+    [updateRangeTotals],
+  );
+  const bumpWater = useCallback(
+    (oz: number) => {
+      setHome((h) =>
+        h
+          ? updateRangeTotals(
+              { ...h, todayWaterOz: Math.max(0, h.todayWaterOz + oz) },
+              {
+                waterOz: Math.max(
+                  0,
+                  (h.rangeTotals?.waterOz ?? h.todayWaterOz) + oz,
+                ),
+              },
+            )
+          : h,
+      );
+      if (oz <= 0) return;
+      api
+        .createWaterLog({ amountOz: oz, datetime: new Date().toISOString() })
+        .catch(() => {
+          setHome((h) =>
+            h
+              ? updateRangeTotals(
+                  { ...h, todayWaterOz: Math.max(0, h.todayWaterOz - oz) },
+                  {
+                    waterOz: Math.max(
+                      0,
+                      (h.rangeTotals?.waterOz ?? h.todayWaterOz) - oz,
+                    ),
+                  },
+                )
+              : h,
+          );
+        });
+    },
+    [updateRangeTotals],
+  );
+  const bumpFiber = useCallback(
+    (grams: number) => {
+      setHome((h) =>
+        h
+          ? updateRangeTotals(
+              { ...h, todayFiberGrams: Math.max(0, h.todayFiberGrams + grams) },
+              {
+                fiberGrams: Math.max(
+                  0,
+                  (h.rangeTotals?.fiberGrams ?? h.todayFiberGrams) + grams,
+                ),
+              },
+            )
+          : h,
+      );
+      if (grams <= 0) return;
+      api
+        .createFiberLog({ grams, datetime: new Date().toISOString() })
+        .catch(() => {
+          setHome((h) =>
+            h
+              ? updateRangeTotals(
+                  {
+                    ...h,
+                    todayFiberGrams: Math.max(0, h.todayFiberGrams - grams),
+                  },
+                  {
+                    fiberGrams: Math.max(
+                      0,
+                      (h.rangeTotals?.fiberGrams ?? h.todayFiberGrams) - grams,
+                    ),
+                  },
+                )
+              : h,
+          );
+        });
+    },
+    [updateRangeTotals],
+  );
 
   const refreshTrack = useCallback(async () => {
     setTrackError(null);
@@ -288,17 +364,7 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
     );
   }, []);
   const addSideEffectLog = useCallback((input: SideEffectLogInput) => {
-    setTrack((t) =>
-      t
-        ? {
-            ...t,
-            sideEffectLogs: [
-              optimisticRow<SideEffectLogResponse>(input),
-              ...t.sideEffectLogs,
-            ],
-          }
-        : t,
-    );
+    setTrack((t) => trackWithAddedSideEffect(t, input));
   }, []);
   const addWeightLog = useCallback((input: WeightLogInput) => {
     const row = optimisticRow<WeightLogResponse>(input);
@@ -325,25 +391,33 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
         : p,
     );
   }, []);
-  const addMeal = useCallback((input: MealLogInput) => {
-    setHome((h) =>
-      h
-        ? updateRangeTotals(
-            {
-              ...h,
-              todayProteinGrams: h.todayProteinGrams + input.protein,
-              todayCalories: h.todayCalories + input.calories,
-              todayFiberGrams: h.todayFiberGrams + (input.fiber ?? 0),
-            },
-            {
-              proteinGrams: (h.rangeTotals?.proteinGrams ?? h.todayProteinGrams) + input.protein,
-              calories: (h.rangeTotals?.calories ?? h.todayCalories) + input.calories,
-              fiberGrams: (h.rangeTotals?.fiberGrams ?? h.todayFiberGrams) + (input.fiber ?? 0),
-            },
-          )
-        : h,
-    );
-  }, [updateRangeTotals]);
+  const addMeal = useCallback(
+    (input: MealLogInput) => {
+      setHome((h) =>
+        h
+          ? updateRangeTotals(
+              {
+                ...h,
+                todayProteinGrams: h.todayProteinGrams + input.protein,
+                todayCalories: h.todayCalories + input.calories,
+                todayFiberGrams: h.todayFiberGrams + (input.fiber ?? 0),
+              },
+              {
+                proteinGrams:
+                  (h.rangeTotals?.proteinGrams ?? h.todayProteinGrams) +
+                  input.protein,
+                calories:
+                  (h.rangeTotals?.calories ?? h.todayCalories) + input.calories,
+                fiberGrams:
+                  (h.rangeTotals?.fiberGrams ?? h.todayFiberGrams) +
+                  (input.fiber ?? 0),
+              },
+            )
+          : h,
+      );
+    },
+    [updateRangeTotals],
+  );
 
   const addCompound = useCallback(
     async (input: CompoundInput) => {

@@ -1,11 +1,16 @@
-import { userProfileSettingsPatchSchema } from "@pepta/shared";
+import {
+  userAccountPatchSchema,
+  userProfileSettingsPatchSchema,
+} from "@pepta/shared";
 import { Router } from "express";
 import { requireAuth } from "../auth/middleware";
 import { asyncHandler } from "../lib/async-handler";
-import { sendData } from "../lib/responses";
+import { sendData, sendNoContent } from "../lib/responses";
 import { validateBody } from "../middleware/validate.middleware";
 import {
+  deleteCurrentUser,
   getCurrentUser,
+  updateCurrentUser,
   updateProfileSettings,
 } from "../services/user.service";
 
@@ -17,6 +22,22 @@ router.get(
   "/",
   asyncHandler(async (req, res) => {
     sendData(res, await getCurrentUser(req.user!.id));
+  }),
+);
+
+router.patch(
+  "/account",
+  validateBody(userAccountPatchSchema),
+  asyncHandler(async (req, res) => {
+    sendData(res, await updateCurrentUser(req.user!.id, req.body));
+  }),
+);
+
+router.delete(
+  "/account",
+  asyncHandler(async (req, res) => {
+    await deleteCurrentUser(req.user!.id);
+    sendNoContent(res);
   }),
 );
 

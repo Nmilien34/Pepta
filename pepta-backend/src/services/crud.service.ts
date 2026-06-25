@@ -1,9 +1,9 @@
-import type { LogListQuery } from '@pepta/shared';
-import { ERROR_CODES } from '@pepta/shared';
-import type { Model, Types } from 'mongoose';
-import { AppError, NotFoundError } from '../lib/errors';
-import { serializeWithSchema } from './serializers';
-import type { z } from 'zod';
+import type { LogListQuery } from "@pepta/shared";
+import { ERROR_CODES } from "@pepta/shared";
+import type { Model, Types } from "mongoose";
+import { AppError, NotFoundError } from "../lib/errors";
+import { serializeWithSchema } from "./serializers";
+import type { z } from "zod";
 
 interface LogDocumentBase {
   _id: Types.ObjectId;
@@ -19,7 +19,10 @@ interface DuplicateKeyError extends Error {
   keyPattern?: Record<string, unknown>;
 }
 
-interface CrudServiceConfig<TDocument extends LogDocumentBase, TResponseSchema extends z.ZodTypeAny> {
+interface CrudServiceConfig<
+  TDocument extends LogDocumentBase,
+  TResponseSchema extends z.ZodTypeAny,
+> {
   model: Model<TDocument>;
   responseSchema: TResponseSchema;
   name: string;
@@ -27,21 +30,24 @@ interface CrudServiceConfig<TDocument extends LogDocumentBase, TResponseSchema e
 }
 
 const DEFAULT_LOOKBACK_DAYS = 30;
+const DEFAULT_FUTURE_SKEW_MS = 5 * 60 * 1000;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 function isDuplicateKey(error: unknown): error is DuplicateKeyError {
   return (
-    typeof error === 'object' &&
+    typeof error === "object" &&
     error !== null &&
-    'code' in error &&
+    "code" in error &&
     (error as DuplicateKeyError).code === 11000
   );
 }
 
-function prepareCreateBody(body: Record<string, unknown>): Record<string, unknown> {
+function prepareCreateBody(
+  body: Record<string, unknown>,
+): Record<string, unknown> {
   return Object.fromEntries(
     Object.entries(body).map(([key, value]) => {
-      if (key === 'datetime' && typeof value === 'string') {
+      if (key === "datetime" && typeof value === "string") {
         return [key, new Date(value)];
       }
 
@@ -50,8 +56,14 @@ function prepareCreateBody(body: Record<string, unknown>): Record<string, unknow
   );
 }
 
-function queryWindow(query?: LogListQuery): { from: Date; to: Date; limit: number } {
-  const to = query?.to ? new Date(query.to) : new Date();
+function queryWindow(query?: LogListQuery): {
+  from: Date;
+  to: Date;
+  limit: number;
+} {
+  const to = query?.to
+    ? new Date(query.to)
+    : new Date(Date.now() + DEFAULT_FUTURE_SKEW_MS);
   const from = query?.from
     ? new Date(query.from)
     : new Date(to.getTime() - DEFAULT_LOOKBACK_DAYS * MS_PER_DAY);
@@ -74,8 +86,11 @@ export function createCrudService<
     return serializeWithSchema(config.responseSchema, document);
   }
 
-  async function findExisting(userId: string, idempotencyKey: unknown): Promise<TDocument | null> {
-    if (!config.hasIdempotencyKey || typeof idempotencyKey !== 'string') {
+  async function findExisting(
+    userId: string,
+    idempotencyKey: unknown,
+  ): Promise<TDocument | null> {
+    if (!config.hasIdempotencyKey || typeof idempotencyKey !== "string") {
       return null;
     }
 

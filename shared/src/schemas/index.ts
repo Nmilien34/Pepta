@@ -127,6 +127,16 @@ export const userResponseSchema = z
   })
   .strict();
 
+export const userAccountPatchSchema = z
+  .object({
+    displayName: z.string().trim().min(1).max(120).optional(),
+    avatarUrl: z.string().url().optional(),
+  })
+  .strict()
+  .refine((patch) => Object.keys(patch).length > 0, {
+    message: "At least one account field is required",
+  });
+
 export const googleAuthSchema = z
   .object({
     idToken: z.string().min(1),

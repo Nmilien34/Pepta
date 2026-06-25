@@ -1,23 +1,92 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  deleteS3Object: vi.fn(),
+  modelDeleteMany: {
+    ActivityLogModel: vi.fn(),
+    CompoundModel: vi.fn(),
+    CycleModel: vi.fn(),
+    DoseLogModel: vi.fn(),
+    FiberLogModel: vi.fn(),
+    InsightModel: vi.fn(),
+    MealLogModel: vi.fn(),
+    MealScanModel: vi.fn(),
+    MeasurementModel: vi.fn(),
+    ProcessedWebhookEventModel: vi.fn(),
+    ProgressPhotoModel: vi.fn(),
+    ProteinLogModel: vi.fn(),
+    ScheduleModel: vi.fn(),
+    SideEffectLogModel: vi.fn(),
+    UserProfileModel: vi.fn(),
+    WaterLogModel: vi.fn(),
+    WeeklyRetentionModel: vi.fn(),
+    WeightLogModel: vi.fn(),
+  },
+  mealLogFind: vi.fn(),
+  mealScanFind: vi.fn(),
   profileFindOne: vi.fn(),
   profileFindOneAndUpdate: vi.fn(),
+  progressPhotoFind: vi.fn(),
+  userDeleteOne: vi.fn(),
+  userFindById: vi.fn(),
   userFindByIdAndUpdate: vi.fn(),
 }));
 
 vi.mock("../../models", () => ({
+  ActivityLogModel: { deleteMany: mocks.modelDeleteMany.ActivityLogModel },
+  CompoundModel: { deleteMany: mocks.modelDeleteMany.CompoundModel },
+  CycleModel: { deleteMany: mocks.modelDeleteMany.CycleModel },
+  DoseLogModel: { deleteMany: mocks.modelDeleteMany.DoseLogModel },
+  FiberLogModel: { deleteMany: mocks.modelDeleteMany.FiberLogModel },
+  InsightModel: { deleteMany: mocks.modelDeleteMany.InsightModel },
+  MealLogModel: {
+    deleteMany: mocks.modelDeleteMany.MealLogModel,
+    find: mocks.mealLogFind,
+  },
+  MealScanModel: {
+    deleteMany: mocks.modelDeleteMany.MealScanModel,
+    find: mocks.mealScanFind,
+  },
+  MeasurementModel: { deleteMany: mocks.modelDeleteMany.MeasurementModel },
+  ProcessedWebhookEventModel: {
+    deleteMany: mocks.modelDeleteMany.ProcessedWebhookEventModel,
+  },
+  ProgressPhotoModel: {
+    deleteMany: mocks.modelDeleteMany.ProgressPhotoModel,
+    find: mocks.progressPhotoFind,
+  },
+  ProteinLogModel: { deleteMany: mocks.modelDeleteMany.ProteinLogModel },
+  ScheduleModel: { deleteMany: mocks.modelDeleteMany.ScheduleModel },
+  SideEffectLogModel: {
+    deleteMany: mocks.modelDeleteMany.SideEffectLogModel,
+  },
   UserModel: {
+    deleteOne: mocks.userDeleteOne,
+    findById: mocks.userFindById,
     findByIdAndUpdate: mocks.userFindByIdAndUpdate,
   },
   UserProfileModel: {
+    deleteMany: mocks.modelDeleteMany.UserProfileModel,
     exists: vi.fn(),
     findOne: mocks.profileFindOne,
     findOneAndUpdate: mocks.profileFindOneAndUpdate,
   },
+  WaterLogModel: { deleteMany: mocks.modelDeleteMany.WaterLogModel },
+  WeeklyRetentionModel: {
+    deleteMany: mocks.modelDeleteMany.WeeklyRetentionModel,
+  },
+  WeightLogModel: { deleteMany: mocks.modelDeleteMany.WeightLogModel },
 }));
 
-import { updateProfileSettings } from "../../services/user.service";
+vi.mock("../../services/s3.service", () => ({
+  deleteS3Object: mocks.deleteS3Object,
+}));
+
+import {
+  deleteCurrentUser,
+  updateCurrentUser,
+  updateProfileSettings,
+} from "../../services/user.service";
 
 type ModelUpdate = {
   $set?: Record<string, unknown>;
@@ -112,5 +181,100 @@ describe("user service profile settings", () => {
     );
     expect(result.dailyWaterTargetOz).toBe(101);
     expect(result.dailyFiberTargetGrams).toBe(38);
+  });
+});
+
+describe("user service account settings", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.values(mocks.modelDeleteMany).forEach((fn) => {
+      fn.mockResolvedValue({ deletedCount: 1 });
+    });
+    mocks.deleteS3Object.mockResolvedValue(undefined);
+    mocks.mealLogFind.mockResolvedValue([]);
+    mocks.mealScanFind.mockResolvedValue([]);
+    mocks.progressPhotoFind.mockResolvedValue([]);
+    mocks.userDeleteOne.mockResolvedValue({ deletedCount: 1 });
+    mocks.userFindById.mockResolvedValue(
+      document({
+        id: userId,
+        email: "nick@pepta.app",
+        emailVerified: true,
+        authProviders: [],
+        entitlement: { status: "free", expiresAt: null, willRenew: false },
+        onboardingComplete: true,
+        createdAt: "2026-06-21T00:00:00.000Z",
+        updatedAt: "2026-06-21T00:00:00.000Z",
+      }),
+    );
+    mocks.userFindByIdAndUpdate.mockImplementation(
+      (_id: unknown, update: ModelUpdate) =>
+        Promise.resolve(
+          document({
+            id: userId,
+            email: "nick@pepta.app",
+            emailVerified: true,
+            displayName: update.$set?.displayName,
+            authProviders: [],
+            entitlement: { status: "free", expiresAt: null, willRenew: false },
+            onboardingComplete: true,
+            createdAt: "2026-06-21T00:00:00.000Z",
+            updatedAt: "2026-06-21T00:00:00.000Z",
+          }),
+        ),
+    );
+  });
+
+  it("updates the current user's display name", async () => {
+    const result = await updateCurrentUser(userId, {
+      displayName: "Nico Pepta",
+    });
+
+    expect(mocks.userFindByIdAndUpdate).toHaveBeenCalledWith(
+      userId,
+      { $set: { displayName: "Nico Pepta" } },
+      { new: true, runValidators: true },
+    );
+    expect(result.displayName).toBe("Nico Pepta");
+  });
+
+  it("deletes the user, user-owned data, and known S3 images", async () => {
+    mocks.progressPhotoFind.mockResolvedValue([
+      { s3Key: "pepta/progress/user-1/front.jpg" },
+    ]);
+    mocks.mealScanFind.mockResolvedValue([
+      { photoS3Key: "pepta/meal-scans/user-1/scan.jpg" },
+    ]);
+    mocks.mealLogFind.mockResolvedValue([
+      { photoS3Key: "pepta/meal-logs/user-1/manual.jpg" },
+      { photoS3Key: "pepta/meal-scans/user-1/scan.jpg" },
+      { photoS3Key: "" },
+    ]);
+
+    await deleteCurrentUser(userId);
+
+    expect(mocks.deleteS3Object.mock.calls.map(([key]) => key).sort()).toEqual([
+      "pepta/meal-logs/user-1/manual.jpg",
+      "pepta/meal-scans/user-1/scan.jpg",
+      "pepta/progress/user-1/front.jpg",
+    ]);
+    expect(mocks.modelDeleteMany.UserProfileModel).toHaveBeenCalledWith({
+      userId,
+    });
+    expect(mocks.modelDeleteMany.CompoundModel).toHaveBeenCalledWith({
+      userId,
+    });
+    expect(mocks.modelDeleteMany.MealLogModel).toHaveBeenCalledWith({
+      userId,
+    });
+    expect(mocks.modelDeleteMany.ProgressPhotoModel).toHaveBeenCalledWith({
+      userId,
+    });
+    expect(
+      mocks.modelDeleteMany.ProcessedWebhookEventModel,
+    ).toHaveBeenCalledWith({
+      appUserId: userId,
+    });
+    expect(mocks.userDeleteOne).toHaveBeenCalledWith({ _id: userId });
   });
 });

@@ -8,6 +8,7 @@ import {
   onboardingCompleteInputSchema,
   onboardingResultResponseSchema,
   sideEffectLogInputSchema,
+  userAccountPatchSchema,
   userProfileInputSchema,
   userProfileResponseSchema,
 } from "./index";
@@ -67,6 +68,16 @@ describe("shared profile schemas", () => {
     const result = userProfileInputSchema.safeParse(baseProfile);
 
     expect(result.success).toBe(true);
+  });
+
+  it("accepts account display-name patches and rejects empty account patches", () => {
+    expect(
+      userAccountPatchSchema.safeParse({ displayName: "Nico Pepta" }).success,
+    ).toBe(true);
+    expect(userAccountPatchSchema.safeParse({}).success).toBe(false);
+    expect(
+      userAccountPatchSchema.safeParse({ displayName: "   " }).success,
+    ).toBe(false);
   });
 
   it("allows additive insight copy versions", () => {

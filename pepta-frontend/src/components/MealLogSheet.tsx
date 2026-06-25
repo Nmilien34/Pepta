@@ -57,9 +57,16 @@ type View_ =
 export interface MealLogSheetProps {
   visible: boolean;
   onClose(): void;
+  onBack?: () => void;
+  onDismissed?: () => void;
 }
 
-export function MealLogSheet({ visible, onClose }: MealLogSheetProps) {
+export function MealLogSheet({
+  visible,
+  onClose,
+  onBack,
+  onDismissed,
+}: MealLogSheetProps) {
   const theme = useTheme();
   const { addMeal, refreshHome } = usePeptaData();
   const [view, setView] = useState<View_>("chooser");
@@ -287,7 +294,11 @@ export function MealLogSheet({ visible, onClose }: MealLogSheetProps) {
         visible={visible && !cameraRequested && !cameraOpen}
         onClose={onClose}
         onDismissed={() => {
-          if (cameraRequested) setCameraOpen(true);
+          if (cameraRequested) {
+            setCameraOpen(true);
+          } else {
+            onDismissed?.();
+          }
         }}
         height={view === "chooser" ? "84%" : undefined}
         scrollable
@@ -329,6 +340,28 @@ export function MealLogSheet({ visible, onClose }: MealLogSheetProps) {
               {HEADINGS[view].sub}
             </AppText>
           </View>
+          {view === "chooser" ? (
+            <Pressable
+              onPress={() => {
+                Haptics.selectionAsync().catch(() => undefined);
+                if (onBack) onBack();
+                else onClose();
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Close meal log"
+              hitSlop={8}
+              style={{
+                width: 30,
+                height: 30,
+                borderRadius: 15,
+                backgroundColor: theme.colors.surfaceAlt,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Icon name="close" size={18} color={theme.colors.textPrimary} />
+            </Pressable>
+          ) : null}
         </View>
 
         {view === "chooser" ? (
@@ -529,20 +562,56 @@ function MealChooser({
           <AppText variant="cardTitle" style={{ fontSize: 20 }}>
             Scan a photo
           </AppText>
-          <AppText variant="body" color="textSecondary" style={{ marginTop: 4, lineHeight: 21 }}>
+          <AppText
+            variant="body"
+            color="textSecondary"
+            style={{ marginTop: 4, lineHeight: 21 }}
+          >
             Snap your plate and Pepta reads the macros.
           </AppText>
         </View>
-        <Icon name="chevron-forward" size={19} color={theme.colors.textTertiary} />
+        <Icon
+          name="chevron-forward"
+          size={19}
+          color={theme.colors.textTertiary}
+        />
       </Pressable>
 
       <View style={{ flexDirection: "row", gap: 10 }}>
-        <CompactMealAction theme={theme} icon="images" color={theme.colors.water} title="Library" hint="Pick photo" onPress={onLibrary} />
-        <CompactMealAction theme={theme} icon="mic" color={theme.colors.primary} title="Voice" hint="Say it" onPress={onVoice} />
+        <CompactMealAction
+          theme={theme}
+          icon="images"
+          color={theme.colors.water}
+          title="Library"
+          hint="Pick photo"
+          onPress={onLibrary}
+        />
+        <CompactMealAction
+          theme={theme}
+          icon="mic"
+          color={theme.colors.primary}
+          title="Voice"
+          hint="Say it"
+          onPress={onVoice}
+        />
       </View>
       <View style={{ flexDirection: "row", gap: 10 }}>
-        <CompactMealAction theme={theme} icon="search" color={theme.colors.fiber} title="Search" hint="Find food" onPress={onSearch} />
-        <CompactMealAction theme={theme} icon="pencil-outline" color={theme.colors.textSecondary} title="Manual" hint="Type macros" onPress={onManual} />
+        <CompactMealAction
+          theme={theme}
+          icon="search"
+          color={theme.colors.fiber}
+          title="Search"
+          hint="Find food"
+          onPress={onSearch}
+        />
+        <CompactMealAction
+          theme={theme}
+          icon="pencil-outline"
+          color={theme.colors.textSecondary}
+          title="Manual"
+          hint="Type macros"
+          onPress={onManual}
+        />
       </View>
 
       <View style={{ paddingTop: 4, paddingBottom: 4 }}>
@@ -558,8 +627,13 @@ function MealChooser({
           }}
         >
           <Icon name="sparkles" size={16} color={theme.colors.primary} />
-          <AppText variant="caption" color="textSecondary" style={{ flex: 1, lineHeight: 16 }}>
-            Every meal you log updates protein, calories, fiber, and your Home totals.
+          <AppText
+            variant="caption"
+            color="textSecondary"
+            style={{ flex: 1, lineHeight: 16 }}
+          >
+            Every meal you log updates protein, calories, fiber, and your Home
+            totals.
           </AppText>
         </View>
       </View>
@@ -609,75 +683,21 @@ function CompactMealAction({
       >
         <Icon name={icon} size={22} color={color} />
       </View>
-      <AppText variant="bodyStrong" style={{ fontWeight: "800", marginTop: 11 }} numberOfLines={1}>
+      <AppText
+        variant="bodyStrong"
+        style={{ fontWeight: "800", marginTop: 11 }}
+        numberOfLines={1}
+      >
         {title}
       </AppText>
-      <AppText variant="caption" color="textSecondary" style={{ marginTop: 2 }} numberOfLines={1}>
+      <AppText
+        variant="caption"
+        color="textSecondary"
+        style={{ marginTop: 2 }}
+        numberOfLines={1}
+      >
         {hint}
       </AppText>
-    </Pressable>
-  );
-}
-
-function Tile({
-  theme,
-  icon,
-  title,
-  hint,
-  onPress,
-}: {
-  theme: Theme;
-  icon: React.ReactNode;
-  title: string;
-  hint: string;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => ({
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 13,
-        paddingVertical: 10,
-        paddingHorizontal: 12,
-        borderRadius: 18,
-        backgroundColor: theme.colors.surface,
-        borderWidth: 0.5,
-        borderColor: theme.colors.border,
-        opacity: pressed ? 0.7 : 1,
-        ...theme.shadows.card,
-      })}
-    >
-      <View
-        style={{
-          width: 36,
-          height: 36,
-          borderRadius: 13,
-          backgroundColor: theme.colors.surfaceAlt,
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        {icon}
-      </View>
-      <View style={{ flex: 1 }}>
-        <AppText variant="bodyStrong" style={{ fontWeight: "800", fontSize: 15 }}>
-          {title}
-        </AppText>
-        <AppText
-          variant="caption"
-          color="textSecondary"
-          style={{ marginTop: 1, lineHeight: 17 }}
-        >
-          {hint}
-        </AppText>
-      </View>
-      <Icon
-        name="chevron-forward"
-        size={17}
-        color={theme.colors.textTertiary}
-      />
     </Pressable>
   );
 }

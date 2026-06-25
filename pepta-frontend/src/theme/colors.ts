@@ -8,24 +8,24 @@
 // color so the eye learns the app ("color-coded cognition").
 const accents = {
   // Brand / medication / level
-  primary: '#7C5CFC',
-  primaryGradientStart: '#8B6CFF',
-  primaryGradientEnd: '#C77DFF',
+  primary: "#7C5CFC",
+  primaryGradientStart: "#6751E8",
+  primaryGradientEnd: "#8C63F4",
   // Data-type colors
-  protein: '#FF8A3D', // orange — also streak
-  streak: '#FF8A3D',
-  fiber: '#34C759', // green — also success
-  success: '#34C759',
-  water: '#2FA8FF', // blue — also medication level secondary
-  level: '#2FA8FF',
-  weight: '#E25CC4', // magenta — also goal
-  goal: '#E25CC4',
+  protein: "#FF8A3D", // orange — also streak
+  streak: "#FF8A3D",
+  fiber: "#34C759", // green — also success
+  success: "#34C759",
+  water: "#2FA8FF", // blue — also medication level secondary
+  level: "#2FA8FF",
+  weight: "#E25CC4", // magenta — also goal
+  goal: "#E25CC4",
   // Status
-  warning: '#FFB020', // amber
-  danger: '#FF4D4F', // red
+  warning: "#FFB020", // amber
+  danger: "#FF4D4F", // red
   // Body map
-  bodyMapFill: '#C9D2F2',
-  bodyMapOutline: '#0E0E12',
+  bodyMapFill: "#C9D2F2",
+  bodyMapOutline: "#0E0E12",
 } as const;
 
 interface SemanticColors {
@@ -43,34 +43,34 @@ interface SemanticColors {
 }
 
 const lightColors: SemanticColors = {
-  bg: '#FAFAFB',
-  surface: '#FFFFFF',
-  surfaceAlt: '#F2F3F5',
-  border: '#ECECEF',
-  textPrimary: '#0E0E12',
-  textSecondary: '#6B6B76',
-  textTertiary: '#A1A1AC',
+  bg: "#FAFAFB",
+  surface: "#FFFFFF",
+  surfaceAlt: "#F2F3F5",
+  border: "#ECECEF",
+  textPrimary: "#0E0E12",
+  textSecondary: "#6B6B76",
+  textTertiary: "#A1A1AC",
   // Subtle tinted fills for inset rows / steppers, keyed off the gray scale.
-  fillPrimary: 'rgba(14,14,18,0.06)',
-  fillSecondary: 'rgba(14,14,18,0.04)',
+  fillPrimary: "rgba(14,14,18,0.06)",
+  fillSecondary: "rgba(14,14,18,0.04)",
   // Soft shadow color (large blur, low opacity).
-  shadow: 'rgba(17,17,26,0.06)',
+  shadow: "rgba(17,17,26,0.06)",
   // Color on top of the primary gradient / colored buttons.
-  onPrimary: '#FFFFFF',
+  onPrimary: "#FFFFFF",
 } as const;
 
 const darkColors: SemanticColors = {
-  bg: '#0E0E12',
-  surface: '#17171C',
-  surfaceAlt: '#1F1F26',
-  border: 'rgba(255,255,255,0.08)',
-  textPrimary: '#F5F5F7',
-  textSecondary: '#A1A1AC',
-  textTertiary: '#6B6B76',
-  fillPrimary: 'rgba(255,255,255,0.08)',
-  fillSecondary: 'rgba(255,255,255,0.04)',
-  shadow: 'rgba(0,0,0,0.4)',
-  onPrimary: '#FFFFFF',
+  bg: "#0E0E12",
+  surface: "#17171C",
+  surfaceAlt: "#1F1F26",
+  border: "rgba(255,255,255,0.08)",
+  textPrimary: "#F5F5F7",
+  textSecondary: "#A1A1AC",
+  textTertiary: "#6B6B76",
+  fillPrimary: "rgba(255,255,255,0.08)",
+  fillSecondary: "rgba(255,255,255,0.04)",
+  shadow: "rgba(0,0,0,0.4)",
+  onPrimary: "#FFFFFF",
 };
 
 export function getColors(isDark: boolean) {
