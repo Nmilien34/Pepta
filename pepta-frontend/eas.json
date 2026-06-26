@@ -1,0 +1,19 @@
+{
+  "cli": {
+    "version": ">= 20.4.0",
+    "appVersionSource": "local"
+  },
+  "build": {
+    "production": {
+      "distribution": "store"
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "ascAppId": "6784368155",
+        "appleTeamId": "N8J23B3BBW"
+      }
+    }
+  }
+}

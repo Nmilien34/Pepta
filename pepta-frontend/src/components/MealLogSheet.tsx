@@ -305,6 +305,7 @@ export function MealLogSheet({
           }
         }}
         height={view === "chooser" ? "84%" : undefined}
+        avoidKeyboard={view !== "search"}
         scrollable
       >
         {/* header */}
@@ -319,7 +320,9 @@ export function MealLogSheet({
           {view !== "chooser" && view !== "analyzing" ? (
             <Pressable
               onPress={back}
-              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Back to meal log options"
+              hitSlop={{ bottom: 14, left: 14, right: 14, top: 14 }}
               style={{
                 width: 30,
                 height: 30,

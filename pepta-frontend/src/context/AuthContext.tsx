@@ -100,6 +100,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user: {
         id: "dev-user",
         emailVerified: false,
+        hasAvatar: false,
         authProviders: [],
         entitlement: { status: "free", expiresAt: null, willRenew: false },
         onboardingComplete: false,

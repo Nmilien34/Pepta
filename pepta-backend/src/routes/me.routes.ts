@@ -1,4 +1,6 @@
 import {
+  avatarConfirmRequestSchema,
+  avatarUploadIntentRequestSchema,
   userAccountPatchSchema,
   userProfileSettingsPatchSchema,
 } from "@pepta/shared";
@@ -7,6 +9,11 @@ import { requireAuth } from "../auth/middleware";
 import { asyncHandler } from "../lib/async-handler";
 import { sendData, sendNoContent } from "../lib/responses";
 import { validateBody } from "../middleware/validate.middleware";
+import {
+  confirmAvatarUpload,
+  createAvatarUploadIntent,
+  getAvatarViewUrl,
+} from "../services/avatar.service";
 import {
   deleteCurrentUser,
   getCurrentUser,
@@ -22,6 +29,29 @@ router.get(
   "/",
   asyncHandler(async (req, res) => {
     sendData(res, await getCurrentUser(req.user!.id));
+  }),
+);
+
+router.post(
+  "/avatar/upload-intent",
+  validateBody(avatarUploadIntentRequestSchema),
+  asyncHandler(async (req, res) => {
+    sendData(res, await createAvatarUploadIntent(req.user!.id, req.body));
+  }),
+);
+
+router.post(
+  "/avatar",
+  validateBody(avatarConfirmRequestSchema),
+  asyncHandler(async (req, res) => {
+    sendData(res, await confirmAvatarUpload(req.user!.id, req.body));
+  }),
+);
+
+router.get(
+  "/avatar/view-url",
+  asyncHandler(async (req, res) => {
+    sendData(res, await getAvatarViewUrl(req.user!.id));
   }),
 );
 

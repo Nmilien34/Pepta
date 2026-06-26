@@ -1,5 +1,10 @@
 import {
+  apiErrorResponseSchema,
   appleAuthSchema,
+  avatarConfirmRequestSchema,
+  avatarUploadIntentRequestSchema,
+  avatarUploadIntentResponseSchema,
+  avatarViewUrlResponseSchema,
   authResponseSchema,
   googleAuthSchema,
   homeResponseSchema,
@@ -42,6 +47,10 @@ import {
   type ActivityLogInput,
   type ActivityLogResponse,
   type AppleAuth,
+  type AvatarConfirmRequest,
+  type AvatarUploadIntentRequest,
+  type AvatarUploadIntentResponse,
+  type AvatarViewUrlResponse,
   type AuthResponse,
   type CompoundInput,
   type CompoundResponse,
@@ -83,6 +92,7 @@ import {
 } from "@pepta/shared";
 import { z } from "zod";
 import { API_BASE_URL } from "../config";
+import { ApiError } from "./apiError";
 import type { FoodSearchResult } from "../screens/app/mealLog";
 import type { CompanionNote } from "../screens/app/companionNotes";
 
@@ -125,17 +135,6 @@ const REQUEST_TIMEOUT_MS = 15_000;
 // cold endpoint can be slow; by the retry it's usually warm).
 const RETRY_DELAY_MS = 400;
 
-// Carries the HTTP status so callers (and the retry logic) can branch on it.
-class ApiError extends Error {
-  constructor(
-    public readonly status: number,
-    message: string,
-  ) {
-    super(message);
-    this.name = "ApiError";
-  }
-}
-
 const delay = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -151,6 +150,28 @@ class PeptaApi {
 
   public setAuthToken(token: string | null): void {
     this.authToken = token;
+  }
+
+  // Turn a non-2xx response into a typed ApiError carrying the backend's
+  // `{ error: { code, message } }` envelope (falls back to the status). Handles
+  // the 401 side-effects (clear token + sign out) in one place.
+  private async failFromResponse(response: Response): Promise<never> {
+    let code: string | undefined;
+    let message = `Pepta API request failed: ${response.status}`;
+    try {
+      const parsed = apiErrorResponseSchema.safeParse(await response.json());
+      if (parsed.success) {
+        code = parsed.data.error.code;
+        message = parsed.data.error.message;
+      }
+    } catch {
+      // Non-JSON / empty body — keep the status-based message.
+    }
+    if (response.status === 401) {
+      this.authToken = null;
+      this.onUnauthorized?.();
+    }
+    throw new ApiError(response.status, message, code);
   }
 
   private async fetchOnce<T>(
@@ -177,22 +198,11 @@ class PeptaApi {
       clearTimeout(timer);
     }
 
-    // 401 → the session is dead. Clear the token and tell AuthContext to sign the
-    // UI out so we don't loop on a stale token.
-    if (response.status === 401) {
-      this.authToken = null;
-      this.onUnauthorized?.();
-      throw new ApiError(401, `Pepta API request failed: 401`);
+    if (!response.ok) {
+      await this.failFromResponse(response); // throws an ApiError
     }
 
     const json = (await response.json()) as unknown;
-    if (!response.ok) {
-      throw new ApiError(
-        response.status,
-        `Pepta API request failed: ${response.status}`,
-      );
-    }
-
     const envelope = z.object({ data: z.unknown() }).parse(json);
     return schema.parse(envelope.data);
   }
@@ -220,17 +230,8 @@ class PeptaApi {
       clearTimeout(timer);
     }
 
-    if (response.status === 401) {
-      this.authToken = null;
-      this.onUnauthorized?.();
-      throw new ApiError(401, `Pepta API request failed: 401`);
-    }
-
     if (!response.ok) {
-      throw new ApiError(
-        response.status,
-        `Pepta API request failed: ${response.status}`,
-      );
+      await this.failFromResponse(response); // throws an ApiError
     }
   }
 
@@ -316,6 +317,30 @@ class PeptaApi {
 
   public deleteAccount(): Promise<void> {
     return this.fetchNoContent("/me/account", { method: "DELETE" });
+  }
+
+  public createAvatarUploadIntent(
+    body: AvatarUploadIntentRequest,
+  ): Promise<AvatarUploadIntentResponse> {
+    return this.request(
+      "/me/avatar/upload-intent",
+      avatarUploadIntentResponseSchema,
+      {
+        method: "POST",
+        body: JSON.stringify(avatarUploadIntentRequestSchema.parse(body)),
+      },
+    );
+  }
+
+  public confirmAvatarUpload(body: AvatarConfirmRequest): Promise<User> {
+    return this.request("/me/avatar", userResponseSchema, {
+      method: "POST",
+      body: JSON.stringify(avatarConfirmRequestSchema.parse(body)),
+    });
+  }
+
+  public getAvatarViewUrl(): Promise<AvatarViewUrlResponse> {
+    return this.request("/me/avatar/view-url", avatarViewUrlResponseSchema);
   }
 
   // POST /compounds → CompoundResponse (201). Adds a medication to track.

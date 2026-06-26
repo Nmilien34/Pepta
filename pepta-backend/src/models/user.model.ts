@@ -28,6 +28,7 @@ export interface UserDocument extends Document<Types.ObjectId> {
   emailVerified: boolean;
   displayName?: string;
   avatarUrl?: string;
+  avatarKey?: string;
   authProviders: LinkedAuthProviderDocument[];
   entitlement: UserEntitlementDocument;
   onboardingComplete?: boolean;
@@ -135,6 +136,10 @@ const userSchema = new Schema<UserDocument>(
       trim: true,
     },
     avatarUrl: {
+      type: String,
+      trim: true,
+    },
+    avatarKey: {
       type: String,
       trim: true,
     },

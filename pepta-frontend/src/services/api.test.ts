@@ -220,4 +220,22 @@ describe("PeptaApi resilience", () => {
     ).rejects.toThrow();
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
+
+  it("parses the backend {error:{code}} envelope onto the thrown ApiError", async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({ error: { code: "FORBIDDEN", message: "Upgrade required" } }),
+          { status: 403, headers: { "content-type": "application/json" } },
+        ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(api.getHome()).rejects.toMatchObject({
+      status: 403,
+      code: "FORBIDDEN",
+      message: "Upgrade required",
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1); // 403 is 4xx → not retried
+  });
 });

@@ -19,7 +19,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation, type NavigationProp } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "../../theme";
-import { AppText, Card, Mascot, Reveal } from "../../components";
+import { AppText, Card, Reveal, UserAvatar } from "../../components";
 import { BottomSheet } from "../../components/BottomSheet";
 import { useAuth } from "../../context/AuthContext";
 import { usePeptaData } from "../../context/PeptaDataContext";
@@ -324,19 +324,7 @@ export function AccountScreen() {
                     opacity: pressed ? 0.6 : 1,
                   }}
                 >
-                  <View
-                    style={{
-                      width: 54,
-                      height: 54,
-                      borderRadius: theme.radii.pill,
-                      backgroundColor: "#EFEBFF",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      overflow: "hidden",
-                    }}
-                  >
-                    <Mascot pose="idle" size={42} />
-                  </View>
+                  <UserAvatar size={54} />
                   <View style={{ flex: 1 }}>
                     <AppText variant="cardTitle" style={{ fontSize: 17 }}>
                       {currentDisplayName}

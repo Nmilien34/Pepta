@@ -222,6 +222,37 @@ describe("MealLogSheet", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
+  it("keeps the search sheet anchored instead of lifting the back button under the status area", async () => {
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+
+    await act(async () => {
+      tree = TestRenderer.create(
+        <MealLogSheet visible={true} onClose={vi.fn()} />,
+      );
+    });
+
+    await act(async () => {
+      tree!.root
+        .findByProps({ accessibilityLabel: "Search meal log" })
+        .props.onPress();
+    });
+
+    const keyboardAvoidingView = tree!.root.find(
+      (node) => String(node.type) === "KeyboardAvoidingView",
+    );
+    const backButton = tree!.root.findByProps({
+      accessibilityLabel: "Back to meal log options",
+    });
+
+    expect(keyboardAvoidingView.props.behavior).toBeUndefined();
+    expect(backButton.props.hitSlop).toEqual({
+      bottom: 14,
+      left: 14,
+      right: 14,
+      top: 14,
+    });
+  });
+
   it("records voice meal audio, transcribes it, and shows the transcript in the box", async () => {
     let tree: TestRenderer.ReactTestRenderer | undefined;
 

@@ -1,3 +1,5 @@
+import { ERROR_CODES } from '@pepta/shared';
+
 export class AppError extends Error {
   public readonly code: string;
   public readonly statusCode: number;
@@ -24,7 +26,7 @@ export class AppError extends Error {
 export class ValidationError extends AppError {
   public constructor(message = 'Validation failed', details?: unknown) {
     super({
-      code: 'VALIDATION',
+      code: ERROR_CODES.validation,
       message,
       statusCode: 400,
       details,
@@ -35,7 +37,7 @@ export class ValidationError extends AppError {
 export class AuthError extends AppError {
   public constructor(message = 'Authentication failed', details?: unknown) {
     super({
-      code: 'AUTH_INVALID_TOKEN',
+      code: ERROR_CODES.authInvalidToken,
       message,
       statusCode: 401,
       details,
@@ -46,7 +48,7 @@ export class AuthError extends AppError {
 export class NotFoundError extends AppError {
   public constructor(message = 'Resource not found', details?: unknown) {
     super({
-      code: 'NOT_FOUND',
+      code: ERROR_CODES.notFound,
       message,
       statusCode: 404,
       details,
@@ -57,7 +59,7 @@ export class NotFoundError extends AppError {
 export class InternalError extends AppError {
   public constructor(message = 'Internal server error', details?: unknown) {
     super({
-      code: 'INTERNAL',
+      code: ERROR_CODES.internal,
       message,
       statusCode: 500,
       details,

@@ -33,6 +33,7 @@ import type {
   WeightLogResponse,
 } from "@pepta/shared";
 import { api } from "../services/api";
+import { extractApiError, isOffline } from "../services/apiError";
 
 type RangeTotalPatch = Partial<
   Pick<
@@ -162,15 +163,18 @@ export function trackWithAddedMeal(
 }
 
 function errorMessage(error: unknown): string {
-  const detail = error instanceof Error ? error.message : String(error);
+  // Branch on the typed error CODE (not message text). extractApiError pulls the
+  // backend's { error: { code } } envelope; network drops/timeouts map to
+  // serviceUnavailable.
+  const { code, message } = extractApiError(error);
   // Always log the raw cause so it shows in the Metro/device console.
-  console.warn("[PeptaData] request failed:", detail);
-  if (/network|fetch|Network request failed/i.test(detail)) {
+  console.warn("[PeptaData] request failed:", code, message);
+  if (isOffline(error)) {
     return "Couldn’t reach Pepta — check your connection.";
   }
-  // Surface the real cause (HTTP status or a schema-parse error) instead of a
-  // generic message, so failures are diagnosable on-device.
-  return `Couldn’t load your data.\n(${detail})`;
+  // Surface the real cause (status code + message) instead of a generic message,
+  // so failures are diagnosable on-device.
+  return `Couldn’t load your data.\n(${message})`;
 }
 
 export function PeptaDataProvider({ children }: { children: ReactNode }) {

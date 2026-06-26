@@ -15,10 +15,11 @@ export interface BottomSheetProps {
   onDismissed?: () => void;
   scrollable?: boolean;
   height?: ViewStyle['height'];
+  avoidKeyboard?: boolean;
   children: React.ReactNode;
 }
 
-export function BottomSheet({ visible, onClose, onDismissed, scrollable, height, children }: BottomSheetProps) {
+export function BottomSheet({ visible, onClose, onDismissed, scrollable, height, avoidKeyboard = true, children }: BottomSheetProps) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const window = useWindowDimensions();
@@ -57,7 +58,7 @@ export function BottomSheet({ visible, onClose, onDismissed, scrollable, height,
       </Animated.View>
       <KeyboardAvoidingView
         pointerEvents="box-none"
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={avoidKeyboard && Platform.OS === 'ios' ? 'padding' : undefined}
         style={{ position: 'absolute', left: 0, right: 0, bottom: -insets.bottom }}
       >
         <Animated.View

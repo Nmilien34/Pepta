@@ -189,6 +189,7 @@ export function serializeUser(user: UserDocument): User {
     emailVerified: value.emailVerified === true,
     displayName: optionalString(value.displayName),
     avatarUrl: optionalString(value.avatarUrl),
+    hasAvatar: optionalString(value.avatarKey) !== undefined,
     authProviders: authProviders.map((provider) => {
       const providerRecord = isRecord(provider) ? provider : {};
 
@@ -356,13 +357,18 @@ function optionalS3Key(value: unknown): string | null {
   return typeof value === "string" && value.trim().length > 0 ? value : null;
 }
 
-async function collectAccountS3Keys(userId: string): Promise<string[]> {
+async function collectAccountS3Keys(
+  userId: string,
+  user: UserDocument,
+): Promise<string[]> {
   const [progressPhotos, mealScans, mealLogs] = await Promise.all([
     ProgressPhotoModel.find({ userId }),
     MealScanModel.find({ userId }),
     MealLogModel.find({ userId, deletedAt: { $exists: true } }),
   ]);
   const keys = new Set<string>();
+  const avatarKey = optionalS3Key(documentObject(user).avatarKey);
+  if (avatarKey) keys.add(avatarKey);
 
   for (const photo of progressPhotos) {
     const key = optionalS3Key(documentObject(photo).s3Key);
@@ -386,7 +392,7 @@ export async function deleteCurrentUser(userId: string): Promise<void> {
     throw new NotFoundError("User not found");
   }
 
-  const s3Keys = await collectAccountS3Keys(userId);
+  const s3Keys = await collectAccountS3Keys(userId, user);
   await Promise.all(s3Keys.map((key) => deleteS3Object(key)));
 
   await Promise.all([

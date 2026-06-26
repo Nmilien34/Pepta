@@ -117,6 +117,7 @@ export const userResponseSchema = z
     emailVerified: z.boolean(),
     displayName: z.string().min(1).optional(),
     avatarUrl: z.string().url().optional(),
+    hasAvatar: z.boolean().default(false),
     authProviders: z.array(linkedAuthProviderSchema),
     entitlement: entitlementSchema,
     onboardingComplete: z.boolean(),
@@ -124,6 +125,41 @@ export const userResponseSchema = z
     legalAcceptance: legalAcceptanceSchema.optional(),
     createdAt: isoDateTimeSchema,
     updatedAt: isoDateTimeSchema,
+  })
+  .strict();
+
+const avatarContentTypeSchema = z.enum([
+  "image/jpeg",
+  "image/png",
+  "image/heic",
+  "image/webp",
+]);
+
+export const avatarUploadIntentRequestSchema = z
+  .object({
+    contentType: avatarContentTypeSchema,
+    sizeBytes: z.number().int().positive().optional(),
+  })
+  .strict();
+
+export const avatarUploadIntentResponseSchema = z
+  .object({
+    key: z.string().min(1),
+    uploadUrl: z.string().url(),
+    expiresAt: isoDateTimeSchema,
+  })
+  .strict();
+
+export const avatarConfirmRequestSchema = z
+  .object({
+    key: z.string().min(1),
+  })
+  .strict();
+
+export const avatarViewUrlResponseSchema = z
+  .object({
+    viewUrl: z.string().url().nullable(),
+    expiresAt: isoDateTimeSchema.nullable(),
   })
   .strict();
 
@@ -815,7 +851,9 @@ export const homeResponseSchema = z
     weeklyRetention: weeklyRetentionResponseSchema.nullable(),
     sectionErrors: z.record(z.string()).default({}),
   })
-  .strict();
+  // Response schema: tolerate unknown/extra server fields (strip, not strict) so
+  // adding a field on the backend doesn't hard-crash an older client.
+  .strip();
 
 export const trackResponseSchema = z
   .object({
@@ -828,7 +866,9 @@ export const trackResponseSchema = z
     measurements: z.array(measurementResponseSchema),
     sectionErrors: z.record(z.string()).default({}),
   })
-  .strict();
+  // Response schema: tolerate unknown/extra server fields (strip, not strict) so
+  // adding a field on the backend doesn't hard-crash an older client.
+  .strip();
 
 export const progressResponseSchema = z
   .object({
@@ -838,7 +878,9 @@ export const progressResponseSchema = z
     weeklyRetention: z.array(weeklyRetentionResponseSchema),
     sectionErrors: z.record(z.string()).default({}),
   })
-  .strict();
+  // Response schema: tolerate unknown/extra server fields (strip, not strict) so
+  // adding a field on the backend doesn't hard-crash an older client.
+  .strip();
 
 export const revenueCatWebhookSchema = z
   .object({

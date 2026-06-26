@@ -4,6 +4,10 @@ import type {
   activityLogInputSchema,
   activityLogResponseSchema,
   appleAuthSchema,
+  avatarConfirmRequestSchema,
+  avatarUploadIntentRequestSchema,
+  avatarUploadIntentResponseSchema,
+  avatarViewUrlResponseSchema,
   authProviderSchema,
   authResponseSchema,
   biggestWorrySchema,
@@ -89,6 +93,14 @@ export type ActivityLevel = z.infer<typeof activityLevelSchema>;
 export type ActivityLogInput = z.infer<typeof activityLogInputSchema>;
 export type ActivityLogResponse = z.infer<typeof activityLogResponseSchema>;
 export type AppleAuth = z.infer<typeof appleAuthSchema>;
+export type AvatarConfirmRequest = z.infer<typeof avatarConfirmRequestSchema>;
+export type AvatarUploadIntentRequest = z.infer<
+  typeof avatarUploadIntentRequestSchema
+>;
+export type AvatarUploadIntentResponse = z.infer<
+  typeof avatarUploadIntentResponseSchema
+>;
+export type AvatarViewUrlResponse = z.infer<typeof avatarViewUrlResponseSchema>;
 export type AuthProvider = z.infer<typeof authProviderSchema>;
 export type AuthResponse = z.infer<typeof authResponseSchema>;
 export type BiggestWorry = z.infer<typeof biggestWorrySchema>;

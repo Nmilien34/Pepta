@@ -3,7 +3,7 @@ import { Alert, Pressable, ScrollView, TextInput, View } from "react-native";
 import * as Haptics from "expo-haptics";
 import { useNavigation } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { AppText, Card, Mascot } from "../../components";
+import { AppText, Card, EditableAvatar } from "../../components";
 import { BottomSheet } from "../../components/BottomSheet";
 import { Icon } from "../../components/Icon";
 import { useAuth } from "../../context/AuthContext";
@@ -127,19 +127,7 @@ export function AccountDetailsScreen() {
               paddingHorizontal: 4,
             }}
           >
-            <View
-              style={{
-                width: 62,
-                height: 62,
-                borderRadius: theme.radii.pill,
-                backgroundColor: "#EFEBFF",
-                alignItems: "center",
-                justifyContent: "center",
-                overflow: "hidden",
-              }}
-            >
-              <Mascot pose="idle" size={48} />
-            </View>
+            <EditableAvatar size={62} />
             <View style={{ flex: 1 }}>
               <AppText variant="screenTitle" style={{ fontSize: 25 }}>
                 {currentName}
@@ -150,6 +138,13 @@ export function AccountDetailsScreen() {
                 style={{ marginTop: 3 }}
               >
                 {user?.email ?? "No email connected"}
+              </AppText>
+              <AppText
+                variant="caption"
+                color="primary"
+                style={{ marginTop: 4, fontWeight: "800" }}
+              >
+                Tap photo to change
               </AppText>
             </View>
           </View>

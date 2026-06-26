@@ -250,10 +250,24 @@ describe("user service account settings", () => {
       { photoS3Key: "pepta/meal-scans/user-1/scan.jpg" },
       { photoS3Key: "" },
     ]);
+    mocks.userFindById.mockResolvedValue(
+      document({
+        id: userId,
+        email: "nick@pepta.app",
+        emailVerified: true,
+        avatarKey: "pepta/avatars/user-1/avatar.jpg",
+        authProviders: [],
+        entitlement: { status: "free", expiresAt: null, willRenew: false },
+        onboardingComplete: true,
+        createdAt: "2026-06-21T00:00:00.000Z",
+        updatedAt: "2026-06-21T00:00:00.000Z",
+      }),
+    );
 
     await deleteCurrentUser(userId);
 
     expect(mocks.deleteS3Object.mock.calls.map(([key]) => key).sort()).toEqual([
+      "pepta/avatars/user-1/avatar.jpg",
       "pepta/meal-logs/user-1/manual.jpg",
       "pepta/meal-scans/user-1/scan.jpg",
       "pepta/progress/user-1/front.jpg",

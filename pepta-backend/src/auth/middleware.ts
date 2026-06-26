@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
+import { ERROR_CODES } from '@pepta/shared';
 import { AppError } from '../lib/errors';
 import { verifySessionJwt } from './jwt';
 
@@ -8,7 +9,7 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction): v
   if (!authorization?.startsWith('Bearer ')) {
     next(
       new AppError({
-        code: 'AUTH_MISSING_TOKEN',
+        code: ERROR_CODES.authMissingToken,
         message: 'Missing bearer token',
         statusCode: 401,
       }),

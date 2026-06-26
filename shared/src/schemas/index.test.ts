@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  avatarConfirmRequestSchema,
+  avatarUploadIntentRequestSchema,
+  avatarUploadIntentResponseSchema,
+  avatarViewUrlResponseSchema,
   compoundResponseSchema,
   insightSchema,
   mealLogScanDetailResponseSchema,
@@ -9,6 +13,7 @@ import {
   onboardingResultResponseSchema,
   sideEffectLogInputSchema,
   userAccountPatchSchema,
+  userResponseSchema,
   userProfileInputSchema,
   userProfileResponseSchema,
 } from "./index";
@@ -78,6 +83,53 @@ describe("shared profile schemas", () => {
     expect(
       userAccountPatchSchema.safeParse({ displayName: "   " }).success,
     ).toBe(false);
+  });
+
+  it("describes uploaded avatar contracts and avatar presence on users", () => {
+    expect(
+      avatarUploadIntentRequestSchema.safeParse({
+        contentType: "image/jpeg",
+        sizeBytes: 12345,
+      }).success,
+    ).toBe(true);
+    expect(
+      avatarUploadIntentResponseSchema.safeParse({
+        key: "pepta/avatars/user-1/upload.jpg",
+        uploadUrl: "https://signed.example/upload",
+        expiresAt: "2026-06-21T00:10:00.000Z",
+      }).success,
+    ).toBe(true);
+    expect(
+      avatarConfirmRequestSchema.safeParse({
+        key: "pepta/avatars/user-1/upload.jpg",
+      }).success,
+    ).toBe(true);
+    expect(
+      avatarViewUrlResponseSchema.safeParse({
+        viewUrl: "https://signed.example/view",
+        expiresAt: "2026-06-21T00:10:00.000Z",
+      }).success,
+    ).toBe(true);
+    expect(
+      avatarViewUrlResponseSchema.safeParse({
+        viewUrl: null,
+        expiresAt: null,
+      }).success,
+    ).toBe(true);
+
+    const result = userResponseSchema.safeParse({
+      id: "user-1",
+      email: "nick@pepta.app",
+      emailVerified: true,
+      hasAvatar: true,
+      authProviders: [],
+      entitlement: { status: "free", expiresAt: null, willRenew: false },
+      onboardingComplete: true,
+      createdAt: "2026-06-21T00:00:00.000Z",
+      updatedAt: "2026-06-21T00:00:00.000Z",
+    });
+
+    expect(result.success).toBe(true);
   });
 
   it("allows additive insight copy versions", () => {

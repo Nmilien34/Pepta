@@ -112,9 +112,9 @@ vi.mock("../../components", () => ({
     React.createElement("Text", null, children),
   Card: ({ children }: { children?: React.ReactNode }) =>
     React.createElement("View", null, children),
-  Mascot: () => React.createElement("View"),
   Reveal: ({ children }: { children?: React.ReactNode }) =>
     React.createElement("View", null, children),
+  UserAvatar: () => React.createElement("UserAvatar"),
 }));
 
 vi.mock("../../components/Icon", () => ({

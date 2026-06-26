@@ -7,6 +7,7 @@ import type { AuthResponse, User } from "@pepta/shared";
 export const mockUser: User = {
   id: "user_1",
   emailVerified: true,
+  hasAvatar: false,
   authProviders: [],
   entitlement: { status: "free", expiresAt: null, willRenew: false },
   onboardingComplete: false,
