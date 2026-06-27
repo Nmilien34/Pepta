@@ -24,6 +24,7 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   signInWithGoogle(idToken: string): Promise<User>;
   signInWithApple(body: AppleAuth): Promise<User>;
+  signInWithDemo(email: string, password: string): Promise<User>;
   // Dev-only local session so the flow is traversable without the (deferred)
   // backend. Remove once real auth works end-to-end.
   devSignIn(): void;
@@ -90,6 +91,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signInWithApple = useCallback(
     async (body: AppleAuth): Promise<User> =>
       finalizeAuth(await api.signInWithApple(body)),
+    [finalizeAuth],
+  );
+
+  // App Store review demo login — scoped server-side to the seeded demo account.
+  const signInWithDemo = useCallback(
+    async (email: string, password: string): Promise<User> =>
+      finalizeAuth(await api.signInWithDemo(email, password)),
     [finalizeAuth],
   );
 
@@ -165,6 +173,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAuthenticated: Boolean(auth),
       signInWithGoogle,
       signInWithApple,
+      signInWithDemo,
       devSignIn,
       markOnboardingComplete,
       updateCachedUser,
@@ -175,6 +184,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isLoading,
       logout,
       signInWithApple,
+      signInWithDemo,
       signInWithGoogle,
       devSignIn,
       markOnboardingComplete,

@@ -272,6 +272,18 @@ class PeptaApi {
     });
   }
 
+  // POST /auth/demo → AuthResponse. App Store review demo login; the backend
+  // scopes it to the seeded demo account (not a general password path).
+  public signInWithDemo(
+    email: string,
+    password: string,
+  ): Promise<AuthResponse> {
+    return this.request("/auth/demo", authResponseSchema, {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    });
+  }
+
   // POST /onboarding/complete → OnboardingResultResponse (profile + derived
   // targets + plan highlights).
   public completeOnboarding(

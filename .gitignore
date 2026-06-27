@@ -5,6 +5,10 @@ dist/
 .env.*
 !.env.example
 coverage/
+pepta-frontend/build/
+*.xcarchive/
+*.dSYM/
+marketing/
 ios/Pods/
 ios/build/
 android/

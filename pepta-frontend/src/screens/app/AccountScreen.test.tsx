@@ -449,6 +449,31 @@ describe("AccountScreen settings", () => {
     expect(mocks.navigate).toHaveBeenCalledWith("AccountFAQ");
   });
 
+  it("opens Pepta legal pages from account settings", async () => {
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+
+    await act(async () => {
+      tree = TestRenderer.create(<AccountScreen />);
+    });
+
+    await act(async () => {
+      pressableContaining(tree!.root, "Terms").props.onPress();
+    });
+
+    await act(async () => {
+      pressableContaining(tree!.root, "Privacy").props.onPress();
+    });
+
+    expect(mocks.openURL).toHaveBeenNthCalledWith(
+      1,
+      "https://pepta.test/terms",
+    );
+    expect(mocks.openURL).toHaveBeenNthCalledWith(
+      2,
+      "https://pepta.test/privacy",
+    );
+  });
+
   it("opens report emails to the Boltzman dev inbox", async () => {
     let tree: TestRenderer.ReactTestRenderer | undefined;
 

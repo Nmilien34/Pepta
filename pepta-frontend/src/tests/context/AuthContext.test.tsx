@@ -12,6 +12,7 @@ const { mockApi } = vi.hoisted(() => ({
   mockApi: {
     signInWithGoogle: vi.fn(),
     signInWithApple: vi.fn(),
+    signInWithDemo: vi.fn(),
     setAuthToken: vi.fn(),
     setUnauthorizedHandler: vi.fn(),
   },
@@ -49,6 +50,7 @@ describe("AuthContext", () => {
   beforeEach(() => {
     testStorage.clear();
     mockApi.signInWithGoogle.mockReset();
+    mockApi.signInWithDemo.mockReset();
     mockApi.setAuthToken.mockReset();
     mockApi.setUnauthorizedHandler.mockReset();
   });
@@ -67,6 +69,25 @@ describe("AuthContext", () => {
 
     expect(harness.value().isAuthenticated).toBe(true);
     expect(harness.value().user?.id).toBe("user_1");
+    expect(mockApi.setAuthToken).toHaveBeenCalledWith("token_1");
+    expect(testStorage.snapshot()[AUTH_STORAGE_KEY]).toBeDefined();
+  });
+
+  it("persists the session + sets the token after reviewer demo sign-in", async () => {
+    mockApi.signInWithDemo.mockResolvedValue(makeAuthResponse());
+    const harness = await renderAuthHarness();
+
+    await act(async () => {
+      await harness
+        .value()
+        .signInWithDemo("review@pepta.app", "PeptaReview2026!");
+    });
+
+    expect(harness.value().isAuthenticated).toBe(true);
+    expect(mockApi.signInWithDemo).toHaveBeenCalledWith(
+      "review@pepta.app",
+      "PeptaReview2026!",
+    );
     expect(mockApi.setAuthToken).toHaveBeenCalledWith("token_1");
     expect(testStorage.snapshot()[AUTH_STORAGE_KEY]).toBeDefined();
   });
