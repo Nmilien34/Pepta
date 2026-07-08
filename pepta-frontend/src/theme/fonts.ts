@@ -21,13 +21,15 @@ export const FONT_FAMILIES = {
 } as const;
 
 // Returns true once the Hanken faces are ready. App gates its first paint on
-// this so text never flashes in the system fallback.
+// this so text never flashes in the system fallback. If loading FAILS we also
+// return true — rendering with the system fallback beats gating forever on a
+// blank screen (App Review rejects a blank launch as a 2.1(a) bug).
 export function useAppFonts(): boolean {
-  const [loaded] = useFonts({
+  const [loaded, error] = useFonts({
     HankenGrotesk_500Medium,
     HankenGrotesk_600SemiBold,
     HankenGrotesk_700Bold,
     HankenGrotesk_800ExtraBold,
   });
-  return loaded;
+  return loaded || error != null;
 }

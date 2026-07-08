@@ -1,7 +1,7 @@
-// Onboarding screen 21 — Notifications. Deferred integration: "Allow" is a safe
-// stub that advances (no permission request yet); "Not now" skips. Both move on.
+// Onboarding screen 21 — Notifications. "Allow" requests local reminder
+// permission through the navigator; "Not now" skips without saving defaults.
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { Icon } from "../../components/Icon";
 import { LinearGradient } from 'expo-linear-gradient';
@@ -11,15 +11,22 @@ import { AppText, Button, OnboardingScaffold } from '../../components';
 export interface NotificationsScreenProps {
   progress: number;
   onBack?(): void;
+  onAllow?(): Promise<void> | void;
   onContinue(): void;
 }
 
-export function NotificationsScreen({ progress, onBack, onContinue }: NotificationsScreenProps) {
+export function NotificationsScreen({ progress, onBack, onAllow, onContinue }: NotificationsScreenProps) {
   const theme = useTheme();
+  const [loading, setLoading] = useState(false);
 
-  const handleAllow = () => {
-    // TODO: request push permission (expo-notifications) when the integration lands.
-    onContinue();
+  const handleAllow = async () => {
+    setLoading(true);
+    try {
+      await onAllow?.();
+    } finally {
+      setLoading(false);
+      onContinue();
+    }
   };
 
   return (
@@ -29,7 +36,7 @@ export function NotificationsScreen({ progress, onBack, onContinue }: Notificati
       tintColor="#F1ECFF"
       footer={
         <View style={{ gap: theme.spacing.md, alignItems: 'center' }}>
-          <Button label="Allow notifications" onPress={handleAllow} />
+          <Button label="Allow notifications" onPress={handleAllow} loading={loading} />
           <Pressable onPress={onContinue} hitSlop={theme.sizes.hitSlop} accessibilityRole="button">
             <AppText variant="caption" color="textSecondary">
               Not now

@@ -35,7 +35,7 @@ export function entitlementView(user: User | null): EntitlementView {
   const when = fmtDate(ent?.expiresAt);
   switch (ent?.status) {
     case 'trialing':
-      return { title: 'Pepta Plus', detail: when ? `Free trial · ends ${when}` : 'Free trial', cta: 'Manage', premium: true };
+      return { title: 'Pepta Plus', detail: when ? `Active · until ${when}` : 'Active', cta: 'Manage', premium: true };
     case 'active':
       return {
         title: 'Pepta Plus',

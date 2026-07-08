@@ -211,12 +211,16 @@ export function SignInScreen({ onBack }: SignInScreenProps) {
               onPress={handleGoogle}
             />
             {showApple ? (
-              <ProviderButton
-                variant="apple"
-                label="Continue with Apple"
-                busy={busy === "apple"}
-                disabled={busy != null}
-                onPress={handleApple}
+              // Apple's own button (AuthenticationServices) — App Review
+              // guideline 4 requires the system artwork, not a redrawn logo.
+              <AppleAuthentication.AppleAuthenticationButton
+                buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+                buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+                cornerRadius={theme.radii.pill}
+                style={{ height: theme.sizes.button.height, opacity: busy != null && busy !== "apple" ? 0.5 : 1 }}
+                onPress={() => {
+                  if (busy == null) void handleApple();
+                }}
               />
             ) : null}
           </Reveal>

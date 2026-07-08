@@ -37,6 +37,9 @@ describe('entitlementView', () => {
     expect(
       entitlementView(user({ entitlement: { status: 'active_canceled', expiresAt: '2026-07-21T00:00:00.000Z', willRenew: false } })),
     ).toMatchObject({ detail: 'Ends Jul 21', premium: true });
+    expect(
+      entitlementView(user({ entitlement: { status: 'trialing', expiresAt: '2026-07-21T00:00:00.000Z', willRenew: false } })),
+    ).toMatchObject({ title: 'Pepta Plus', detail: 'Active · until Jul 21', premium: true });
   });
   it('marks premium statuses', () => {
     expect(isPremium(user({ entitlement: { status: 'trialing', expiresAt: null, willRenew: false } }))).toBe(true);

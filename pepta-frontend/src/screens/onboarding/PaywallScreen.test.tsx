@@ -6,6 +6,7 @@ import { PaywallScreen } from "./PaywallScreen";
 const mocks = vi.hoisted(() => ({
   getCurrentUser: vi.fn(),
   getPaywallPackages: vi.fn(() => Promise.resolve(null)),
+  isPurchaseCancelled: vi.fn(() => false),
   onComplete: vi.fn(() => Promise.resolve()),
   openURL: vi.fn(() => Promise.resolve()),
   purchasePlan: vi.fn(),
@@ -118,7 +119,7 @@ vi.mock("../../services/api", () => ({
 }));
 
 vi.mock("../../services/revenueCat", () => ({
-  isRevenueCatPurchaseCancelled: () => false,
+  isRevenueCatPurchaseCancelled: mocks.isPurchaseCancelled,
   revenueCat: {
     getPaywallPackages: mocks.getPaywallPackages,
     purchasePlan: mocks.purchasePlan,
@@ -150,14 +151,40 @@ function textLink(
   return match;
 }
 
+function button(
+  root: TestRenderer.ReactTestRenderer["root"],
+  label: string,
+): ReactTestInstance {
+  const match = root
+    .findAll(
+      (node) =>
+        (node.type as unknown) === "Pressable" &&
+        node.props.accessibilityRole === "button" &&
+        node.props.accessibilityLabel === label,
+    )
+    .at(0);
+  if (!match) throw new Error(`No button named "${label}"`);
+  return match;
+}
+
+function allText(root: TestRenderer.ReactTestRenderer["root"]): string {
+  return root
+    .findAll((node) => (node.type as unknown) === "Text")
+    .map(nodeText)
+    .join("\n");
+}
+
 describe("PaywallScreen legal links", () => {
   beforeEach(() => {
     mocks.getPaywallPackages.mockClear();
+    mocks.isPurchaseCancelled.mockReset();
+    mocks.isPurchaseCancelled.mockReturnValue(false);
     mocks.onComplete.mockClear();
     mocks.openURL.mockClear();
+    mocks.purchasePlan.mockReset();
   });
 
-  it("opens terms and privacy from the trial review footer", async () => {
+  it("opens terms and privacy from the subscription footer", async () => {
     let tree: TestRenderer.ReactTestRenderer | undefined;
 
     await act(async () => {
@@ -182,5 +209,65 @@ describe("PaywallScreen legal links", () => {
       2,
       "https://pepta.test/privacy",
     );
+  });
+
+  it("renders a hard paywall without close bypass or trial copy", async () => {
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+
+    await act(async () => {
+      tree = TestRenderer.create(
+        <PaywallScreen onComplete={mocks.onComplete} />,
+      );
+    });
+
+    expect(
+      tree!.root.findAll((node) => node.props.accessibilityLabel === "Close"),
+    ).toHaveLength(0);
+    expect(button(tree!.root, "Subscribe")).toBeTruthy();
+    expect(allText(tree!.root).toLowerCase()).not.toContain("free trial");
+    expect(allText(tree!.root).toLowerCase()).not.toContain("7 days free");
+  });
+
+  it("keeps users on the paywall without an in-app retention offer after cancellation", async () => {
+    mocks.isPurchaseCancelled.mockReturnValue(true);
+    mocks.purchasePlan.mockRejectedValueOnce({ code: "USER_CANCELLED" });
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+
+    await act(async () => {
+      tree = TestRenderer.create(
+        <PaywallScreen onComplete={mocks.onComplete} />,
+      );
+    });
+
+    await act(async () => {
+      await button(tree!.root, "Subscribe").props.onPress();
+    });
+
+    expect(mocks.purchasePlan).toHaveBeenCalledWith("u1", "yearly");
+    expect(mocks.onComplete).not.toHaveBeenCalled();
+    expect(allText(tree!.root)).not.toContain("Exclusive Offer");
+    expect(allText(tree!.root)).not.toContain("$44.99");
+  });
+
+  it("does not complete onboarding until purchase entitlement is active", async () => {
+    mocks.purchasePlan.mockResolvedValueOnce({
+      customerInfo: {},
+      entitlementActive: false,
+    });
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+
+    await act(async () => {
+      tree = TestRenderer.create(
+        <PaywallScreen onComplete={mocks.onComplete} />,
+      );
+    });
+
+    await act(async () => {
+      await button(tree!.root, "Subscribe").props.onPress();
+    });
+
+    expect(mocks.purchasePlan).toHaveBeenCalledWith("u1", "yearly");
+    expect(mocks.onComplete).not.toHaveBeenCalled();
+    expect(allText(tree!.root)).toContain("Purchase is still syncing");
   });
 });

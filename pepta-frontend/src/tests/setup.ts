@@ -45,3 +45,20 @@ vi.mock("react-native-purchases", () => ({
     setLogLevel: vi.fn(),
   },
 }));
+
+vi.mock("expo-notifications", () => ({
+  AndroidImportance: { DEFAULT: 5 },
+  SchedulableTriggerInputTypes: {
+    DAILY: "daily",
+    DATE: "date",
+    TIME_INTERVAL: "timeInterval",
+    WEEKLY: "weekly",
+  },
+  getAllScheduledNotificationsAsync: vi.fn(async () => []),
+  getPermissionsAsync: vi.fn(async () => ({ status: "granted", granted: true })),
+  requestPermissionsAsync: vi.fn(async () => ({ status: "granted", granted: true })),
+  scheduleNotificationAsync: vi.fn(async (request: { identifier?: string }) => request.identifier ?? "test-notification"),
+  cancelScheduledNotificationAsync: vi.fn(async () => undefined),
+  setNotificationChannelAsync: vi.fn(async () => undefined),
+  setNotificationHandler: vi.fn(),
+}));

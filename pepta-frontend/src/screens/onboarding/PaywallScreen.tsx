@@ -1,6 +1,6 @@
 // Onboarding screen 25 — Paywall. Value-forward, with an interactive plan
-// selector. Custom chrome (X + Restore) rather than the progress scaffold,
-// matching the design lab.
+// selector. Restore-only chrome rather than the progress scaffold, matching
+// the design lab.
 
 import React, { useEffect, useState } from "react";
 import { Linking, Pressable, ScrollView, StatusBar, View } from "react-native";
@@ -103,20 +103,6 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
     await onComplete();
   };
 
-  const handleSkip = async () => {
-    if (completing) return;
-    setMessage(null);
-    setFailed(false);
-    setCompleting(true);
-    try {
-      await completeSetup(false);
-    } catch {
-      setFailed(true);
-    } finally {
-      setCompleting(false);
-    }
-  };
-
   const handleStart = async () => {
     if (!auth.user?.id || completing) return;
     setMessage(null);
@@ -124,8 +110,16 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
     setCompleting(true);
     try {
       const result = await revenueCat.purchasePlan(auth.user.id, plan);
-      await completeSetup(result.entitlementActive);
+      if (!result.entitlementActive) {
+        setFailed(true);
+        setMessage(
+          "Purchase is still syncing. Tap Restore in a moment to unlock Pepta Plus.",
+        );
+        return;
+      }
+      await completeSetup(true);
     } catch (error) {
+      // Keep cancellation App Review-safe: no custom retention overlay here.
       if (isRevenueCatPurchaseCancelled(error)) return;
       setFailed(true);
       setMessage(
@@ -171,14 +165,7 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
             paddingTop: theme.spacing.sm,
           }}
         >
-          <Pressable
-            onPress={() => void handleSkip()}
-            hitSlop={theme.sizes.hitSlop}
-            accessibilityRole="button"
-            accessibilityLabel="Close"
-          >
-            <Icon name="close" size={24} color={theme.colors.textSecondary} />
-          </Pressable>
+          <View style={{ width: 64 }} />
           <Pressable
             onPress={() => void handleRestore()}
             hitSlop={theme.sizes.hitSlop}
@@ -283,7 +270,7 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
             </AppText>
           ) : null}
           <Button
-            label={completing ? "Working…" : "Start 7-day free trial"}
+            label={completing ? "Working…" : "Subscribe"}
             onPress={() => void handleStart()}
             disabled={completing}
           />

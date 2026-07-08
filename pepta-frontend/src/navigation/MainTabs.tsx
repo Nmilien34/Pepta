@@ -16,6 +16,7 @@ import { ProgressScreen } from "../screens/app/ProgressScreen";
 import { AccountScreen } from "../screens/app/AccountScreen";
 import { AccountDetailsScreen } from "../screens/app/AccountDetailsScreen";
 import { AccountFAQScreen } from "../screens/app/AccountFAQScreen";
+import { SourcesScreen } from "../screens/app/SourcesScreen";
 import { DoseSettingsScreen } from "../screens/app/DoseSettingsScreen";
 import { FoodHistoryScreen } from "../screens/app/FoodHistoryScreen";
 import { WeightDetailScreen } from "../screens/app/WeightDetailScreen";
@@ -35,6 +36,7 @@ export function MainTabs() {
         <Stack.Screen name="WidgetSetup" component={WidgetSetupScreen} />
         <Stack.Screen name="AccountDetails" component={AccountDetailsScreen} />
         <Stack.Screen name="AccountFAQ" component={AccountFAQScreen} />
+        <Stack.Screen name="Sources" component={SourcesScreen} />
       </Stack.Navigator>
     </LogSheetsProvider>
   );

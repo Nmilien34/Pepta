@@ -4,6 +4,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ThemeProvider, useAppFonts, useTheme } from './src/theme';
+import { AppErrorBoundary } from './src/components/AppErrorBoundary';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { OnboardingProvider } from './src/context/OnboardingContext';
 import { PeptaDataProvider } from './src/context/PeptaDataContext';
@@ -59,19 +60,21 @@ function AppShell() {
 export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
-        <ThemeProvider>
-          <FontGate>
-            <AuthProvider>
-              <PeptaDataProvider>
-                <OnboardingProvider>
-                  <AppShell />
-                </OnboardingProvider>
-              </PeptaDataProvider>
-            </AuthProvider>
-          </FontGate>
-        </ThemeProvider>
-      </SafeAreaProvider>
+      <AppErrorBoundary>
+        <SafeAreaProvider>
+          <ThemeProvider>
+            <FontGate>
+              <AuthProvider>
+                <PeptaDataProvider>
+                  <OnboardingProvider>
+                    <AppShell />
+                  </OnboardingProvider>
+                </PeptaDataProvider>
+              </AuthProvider>
+            </FontGate>
+          </ThemeProvider>
+        </SafeAreaProvider>
+      </AppErrorBoundary>
     </GestureHandlerRootView>
   );
 }

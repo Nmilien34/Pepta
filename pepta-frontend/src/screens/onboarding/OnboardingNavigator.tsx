@@ -52,6 +52,8 @@ import { buildOnboardingPayload } from './onboardingPayload';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { useOnboarding } from '../../context/OnboardingContext';
+import { deriveReminderGroups, defaultReminderState } from '../app/reminderSettings';
+import { saveReminderState, syncReminderNotifications } from '../../services/reminderNotification.service';
 
 function defaultBirthday(): DateParts {
   return { year: new Date().getFullYear() - 30, month: 0, day: 1 };
@@ -176,6 +178,13 @@ export function OnboardingNavigator() {
     await AsyncStorage.removeItem(ONBOARDING_DRAFT_KEY).catch(() => undefined);
     // Only enter the app after profile + medication setup have persisted.
     auth.markOnboardingComplete();
+  };
+
+  const handleNotificationAllow = async () => {
+    const groups = deriveReminderGroups({ home: null, track: null });
+    const state = defaultReminderState(groups);
+    await saveReminderState(state);
+    await syncReminderNotifications(groups, state);
   };
 
   // Hold the first frame until the saved draft (if any) has been restored.
@@ -405,7 +414,14 @@ export function OnboardingNavigator() {
       );
     }
     case 'notifications':
-      return <NotificationsScreen progress={progress} onBack={goBack} onContinue={goNext} />;
+      return (
+        <NotificationsScreen
+          progress={progress}
+          onBack={goBack}
+          onAllow={handleNotificationAllow}
+          onContinue={goNext}
+        />
+      );
     case 'rating':
       return <RatingScreen progress={progress} onBack={goBack} onContinue={goNext} />;
     case 'crafting':

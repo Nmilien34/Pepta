@@ -67,6 +67,18 @@ vi.mock("expo-apple-authentication", () => ({
     EMAIL: "EMAIL",
     FULL_NAME: "FULL_NAME",
   },
+  AppleAuthenticationButtonType: {
+    SIGN_IN: 0,
+    CONTINUE: 1,
+    SIGN_UP: 2,
+  },
+  AppleAuthenticationButtonStyle: {
+    WHITE: 0,
+    WHITE_OUTLINE: 1,
+    BLACK: 2,
+  },
+  // Renders nothing in tests; the native button only exists on device.
+  AppleAuthenticationButton: () => null,
   signInAsync: vi.fn(),
 }));
 

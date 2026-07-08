@@ -25,12 +25,16 @@ interface PricePackage {
   product: StoreProductPrice;
 }
 
+// App Review guideline 3.1.2(c): the BILLED amount must be the most conspicuous
+// price on each plan. `price` is the big element in PlanCard, so it always
+// carries the amount actually charged; calculated equivalents (per-month,
+// per-day) live in the subordinate `sub` line.
 const FALLBACK_PRICING: PaywallPricingCopy = {
   yearly: {
     title: "Yearly",
-    sub: "$40.00/yr · just $0.11 a day",
-    price: "$3.33",
-    per: "/mo",
+    sub: "just $3.33 a month",
+    price: "$40.00",
+    per: "/yr",
     badge: "SAVE 63%",
   },
   monthly: {
@@ -40,8 +44,8 @@ const FALLBACK_PRICING: PaywallPricingCopy = {
     per: "/mo",
   },
   footer: {
-    yearly: "7 days free, then $40/yr ($3.33/mo). Cancel anytime · Terms & Privacy",
-    monthly: "7 days free, then $9/mo. Cancel anytime · Terms & Privacy",
+    yearly: "$40/yr ($3.33/mo). Cancel anytime · Terms & Privacy",
+    monthly: "$9/mo. Cancel anytime · Terms & Privacy",
   },
 };
 
@@ -100,9 +104,9 @@ export function buildPaywallPricing(
   return {
     yearly: {
       title: "Yearly",
-      sub: `${annualPrice}/yr · just ${monthlyEquivalent} a month`,
-      price: monthlyEquivalent,
-      per: "/mo",
+      sub: `just ${monthlyEquivalent} a month`,
+      price: annualPrice,
+      per: "/yr",
       badge: savingsBadge(monthly, yearly),
     },
     monthly: {
@@ -112,8 +116,8 @@ export function buildPaywallPricing(
       per: "/mo",
     },
     footer: {
-      yearly: `7 days free, then ${annualPrice}/yr (${monthlyEquivalent}/mo). Cancel anytime · Terms & Privacy`,
-      monthly: `7 days free, then ${monthlyPrice}/mo. Cancel anytime · Terms & Privacy`,
+      yearly: `${annualPrice}/yr (${monthlyEquivalent}/mo). Cancel anytime · Terms & Privacy`,
+      monthly: `${monthlyPrice}/mo. Cancel anytime · Terms & Privacy`,
     },
   };
 }

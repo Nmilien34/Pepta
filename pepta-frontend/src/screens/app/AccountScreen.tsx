@@ -36,6 +36,7 @@ import {
   profileSubtitle,
   unitsLabel,
 } from "./accountView";
+import { ReminderSettingsScreen } from "./ReminderSettingsScreen";
 import {
   buildPeptaReportExportPayload,
   buildPeptaReportExportShareContent,
@@ -48,6 +49,7 @@ type AccountNavigationParamList = {
   AccountDetails: undefined;
   AccountFAQ: undefined;
   WidgetSetup: undefined;
+  Sources: undefined;
 };
 
 interface Row {
@@ -68,6 +70,7 @@ export function AccountScreen() {
   const { user, logout } = useAuth();
   const { home, track, progress, refreshHome } = usePeptaData();
   const [settingsSheet, setSettingsSheet] = useState<SettingsSheet>(null);
+  const [remindersOpen, setRemindersOpen] = useState(false);
   const [profilePatch, setProfilePatch] = useState<UserProfileSettingsPatch>(
     {},
   );
@@ -197,7 +200,7 @@ export function AccountScreen() {
       iconBg: "#FFF1E7",
       iconColor: "#C75B16",
       label: "Notifications",
-      onPress: openAppSettings,
+      onPress: () => setRemindersOpen(true),
       chevron: true,
     },
     {
@@ -279,6 +282,14 @@ export function AccountScreen() {
     },
   ];
   const about: Row[] = [
+    {
+      icon: "document-text-outline",
+      iconBg: "#EFEBFF",
+      iconColor: theme.colors.primary,
+      label: "Sources & citations",
+      onPress: () => navigation.navigate("Sources"),
+      chevron: true,
+    },
     {
       icon: "document-text-outline",
       iconBg: "#F1EFE8",
@@ -471,6 +482,12 @@ export function AccountScreen() {
           patchSettings({ doseUnitPreference })
         }
       />
+      {remindersOpen ? (
+        <ReminderSettingsScreen
+          visible={remindersOpen}
+          onClose={() => setRemindersOpen(false)}
+        />
+      ) : null}
     </View>
   );
 }

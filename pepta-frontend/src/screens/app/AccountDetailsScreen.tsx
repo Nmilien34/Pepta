@@ -539,7 +539,7 @@ function providerRows(
 function planLabel(status: string | undefined): string {
   switch (status) {
     case "trialing":
-      return "Free trial";
+      return "Pepta Plus";
     case "active":
       return "Pepta Plus";
     case "active_canceled":
