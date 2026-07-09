@@ -8,6 +8,7 @@ import React, { useEffect, useState } from "react";
 import {
   Alert,
   Linking,
+  Modal,
   Pressable,
   ScrollView,
   Share,
@@ -37,12 +38,14 @@ import {
   unitsLabel,
 } from "./accountView";
 import { ReminderSettingsScreen } from "./ReminderSettingsScreen";
+import { PaywallScreen } from "../onboarding/PaywallScreen";
 import {
   buildPeptaReportExportPayload,
   buildPeptaReportExportShareContent,
 } from "./reportExport";
 
 const SUPPORT_EMAIL = "dev@boltzman.ai";
+const APPLE_SUBSCRIPTIONS_URL = "https://apps.apple.com/account/subscriptions";
 const DOSE_UNIT_OPTIONS = ["mg", "mcg", "ml", "units"] as const;
 type SettingsSheet = "units" | "doseUnit" | null;
 type AccountNavigationParamList = {
@@ -71,6 +74,7 @@ export function AccountScreen() {
   const { home, track, progress, refreshHome } = usePeptaData();
   const [settingsSheet, setSettingsSheet] = useState<SettingsSheet>(null);
   const [remindersOpen, setRemindersOpen] = useState(false);
+  const [paywallOpen, setPaywallOpen] = useState(false);
   const [profilePatch, setProfilePatch] = useState<UserProfileSettingsPatch>(
     {},
   );
@@ -126,6 +130,15 @@ export function AccountScreen() {
   const openAppSettings = () => {
     Haptics.selectionAsync().catch(() => undefined);
     Linking.openSettings().catch(() => undefined);
+  };
+
+  const handleSubscriptionPress = () => {
+    Haptics.selectionAsync().catch(() => undefined);
+    if (ent.premium) {
+      Linking.openURL(APPLE_SUBSCRIPTIONS_URL).catch(() => undefined);
+      return;
+    }
+    setPaywallOpen(true);
   };
 
   const exportReport = async () => {
@@ -366,7 +379,8 @@ export function AccountScreen() {
           {/* subscription */}
           <Reveal delay={120} style={{ marginTop: 12 }}>
             <Pressable
-              onPress={() => Haptics.selectionAsync().catch(() => undefined)}
+              onPress={handleSubscriptionPress}
+              accessibilityRole="button"
             >
               <LinearGradient
                 colors={["#F3EFFF", "#FBF4FF"] as const}
@@ -464,6 +478,19 @@ export function AccountScreen() {
             Pepta · v1.0.0
           </AppText>
         </ScrollView>
+        <Modal
+          visible={paywallOpen}
+          animationType="slide"
+          presentationStyle="fullScreen"
+          onRequestClose={() => setPaywallOpen(false)}
+        >
+          <PaywallScreen
+            onComplete={() => {
+              setPaywallOpen(false);
+              void refreshHome();
+            }}
+          />
+        </Modal>
       </SafeAreaView>
       <SettingsSelectorSheet
         visible={settingsSheet !== null}

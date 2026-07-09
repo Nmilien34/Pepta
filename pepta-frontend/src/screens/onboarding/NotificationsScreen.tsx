@@ -1,4 +1,4 @@
-// Onboarding screen 21 — Notifications. "Allow" requests local reminder
+// Onboarding screen 21 — Notifications. "Continue" requests local reminder
 // permission through the navigator; "Not now" skips without saving defaults.
 
 import React, { useState } from 'react';
@@ -36,7 +36,7 @@ export function NotificationsScreen({ progress, onBack, onAllow, onContinue }: N
       tintColor="#F1ECFF"
       footer={
         <View style={{ gap: theme.spacing.md, alignItems: 'center' }}>
-          <Button label="Allow notifications" onPress={handleAllow} loading={loading} />
+          <Button label="Continue" onPress={handleAllow} loading={loading} />
           <Pressable onPress={onContinue} hitSlop={theme.sizes.hitSlop} accessibilityRole="button">
             <AppText variant="caption" color="textSecondary">
               Not now

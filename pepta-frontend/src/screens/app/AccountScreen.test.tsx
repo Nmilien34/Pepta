@@ -41,6 +41,13 @@ vi.mock("react-native", () => ({
   Share: {
     share: mocks.share,
   },
+  Modal: ({
+    visible,
+    children,
+  }: {
+    visible?: boolean;
+    children?: React.ReactNode;
+  }) => (visible ? React.createElement("Modal", { visible }, children) : null),
   Pressable: ({
     children,
     ...props
@@ -138,6 +145,15 @@ vi.mock("../../components/BottomSheet", () => ({
           children,
         )
       : null,
+}));
+
+vi.mock("../onboarding/PaywallScreen", () => ({
+  PaywallScreen: ({ onComplete }: { onComplete: () => void }) =>
+    React.createElement(
+      "PaywallScreen",
+      { onComplete },
+      "Mock Pepta Plus Paywall",
+    ),
 }));
 
 vi.mock("../../context/AuthContext", () => ({
@@ -433,6 +449,49 @@ describe("AccountScreen settings", () => {
       expect.any(String),
     );
     expect(mocks.navigate).toHaveBeenCalledWith("WidgetSetup");
+  });
+
+  it("opens the in-app paywall from the free Upgrade subscription card", async () => {
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+
+    await act(async () => {
+      tree = TestRenderer.create(<AccountScreen />);
+    });
+
+    expect(nodeText(tree!.root)).not.toContain("Mock Pepta Plus Paywall");
+
+    await act(async () => {
+      pressableContaining(
+        tree!.root,
+        "Pepta PlusUnlock your full planUpgrade",
+      ).props.onPress();
+    });
+
+    expect(nodeText(tree!.root)).toContain("Mock Pepta Plus Paywall");
+  });
+
+  it("opens Apple subscription management for active subscriptions", async () => {
+    mocks.user = {
+      ...mocks.user!,
+      entitlement: {
+        status: "active",
+        expiresAt: "2026-07-31T00:00:00.000Z",
+        willRenew: true,
+      },
+    } as User;
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+
+    await act(async () => {
+      tree = TestRenderer.create(<AccountScreen />);
+    });
+
+    await act(async () => {
+      pressableContaining(tree!.root, "Pepta PlusActive").props.onPress();
+    });
+
+    expect(mocks.openURL).toHaveBeenCalledWith(
+      "https://apps.apple.com/account/subscriptions",
+    );
   });
 
   it("opens the FAQ screen from support", async () => {

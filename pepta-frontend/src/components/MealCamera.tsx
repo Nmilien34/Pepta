@@ -47,7 +47,7 @@ export function MealCamera({ visible, onClose, onCapture, onSearch, onVoice }: M
               Pepta needs your camera to scan a meal. You can also upload from your library or log manually.
             </AppText>
             <View style={{ width: 220, gap: 10 }}>
-              <Button label="Allow camera" onPress={() => void requestPermission()} />
+              <Button label="Continue" onPress={() => void requestPermission()} />
               <Pressable onPress={onClose} style={{ alignItems: 'center', paddingVertical: 10 }}>
                 <AppText variant="bodyStrong" style={{ color: 'rgba(255,255,255,0.7)' }}>
                   Not now
