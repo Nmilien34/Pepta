@@ -15,6 +15,7 @@ import {
   INSIGHT_SEVERITIES,
   INSIGHT_TYPES,
   MEDICATION_FREQUENCIES,
+  INJECTION_DEVICE_TYPES,
   MEDICATION_ROUTES,
   MEDICATION_STATUSES,
   MEAL_LOG_SOURCES,
@@ -49,6 +50,7 @@ export const biggestWorrySchema = z.enum(BIGGEST_WORRIES);
 export const doseUnitSchema = z.enum(DOSE_UNITS);
 export const drugClassSchema = z.enum(DRUG_CLASSES);
 export const medicationRouteSchema = z.enum(MEDICATION_ROUTES);
+export const injectionDeviceTypeSchema = z.enum(INJECTION_DEVICE_TYPES);
 export const medicationFrequencySchema = z.enum(MEDICATION_FREQUENCIES);
 export const medicationStatusSchema = z.enum(MEDICATION_STATUSES);
 export const genderIdentitySchema = z.enum(GENDER_IDENTITIES);
@@ -305,6 +307,8 @@ export const compoundInputSchema = z
     name: z.string().trim().min(1),
     drugClass: drugClassSchema,
     route: medicationRouteSchema.default("injection"),
+    // How the user injects (pen vs vial etc.) — optional; oral compounds omit it.
+    deviceType: injectionDeviceTypeSchema.optional(),
     halfLifeDays: z.number().positive(),
     doseUnit: doseUnitSchema,
     plannedDose: z.number().positive().optional(),

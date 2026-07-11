@@ -13,6 +13,7 @@ import type {
   biggestWorrySchema,
   compoundInputSchema,
   compoundPatchSchema,
+  injectionDeviceTypeSchema,
   compoundResponseSchema,
   cycleInputSchema,
   cycleResponseSchema,
@@ -105,6 +106,7 @@ export type AuthProvider = z.infer<typeof authProviderSchema>;
 export type AuthResponse = z.infer<typeof authResponseSchema>;
 export type BiggestWorry = z.infer<typeof biggestWorrySchema>;
 export type CompoundInput = z.infer<typeof compoundInputSchema>;
+export type InjectionDeviceType = z.infer<typeof injectionDeviceTypeSchema>;
 export type CompoundPatch = z.infer<typeof compoundPatchSchema>;
 export type CompoundResponse = z.infer<typeof compoundResponseSchema>;
 export type CycleInput = z.infer<typeof cycleInputSchema>;

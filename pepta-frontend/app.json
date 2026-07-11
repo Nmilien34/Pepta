@@ -9,7 +9,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "ai.boltzman.peptaapp",
-      "buildNumber": "7",
+      "buildNumber": "8",
       "usesAppleSignIn": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
@@ -23,7 +23,7 @@
       "package": "ai.boltzman.peptaapp",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#EFE7FF"
+        "backgroundColor": "#FFFFFF"
       },
       "permissions": [
         "android.permission.CAMERA",

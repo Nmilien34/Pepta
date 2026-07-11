@@ -18,6 +18,9 @@ export interface MedicationOption {
   doseUnit: DoseUnit;
   halfLifeDays: number;
   route: 'injection' | 'oral';
+  // True when this pick doesn't pin the route (compounded/other meds come as
+  // injections OR oral drops/troches) — onboarding then asks the user directly.
+  routeAmbiguous?: boolean;
   commonDoses: number[];
   kind: 'brand' | 'oral' | 'compound' | 'other';
   initial?: string;
@@ -110,6 +113,7 @@ export const MEDICATION_CATALOG: readonly MedicationOption[] = [
     doseUnit: 'mg',
     halfLifeDays: 5,
     route: 'injection',
+    routeAmbiguous: true,
     commonDoses: [],
     kind: 'compound',
     tintColor: '#0F6E56',
@@ -122,6 +126,7 @@ export const MEDICATION_CATALOG: readonly MedicationOption[] = [
     doseUnit: 'mg',
     halfLifeDays: 7,
     route: 'injection',
+    routeAmbiguous: true,
     commonDoses: [],
     kind: 'compound',
     tintColor: '#1E8E40',
@@ -134,6 +139,7 @@ export const MEDICATION_CATALOG: readonly MedicationOption[] = [
     doseUnit: 'mcg',
     halfLifeDays: 1,
     route: 'injection',
+    routeAmbiguous: true,
     commonDoses: [],
     kind: 'other',
     tintColor: '#5F5E5A',
@@ -146,6 +152,7 @@ export const MEDICATION_CATALOG: readonly MedicationOption[] = [
     doseUnit: 'mg',
     halfLifeDays: 7,
     route: 'injection',
+    routeAmbiguous: true,
     commonDoses: [],
     kind: 'other',
     tintColor: '#5F5E5A',

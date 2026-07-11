@@ -67,6 +67,10 @@ const compoundSchema = new Schema<CompoundDocument>(
       required: true,
       default: "injection",
     },
+    deviceType: {
+      type: String,
+      enum: ["single_dose_pen", "auto_injector", "syringe_vial", "other"],
+    },
     halfLifeDays: {
       type: Number,
       required: true,

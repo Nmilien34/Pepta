@@ -358,7 +358,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "APP_BUNDLE=\"${TARGET_BUILD_DIR}/${FULL_PRODUCT_NAME}\"\nif [ -d \"$APP_BUNDLE\" ]; then\n  /usr/bin/xattr -cr \"$APP_BUNDLE\"\nfi\n";
+			shellScript = "strip_bundle_attributes() {\n  APP_BUNDLE=\"$1\"\n  if [ -d \"$APP_BUNDLE\" ]; then\n    echo \"Stripping extended attributes from $APP_BUNDLE\"\n    /usr/bin/xattr -cr \"$APP_BUNDLE\" 2>/dev/null || true\n    for ATTR in com.apple.FinderInfo com.apple.ResourceFork com.apple.fileprovider.fpfs#P com.apple.provenance; do\n      /usr/bin/find \"$APP_BUNDLE\" -exec /usr/bin/xattr -d \"$ATTR\" {} \\; 2>/dev/null || true\n    done\n  fi\n}\n\nstrip_bundle_attributes \"${TARGET_BUILD_DIR}/${FULL_PRODUCT_NAME}\"\nstrip_bundle_attributes \"${BUILT_PRODUCTS_DIR}/${FULL_PRODUCT_NAME}\"\n\nif [ -n \"${DSTROOT:-}\" ] && [ -n \"${INSTALL_PATH:-}\" ]; then\n  strip_bundle_attributes \"${DSTROOT}${INSTALL_PATH}/${FULL_PRODUCT_NAME}\"\nfi\n\nARCHIVE_ROOT=\"${TARGET_BUILD_DIR%/BuildProductsPath/*}\"\nif [ \"$ARCHIVE_ROOT\" != \"$TARGET_BUILD_DIR\" ]; then\n  strip_bundle_attributes \"${ARCHIVE_ROOT}/InstallationBuildProductsLocation/Applications/${FULL_PRODUCT_NAME}\"\nfi\n";
 			showEnvVarsInLog = 0;
 		};
 /* End PBXShellScriptBuildPhase section */
@@ -383,7 +383,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = Pepta/Pepta.entitlements;
-				CURRENT_PROJECT_VERSION = 7;
+				CURRENT_PROJECT_VERSION = 8;
 				DEVELOPMENT_TEAM = N8J23B3BBW;
 				ENABLE_BITCODE = NO;
 				GCC_PREPROCESSOR_DEFINITIONS = (
@@ -420,7 +420,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = Pepta/Pepta.entitlements;
-				CURRENT_PROJECT_VERSION = 7;
+				CURRENT_PROJECT_VERSION = 8;
 				DEVELOPMENT_TEAM = N8J23B3BBW;
 				INFOPLIST_FILE = Pepta/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;

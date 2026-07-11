@@ -34,16 +34,9 @@ export function NotificationsScreen({ progress, onBack, onAllow, onContinue }: N
       progress={progress}
       onBack={onBack}
       tintColor="#F1ECFF"
-      footer={
-        <View style={{ gap: theme.spacing.md, alignItems: 'center' }}>
-          <Button label="Continue" onPress={handleAllow} loading={loading} />
-          <Pressable onPress={onContinue} hitSlop={theme.sizes.hitSlop} accessibilityRole="button">
-            <AppText variant="caption" color="textSecondary">
-              Not now
-            </AppText>
-          </Pressable>
-        </View>
-      }
+      // 5.1.1(iv): a pre-permission screen must flow INTO the system prompt —
+      // no skip/exit. Denying lives in the iOS dialog itself.
+      footer={<Button label="Continue" onPress={handleAllow} loading={loading} />}
     >
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: theme.spacing.xl }}>
         <LinearGradient

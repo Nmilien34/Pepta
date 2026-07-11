@@ -4,7 +4,7 @@
 // Needs the live backend for the presigned URL; in dev it lands on the error card.
 
 import React, { useState } from 'react';
-import { ActivityIndicator, Image, Modal, Pressable, View } from 'react-native';
+import { ActivityIndicator, Image, Linking, Modal, Pressable, View } from 'react-native';
 import { Icon } from "./Icon";
 import { CameraView, useCameraPermissions, type CameraType } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
@@ -36,6 +36,11 @@ export function ProgressPhotoCapture({ visible, onClose, onSaved, recentPhotos }
   const [stage, setStage] = useState<Stage>('camera');
   const [facing, setFacing] = useState<CameraType>('back');
   const cameraRef = React.useRef<CameraView>(null);
+  const cameraDenied = permission?.status === 'denied';
+
+  const openSettings = () => {
+    Linking.openSettings().catch(() => undefined);
+  };
 
   // Reset to the camera each time the modal opens.
   React.useEffect(() => {
@@ -68,18 +73,22 @@ export function ProgressPhotoCapture({ visible, onClose, onSaved, recentPhotos }
           <SafeAreaView style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28, gap: 16 }}>
             <Icon name="camera-outline" size={40} color="#fff" />
             <AppText variant="cardTitle" align="center" style={{ color: '#fff' }}>
-              Camera access
+              {cameraDenied ? 'Camera is off' : 'Camera access'}
             </AppText>
             <AppText variant="body" align="center" style={{ color: 'rgba(255,255,255,0.7)', maxWidth: 280 }}>
-              Pepta needs your camera to capture progress photos. They stay private to your account.
+              {cameraDenied
+                ? 'Turn camera access on in Settings to capture progress photos.'
+                : 'Pepta needs your camera to capture progress photos. They stay private to your account.'}
             </AppText>
             <View style={{ width: 220, gap: 10 }}>
-              <Button label="Continue" onPress={() => void requestPermission()} />
-              <Pressable onPress={onClose} style={{ alignItems: 'center', paddingVertical: 10 }}>
-                <AppText variant="bodyStrong" style={{ color: 'rgba(255,255,255,0.7)' }}>
-                  Not now
-                </AppText>
-              </Pressable>
+              {cameraDenied ? (
+                <>
+                  <Button label="Open Settings" onPress={openSettings} />
+                  <Button label="Close" variant="secondary" onPress={onClose} />
+                </>
+              ) : (
+                <Button label="Continue" onPress={() => void requestPermission()} />
+              )}
             </View>
           </SafeAreaView>
         ) : (

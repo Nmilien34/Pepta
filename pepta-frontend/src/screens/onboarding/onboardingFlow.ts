@@ -7,10 +7,11 @@ export const ONBOARDING_STEPS = [
   'privacy',
   'journeyStage',
   'medication',
+  'route',
   'currentDose',
+  'deviceType',
   'frequency',
   'shotDay',
-  'appleHealth',
   'goalType',
   'sexGender',
   'birthday',
@@ -34,7 +35,7 @@ export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
 
 // The progress bar counts the full funnel (Welcome=1, Sign-in≈1b, then these),
 // so the first onboarding step (privacy) reads as 2/25 to match the design lab.
-const FUNNEL_LENGTH = 25;
+const FUNNEL_LENGTH = 26;
 const FUNNEL_OFFSET = 2; // privacy is screen #2
 
 export function stepIndex(step: OnboardingStep): number {
@@ -64,19 +65,26 @@ export function progressForStep(step: OnboardingStep): number {
 export interface FlowContext {
   journeyStage?: 'active' | 'starting_soon' | 'none';
   route?: 'injection' | 'oral';
+  // True when the picked medication pins its route (branded meds) — the
+  // explicit "how do you take it" step only shows for ambiguous picks.
+  routeLocked?: boolean;
   frequency?: 'weekly' | 'biweekly' | 'daily' | 'custom';
 }
 
 // The dosing block only makes sense for someone actively on a GLP-1.
-const MEDICATION_BLOCK: readonly OnboardingStep[] = ['currentDose', 'frequency', 'shotDay'];
+const MEDICATION_BLOCK: readonly OnboardingStep[] = ['currentDose', 'deviceType', 'frequency', 'shotDay'];
 
 export function shouldSkipStep(step: OnboardingStep, ctx: FlowContext): boolean {
   // Not actively dosing → skip the dose/frequency/shot-day block.
   if (ctx.journeyStage && ctx.journeyStage !== 'active' && MEDICATION_BLOCK.includes(step)) {
     return true;
   }
-  // Not on a GLP-1 at all → also skip the medication picker.
-  if (ctx.journeyStage === 'none' && step === 'medication') return true;
+  // Not on a GLP-1 at all → also skip the medication picker (and its route question).
+  if (ctx.journeyStage === 'none' && (step === 'medication' || step === 'route')) return true;
+  // The route question only shows when the picked medication doesn't pin it.
+  if (step === 'route' && ctx.routeLocked) return true;
+  // Device type is an injection question.
+  if (step === 'deviceType' && ctx.route === 'oral') return true;
   // Shot day is for weekly injections only (oral / non-weekly have no shot day).
   if (step === 'shotDay' && (ctx.route === 'oral' || (ctx.frequency != null && ctx.frequency !== 'weekly'))) {
     return true;

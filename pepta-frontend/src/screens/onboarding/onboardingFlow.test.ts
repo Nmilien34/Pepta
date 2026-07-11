@@ -28,8 +28,10 @@ describe('onboarding flow', () => {
   });
 
   it('matches the design lab progress values', () => {
-    expect(progressForStep('privacy')).toBeCloseTo(0.08, 5);
-    expect(progressForStep('journeyStage')).toBeCloseTo(0.12, 5);
+    // 26-step funnel: route + deviceType joined; appleHealth left until
+    // HealthKit is real (5.1.1(iv)). Welcome=1, privacy=#2.
+    expect(progressForStep('privacy')).toBeCloseTo(2 / 26, 5);
+    expect(progressForStep('journeyStage')).toBeCloseTo(3 / 26, 5);
     expect(progressForStep('paywall')).toBe(1);
   });
 });
@@ -37,7 +39,7 @@ describe('onboarding flow', () => {
 describe('shouldSkipStep', () => {
   it('keeps every dosing step for an active injectable, weekly user', () => {
     const ctx = { journeyStage: 'active', route: 'injection', frequency: 'weekly' } as const;
-    for (const step of ['medication', 'currentDose', 'frequency', 'shotDay'] as const) {
+    for (const step of ['medication', 'currentDose', 'deviceType', 'frequency', 'shotDay'] as const) {
       expect(shouldSkipStep(step, ctx)).toBe(false);
     }
   });
@@ -60,3 +62,22 @@ describe('shouldSkipStep', () => {
     expect(shouldSkipStep('birthday', { journeyStage: 'starting_soon' })).toBe(false);
   });
 });
+
+describe('route + deviceType gating', () => {
+  it('asks the route only for ambiguous medications', () => {
+    expect(shouldSkipStep('route', { journeyStage: 'active', routeLocked: true })).toBe(true);
+    expect(shouldSkipStep('route', { journeyStage: 'active', routeLocked: false })).toBe(false);
+  });
+
+  it('skips the route question for users not on a medication', () => {
+    expect(shouldSkipStep('route', { journeyStage: 'none' })).toBe(true);
+  });
+
+  it('asks the device only for active injection users', () => {
+    expect(shouldSkipStep('deviceType', { journeyStage: 'active', route: 'injection' })).toBe(false);
+    expect(shouldSkipStep('deviceType', { journeyStage: 'active', route: 'oral' })).toBe(true);
+    expect(shouldSkipStep('deviceType', { journeyStage: 'starting_soon', route: 'injection' })).toBe(true);
+    expect(shouldSkipStep('deviceType', { journeyStage: 'none' })).toBe(true);
+  });
+});
+

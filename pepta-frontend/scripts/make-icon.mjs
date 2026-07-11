@@ -1,5 +1,7 @@
 // Generates the Pepta app icon from the Pep mascot vectors (mirrors
-// src/components/Mascot.tsx): full-color Pep on a soft light-lavender background.
+// src/components/Mascot.tsx): full-color Pep up front on a pure white ground.
+// (v2, 2026-07-08 — the original lavender wash read too pale on the home
+// screen; design source: marketing/icon-variants/make-variants.mjs v1.)
 // Run: node scripts/make-icon.mjs   → assets/icon.png + assets/adaptive-icon.png
 import { Resvg } from '@resvg/resvg-js';
 import { writeFileSync, mkdirSync } from 'node:fs';
@@ -26,27 +28,33 @@ const PEP = `
   </g>`;
 
 const DEFS = `<defs>
-  <radialGradient id="lightbg" cx="0.5" cy="0.4" r="0.85">
-    <stop offset="0" stop-color="#FBF9FF"/><stop offset="1" stop-color="#E9DEFF"/>
-  </radialGradient>
   <linearGradient id="pepBody" x1="0" y1="0" x2="0" y2="1">
     <stop offset="0" stop-color="#9C82FF"/><stop offset="1" stop-color="#6E4EF0"/>
   </linearGradient>
-  <filter id="sh" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="26"/></filter>
+  <radialGradient id="glow" cx="0.5" cy="0.52" r="0.5">
+    <stop offset="0" stop-color="#8B6CFF" stop-opacity="0.26"/>
+    <stop offset="1" stop-color="#8B6CFF" stop-opacity="0"/>
+  </radialGradient>
+  <filter id="sh" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="24"/></filter>
 </defs>`;
 
-// Main icon — Pep at ~59% height, centered (content center is 60,63.5 in a 120x142 box).
+// Main icon — pure white ground, Pep up front at ~90% of the canvas height so
+// he reads instantly at home-screen size. A soft purple under-glow + grounded
+// shadow give depth without tinting the white back toward "pale lavender".
+// Pep box 120x142 at scale 6.5 → 780x923. x=(1024-780)/2=122, y=(1024-923)/2−7.
 const icon = `<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
   ${DEFS}
-  <rect width="1024" height="1024" fill="url(#lightbg)"/>
-  <ellipse cx="512" cy="838" rx="208" ry="40" fill="#6E4EF0" opacity="0.16" filter="url(#sh)"/>
-  <g transform="translate(224,207) scale(4.8)">${PEP}</g>
+  <rect width="1024" height="1024" fill="#FFFFFF"/>
+  <circle cx="512" cy="540" r="500" fill="url(#glow)"/>
+  <ellipse cx="512" cy="972" rx="290" ry="40" fill="#6E4EF0" opacity="0.22" filter="url(#sh)"/>
+  <g transform="translate(122,44) scale(6.5)">${PEP}</g>
 </svg>`;
 
-// Android adaptive foreground — smaller (fits the masked safe zone), transparent bg.
+// Android adaptive foreground — smaller (fits the masked safe zone), transparent
+// bg; the white ground comes from android.adaptiveIcon.backgroundColor.
 const adaptive = `<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
   ${DEFS}
-  <g transform="translate(260,245) scale(4.2)">${PEP}</g>
+  <g transform="translate(260,214) scale(4.2)">${PEP}</g>
 </svg>`;
 
 function render(svg, out) {

@@ -1,6 +1,9 @@
-// Onboarding screen 8 — Apple Health (optional). A friendly value pitch. The
-// HealthKit integration is DEFERRED: "Connect" is a safe no-op that advances the
-// flow (never fakes a real connection), and "Maybe later" skips. Both move on.
+// Apple Health pitch — OUT OF THE FLOW until HealthKit actually lands.
+// App Review rejected 1.0(7) under 5.1.1(iv) for exactly this pattern: a
+// pre-permission message with a "Connect Apple Health" button and a skip link,
+// for a permission that doesn't even exist yet (Connect was a stub). When
+// HealthKit ships, re-add the step with a single "Continue" button that
+// immediately triggers the real system prompt — no skip/maybe-later escape.
 
 import React from 'react';
 import { Pressable, View } from 'react-native';

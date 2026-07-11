@@ -1,7 +1,9 @@
 import React, { useState } from "react";
 import {
+  ActionSheetIOS,
   ActivityIndicator,
   Alert,
+  Platform,
   Pressable,
   StyleSheet,
   View,
@@ -42,21 +44,31 @@ export function EditableAvatar({ size = 62 }: EditableAvatarProps) {
     }
   };
 
+  // Source chooser as a native action sheet with no explanatory copy. App
+  // Review (5.1.1(iv)) reads a custom titled message + Cancel shown before the
+  // camera/photos permission as a pre-permission gate; a bare action menu that
+  // flows straight into the system prompt is the compliant pattern.
   const openPicker = () => {
     if (busy) return;
     Haptics.selectionAsync().catch(() => undefined);
-    Alert.alert(
-      "Profile photo",
-      "Choose a photo from your library or take a new one.",
-      [
+    if (Platform.OS === "ios") {
+      ActionSheetIOS.showActionSheetWithOptions(
         {
-          text: "Choose from Library",
-          onPress: () => void runUpload("library"),
+          options: ["Choose from Library", "Take Photo", "Cancel"],
+          cancelButtonIndex: 2,
         },
-        { text: "Take Photo", onPress: () => void runUpload("camera") },
-        { text: "Cancel", style: "cancel" },
-      ],
-    );
+        (index) => {
+          if (index === 0) void runUpload("library");
+          if (index === 1) void runUpload("camera");
+        },
+      );
+      return;
+    }
+    Alert.alert("", "", [
+      { text: "Choose from Library", onPress: () => void runUpload("library") },
+      { text: "Take Photo", onPress: () => void runUpload("camera") },
+      { text: "Cancel", style: "cancel" },
+    ]);
   };
 
   const badgeSize = Math.max(22, Math.round(size * 0.35));

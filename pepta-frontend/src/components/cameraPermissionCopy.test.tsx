@@ -1,12 +1,22 @@
 import React from "react";
 import TestRenderer, { act, type ReactTestInstance } from "react-test-renderer";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MealCamera } from "./MealCamera";
 import { ProgressPhotoCapture } from "./ProgressPhotoCapture";
+
+const mocks = vi.hoisted(() => ({
+  cameraPermission: {
+    current: { granted: false, status: "undetermined" },
+  },
+  requestPermission: vi.fn(),
+}));
 
 vi.mock("react-native", () => ({
   ActivityIndicator: "ActivityIndicator",
   Image: "Image",
+  Linking: {
+    openSettings: vi.fn(() => Promise.resolve()),
+  },
   Modal: ({
     visible,
     children,
@@ -37,7 +47,10 @@ vi.mock("react-native-safe-area-context", () => ({
 
 vi.mock("expo-camera", () => ({
   CameraView: "CameraView",
-  useCameraPermissions: () => [{ granted: false }, vi.fn()],
+  useCameraPermissions: () => [
+    mocks.cameraPermission.current,
+    mocks.requestPermission,
+  ],
 }));
 
 vi.mock("expo-haptics", () => ({
@@ -100,6 +113,14 @@ function nodeText(node: ReactTestInstance): string {
 }
 
 describe("camera permission prompts", () => {
+  beforeEach(() => {
+    mocks.cameraPermission.current = {
+      granted: false,
+      status: "undetermined",
+    };
+    mocks.requestPermission.mockClear();
+  });
+
   it("uses a neutral Continue button before meal camera permission", async () => {
     let tree: TestRenderer.ReactTestRenderer | undefined;
 
@@ -117,6 +138,29 @@ describe("camera permission prompts", () => {
 
     expect(nodeText(tree!.root)).toContain("Continue");
     expect(nodeText(tree!.root)).not.toContain("Allow camera");
+    expect(nodeText(tree!.root)).not.toContain("Not now");
+  });
+
+  it("offers settings after meal camera permission has been denied", async () => {
+    mocks.cameraPermission.current = { granted: false, status: "denied" };
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+
+    await act(async () => {
+      tree = TestRenderer.create(
+        <MealCamera
+          visible
+          onClose={vi.fn()}
+          onCapture={vi.fn()}
+          onSearch={vi.fn()}
+          onVoice={vi.fn()}
+        />,
+      );
+    });
+
+    const text = nodeText(tree!.root);
+    expect(text).toContain("Open Settings");
+    expect(text).toContain("Choose another way");
+    expect(text).not.toContain("Continue");
   });
 
   it("uses a neutral Continue button before progress photo camera permission", async () => {
@@ -135,5 +179,27 @@ describe("camera permission prompts", () => {
 
     expect(nodeText(tree!.root)).toContain("Continue");
     expect(nodeText(tree!.root)).not.toContain("Allow camera");
+    expect(nodeText(tree!.root)).not.toContain("Not now");
+  });
+
+  it("offers settings after progress photo camera permission has been denied", async () => {
+    mocks.cameraPermission.current = { granted: false, status: "denied" };
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+
+    await act(async () => {
+      tree = TestRenderer.create(
+        <ProgressPhotoCapture
+          visible
+          onClose={vi.fn()}
+          onSaved={vi.fn()}
+          recentPhotos={[]}
+        />,
+      );
+    });
+
+    const text = nodeText(tree!.root);
+    expect(text).toContain("Open Settings");
+    expect(text).toContain("Close");
+    expect(text).not.toContain("Continue");
   });
 });

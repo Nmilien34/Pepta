@@ -4,7 +4,7 @@
 // to the closest schema field or drop them (flagged TODO). The api call is real
 // and correct so wiring the live backend is a no-op swap.
 
-import type { ActivityLevel, BiggestWorry, OnboardingCompleteInput, TrainingStatus } from '@pepta/shared';
+import type { ActivityLevel, BiggestWorry, InjectionDeviceType, OnboardingCompleteInput, TrainingStatus } from '@pepta/shared';
 import type { MedicationOption } from '../../data/medicationCatalog';
 import { toIsoDate, type DateParts } from '../../utils/dateParts';
 import type { BodyMeasure } from '../../utils/units';
@@ -15,10 +15,13 @@ import type { GoalType } from './GoalTypeScreen';
 import type { GenderIdentity } from './SexGenderScreen';
 import type { WeightUnit } from './GoalWeightScreen';
 import type { SideEffectType } from './SideEffectsScreen';
+import type { MedicationRoute } from './RouteScreen';
 
 export interface OnboardingAnswers {
   journeyStage?: JourneyStage;
   medication?: MedicationOption;
+  route?: MedicationRoute;
+  deviceType?: InjectionDeviceType;
   dose?: DoseValue;
   frequency?: DoseFrequency;
   lastShot?: DateParts;
@@ -111,7 +114,13 @@ export function buildOnboardingPayload(answers: OnboardingAnswers, now: Date): O
       ? ({
           name: answers.medication.name,
           drugClass: answers.medication.drugClass,
-          route: answers.medication.route,
+          // The explicit route answer (asked for ambiguous meds) overrides the
+          // catalog default; "unsure" falls back to the catalog route.
+          route:
+            answers.route === 'injection' || answers.route === 'oral'
+              ? answers.route
+              : answers.medication.route,
+          ...(answers.deviceType && answers.route !== 'oral' ? { deviceType: answers.deviceType } : {}),
           halfLifeDays: answers.medication.halfLifeDays,
           doseUnit: answers.medication.doseUnit,
           ...(typeof answers.dose === 'number' ? { plannedDose: answers.dose } : {}),

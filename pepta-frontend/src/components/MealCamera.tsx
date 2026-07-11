@@ -5,7 +5,7 @@
 // `ImagePicker({base64:true})` caused) and runs the AI scan.
 
 import React, { useRef, useState } from 'react';
-import { Modal, Pressable, View } from 'react-native';
+import { Linking, Modal, Pressable, View } from 'react-native';
 import { Icon } from './Icon';
 import { CameraView, useCameraPermissions, type CameraType } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
@@ -27,6 +27,11 @@ export function MealCamera({ visible, onClose, onCapture, onSearch, onVoice }: M
   const [facing] = useState<CameraType>('back');
   const [torch, setTorch] = useState(false);
   const cameraRef = useRef<CameraView>(null);
+  const cameraDenied = permission?.status === 'denied';
+
+  const openSettings = () => {
+    Linking.openSettings().catch(() => undefined);
+  };
 
   const capture = async () => {
     Haptics.selectionAsync().catch(() => undefined);
@@ -41,18 +46,22 @@ export function MealCamera({ visible, onClose, onCapture, onSearch, onVoice }: M
           <SafeAreaView style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28, gap: 16 }}>
             <Icon name="camera-outline" size={40} color="#fff" />
             <AppText variant="cardTitle" align="center" style={{ color: '#fff' }}>
-              Camera access
+              {cameraDenied ? 'Camera is off' : 'Camera access'}
             </AppText>
             <AppText variant="body" align="center" style={{ color: 'rgba(255,255,255,0.7)', maxWidth: 280 }}>
-              Pepta needs your camera to scan a meal. You can also upload from your library or log manually.
+              {cameraDenied
+                ? 'Turn camera access on in Settings, or choose another way to log this meal.'
+                : 'Pepta needs your camera to scan a meal. You can also upload from your library or log manually.'}
             </AppText>
             <View style={{ width: 220, gap: 10 }}>
-              <Button label="Continue" onPress={() => void requestPermission()} />
-              <Pressable onPress={onClose} style={{ alignItems: 'center', paddingVertical: 10 }}>
-                <AppText variant="bodyStrong" style={{ color: 'rgba(255,255,255,0.7)' }}>
-                  Not now
-                </AppText>
-              </Pressable>
+              {cameraDenied ? (
+                <>
+                  <Button label="Open Settings" onPress={openSettings} />
+                  <Button label="Choose another way" variant="secondary" onPress={onClose} />
+                </>
+              ) : (
+                <Button label="Continue" onPress={() => void requestPermission()} />
+              )}
             </View>
           </SafeAreaView>
         ) : (

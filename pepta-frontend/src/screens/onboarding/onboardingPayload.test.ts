@@ -74,3 +74,30 @@ describe('buildOnboardingPayload', () => {
     expect(buildOnboardingPayload({ genderIdentity: 'man' }, now).profile.sex).toBe('male');
   });
 });
+
+describe('route + device answers', () => {
+  it('lets the explicit route answer override an ambiguous catalog route', () => {
+    const compounded: MedicationOption = {
+      ...mounjaro,
+      id: 'compounded_semaglutide',
+      name: 'Compounded semaglutide',
+      routeAmbiguous: true,
+    };
+    const p = buildOnboardingPayload(
+      { ...fullAnswers, medication: compounded, route: 'oral' },
+      now,
+    );
+    expect(p.compound?.route).toBe('oral');
+    expect(p.compound?.deviceType).toBeUndefined();
+  });
+
+  it('keeps the catalog route when the user is unsure and attaches the device', () => {
+    const p = buildOnboardingPayload(
+      { ...fullAnswers, route: 'unsure', deviceType: 'single_dose_pen' },
+      now,
+    );
+    expect(p.compound?.route).toBe('injection');
+    expect(p.compound?.deviceType).toBe('single_dose_pen');
+  });
+});
+

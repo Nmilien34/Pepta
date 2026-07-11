@@ -24,7 +24,6 @@ import { MedicationPickerScreen } from './MedicationPickerScreen';
 import { DoseScreen, type DoseValue } from './DoseScreen';
 import { FrequencyScreen, type DoseFrequency } from './FrequencyScreen';
 import { ShotDayScreen } from './ShotDayScreen';
-import { AppleHealthScreen } from './AppleHealthScreen';
 import { GoalTypeScreen, type GoalType } from './GoalTypeScreen';
 import { SexGenderScreen, type GenderIdentity } from './SexGenderScreen';
 import { BirthdayScreen } from './BirthdayScreen';
@@ -44,6 +43,9 @@ import { RevealScreen } from './RevealScreen';
 import { PaywallScreen } from './PaywallScreen';
 import type { ActivityLevel, BiggestWorry, TrainingStatus } from '@pepta/shared';
 import type { MedicationOption } from '../../data/medicationCatalog';
+import { RouteScreen, type MedicationRoute } from './RouteScreen';
+import { DeviceTypeScreen } from './DeviceTypeScreen';
+import type { InjectionDeviceType } from '@pepta/shared';
 import { toDateParts, type DateParts } from '../../utils/dateParts';
 import { kgToLb, lbToKg, type BodyMeasure } from '../../utils/units';
 import { projectGoal } from '../../utils/goalProjection';
@@ -62,6 +64,8 @@ function defaultBirthday(): DateParts {
 interface FlowAnswers {
   journeyStage?: JourneyStage;
   medication?: MedicationOption;
+  route?: MedicationRoute;
+  deviceType?: InjectionDeviceType;
   dose?: DoseValue;
   frequency?: DoseFrequency;
   lastShot?: DateParts;
@@ -143,9 +147,16 @@ export function OnboardingNavigator() {
   }, [hydrated, step, answers]);
 
   const progress = progressForStep(step);
+  // The explicit route answer (ambiguous meds only) overrides the catalog
+  // default; "unsure" falls back to the catalog route (injection).
+  const resolvedRoute =
+    answers.route === 'injection' || answers.route === 'oral'
+      ? answers.route
+      : answers.medication?.route;
   const ctx: FlowContext = {
     journeyStage: answers.journeyStage,
-    route: answers.medication?.route,
+    route: resolvedRoute,
+    routeLocked: answers.medication ? !answers.medication.routeAmbiguous : false,
     frequency: answers.frequency,
   };
 
@@ -215,6 +226,17 @@ export function OnboardingNavigator() {
           onContinue={goNext}
         />
       );
+    case 'route':
+      return (
+        <RouteScreen
+          progress={progress}
+          onBack={goBack}
+          medicationName={answers.medication?.name}
+          value={answers.route}
+          onChange={(route) => setAnswers((a) => ({ ...a, route }))}
+          onContinue={goNext}
+        />
+      );
     case 'currentDose':
       return (
         <DoseScreen
@@ -226,12 +248,23 @@ export function OnboardingNavigator() {
           onContinue={goNext}
         />
       );
+    case 'deviceType':
+      return (
+        <DeviceTypeScreen
+          progress={progress}
+          onBack={goBack}
+          medicationName={answers.medication?.name}
+          value={answers.deviceType}
+          onChange={(deviceType) => setAnswers((a) => ({ ...a, deviceType }))}
+          onContinue={goNext}
+        />
+      );
     case 'frequency':
       return (
         <FrequencyScreen
           progress={progress}
           onBack={goBack}
-          oral={answers.medication?.route === 'oral'}
+          oral={resolvedRoute === 'oral'}
           frequency={answers.frequency}
           onFrequencyChange={(frequency) => setAnswers((a) => ({ ...a, frequency }))}
           lastShot={answers.lastShot ?? toDateParts(new Date())}
@@ -249,8 +282,6 @@ export function OnboardingNavigator() {
           onContinue={goNext}
         />
       );
-    case 'appleHealth':
-      return <AppleHealthScreen progress={progress} onBack={goBack} onContinue={goNext} />;
     case 'goalType':
       return (
         <GoalTypeScreen

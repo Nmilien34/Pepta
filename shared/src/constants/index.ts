@@ -45,6 +45,7 @@ export const DRUG_CLASSES = [
   "other",
 ] as const;
 export const MEDICATION_ROUTES = ["injection", "oral"] as const;
+export const INJECTION_DEVICE_TYPES = ["single_dose_pen", "auto_injector", "syringe_vial", "other"] as const;
 export const MEDICATION_FREQUENCIES = [
   "daily",
   "weekly",
