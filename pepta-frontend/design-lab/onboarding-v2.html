@@ -1,0 +1,672 @@
+<!doctype html><html><head><meta charset="utf-8">
+<title>Pepta — Conversational Onboarding v2.1 (design)</title>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   Pepta conversational onboarding v2.1 — DESIGN ONLY.
+   Quality bar = Leanient's conversational flow, translated to
+   daylight. The discipline that makes it feel expensive:
+   · type IS the interface — echo line is the SAME size as the
+     question, just dimmed; no small-print echoes
+   · accent appears ≤3 times per screen: caret, one punctuation
+     square, the selected/sent moment. NO GRADIENTS anywhere.
+   · CTAs are quiet outlined pills; solid purple is reserved
+     for the wall's single CTA
+   · the ground is never flat: huge soft tonal orbs at 4–6%
+     purple give the white air (Leanient's "flair", in light)
+   ============================================================ */
+:root{
+  --ink:#17141F; --dim:rgba(23,20,31,.5); --ts:#6B6B76; --tt:#A8A5B2;
+  --primary:#7C5CFC; --accent:#6E4EF0;
+  --ground:#FCFBFE; --orb:rgba(124,92,252,.05); --orb2:rgba(124,92,252,.075);
+  --hair:rgba(23,20,31,.12); --hairsoft:rgba(23,20,31,.07);
+  --wall:#171128; --wallorb:rgba(139,108,255,.07);
+  --f:"Hanken Grotesk",-apple-system,system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#EDEBF2;font-family:var(--f);color:var(--ink);padding:40px}
+h1{font-size:28px;font-weight:800;letter-spacing:-.5px}
+h2{font-size:18px;font-weight:800;margin:44px 0 6px}
+.note{color:var(--ts);font-size:13.5px;line-height:1.55;max-width:900px;margin-top:6px}
+.gallery{display:flex;flex-wrap:wrap;gap:34px;margin-top:22px}
+.fw{width:300px}
+.fl{font-weight:700;font-size:13px;color:var(--ts);margin-bottom:8px}
+.spec{font-size:11.5px;color:var(--tt);line-height:1.45;margin-top:8px}
+.spec b{color:var(--ts)}
+
+/* device */
+.dev{width:300px;height:650px;border-radius:44px;border:8px solid #0A0A0E;background:var(--ground);overflow:hidden;position:relative;box-shadow:0 24px 50px -20px rgba(20,16,40,.35)}
+.orbs i{position:absolute;border-radius:999px}
+.orbs i:nth-child(1){width:300px;height:300px;background:var(--orb2);top:-90px;left:-110px}
+.orbs i:nth-child(2){width:260px;height:260px;background:var(--orb);bottom:120px;right:-120px}
+.orbs i:nth-child(3){width:220px;height:220px;background:var(--orb);bottom:-90px;left:60px}
+.scr{position:relative;height:100%;padding:24px 24px 22px;display:flex;flex-direction:column}
+.top{display:flex;align-items:center;gap:12px;margin-top:10px}
+.back{font-size:16px;color:var(--ink);font-weight:700}
+.prog{flex:1;height:2px;background:rgba(23,20,31,.1);border-radius:2px}
+.prog>i{display:block;height:100%;background:var(--ink);border-radius:2px}
+
+/* conversation type — echo is the SAME scale, dimmed */
+.echo{font-size:27px;font-weight:800;letter-spacing:-.7px;line-height:1.14;color:var(--dim);margin-top:34px}
+.q{font-size:27px;font-weight:800;letter-spacing:-.7px;line-height:1.14;margin-top:18px}
+.q .caret{display:inline-block;width:12px;height:23px;background:#8FE3B0;margin-left:4px;vertical-align:-2px;border-radius:2px}
+.q .caret.p{background:var(--primary)}
+.q .sq{color:var(--primary)}
+.subq{font-size:14px;color:var(--ts);margin-top:12px;font-weight:600}
+
+/* chips — quiet, neutral selection (app's OptionCard convention) */
+.chips{display:flex;flex-direction:column;gap:9px;margin-top:auto;padding-top:20px}
+.chip{border:1px solid var(--hair);background:rgba(255,255,255,.7);border-radius:16px;padding:15px 16px;font-weight:700;font-size:15px}
+.chip .d{display:block;font-size:12px;color:var(--ts);font-weight:600;margin-top:2px}
+.chip.sel{border:1.5px solid var(--ink);background:#fff}
+.chiprow{display:flex;flex-wrap:wrap;gap:8px;margin-top:auto;padding-top:20px}
+.chiprow .chip{padding:12px 16px}
+
+/* the sent beat */
+.sent{align-self:flex-end;background:var(--primary);color:#fff;font-weight:700;font-size:15px;border-radius:18px 18px 6px 18px;padding:12px 16px;margin-top:26px}
+.dots{align-self:flex-start;border:1px solid var(--hair);background:rgba(255,255,255,.7);border-radius:18px 18px 18px 6px;padding:13px 16px;margin-top:12px;display:flex;gap:5px}
+.dots i{width:6px;height:6px;border-radius:99px;background:var(--tt)}
+.dots i:nth-child(2){opacity:.7}.dots i:nth-child(3){opacity:.4}
+
+/* CTAs — outlined pill, ink text; never gradients */
+.cta{margin-top:auto;border:1.5px solid var(--hair);border-radius:999px;padding:15px;text-align:center;font-weight:800;font-size:15.5px;color:var(--ink);background:rgba(255,255,255,.6)}
+.cta.ghost{border:none;background:none;color:var(--ts);font-weight:700;padding:10px}
+.cta.solid{background:var(--primary);border-color:var(--primary);color:#fff}
+
+/* panels for precise inputs — hairline, barely raised */
+.panel{border:1px solid var(--hairsoft);background:rgba(255,255,255,.75);border-radius:20px;padding:18px;margin-top:22px;position:relative}
+.cite{font-size:11.5px;color:var(--tt);font-weight:600;margin-top:10px}
+.stat{font-size:64px;font-weight:800;letter-spacing:-3px;line-height:1}
+.stat .sq{color:var(--primary)}
+.avrow{display:flex;align-items:center;gap:10px;margin-top:22px}
+.avrow .a{display:flex}
+.avrow .a span{width:30px;height:30px;border-radius:99px;border:2px solid var(--ground);margin-left:-8px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#4A4656}
+.avlab{font-size:13px;font-weight:700;color:var(--ts)}
+.wheel{display:flex;flex-direction:column;align-items:center;gap:12px;font-weight:700;color:var(--tt);position:relative;z-index:1}
+.wheel .on{color:var(--ink);font-size:22px;font-weight:800}.wband{position:absolute;left:12px;right:12px;top:50%;transform:translateY(-50%);height:38px;background:#fff;border:1px solid var(--hair);border-radius:12px;z-index:0}
+
+/* the wall */
+.dev.wall{background:var(--wall)}
+.dev.wall .orbs i:nth-child(1){background:var(--wallorb)}
+.dev.wall .orbs i:nth-child(2){background:var(--wallorb)}
+.dev.wall .orbs i:nth-child(3){background:var(--wallorb)}
+.wall .q,.wall .echo{color:#F4F2FA}
+.wall .echo{color:rgba(244,242,250,.4)}
+.vrow{display:flex;align-items:baseline;justify-content:space-between;padding:13px 2px;border-bottom:1px solid rgba(255,255,255,.09)}
+.vrow b{font-size:14.5px;color:#F4F2FA;font-weight:700}
+.vrow span{font-size:12px;color:rgba(244,242,250,.45);font-weight:600}
+.tiers{display:flex;gap:8px;margin-top:18px}
+.tier{flex:1;border-radius:16px;padding:13px}
+.tier.on{background:#fff;color:var(--ink)}
+.tier.off{border:1px solid rgba(255,255,255,.16);color:#F4F2FA}
+.tier b{font-size:16px}.tier small{display:block;font-size:10.5px;font-weight:700;margin-top:2px;opacity:.6}
+.tier.on small{color:var(--ts);opacity:1}
+
+/* reveal celebration: line draws -> flag pops -> confetti falls (loops) */
+.rvpath{stroke-dasharray:240;stroke-dashoffset:240;animation:rvdraw 5.5s ease-in-out infinite}
+.rvflag{transform-box:fill-box;transform-origin:center;transform:scale(0);opacity:0;animation:rvpop 5.5s ease-in-out infinite}
+.rvflaglabel{position:absolute;right:6%;bottom:12px;font:800 11px/1 'Hanken Grotesk';color:#B23A93;opacity:0;animation:rvlabel 5.5s ease-in-out infinite}
+.rvconfetti{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.rvconfetti i{position:absolute;top:-10px;width:6px;height:9px;border-radius:2px;opacity:0}
+.rvconfetti i:nth-child(3n+1){background:#7C5CFC;animation:rvfallA 5.5s ease-in infinite}
+.rvconfetti i:nth-child(3n+2){background:#E25CC4;width:7px;height:7px;border-radius:99px;animation:rvfallB 5.5s ease-in infinite}
+.rvconfetti i:nth-child(3n){background:#2FA8FF;animation:rvfallC 5.5s ease-in infinite}
+@keyframes rvdraw{0%,7%{stroke-dashoffset:240}34%,100%{stroke-dashoffset:0}}
+@keyframes rvpop{0%,34%{transform:scale(0);opacity:0}40%{transform:scale(1.25);opacity:1}45%{transform:scale(1);opacity:1}95%{transform:scale(1);opacity:1}100%{transform:scale(0);opacity:0}}
+@keyframes rvlabel{0%,38%{opacity:0}45%{opacity:1}95%{opacity:1}100%{opacity:0}}
+@keyframes rvfallA{0%,35%{opacity:0;transform:translateY(-10px) rotate(0)}39%{opacity:1}63%{opacity:1;transform:translateY(440px) rotate(280deg)}72%,100%{opacity:0;transform:translateY(480px) rotate(320deg)}}
+@keyframes rvfallB{0%,36%{opacity:0;transform:translateY(-10px) rotate(0)}40%{opacity:1}63%{opacity:1;transform:translateY(410px) rotate(-240deg)}72%,100%{opacity:0;transform:translateY(450px) rotate(-280deg)}}
+@keyframes rvfallC{0%,37%{opacity:0;transform:translateY(-10px) rotate(0)}41%{opacity:1}65%{opacity:1;transform:translateY(460px) rotate(340deg)}74%,100%{opacity:0;transform:translateY(500px) rotate(380deg)}}
+</style></head><body>
+
+<h1>Conversational onboarding — v2.1 <span style="color:var(--tt);font-weight:600;font-size:15px">design for sign-off · no code</span></h1>
+<p class="note"><b>What changed from v2.0 (the "cheap" fixes):</b> ① echo lines are now the same type scale as the question, dimmed to 50% — legible over the ground orbs while still clearly a "recall" under the full-ink question. ② Accent discipline: purple appears at most three times per screen (caret, one punctuation square, the sent/selected moment) — <b>no gradients anywhere</b>. ③ CTAs are quiet outlined pills; the only solid-purple button in the whole flow is the wall's "Start tracking". ④ The white is never flat: three huge 5%-purple orbs give the ground air. ⑤ Chip selection is neutral-ink (the app's own OptionCard convention), not purple. ⑥ The wall is near-black plum (#171128) with hairline value rows — the purple lives in ONE word and ONE button, not the whole screen. Mechanics unchanged: 32ms/char typing, tick/tap/thump haptic grammar, sent-bubble beat, 950ms auto-advance on single-select, Continue only for multi/wheels, 300ms fade + 14px rise, hairline progress + small back chevron. Full turn-by-turn script = v2.0 (T1–T23 + beats A/B/C + crafting/reveal/wall/welcome) <b>plus four adopted turns (v2.2):</b> T3b experience level · T3c "what would help most?" needs multi-select (its picks are mirrored verbatim by the crafting rows AND the wall's value stack — their own words sell the wall) · T7b concentration (syringe-&-vial users only — arms the reconstitution calculator) · T10b shot time (first reminder defaults to THEIR hour) · T11b "also tracking?" (recovery &amp; healing peptides — matches what the app actually tracks, nothing broader).</p>
+
+<h2>Key frames</h2>
+<div class="gallery">
+
+  <!-- T1 GIFT -->
+  <div class="fw"><div class="fl">T1 · The gift</div>
+    <div class="dev"><div class="orbs"><i></i><i></i><i></i></div><div class="scr">
+      <div class="top"><div class="prog"><i style="width:4%"></i></div></div>
+      <div class="echo">Hi. Before anything else, one thing.</div>
+      <div class="q">You're not doing this alone.</div>
+      <div style="margin-top:44px">
+        <div class="stat">1 in 8<span class="sq">.</span></div>
+        <div style="font-weight:600;font-size:15px;color:var(--ts);margin-top:14px;line-height:1.45">American adults has taken a GLP-1. Millions are on this exact road with you.</div>
+        <div class="cite">KFF Health Tracking Poll, May 2024</div>
+      </div>
+      <div class="avrow">
+        <div class="a"><span style="background:#EAD9C4">M</span><span style="background:#D4E3D2">J</span><span style="background:#DCD2EE">R</span><span style="background:#CFE0EA">T</span><span style="background:#EADFD0">S</span></div>
+        <div class="avlab">15 million+ right now</div>
+      </div>
+      <div class="cta">I'm ready</div>
+    </div></div>
+    <div class="spec"><b>Beat:</b> echo types first, dim. Headline types at 32ms/char. Stat lands with thump. One purple square in the whole frame.</div>
+  </div>
+
+  <!-- T3 QUESTION -->
+  <div class="fw"><div class="fl">T3 · A question turn</div>
+    <div class="dev"><div class="orbs"><i></i><i></i><i></i></div><div class="scr">
+      <div class="top"><span class="back">‹</span><div class="prog"><i style="width:12%"></i></div></div>
+      <div class="echo">Good. Let's get to know each other.</div>
+      <div class="q">Where are you in your GLP-1 journey?<span class="caret p"></span></div>
+      <div class="chips">
+        <div class="chip">Already dosing<span class="d">shots or oral, underway</span></div>
+        <div class="chip">Starting soon<span class="d">prescription on the way</span></div>
+        <div class="chip">Just exploring<span class="d">no medication yet</span></div>
+      </div>
+    </div></div>
+    <div class="spec"><b>Type carries it:</b> echo = same scale, 34% ink. Chips stagger in 60ms apart only after the caret stops. Auto-advance.</div>
+  </div>
+
+  <!-- SENT BEAT -->
+  <div class="fw"><div class="fl">The sent-message beat</div>
+    <div class="dev"><div class="orbs"><i></i><i></i><i></i></div><div class="scr">
+      <div class="top"><span class="back">‹</span><div class="prog"><i style="width:12%"></i></div></div>
+      <div class="echo">Where are you in your GLP-1 journey?</div>
+      <div class="sent">Already dosing</div>
+      <div class="dots"><i></i><i></i><i></i></div>
+    </div></div>
+    <div class="spec"><b>Mechanic:</b> question dims to echo, other chips dissolve (120ms), pick glides up into the purple sent bubble (the ONE purple moment), dots ~500ms, ack types: <b>"Let's dial it in."</b> Thump +220ms, hold 950ms.</div>
+  </div>
+
+  <!-- T6 DOSE -->
+  <div class="fw"><div class="fl">T6 · Precise input</div>
+    <div class="dev"><div class="orbs"><i></i><i></i><i></i></div><div class="scr">
+      <div class="top"><span class="back">‹</span><div class="prog"><i style="width:24%"></i></div></div>
+      <div class="echo">Compounded tirzepatide. Got it.</div>
+      <div class="q">What's your current dose?</div>
+      <div class="panel"><div class="wband"></div><div class="wheel">
+        <span>2.5</span><span class="on">5.0 mg</span><span>7.5</span>
+      </div></div>
+      <div class="chiprow" style="padding-top:14px;margin-top:0">
+        <div class="chip">2.5 mg</div><div class="chip sel">5 mg</div><div class="chip">7.5 mg</div>
+      </div>
+      <div class="cta">Continue</div>
+    </div></div>
+    <div class="spec"><b>Rule:</b> wheels keep Continue. Selection is neutral ink, not purple. Panel = hairline, barely raised.</div>
+  </div>
+
+  <!-- BEAT A -->
+  <div class="fw"><div class="fl">Beat A · Instrument beat</div>
+    <div class="dev"><div class="orbs"><i></i><i></i><i></i></div><div class="scr">
+      <div class="top"><div class="prog"><i style="width:40%"></i></div></div>
+      <div class="echo">Tirzepatide · 5 mg · Sundays.</div>
+      <div class="q">Your level model is armed<span class="sq">.</span></div>
+      <div class="panel" style="margin-top:34px">
+        <svg viewBox="0 0 240 70" style="width:100%"><path d="M0 52 C30 46 44 18 74 15 C106 12 116 40 148 44 C180 48 200 28 240 22" fill="none" stroke="#7C5CFC" stroke-width="2.5" stroke-linecap="round"/><circle cx="148" cy="44" r="4" fill="#7C5CFC"/></svg>
+        <div style="font-size:13px;color:var(--ts);font-weight:600;margin-top:10px">From here, Pepta computes what's still active between shots.</div>
+      </div>
+      <div class="cta ghost">Good to know</div>
+    </div></div>
+    <div class="spec"><b>Beat:</b> capability, not comfort. Curve draws on 600ms. No fill under the line — one thin purple stroke.</div>
+  </div>
+
+  <!-- T16 GOAL ECHO -->
+  <div class="fw"><div class="fl">T16 · Numbers echo forward</div>
+    <div class="dev"><div class="orbs"><i></i><i></i><i></i></div><div class="scr">
+      <div class="top"><span class="back">‹</span><div class="prog"><i style="width:62%"></i></div></div>
+      <div class="echo">226 today. Thanks for trusting me with that.</div>
+      <div class="q">Where are we headed?</div>
+      <div class="panel" style="margin-top:30px"><div class="wband"></div><div class="wheel">
+        <span>180</span><span class="on">185 lb</span><span>190</span>
+      </div></div>
+      <div class="cta">Continue</div>
+    </div></div>
+    <div class="spec"><b>Ack after Continue:</b> "185. I like it." — then pace. Every screen opens with their last number.</div>
+  </div>
+
+  <!-- T17 PACE -->
+  <div class="fw"><div class="fl">T17 · Recommended default</div>
+    <div class="dev"><div class="orbs"><i></i><i></i><i></i></div><div class="scr">
+      <div class="top"><span class="back">‹</span><div class="prog"><i style="width:66%"></i></div></div>
+      <div class="echo">185. I like it.</div>
+      <div class="q">Pick your pace.</div>
+      <div class="chips">
+        <div class="chip">Gentle<span class="d">~0.7 lb a week · 185 by Mar 2</span></div>
+        <div class="chip sel">Steady — recommended<span class="d">~1.2 lb a week · 185 by Jan 17</span></div>
+        <div class="chip">Ambitious<span class="d">~1.8 lb a week · harder to hold muscle</span></div>
+      </div>
+      <div class="cta">Continue</div>
+    </div></div>
+    <div class="spec"><b>Rule:</b> middle pre-selected with THEIR computed date. Aggressive warns in its own sub-line, never forbids.</div>
+  </div>
+
+  <!-- BEAT C -->
+  <div class="fw"><div class="fl">Beat C · The fear, answered</div>
+    <div class="dev"><div class="orbs"><i></i><i></i><i></i></div><div class="scr">
+      <div class="top"><div class="prog"><i style="width:84%"></i></div></div>
+      <div class="echo">What worries you most?</div>
+      <div class="sent">Losing muscle</div>
+      <div class="q" style="margin-top:30px">You're right to watch it<span class="sq">.</span></div>
+      <div style="margin-top:26px">
+        <div class="stat" style="font-size:52px">25–39%</div>
+        <div style="font-weight:600;font-size:14.5px;color:var(--ts);margin-top:10px;line-height:1.45">of weight lost on GLP-1s can be lean mass — and it's preventable. Protein + training targets handle it. That's what gets built next.</div>
+        <div class="cite">STEP-1 / SURMOUNT-1 body-composition analyses</div>
+      </div>
+      <div class="cta">Build my targets</div>
+    </div></div>
+    <div class="spec"><b>Rule:</b> stat + citation + "preventable, built next" in one breath, directly under their own sent words. Stat sits on the ground — no card.</div>
+  </div>
+
+  <!-- CRAFTING -->
+  <div class="fw"><div class="fl">Crafting · assembling</div>
+    <div class="dev"><div class="orbs"><i></i><i></i><i></i></div><div class="scr">
+      <div class="top"><div class="prog"><i style="width:92%"></i></div></div>
+      <div class="echo">Everything you told me, in one place.</div>
+      <div class="q">Dialing you in<span class="sq">.</span></div>
+      <div class="chips" style="margin-top:36px">
+        <div class="chip sel">Level model — tirzepatide · 5 mg · Sundays</div>
+        <div class="chip sel">Muscle guard — 154 g protein a day</div>
+        <div class="chip sel">Goal path — 226 → 185 by Jan 17</div>
+        <div class="chip">Shot-day reminders — Sun 8:00 PM</div>
+      </div>
+      <div style="margin-top:auto"></div>
+    </div></div>
+    <div class="spec"><b>Moment:</b> rows check in one by one (tick each, thump at the end). Copy is assembled from their answers verbatim — and the row LIST mirrors their T3c needs picks (e.g. "Dose &amp; mixing math — calculator armed" appears only if they asked for it).</div>
+  </div>
+
+  <!-- WALL -->
+  <div class="fw"><div class="fl">The wall · only dark screen</div>
+    <div class="dev wall"><div class="orbs"><i></i><i></i><i></i></div><div class="scr">
+      <div class="top"><div class="prog" style="background:rgba(255,255,255,.12)"><i style="width:97%;background:#F4F2FA"></i></div></div>
+      <div class="echo">Your plan is built.</div>
+      <div class="q">Know exactly what's in you<span class="sq">.</span></div>
+      <div style="margin-top:26px">
+        <div class="vrow"><b>Live level model</b><span>what's active, every day</span></div>
+        <div class="vrow"><b>Dose safety</b><span>countdown + site rotation</span></div>
+        <div class="vrow"><b>Meal scan</b><span>macros from a photo</span></div>
+        <div class="vrow"><b>Muscle-protection check</b><span>your 25–39% answer</span></div>
+      </div>
+      <div class="tiers">
+        <div class="tier on"><b>$40<span style="font-size:11px;color:var(--ts)">/yr</span></b><small>$3.33/mo · save 63%</small></div>
+        <div class="tier off"><b>$9<span style="font-size:11px;opacity:.6">/mo</span></b><small>billed monthly</small></div>
+      </div>
+      <div class="cta solid" style="margin-top:16px">Start tracking</div>
+      <div style="text-align:center;font-size:10.5px;color:rgba(244,242,250,.4);font-weight:600;margin-top:9px">Billed $40 yearly · cancel anytime · Restore purchase</div>
+    </div></div>
+    <div class="spec"><b>Fixed:</b> near-black plum ground, hairline value rows, purple only in the accent square + the single solid CTA. No X, no timers, annual pre-selected, billed amount biggest. <b>Value rows reorder to lead with their T3c needs, in their words</b> — the wall sells back what they asked for.</div>
+  </div>
+
+  <!-- WELCOME -->
+  <div class="fw"><div class="fl">Welcome + review ask</div>
+    <div class="dev"><div class="orbs"><i></i><i></i><i></i></div><div class="scr">
+      <div class="top"><div class="prog"><i style="width:100%"></i></div></div>
+      <div class="echo">That's everything.</div>
+      <div class="q">Welcome in<span class="sq">.</span></div>
+      <div style="font-size:26px;letter-spacing:5px;color:var(--primary);margin-top:26px">★★★★★</div>
+      <div style="font-size:14px;color:var(--ts);font-weight:600;margin-top:14px;line-height:1.5">One small favor before we start — a rating helps the next person find this. The one still searching Facebook groups at midnight.</div>
+      <div class="panel" style="font-size:13px;font-weight:600;line-height:1.5">"I was terrified of losing muscle. Watching the protein target fill every day is why I stopped worrying."<div class="cite">slot · mirrors the fear the user named · only once real reviews exist</div></div>
+      <div class="cta">Leave a rating</div>
+      <div class="cta ghost">Not now</div>
+    </div></div>
+    <div class="spec"><b>Placement:</b> post-purchase, pre-app. System sheet on CTA, quiet Not now. Light returns after the wall.</div>
+  </div>
+
+</div>
+
+<h2>Every remaining turn (complete coverage — flow order)</h2>
+<div class="gallery">
+
+  <div class="fw"><div class="fl">T2 · Privacy</div>
+    <div class="dev"><div class="orbs"><i></i><i></i><i></i></div><div class="scr">
+      <div class="top"><div class="prog"><i style="width:8%"></i></div></div>
+      <div class="echo">Glad you're here.</div>
+      <div class="q">First — your data stays yours<span class="sq">.</span></div>
+      <div class="subq">Private by default. Delete anytime.</div>
+      <div class="chips">
+        <div class="chip">Sounds good</div>
+      </div>
+      <div style="text-align:center;font-size:12px;color:var(--tt);font-weight:600;margin-top:12px">Terms · Privacy</div>
+    </div></div>
+    <div class="spec"><b>Advance:</b> auto after ack "Locked." Links open in-place sheets.</div>
+  </div>
+
+
+  <div class="fw"><div class="fl">T3b · Experience (NEW)</div>
+    <div class="dev"><div class="orbs"><i></i><i></i><i></i></div><div class="scr">
+      <div class="top"><span class="back">&#8249;</span><div class="prog"><i style="width:13%"></i></div></div>
+      <div class="echo">Already dosing. Let's dial it in.</div>
+      <div class="q">How deep are you in the peptide world?</div>
+      <div class="chips">
+        <div class="chip">Brand new<span class="d">still learning the ropes</span></div>
+        <div class="chip sel">Getting started<span class="d">researched, ready to go</span></div>
+        <div class="chip">Experienced<span class="d">followed a protocol before</span></div>
+        <div class="chip">Advanced<span class="d">multiple compounds, no hand-holding</span></div>
+      </div>
+    </div></div>
+    <div class="spec"><b>Why:</b> expertise ≠ timeline. Routes copy depth for every later turn (novices keep sub-lines, advanced users get terser acks + an "add your other compounds" offer) and tunes Pep chat's register permanently.</div>
+  </div>
+
+  <div class="fw"><div class="fl">T3c · Needs (NEW · multi)</div>
+    <div class="dev"><div class="orbs"><i></i><i></i><i></i></div><div class="scr">
+      <div class="top"><span class="back">&#8249;</span><div class="prog"><i style="width:14%"></i></div></div>
+      <div class="echo">Getting started. Good place to be.</div>
+      <div class="q">What would help most?</div>
+      <div class="subq">Pick everything that fits.</div>
+      <div class="chiprow">
+        <div class="chip sel">Knowing what's working</div>
+        <div class="chip sel">Logging consistently</div>
+        <div class="chip">My schedule</div>
+        <div class="chip">Multiple compounds</div>
+        <div class="chip sel">Dose &amp; mixing math</div>
+        <div class="chip">Reports for my doctor</div>
+      </div>
+      <div class="cta">Continue</div>
+    </div></div>
+    <div class="spec"><b>The conversion goldmine:</b> these exact words come back — crafting checks them off one by one, and the wall's value stack leads with THEIR picks. Also our clearest product-priority signal in aggregate.</div>
+  </div>
+
+  <div class="fw"><div class="fl">T4 · Medication</div>
+    <div class="dev"><div class="orbs"><i></i><i></i><i></i></div><div class="scr">
+      <div class="top"><span class="back">&#8249;</span><div class="prog"><i style="width:16%"></i></div></div>
+      <div class="echo">Already dosing. Let's dial it in.</div>
+      <div class="q">Which medication?</div>
+      <div class="panel" style="padding:12px 16px;font-weight:600;color:var(--tt);font-size:14px">Search medications&hellip;</div>
+      <div class="chips" style="margin-top:14px;padding-top:0">
+        <div class="chip">Mounjaro<span class="d">tirzepatide · weekly shot</span></div>
+        <div class="chip">Zepbound<span class="d">tirzepatide · weekly shot</span></div>
+        <div class="chip">Ozempic<span class="d">semaglutide · weekly shot</span></div>
+        <div class="chip sel">Compounded tirzepatide<span class="d">from a compounding pharmacy</span></div>
+      </div>
+    </div></div>
+    <div class="spec"><b>Input:</b> live-filter list (full catalog scrolls). Single-select, auto-advance after ack.</div>
+  </div>
+
+  <div class="fw"><div class="fl">T5 · Route (ambiguous meds only)</div>
+    <div class="dev"><div class="orbs"><i></i><i></i><i></i></div><div class="scr">
+      <div class="top"><span class="back">&#8249;</span><div class="prog"><i style="width:20%"></i></div></div>
+      <div class="echo">Compounded tirzepatide. Got it.</div>
+      <div class="q">How do you take it?</div>
+      <div class="chips">
+        <div class="chip">Injection<span class="d">pen, auto-injector, or syringe</span></div>
+        <div class="chip">Pill or oral<span class="d">tablets, drops, or troches</span></div>
+        <div class="chip">Not sure<span class="d">we'll start with injection tracking</span></div>
+      </div>
+    </div></div>
+    <div class="spec"><b>Routing:</b> branded meds skip this turn (route is pinned). Oral skips T7 + T10.</div>
+  </div>
+
+  <div class="fw"><div class="fl">T7 · Device (injections only)</div>
+    <div class="dev"><div class="orbs"><i></i><i></i><i></i></div><div class="scr">
+      <div class="top"><span class="back">&#8249;</span><div class="prog"><i style="width:28%"></i></div></div>
+      <div class="echo">5 mg. Noted.</div>
+      <div class="q">What do you inject with?</div>
+      <div class="chips">
+        <div class="chip">Single-dose pen<span class="d">one prefilled pen per shot</span></div>
+        <div class="chip">Auto-injector<span class="d">reusable or dial-a-dose pen</span></div>
+        <div class="chip sel">Syringe &amp; vial<span class="d">you draw each dose</span></div>
+        <div class="chip">Other or not sure</div>
+      </div>
+    </div></div>
+    <div class="spec"><b>Why:</b> device shapes dose logging + unlocks the reconstitution calculator for vial users.</div>
+  </div>
+
+
+  <div class="fw"><div class="fl">T7b · Concentration (NEW · vial users only)</div>
+    <div class="dev"><div class="orbs"><i></i><i></i><i></i></div><div class="scr">
+      <div class="top"><span class="back">&#8249;</span><div class="prog"><i style="width:30%"></i></div></div>
+      <div class="echo">Syringe and vial. The precise way.</div>
+      <div class="q">What's the concentration?</div>
+      <div class="subq">This arms your units calculator.</div>
+      <div class="panel" style="margin-top:22px"><div class="wband"></div><div class="wheel">
+        <span>5</span><span class="on">10 mg/mL</span><span>15</span>
+      </div></div>
+      <div class="chiprow" style="padding-top:14px;margin-top:0">
+        <div class="chip">Not sure yet</div>
+      </div>
+      <div class="cta">Continue</div>
+    </div></div>
+    <div class="spec"><b>Why:</b> dose + concentration = draw-to units on day one ("1 mg = 10 units"). Schema field already exists. "Not sure yet" skips gracefully — calculator asks again later.</div>
+  </div>
+
+  <div class="fw"><div class="fl">T8 · Frequency</div>
+    <div class="dev"><div class="orbs"><i></i><i></i><i></i></div><div class="scr">
+      <div class="top"><span class="back">&#8249;</span><div class="prog"><i style="width:32%"></i></div></div>
+      <div class="echo">Syringe and vial. The precise way.</div>
+      <div class="q">How often do you dose?</div>
+      <div class="chips">
+        <div class="chip sel">Weekly</div>
+        <div class="chip">Every 2 weeks</div>
+        <div class="chip">Daily</div>
+        <div class="chip">Custom</div>
+      </div>
+    </div></div>
+    <div class="spec"><b>Advance:</b> auto. Daily/custom routes skip shot-day (T10).</div>
+  </div>
+
+  <div class="fw"><div class="fl">T9 · Last shot</div>
+    <div class="dev"><div class="orbs"><i></i><i></i><i></i></div><div class="scr">
+      <div class="top"><span class="back">&#8249;</span><div class="prog"><i style="width:36%"></i></div></div>
+      <div class="echo">Weekly. Classic.</div>
+      <div class="q">When was your last shot?</div>
+      <div class="panel" style="margin-top:26px"><div class="wband"></div><div class="wheel">
+        <span>Sat, Jun 28</span><span class="on">Sun, Jun 29</span><span>Mon, Jun 30</span>
+      </div></div>
+      <div class="cta">Continue</div>
+    </div></div>
+    <div class="spec"><b>Instrument moment:</b> this date arms the level model. Wheel = Continue.</div>
+  </div>
+
+  <div class="fw"><div class="fl">T10 · Shot day</div>
+    <div class="dev"><div class="orbs"><i></i><i></i><i></i></div><div class="scr">
+      <div class="top"><span class="back">&#8249;</span><div class="prog"><i style="width:40%"></i></div></div>
+      <div class="echo">Sunday evening. So&hellip;</div>
+      <div class="q">Sundays are shot day?</div>
+      <div class="chips">
+        <div class="chip sel">Sundays it is</div>
+        <div class="chip">Pick another day</div>
+      </div>
+    </div></div>
+    <div class="spec"><b>Rule:</b> derived from their last-shot date, pre-selected — confirm, don't re-ask.</div>
+  </div>
+
+
+  <div class="fw"><div class="fl">T10b · Shot time (NEW)</div>
+    <div class="dev"><div class="orbs"><i></i><i></i><i></i></div><div class="scr">
+      <div class="top"><span class="back">&#8249;</span><div class="prog"><i style="width:42%"></i></div></div>
+      <div class="echo">Sundays it is.</div>
+      <div class="q">What time, usually?</div>
+      <div class="chips">
+        <div class="chip">Morning<span class="d">around 8 AM</span></div>
+        <div class="chip">Midday</div>
+        <div class="chip sel">Evening<span class="d">around 8 PM</span></div>
+        <div class="chip">Pick exact time</div>
+      </div>
+    </div></div>
+    <div class="spec"><b>Why:</b> the first reminder lands at THEIR hour instead of a default — the setup feels psychic on day one. "Pick exact time" opens a wheel panel.</div>
+  </div>
+
+  <div class="fw"><div class="fl">T11 · Goal type</div>
+    <div class="dev"><div class="orbs"><i></i><i></i><i></i></div><div class="scr">
+      <div class="top"><span class="back">&#8249;</span><div class="prog"><i style="width:48%"></i></div></div>
+      <div class="echo">Level model armed. Now you.</div>
+      <div class="q">What's the goal?</div>
+      <div class="chips">
+        <div class="chip sel">Lose fat<span class="d">and keep the muscle</span></div>
+        <div class="chip">Build &amp; recomp<span class="d">trade fat for lean mass</span></div>
+        <div class="chip">Maintain<span class="d">hold the line</span></div>
+      </div>
+    </div></div>
+    <div class="spec"><b>Advance:</b> auto after ack.</div>
+  </div>
+
+
+  <div class="fw"><div class="fl">T11b · Also tracking? (NEW)</div>
+    <div class="dev"><div class="orbs"><i></i><i></i><i></i></div><div class="scr">
+      <div class="top"><span class="back">&#8249;</span><div class="prog"><i style="width:50%"></i></div></div>
+      <div class="echo">Lose fat, keep muscle. Clear.</div>
+      <div class="q">Anything riding along?</div>
+      <div class="chips">
+        <div class="chip">Recovery &amp; healing peptides<span class="d">BPC-157 and friends — tracked side by side</span></div>
+        <div class="chip sel">Just the GLP-1 journey</div>
+      </div>
+    </div></div>
+    <div class="spec"><b>Honest scope:</b> only what the app actually tracks (compounds beyond the GLP-1) — no sleep/focus lifestyle chips we can't serve. Picking it offers the second-compound setup right here.</div>
+  </div>
+
+  <div class="fw"><div class="fl">T12 · Sex</div>
+    <div class="dev"><div class="orbs"><i></i><i></i><i></i></div><div class="scr">
+      <div class="top"><span class="back">&#8249;</span><div class="prog"><i style="width:52%"></i></div></div>
+      <div class="echo">Lose fat, keep muscle. Clear.</div>
+      <div class="q">Calorie math needs this<span class="sq">.</span></div>
+      <div class="subq">Used only for the math.</div>
+      <div class="chips">
+        <div class="chip">Man</div>
+        <div class="chip">Woman</div>
+        <div class="chip">Non-binary</div>
+      </div>
+    </div></div>
+    <div class="spec"><b>Disarm:</b> the sub-line explains WHY before asking. Auto-advance.</div>
+  </div>
+
+  <div class="fw"><div class="fl">T13 · Birthday</div>
+    <div class="dev"><div class="orbs"><i></i><i></i><i></i></div><div class="scr">
+      <div class="top"><span class="back">&#8249;</span><div class="prog"><i style="width:56%"></i></div></div>
+      <div class="echo">Got it.</div>
+      <div class="q">When were you born?</div>
+      <div class="panel" style="margin-top:26px;display:flex;justify-content:space-around"><div class="wband"></div>
+        <div class="wheel"><span>May</span><span class="on">Jun</span><span>Jul</span></div>
+        <div class="wheel"><span>13</span><span class="on">14</span><span>15</span></div>
+        <div class="wheel"><span>1987</span><span class="on">1988</span><span>1989</span></div>
+      </div>
+      <div class="cta">Continue</div>
+    </div></div>
+    <div class="spec"><b>Wheel = Continue.</b> Ack: "Noted — 38."</div>
+  </div>
+
+  <div class="fw"><div class="fl">T14 · Height &amp; weight</div>
+    <div class="dev"><div class="orbs"><i></i><i></i><i></i></div><div class="scr">
+      <div class="top"><span class="back">&#8249;</span><div class="prog"><i style="width:60%"></i></div></div>
+      <div class="echo">Almost there on the numbers.</div>
+      <div class="q">Height and weight, today?</div>
+      <div class="panel" style="margin-top:22px;display:flex;justify-content:space-around"><div class="wband"></div>
+        <div class="wheel"><span>5'9"</span><span class="on">5'10"</span><span>5'11"</span></div>
+        <div class="wheel"><span>225</span><span class="on">226 lb</span><span>227</span></div>
+      </div>
+      <div class="cta">Continue</div>
+    </div></div>
+    <div class="spec"><b>Ack:</b> "226 today. Thanks for trusting me with that." — echoes into T15/T16.</div>
+  </div>
+
+  <div class="fw"><div class="fl">T15 · Start weight</div>
+    <div class="dev"><div class="orbs"><i></i><i></i><i></i></div><div class="scr">
+      <div class="top"><span class="back">&#8249;</span><div class="prog"><i style="width:64%"></i></div></div>
+      <div class="echo">5'10", 226 today.</div>
+      <div class="q">Where did you start?</div>
+      <div class="panel" style="margin-top:24px;display:flex;justify-content:space-around"><div class="wband"></div>
+        <div class="wheel"><span>237</span><span class="on">238 lb</span><span>239</span></div>
+        <div class="wheel"><span>Mar</span><span class="on">Apr 4</span><span>May</span></div>
+      </div>
+      <div class="cta">Continue</div>
+    </div></div>
+    <div class="spec"><b>Ack:</b> "238 to 226 already. That's real." — the momentum beat (T22 echo) uses this.</div>
+  </div>
+
+  <div class="fw"><div class="fl">Beat B · Company (non-question)</div>
+    <div class="dev"><div class="orbs"><i></i><i></i><i></i></div><div class="scr">
+      <div class="top"><div class="prog"><i style="width:68%"></i></div></div>
+      <div class="echo">Steady pace. 185 by Jan 17.</div>
+      <div class="q">You're in good company<span class="sq">.</span></div>
+      <div style="margin-top:34px">
+        <div class="stat" style="font-size:56px">~15%</div>
+        <div style="font-weight:600;font-size:14.5px;color:var(--ts);margin-top:10px;line-height:1.45">average body-weight loss at 68 weeks on semaglutide. The medication works. Tracking keeps it working for you.</div>
+        <div class="cite">STEP-1, New England Journal of Medicine, 2021</div>
+      </div>
+      <div class="cta ghost">Good to know</div>
+    </div></div>
+    <div class="spec"><b>Beat:</b> breathing room after the body cluster. Stat on the ground, no card.</div>
+  </div>
+
+  <div class="fw"><div class="fl">T18 · Routine</div>
+    <div class="dev"><div class="orbs"><i></i><i></i><i></i></div><div class="scr">
+      <div class="top"><span class="back">&#8249;</span><div class="prog"><i style="width:72%"></i></div></div>
+      <div class="echo">Now, your days.</div>
+      <div class="q">Most days look like&hellip;</div>
+      <div class="chips">
+        <div class="chip">Mostly sitting<span class="d">desk, car, couch</span></div>
+        <div class="chip sel">Lightly active<span class="d">on your feet a fair bit</span></div>
+        <div class="chip">Active<span class="d">moving most of the day</span></div>
+      </div>
+    </div></div>
+    <div class="spec"><b>Advance:</b> auto. Feeds the calorie + step targets.</div>
+  </div>
+
+  <div class="fw"><div class="fl">T19 · Training</div>
+    <div class="dev"><div class="orbs"><i></i><i></i><i></i></div><div class="scr">
+      <div class="top"><span class="back">&#8249;</span><div class="prog"><i style="width:76%"></i></div></div>
+      <div class="echo">Lightly active. Honest.</div>
+      <div class="q">Lifting these days?</div>
+      <div class="chips">
+        <div class="chip">Regularly<span class="d">2+ sessions a week</span></div>
+        <div class="chip sel">Getting back into it</div>
+        <div class="chip">Not yet<span class="d">that's fine — protein still protects</span></div>
+      </div>
+    </div></div>
+    <div class="spec"><b>Note:</b> "Not yet" sub-line pre-reassures — no guilt mechanics anywhere.</div>
+  </div>
+
+  <div class="fw"><div class="fl">T20 · Side effects (multi)</div>
+    <div class="dev"><div class="orbs"><i></i><i></i><i></i></div><div class="scr">
+      <div class="top"><span class="back">&#8249;</span><div class="prog"><i style="width:80%"></i></div></div>
+      <div class="echo">Getting back into it. Respect.</div>
+      <div class="q">Any side effects so far?</div>
+      <div class="subq">Pick everything that fits. No judgment here.</div>
+      <div class="chiprow">
+        <div class="chip sel">Nausea</div>
+        <div class="chip sel">Fatigue</div>
+        <div class="chip">Constipation</div>
+        <div class="chip">Heartburn</div>
+        <div class="chip">None yet</div>
+      </div>
+      <div class="cta">Continue</div>
+    </div></div>
+    <div class="spec"><b>Multi = Continue.</b> "None yet" ack: "Clean slate — the log keeps it that way." Their picks echo into T21.</div>
+  </div>
+
+  <div class="fw"><div class="fl">T22 · The last question</div>
+    <div class="dev"><div class="orbs"><i></i><i></i><i></i></div><div class="scr">
+      <div class="top"><span class="back">&#8249;</span><div class="prog"><i style="width:88%"></i></div></div>
+      <div class="echo">You've given me everything I need.</div>
+      <div class="q">Last one. Be honest.<br>How's it going?</div>
+      <div class="chips">
+        <div class="chip">Locked in<span class="d">logging would make it airtight</span></div>
+        <div class="chip">Wobbly, but going</div>
+        <div class="chip">Haven't really started<span class="d">the perfect starting point</span></div>
+      </div>
+    </div></div>
+    <div class="spec"><b>Rule:</b> framed as the last. The confession answer is pre-reframed in its own sub-line.</div>
+  </div>
+
+  <div class="fw"><div class="fl">T23 · Notifications</div>
+    <div class="dev"><div class="orbs"><i></i><i></i><i></i></div><div class="scr">
+      <div class="top"><div class="prog"><i style="width:92%"></i></div></div>
+      <div class="echo">Wobbly but going. That's why I'm here.</div>
+      <div class="q">Want shot-day pings?</div>
+      <div class="subq">One nudge on shot day. Quiet otherwise.</div>
+      <div class="cta">Continue</div>
+    </div></div>
+    <div class="spec"><b>Compliance:</b> single Continue flows STRAIGHT into the iOS prompt — no skip chip (5.1.1(iv)). Declining lives in the system dialog.</div>
+  </div>
+
+  <div class="fw"><div class="fl">Reveal · It's ready (pre-wall)</div>
+    <div class="dev"><div class="orbs"><i></i><i></i><i></i></div><div class="scr">
+      <div class="top"><div class="prog"><i style="width:96%"></i></div></div>
+      <div class="echo">Dialed in.</div>
+      <div class="q">Your tracker is ready<span class="sq">.</span></div>
+      <div class="panel" style="margin-top:26px;position:relative">
+        <div style="font:700 11px/1 'Hanken Grotesk';letter-spacing:.6px;color:#9A97A2;margin-bottom:9px">GOAL PATH&nbsp;&nbsp;&middot;&nbsp;&nbsp;<span style="color:#7C5CFC">185 lb by Jan 17</span></div><svg viewBox="0 0 240 84" style="width:100%;display:block"><defs><linearGradient id="rvgrad" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#7C5CFC"/><stop offset="1" stop-color="#E25CC4"/></linearGradient></defs><path d="M6 18 C64 28 128 48 204 68" fill="none" stroke="var(--hair)" stroke-width="2" stroke-dasharray="4 6"/><path class="rvpath" d="M6 18 C64 28 128 48 204 68" fill="none" stroke="url(#rvgrad)" stroke-width="3" stroke-linecap="round"/><circle cx="6" cy="18" r="4.5" fill="#7C5CFC" stroke="#fff" stroke-width="2"/><g class="rvflag"><circle cx="204" cy="68" r="6.5" fill="#E25CC4" stroke="#fff" stroke-width="2.5"/></g><text x="15" y="14" font-size="10" font-weight="700" fill="#9A97A2">226 lb today</text></svg><div class="rvflaglabel">185 lb</div>
+      </div>
+      <div class="chiprow" style="margin-top:16px;padding-top:0">
+        <div class="chip">154 g protein</div><div class="chip">94 oz water</div><div class="chip">Jan 17</div>
+      </div>
+      <div class="cta">Start today</div>
+      <div class="rvconfetti"><i style="left:18%"></i><i style="left:30%"></i><i style="left:42%"></i><i style="left:54%"></i><i style="left:64%"></i><i style="left:74%"></i><i style="left:84%"></i><i style="left:26%"></i><i style="left:60%"></i><i style="left:48%"></i></div>
+    </div></div>
+    <div class="spec"><b>Placement:</b> white reveal BEFORE the wall — "it's ready" then "claim it." Confetti burst on entry (subtle, purple).</div>
+  </div>
+
+</div>
+
+</body></html>

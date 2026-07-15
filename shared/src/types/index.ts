@@ -13,6 +13,9 @@ import type {
   biggestWorrySchema,
   compoundInputSchema,
   compoundPatchSchema,
+  pepChatMessageSchema,
+  pepChatRequestSchema,
+  pepChatResponseSchema,
   injectionDeviceTypeSchema,
   compoundResponseSchema,
   cycleInputSchema,
@@ -34,9 +37,13 @@ import type {
   legalAcceptanceSchema,
   logListQuerySchema,
   lifestyleTargetsSchema,
+  mealBarcodeInputSchema,
   mealLogInputSchema,
   mealLogResponseSchema,
   mealLogScanDetailResponseSchema,
+  mealProductCitationSchema,
+  mealProductScanInputSchema,
+  mealProductScanMetadataSchema,
   mealScanAnalysisSchema,
   mealScanCoachContentSchema,
   mealScanInputSchema,
@@ -52,6 +59,8 @@ import type {
   medicationStatusSchema,
   measurementInputSchema,
   measurementResponseSchema,
+  notificationPreferencesPatchSchema,
+  notificationPreferencesResponseSchema,
   onboardingCompleteInputSchema,
   onboardingResultResponseSchema,
   progressPhotoConfirmInputSchema,
@@ -63,6 +72,9 @@ import type {
   proteinLogResponseSchema,
   fiberLogInputSchema,
   fiberLogResponseSchema,
+  pushPlatformSchema,
+  pushTokenRegistrationRequestSchema,
+  pushTokenRegistrationResponseSchema,
   researchArticleSchema,
   revenueCatWebhookSchema,
   scheduleInputSchema,
@@ -107,6 +119,9 @@ export type AuthResponse = z.infer<typeof authResponseSchema>;
 export type BiggestWorry = z.infer<typeof biggestWorrySchema>;
 export type CompoundInput = z.infer<typeof compoundInputSchema>;
 export type InjectionDeviceType = z.infer<typeof injectionDeviceTypeSchema>;
+export type PepChatMessage = z.infer<typeof pepChatMessageSchema>;
+export type PepChatRequest = z.infer<typeof pepChatRequestSchema>;
+export type PepChatResponse = z.infer<typeof pepChatResponseSchema>;
 export type CompoundPatch = z.infer<typeof compoundPatchSchema>;
 export type CompoundResponse = z.infer<typeof compoundResponseSchema>;
 export type CycleInput = z.infer<typeof cycleInputSchema>;
@@ -128,10 +143,16 @@ export type Insight = z.infer<typeof insightSchema>;
 export type LegalAcceptance = z.infer<typeof legalAcceptanceSchema>;
 export type LogListQuery = z.infer<typeof logListQuerySchema>;
 export type LifestyleTargets = z.infer<typeof lifestyleTargetsSchema>;
+export type MealBarcodeInput = z.infer<typeof mealBarcodeInputSchema>;
 export type MealLogInput = z.infer<typeof mealLogInputSchema>;
 export type MealLogResponse = z.infer<typeof mealLogResponseSchema>;
 export type MealLogScanDetailResponse = z.infer<
   typeof mealLogScanDetailResponseSchema
+>;
+export type MealProductCitation = z.infer<typeof mealProductCitationSchema>;
+export type MealProductScanInput = z.infer<typeof mealProductScanInputSchema>;
+export type MealProductScanMetadata = z.infer<
+  typeof mealProductScanMetadataSchema
 >;
 export type MealScanAnalysis = z.infer<typeof mealScanAnalysisSchema>;
 export type MealScanCoachContent = z.infer<typeof mealScanCoachContentSchema>;
@@ -154,6 +175,12 @@ export type MedicationRoute = z.infer<typeof medicationRouteSchema>;
 export type MedicationStatus = z.infer<typeof medicationStatusSchema>;
 export type MeasurementInput = z.infer<typeof measurementInputSchema>;
 export type MeasurementResponse = z.infer<typeof measurementResponseSchema>;
+export type NotificationPreferencesPatch = z.infer<
+  typeof notificationPreferencesPatchSchema
+>;
+export type NotificationPreferencesResponse = z.infer<
+  typeof notificationPreferencesResponseSchema
+>;
 export type OnboardingCompleteInput = z.infer<
   typeof onboardingCompleteInputSchema
 >;
@@ -173,6 +200,13 @@ export type ProteinLogInput = z.infer<typeof proteinLogInputSchema>;
 export type ProteinLogResponse = z.infer<typeof proteinLogResponseSchema>;
 export type FiberLogInput = z.infer<typeof fiberLogInputSchema>;
 export type FiberLogResponse = z.infer<typeof fiberLogResponseSchema>;
+export type PushPlatform = z.infer<typeof pushPlatformSchema>;
+export type PushTokenRegistrationRequest = z.infer<
+  typeof pushTokenRegistrationRequestSchema
+>;
+export type PushTokenRegistrationResponse = z.infer<
+  typeof pushTokenRegistrationResponseSchema
+>;
 export type ResearchArticle = z.infer<typeof researchArticleSchema>;
 export type RevenueCatWebhook = z.infer<typeof revenueCatWebhookSchema>;
 export type ScheduleInput = z.infer<typeof scheduleInputSchema>;

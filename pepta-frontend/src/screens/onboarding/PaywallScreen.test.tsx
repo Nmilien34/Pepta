@@ -5,7 +5,7 @@ import { PaywallScreen } from "./PaywallScreen";
 
 const mocks = vi.hoisted(() => ({
   getCurrentUser: vi.fn(),
-  getPaywallPackages: vi.fn(() => Promise.resolve(null)),
+  getPaywallPackages: vi.fn(),
   isPurchaseCancelled: vi.fn(() => false),
   onComplete: vi.fn(() => Promise.resolve()),
   openURL: vi.fn(() => Promise.resolve()),
@@ -13,6 +13,11 @@ const mocks = vi.hoisted(() => ({
   restore: vi.fn(),
   updateCachedUser: vi.fn(),
 }));
+
+const paywallPackages = {
+  monthly: { product: { price: 9, priceString: "$9.00", currencyCode: "USD" } },
+  yearly: { product: { price: 40, priceString: "$40.00", currencyCode: "USD" } },
+};
 
 vi.mock("react-native", () => ({
   Linking: {
@@ -176,12 +181,16 @@ function allText(root: TestRenderer.ReactTestRenderer["root"]): string {
 
 describe("PaywallScreen legal links", () => {
   beforeEach(() => {
+    mocks.getCurrentUser.mockReset();
     mocks.getPaywallPackages.mockClear();
+    mocks.getPaywallPackages.mockResolvedValue(paywallPackages);
     mocks.isPurchaseCancelled.mockReset();
     mocks.isPurchaseCancelled.mockReturnValue(false);
     mocks.onComplete.mockClear();
     mocks.openURL.mockClear();
     mocks.purchasePlan.mockReset();
+    mocks.restore.mockReset();
+    mocks.updateCachedUser.mockClear();
   });
 
   it("opens terms and privacy from the subscription footer", async () => {
@@ -228,6 +237,27 @@ describe("PaywallScreen legal links", () => {
     expect(allText(tree!.root).toLowerCase()).not.toContain("7 days free");
   });
 
+  it("keeps subscribe disabled until App Store packages are loaded", async () => {
+    mocks.getPaywallPackages.mockResolvedValueOnce(null);
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+
+    await act(async () => {
+      tree = TestRenderer.create(
+        <PaywallScreen onComplete={mocks.onComplete} />,
+      );
+    });
+
+    const subscribe = button(tree!.root, "Subscribe");
+    expect(subscribe.props.disabled).toBe(true);
+    expect(allText(tree!.root)).toContain("Loading App Store plans");
+
+    await act(async () => {
+      await subscribe.props.onPress?.();
+    });
+
+    expect(mocks.purchasePlan).not.toHaveBeenCalled();
+  });
+
   it("keeps users on the paywall without an in-app retention offer after cancellation", async () => {
     mocks.isPurchaseCancelled.mockReturnValue(true);
     mocks.purchasePlan.mockRejectedValueOnce({ code: "USER_CANCELLED" });
@@ -269,5 +299,42 @@ describe("PaywallScreen legal links", () => {
     expect(mocks.purchasePlan).toHaveBeenCalledWith("u1", "yearly");
     expect(mocks.onComplete).not.toHaveBeenCalled();
     expect(allText(tree!.root)).toContain("Purchase is still syncing");
+  });
+
+  it("keeps optimistic pro access if the backend refresh is still waiting on the RevenueCat webhook", async () => {
+    mocks.purchasePlan.mockResolvedValueOnce({
+      customerInfo: {},
+      entitlementActive: true,
+    });
+    mocks.getCurrentUser.mockResolvedValueOnce({
+      id: "u1",
+      entitlement: { status: "free", expiresAt: null, willRenew: false },
+    });
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+
+    await act(async () => {
+      tree = TestRenderer.create(
+        <PaywallScreen onComplete={mocks.onComplete} />,
+      );
+    });
+
+    await act(async () => {
+      await button(tree!.root, "Subscribe").props.onPress();
+    });
+
+    expect(mocks.purchasePlan).toHaveBeenCalledWith("u1", "yearly");
+    expect(mocks.onComplete).toHaveBeenCalledTimes(1);
+    expect(mocks.updateCachedUser).toHaveBeenCalledWith(
+      expect.objectContaining({
+        entitlement: expect.objectContaining({
+          status: "active",
+          revenueCatCustomerId: "u1",
+          revenueCatEntitlement: "pro",
+        }),
+      }),
+    );
+    expect(
+      mocks.updateCachedUser.mock.calls.at(-1)?.[0].entitlement.status,
+    ).toBe("active");
   });
 });

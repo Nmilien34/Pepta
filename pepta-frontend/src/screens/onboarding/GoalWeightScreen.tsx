@@ -1,23 +1,18 @@
-// Onboarding screen 14 — Goal weight ("dream weight"). A big hero number driven
-// by a horizontal ruler, with an lb/kg toggle. Maps to goalWeight +
-// goalWeightUnit (not in the current @pepta/shared schema yet → navigator-local).
+// Onboarding — Goal weight (T16). "Where are we headed?" — the big number rides
+// the ruler; the context line echoes their current weight forward ("226 today.
+// Thanks for trusting me with that."). Precise input → Continue.
 
 import React from 'react';
-import { View } from 'react-native';
-import { useTheme } from '../../theme';
-import {
-  AppText,
-  Button,
-  OnboardingScaffold,
-  RulerPicker,
-  SegmentedToggle,
-} from '../../components';
+import { StyleSheet, Text, View } from 'react-native';
+import { ConvoButton, ConvoScreen, RulerPicker, SegmentedToggle, convo } from '../../components';
+import { typography } from '../../theme/typography';
 
 export type WeightUnit = 'lb' | 'kg';
 
 export interface GoalWeightScreenProps {
   progress: number;
   onBack?(): void;
+  context?: string;
   value: number;
   unit: WeightUnit;
   onValueChange(value: number): void;
@@ -33,36 +28,28 @@ const UNIT_OPTIONS: { label: string; value: WeightUnit }[] = [
 export function GoalWeightScreen({
   progress,
   onBack,
+  context,
   value,
   unit,
   onValueChange,
   onUnitChange,
   onContinue,
 }: GoalWeightScreenProps) {
-  const theme = useTheme();
   const min = unit === 'kg' ? 32 : 70;
   const max = unit === 'kg' ? 180 : 400;
 
   return (
-    <OnboardingScaffold
+    <ConvoScreen
       progress={progress}
       onBack={onBack}
-      footer={<Button label="Continue" onPress={onContinue} />}
+      context={context}
+      question="Where are we headed?"
+      footer={<ConvoButton label="Continue" onPress={onContinue} />}
     >
-      <AppText variant="obTitle">Set your dream weight</AppText>
-
-      <View style={{ flex: 1, justifyContent: 'center', gap: theme.spacing['2xl'] }}>
-        <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'center', gap: theme.spacing.sm }}>
-          <AppText
-            variant="statBig"
-            color="weight"
-            style={{ fontSize: 62, lineHeight: 64, letterSpacing: -2 }}
-          >
-            {value}
-          </AppText>
-          <AppText variant="cardTitle" color="textSecondary">
-            {unit}
-          </AppText>
+      <View style={{ flex: 1, justifyContent: 'center', gap: 30 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'center', gap: 8 }}>
+          <Text style={styles.hero}>{value}</Text>
+          <Text style={styles.heroUnit}>{unit}</Text>
         </View>
 
         <RulerPicker key={unit} value={value} onChange={onValueChange} min={min} max={max} />
@@ -71,6 +58,11 @@ export function GoalWeightScreen({
           <SegmentedToggle options={UNIT_OPTIONS} value={unit} onChange={onUnitChange} />
         </View>
       </View>
-    </OnboardingScaffold>
+    </ConvoScreen>
   );
 }
+
+const styles = StyleSheet.create({
+  hero: { fontFamily: typography.fonts.heavy, fontSize: 62, lineHeight: 66, letterSpacing: -2, color: convo.ink },
+  heroUnit: { fontFamily: typography.fonts.bold, fontSize: 18, color: convo.soft },
+});

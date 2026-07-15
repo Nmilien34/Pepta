@@ -19,9 +19,19 @@ export interface MealCameraProps {
   onCapture(uri: string): void;
   onSearch(): void;
   onVoice(): void;
+  frameHint?: string;
+  activeLabel?: string;
 }
 
-export function MealCamera({ visible, onClose, onCapture, onSearch, onVoice }: MealCameraProps) {
+export function MealCamera({
+  visible,
+  onClose,
+  onCapture,
+  onSearch,
+  onVoice,
+  frameHint = "Point at your plate",
+  activeLabel = "Scan",
+}: MealCameraProps) {
   const insets = useSafeAreaInsets();
   const [permission, requestPermission] = useCameraPermissions();
   const [facing] = useState<CameraType>('back');
@@ -117,7 +127,7 @@ export function MealCamera({ visible, onClose, onCapture, onSearch, onVoice }: M
               <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16 }} pointerEvents="none">
                 <View style={{ width: 220, height: 220, borderRadius: 28, borderWidth: 2, borderColor: 'rgba(255,255,255,0.7)' }} />
                 <AppText variant="caption" style={{ color: 'rgba(255,255,255,0.85)' }}>
-                  Point at your plate
+                  {frameHint}
                 </AppText>
               </View>
 
@@ -127,7 +137,7 @@ export function MealCamera({ visible, onClose, onCapture, onSearch, onVoice }: M
                   <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: '#fff' }} />
                 </Pressable>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <ModeChip label="Scan" active />
+                  <ModeChip label={activeLabel} active />
                   <ModeChip label="Search" onPress={onSearch} />
                   <ModeChip label="Voice" onPress={onVoice} />
                 </View>

@@ -451,6 +451,24 @@ describe("AccountScreen settings", () => {
     expect(mocks.navigate).toHaveBeenCalledWith("WidgetSetup");
   });
 
+  it("does not redirect to iOS Settings for HealthKit before a system permission request exists", async () => {
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+
+    await act(async () => {
+      tree = TestRenderer.create(<AccountScreen />);
+    });
+
+    await act(async () => {
+      pressableContaining(tree!.root, "Health data importNot connected").props.onPress();
+    });
+
+    expect(mocks.openSettings).not.toHaveBeenCalled();
+    expect(mocks.alert).toHaveBeenCalledWith(
+      "Health data import",
+      "Health import is not connected in this version of Pepta. You can keep logging weight, meals, doses, and progress manually.",
+    );
+  });
+
   it("opens the in-app paywall from the free Upgrade subscription card", async () => {
     let tree: TestRenderer.ReactTestRenderer | undefined;
 

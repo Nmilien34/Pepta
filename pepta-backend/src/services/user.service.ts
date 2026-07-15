@@ -21,9 +21,12 @@ import {
   MealLogModel,
   MealScanModel,
   MeasurementModel,
+  PepMemoryModel,
+  PepPushDeliveryModel,
   ProcessedWebhookEventModel,
   ProgressPhotoModel,
   ProteinLogModel,
+  PushTokenModel,
   ScheduleModel,
   SideEffectLogModel,
   UserModel,
@@ -182,6 +185,11 @@ export function serializeUser(user: UserDocument): User {
   const legalAcceptance = isRecord(value.legalAcceptance)
     ? value.legalAcceptance
     : undefined;
+  const notificationPreferences = isRecord(value.notificationPreferences)
+    ? value.notificationPreferences
+    : {};
+  const aiPushCopyConsent =
+    notificationPreferences.aiPushCopyConsent === true;
 
   return userResponseSchema.parse({
     id: idToString(value.id ?? value._id),
@@ -215,14 +223,26 @@ export function serializeUser(user: UserDocument): User {
           acceptedAt: dateToIso(legalAcceptance.acceptedAt),
         }
       : undefined,
+    notificationPreferences: {
+      aiPushCopyConsent,
+      aiPushCopyConsentAt:
+        dateToIso(notificationPreferences.aiPushCopyConsentAt) ?? null,
+      aiPushCopyConsentRevokedAt:
+        dateToIso(notificationPreferences.aiPushCopyConsentRevokedAt) ?? null,
+    },
     createdAt: dateToIso(value.createdAt),
     updatedAt: dateToIso(value.updatedAt),
   });
 }
 
-export async function upsertUserFromIdentity(
+interface UpsertUserFromIdentityResult {
+  user: UserDocument;
+  isNewUser: boolean;
+}
+
+export async function upsertUserFromIdentityWithResult(
   identity: ProviderIdentity,
-): Promise<UserDocument> {
+): Promise<UpsertUserFromIdentityResult> {
   const existingByProvider = await UserModel.findOne({
     authProviders: {
       $elemMatch: {
@@ -235,7 +255,7 @@ export async function upsertUserFromIdentity(
   if (existingByProvider) {
     applyIdentityToUser(existingByProvider, identity);
     await existingByProvider.save();
-    return existingByProvider;
+    return { user: existingByProvider, isNewUser: false };
   }
 
   const email = normalizeEmail(identity.email);
@@ -248,10 +268,10 @@ export async function upsertUserFromIdentity(
   if (existingByEmail) {
     applyIdentityToUser(existingByEmail, identity);
     await existingByEmail.save();
-    return existingByEmail;
+    return { user: existingByEmail, isNewUser: false };
   }
 
-  return UserModel.create({
+  const user = await UserModel.create({
     email,
     emailVerified: emailIsVerified,
     displayName: identity.name,
@@ -270,6 +290,15 @@ export async function upsertUserFromIdentity(
     },
     onboardingComplete: false,
   });
+
+  return { user, isNewUser: true };
+}
+
+export async function upsertUserFromIdentity(
+  identity: ProviderIdentity,
+): Promise<UserDocument> {
+  const result = await upsertUserFromIdentityWithResult(identity);
+  return result.user;
 }
 
 export async function linkProviderIdentityToUser(
@@ -413,6 +442,9 @@ export async function deleteCurrentUser(userId: string): Promise<void> {
     MealScanModel.deleteMany({ userId }),
     InsightModel.deleteMany({ userId }),
     WeeklyRetentionModel.deleteMany({ userId }),
+    PushTokenModel.deleteMany({ userId }),
+    PepMemoryModel.deleteMany({ userId }),
+    PepPushDeliveryModel.deleteMany({ userId }),
     ProcessedWebhookEventModel.deleteMany({ appUserId: userId }),
   ]);
 

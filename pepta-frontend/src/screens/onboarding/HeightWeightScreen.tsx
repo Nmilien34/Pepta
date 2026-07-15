@@ -1,17 +1,18 @@
-// Onboarding screen 12 — Height & weight. Two wheels + an Imperial/Metric toggle.
-// Toggling converts both values (convertBody) and remounts the wheels (keyed on
-// units) so they re-center. Each scroll fires the haptic + tick (WheelPicker).
+// Onboarding — Height & weight (T14). Two wheels + an Imperial/Metric toggle
+// inside the conversation turn. Toggling converts both values and remounts the
+// wheels (keyed on units) so they re-center.
 
 import React from 'react';
-import { View } from 'react-native';
-import { useTheme } from '../../theme';
-import { AppText, Button, OnboardingScaffold, SegmentedToggle, WheelPicker, type WheelItem } from '../../components';
+import { StyleSheet, Text, View } from 'react-native';
+import { ConvoButton, ConvoScreen, SegmentedToggle, WheelPicker, convo, type WheelItem } from '../../components';
+import { typography } from '../../theme/typography';
 import { numberRange } from '../../utils/dateParts';
 import { convertBody, type BodyMeasure, type UnitSystem } from '../../utils/units';
 
 export interface HeightWeightScreenProps {
   progress: number;
   onBack?(): void;
+  context?: string;
   value: BodyMeasure;
   onChange(value: BodyMeasure): void;
   onContinue(): void;
@@ -22,8 +23,7 @@ const UNIT_OPTIONS: { label: string; value: UnitSystem }[] = [
   { label: 'Metric', value: 'metric' },
 ];
 
-export function HeightWeightScreen({ progress, onBack, value, onChange, onContinue }: HeightWeightScreenProps) {
-  const theme = useTheme();
+export function HeightWeightScreen({ progress, onBack, context, value, onChange, onContinue }: HeightWeightScreenProps) {
   const metric = value.units === 'metric';
 
   const heightItems: WheelItem[] = metric
@@ -34,14 +34,14 @@ export function HeightWeightScreen({ progress, onBack, value, onChange, onContin
     : numberRange(70, 400).map((lb) => ({ label: `${lb} lb`, value: lb }));
 
   return (
-    <OnboardingScaffold
+    <ConvoScreen
       progress={progress}
       onBack={onBack}
-      footer={<Button label="Continue" onPress={onContinue} />}
+      context={context}
+      question="Height and weight, today?"
+      footer={<ConvoButton label="Continue" onPress={onContinue} />}
     >
-      <AppText variant="obTitle">Your height & weight</AppText>
-
-      <View style={{ alignItems: 'center', marginTop: theme.spacing.lg }}>
+      <View style={{ alignItems: 'center', marginTop: 24 }}>
         <SegmentedToggle
           options={UNIT_OPTIONS}
           value={value.units}
@@ -49,11 +49,9 @@ export function HeightWeightScreen({ progress, onBack, value, onChange, onContin
         />
       </View>
 
-      <View style={{ flex: 1, flexDirection: 'row', gap: theme.spacing.lg, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ flex: 1, flexDirection: 'row', gap: 18, alignItems: 'center', justifyContent: 'center' }}>
         <View style={{ flex: 1 }}>
-          <AppText variant="sectionHeader" color="textTertiary" align="center" style={{ marginBottom: theme.spacing.sm }}>
-            Height
-          </AppText>
+          <Text style={styles.wheelLabel}>HEIGHT</Text>
           <WheelPicker
             key={`height-${value.units}`}
             items={heightItems}
@@ -62,9 +60,7 @@ export function HeightWeightScreen({ progress, onBack, value, onChange, onContin
           />
         </View>
         <View style={{ flex: 1 }}>
-          <AppText variant="sectionHeader" color="textTertiary" align="center" style={{ marginBottom: theme.spacing.sm }}>
-            Weight
-          </AppText>
+          <Text style={styles.wheelLabel}>WEIGHT</Text>
           <WheelPicker
             key={`weight-${value.units}`}
             items={weightItems}
@@ -73,6 +69,17 @@ export function HeightWeightScreen({ progress, onBack, value, onChange, onContin
           />
         </View>
       </View>
-    </OnboardingScaffold>
+    </ConvoScreen>
   );
 }
+
+const styles = StyleSheet.create({
+  wheelLabel: {
+    fontFamily: typography.fonts.semiBold,
+    fontSize: 12,
+    letterSpacing: 0.6,
+    color: convo.faint,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+});

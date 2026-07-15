@@ -11,6 +11,9 @@ PODS:
     - PromisesObjC (~> 2.4)
     - PromisesSwift (~> 2.4)
     - RecaptchaInterop (~> 101.0)
+  - AppsFlyerFramework (6.18.0):
+    - AppsFlyerFramework/Main (= 6.18.0)
+  - AppsFlyerFramework/Main (6.18.0)
   - EXApplication (7.0.8):
     - ExpoModulesCore
   - EXConstants (18.0.13):
@@ -269,6 +272,10 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
+  - ExpoStoreReview (9.0.9):
+    - ExpoModulesCore
+  - ExpoTrackingTransparency (6.0.8):
+    - ExpoModulesCore
   - EXUpdatesInterface (2.0.0):
     - ExpoModulesCore
   - FBLazyVector (0.81.5)
@@ -1577,6 +1584,9 @@ PODS:
     - React-RCTFBReactNativeSpec
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
+  - react-native-appsflyer (6.18.0):
+    - AppsFlyerFramework (= 6.18.0)
+    - React
   - react-native-safe-area-context (5.6.2):
     - hermes-engine
     - RCTRequired
@@ -2337,6 +2347,8 @@ DEPENDENCIES:
   - ExpoKeepAwake (from `../../node_modules/expo-keep-awake/ios`)
   - ExpoLinearGradient (from `../../node_modules/expo-linear-gradient/ios`)
   - ExpoModulesCore (from `../../node_modules/expo-modules-core`)
+  - ExpoStoreReview (from `../../node_modules/expo-store-review/ios`)
+  - ExpoTrackingTransparency (from `../../node_modules/expo-tracking-transparency/ios`)
   - EXUpdatesInterface (from `../../node_modules/expo-updates-interface/ios`)
   - FBLazyVector (from `../../node_modules/react-native/Libraries/FBLazyVector`)
   - hermes-engine (from `../../node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec`)
@@ -2374,6 +2386,7 @@ DEPENDENCIES:
   - React-logger (from `../../node_modules/react-native/ReactCommon/logger`)
   - React-Mapbuffer (from `../../node_modules/react-native/ReactCommon`)
   - React-microtasksnativemodule (from `../../node_modules/react-native/ReactCommon/react/nativemodule/microtasks`)
+  - react-native-appsflyer (from `../../node_modules/react-native-appsflyer`)
   - react-native-safe-area-context (from `../../node_modules/react-native-safe-area-context`)
   - React-NativeModulesApple (from `../../node_modules/react-native/ReactCommon/react/nativemodule/core/platform/ios`)
   - React-oscompat (from `../../node_modules/react-native/ReactCommon/oscompat`)
@@ -2420,6 +2433,7 @@ SPEC REPOS:
   trunk:
     - AppAuth
     - AppCheckCore
+    - AppsFlyerFramework
     - GoogleSignIn
     - GoogleUtilities
     - GTMAppAuth
@@ -2478,6 +2492,10 @@ EXTERNAL SOURCES:
     :path: "../../node_modules/expo-linear-gradient/ios"
   ExpoModulesCore:
     :path: "../../node_modules/expo-modules-core"
+  ExpoStoreReview:
+    :path: "../../node_modules/expo-store-review/ios"
+  ExpoTrackingTransparency:
+    :path: "../../node_modules/expo-tracking-transparency/ios"
   EXUpdatesInterface:
     :path: "../../node_modules/expo-updates-interface/ios"
   FBLazyVector:
@@ -2551,6 +2569,8 @@ EXTERNAL SOURCES:
     :path: "../../node_modules/react-native/ReactCommon"
   React-microtasksnativemodule:
     :path: "../../node_modules/react-native/ReactCommon/react/nativemodule/microtasks"
+  react-native-appsflyer:
+    :path: "../../node_modules/react-native-appsflyer"
   react-native-safe-area-context:
     :path: "../../node_modules/react-native-safe-area-context"
   React-NativeModulesApple:
@@ -2637,6 +2657,7 @@ EXTERNAL SOURCES:
 SPEC CHECKSUMS:
   AppAuth: ef4da5a3fc2e10b90c09a0a94a9baeaedc0341d5
   AppCheckCore: 214137f5c378d1dec88a68425c467fe65aaff637
+  AppsFlyerFramework: c1e1e4cd3b98ffdca2fe32b17ae93909e409b6ab
   EXApplication: 1e98d4b1dccdf30627f92917f4b2c5a53c330e5f
   EXConstants: fce59a631a06c4151602843667f7cfe35f81e271
   EXImageLoader: 189e3476581efe3ad4d1d3fb4735b7179eb26f05
@@ -2660,6 +2681,8 @@ SPEC CHECKSUMS:
   ExpoKeepAwake: 55f75eca6499bb9e4231ebad6f3e9cb8f99c0296
   ExpoLinearGradient: 809102bdb979f590083af49f7fa4805cd931bd58
   ExpoModulesCore: b0bd53ca36654854eca93afbd73547c4553c9ba7
+  ExpoStoreReview: 32bb43b6fae9c8db3e33cad69996dff3785eef5f
+  ExpoTrackingTransparency: 4f823a38ff7c0efea4cac722ecbc0589278ff548
   EXUpdatesInterface: 5adf50cb41e079c861da6d9b4b954c3db9a50734
   FBLazyVector: e95a291ad2dadb88e42b06e0c5fb8262de53ec12
   GoogleSignIn: e449a40a92e9f2eea56e98b5214d13725dc5a00a
@@ -2703,6 +2726,7 @@ SPEC CHECKSUMS:
   React-logger: 50fdb9a8236da90c0b1072da5c32ee03aeb5bf28
   React-Mapbuffer: 0164bc6ba0866e6314d86851620e6f1f95a1b4fb
   React-microtasksnativemodule: f5972fb404f7c363ff34b2292e72a716956c590c
+  react-native-appsflyer: 4e82e778b32d759713a2028412e75b80113cfb64
   react-native-safe-area-context: c5d42c4294aa175415947e23c2ac956253abfc7d
   React-NativeModulesApple: 8969913947d5b576de4ed371a939455a8daf28aa
   React-oscompat: ce47230ed20185e91de62d8c6d139ae61763d09c
@@ -2748,6 +2772,6 @@ SPEC CHECKSUMS:
   Yoga: 65431d43277b661ebc7289c6c5d82f64ce42cfe0
   ZXingObjC: 8898711ab495761b2dbbdec76d90164a6d7e14c5
 
-PODFILE CHECKSUM: 68f380ff616de9c727ed83c98b17c706155c45d3
+PODFILE CHECKSUM: 291732a82ae38a7573227a0d020cd56e781bdc96
 
 COCOAPODS: 1.16.2

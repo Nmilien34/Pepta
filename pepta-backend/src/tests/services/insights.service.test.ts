@@ -158,7 +158,7 @@ describe('insights service', () => {
       }),
     );
 
-    const result = await getInsights('user-1', now, { generateProse });
+    const result = await getInsights('user-1', now, { allowAIProse: true, generateProse });
 
     expect(generateProse).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -178,6 +178,37 @@ describe('insights service', () => {
       expect.any(Object),
     );
     expect(result[0]).toMatchObject({ headline: 'AI headline', body: 'AI body' });
+  });
+
+  it('uses deterministic fallback copy instead of AI prose without consent', async () => {
+    const generateProse = vi.fn().mockResolvedValue({
+      headline: 'AI headline',
+      body: 'AI body',
+    });
+    mocks.insightFindOne.mockResolvedValue(
+      insightDocument({
+        generatedAt: new Date('2026-06-20T00:00:00.000Z'),
+      }),
+    );
+
+    const result = await getInsights('user-1', now, { generateProse });
+
+    expect(generateProse).not.toHaveBeenCalled();
+    expect(mocks.insightFindOneAndUpdate).toHaveBeenCalledWith(
+      { userId: 'user-1', type: 'medication_level' },
+      expect.objectContaining({
+        $set: expect.objectContaining({
+          headline: 'Semaglutide is near the lower part of the curve',
+          body: 'Your relative medication estimate is lower in the current dose cycle.',
+          copyVersion: 'insight-copy-v1',
+        }),
+      }),
+      expect.any(Object),
+    );
+    expect(result[0]).toMatchObject({
+      headline: 'Semaglutide is near the lower part of the curve',
+      body: 'Your relative medication estimate is lower in the current dose cycle.',
+    });
   });
 
   it('surfaces every active deterministic detector in the insight feed', async () => {
@@ -210,6 +241,7 @@ describe('insights service', () => {
     });
 
     const result = await getInsights('user-1', now, {
+      allowAIProse: true,
       generateProse: vi.fn().mockRejectedValue(new Error('OpenAI unavailable')),
     });
 

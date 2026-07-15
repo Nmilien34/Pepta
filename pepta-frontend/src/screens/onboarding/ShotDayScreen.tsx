@@ -1,45 +1,57 @@
-// Onboarding screen 7 — Shot day. Day-of-week selector (multi-select; some
-// protocols dose on more than one day → maps to schedule.daysOfWeek[]), framed
-// with our flair so the dose timing feels personalized. Shown only for weekly
-// injections (gated by the navigator).
+// Onboarding — Shot day (T10). Derived, not re-asked: the last-shot date names
+// the day ("Sundays are shot day?") and the user confirms in one tap. "Pick
+// another day" holds the turn open with the day-of-week picker + Continue.
 
 import React from 'react';
 import { View } from 'react-native';
-import { useTheme } from '../../theme';
-import { AppText, Button, Card, DayOfWeekPicker, Mascot, OnboardingScaffold } from '../../components';
+import { ConvoButton, ConvoScreen, DayOfWeekPicker } from '../../components';
+
+type ShotDayChoice = 'confirm' | 'other';
+
+const DAY_NAMES = ['Sundays', 'Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays', 'Saturdays'];
 
 export interface ShotDayScreenProps {
   progress: number;
   onBack?(): void;
+  context?: string;
+  /** 0–6 weekday derived from the last-shot date. */
+  derivedDay: number;
   value: number[];
   onToggle(day: number): void;
-  onContinue(): void;
+  /** Called with the confirmed day list; the navigator stores + advances. */
+  onAnswer(days: number[]): void;
 }
 
-export function ShotDayScreen({ progress, onBack, value, onToggle, onContinue }: ShotDayScreenProps) {
-  const theme = useTheme();
+export function ShotDayScreen({ progress, onBack, context, derivedDay, value, onToggle, onAnswer }: ShotDayScreenProps) {
+  const [holding, setHolding] = React.useState(false);
+  const dayName = DAY_NAMES[derivedDay] ?? 'Sundays';
 
   return (
-    <OnboardingScaffold
+    <ConvoScreen<ShotDayChoice>
       progress={progress}
       onBack={onBack}
-      footer={<Button label="Continue" onPress={onContinue} disabled={value.length === 0} />}
+      context={context}
+      question={`${dayName} are shot day?`}
+      options={[
+        { label: `${dayName} it is`, value: 'confirm' },
+        { label: 'Pick another day', value: 'other', holds: true },
+      ]}
+      value={holding ? 'other' : undefined}
+      onSelect={() => setHolding(true)}
+      onAnswer={(choice) => {
+        if (choice === 'confirm') onAnswer([derivedDay]);
+      }}
+      footer={
+        holding ? (
+          <ConvoButton label="Continue" disabled={value.length === 0} onPress={() => onAnswer(value)} />
+        ) : undefined
+      }
     >
-      <AppText variant="obTitle">Which days do cravings hit hardest?</AppText>
-      <AppText variant="caption" color="textSecondary" style={{ marginTop: theme.spacing.sm }}>
-        Pick all that apply — we’ll time your dose insights around them.
-      </AppText>
-
-      <View style={{ marginTop: theme.spacing.xl }}>
-        <DayOfWeekPicker value={value} onToggle={onToggle} />
-      </View>
-
-      <Card style={{ marginTop: theme.spacing.xl, flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
-        <Mascot pose="idle" size={44} />
-        <AppText variant="caption" color="textPrimary" style={{ flex: 1 }}>
-          Appetite usually dips for a day or two after your shot — we’ll help you front-load protein then.
-        </AppText>
-      </Card>
-    </OnboardingScaffold>
+      {holding ? (
+        <View style={{ marginTop: 24 }}>
+          <DayOfWeekPicker value={value} onToggle={onToggle} />
+        </View>
+      ) : null}
+    </ConvoScreen>
   );
 }

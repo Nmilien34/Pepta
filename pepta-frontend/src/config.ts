@@ -14,6 +14,10 @@ export const GOOGLE_IOS_CLIENT_ID =
   process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ?? "";
 export const REVENUECAT_IOS_API_KEY =
   process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY ?? "";
+export const APPSFLYER_DEV_KEY =
+  process.env.EXPO_PUBLIC_APPSFLYER_DEV_KEY ?? "";
+export const APPSFLYER_APP_ID =
+  process.env.EXPO_PUBLIC_APPSFLYER_APP_ID ?? "";
 
 // Legal pages served by the active backend for onboarding, settings, and App Store metadata.
 export const TERMS_URL = `${API_BASE_URL}/legal/terms`;

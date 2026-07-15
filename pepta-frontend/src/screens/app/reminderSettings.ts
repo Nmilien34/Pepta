@@ -1,4 +1,5 @@
 import type { HomeResponse, TrackResponse } from "@pepta/shared";
+import { buildPepReminderNotificationCopy, type PepNotificationCopy } from "./pepPriorities";
 
 export type ReminderIcon =
   | "notifications"
@@ -24,6 +25,7 @@ export interface ReminderItem {
   subtitle: string;
   defaultOn: boolean;
   schedule: ReminderScheduleRule;
+  notification?: PepNotificationCopy;
 }
 
 export interface ReminderGroup {
@@ -81,6 +83,8 @@ export function deriveReminderGroups(args: {
   const timezone = args.home?.profile?.timezone ?? null;
   const proteinTarget = args.home?.profile?.dailyProteinTargetGrams;
   const postDoseAt = nextDoseAt ? addDaysIso(nextDoseAt, 1) : null;
+  const notification = (id: string): PepNotificationCopy | undefined =>
+    buildPepReminderNotificationCopy(id, args.home) ?? undefined;
 
   return [
     {
@@ -95,6 +99,7 @@ export function deriveReminderGroups(args: {
             : "Set your dose schedule to enable",
           defaultOn: Boolean(nextDoseAt),
           schedule: dateSchedule(nextDoseAt),
+          notification: notification("dose_due"),
         },
         {
           id: "post_dose_checkin",
@@ -105,6 +110,7 @@ export function deriveReminderGroups(args: {
             : "Enabled after your next dose is scheduled",
           defaultOn: Boolean(postDoseAt),
           schedule: dateSchedule(postDoseAt),
+          notification: notification("post_dose_checkin"),
         },
       ],
     },
@@ -120,6 +126,7 @@ export function deriveReminderGroups(args: {
             : "Late-morning protein check",
           defaultOn: true,
           schedule: { kind: "daily", hour: 11, minute: 30 },
+          notification: notification("protein_anchor"),
         },
         {
           id: "hydration_check",
@@ -128,6 +135,7 @@ export function deriveReminderGroups(args: {
           subtitle: "Afternoon water + fiber check",
           defaultOn: true,
           schedule: { kind: "daily", hour: 15, minute: 30 },
+          notification: notification("hydration_check"),
         },
       ],
     },
@@ -141,6 +149,7 @@ export function deriveReminderGroups(args: {
           subtitle: "Sunday morning",
           defaultOn: true,
           schedule: { kind: "weekly", weekdays: [1], hour: 8, minute: 0 },
+          notification: notification("weekly_weigh_in"),
         },
         {
           id: "trend_review",
@@ -149,6 +158,7 @@ export function deriveReminderGroups(args: {
           subtitle: "Monday morning",
           defaultOn: true,
           schedule: { kind: "weekly", weekdays: [2], hour: 9, minute: 0 },
+          notification: notification("trend_review"),
         },
         {
           id: "progress_photo",
@@ -157,6 +167,7 @@ export function deriveReminderGroups(args: {
           subtitle: "Every 4 weeks",
           defaultOn: false,
           schedule: { kind: "timeInterval", seconds: 28 * MS_PER_DAY / 1000, repeats: true },
+          notification: notification("progress_photo"),
         },
       ],
     },

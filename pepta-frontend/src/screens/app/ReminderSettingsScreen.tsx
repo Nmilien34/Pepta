@@ -11,7 +11,9 @@ import * as Haptics from "expo-haptics";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AppText, Button, Card } from "../../components";
 import { Icon } from "../../components/Icon";
+import { useAuth } from "../../context/AuthContext";
 import { usePeptaData } from "../../context/PeptaDataContext";
+import { api } from "../../services/api";
 import { useTheme } from "../../theme";
 import {
   deriveReminderGroups,
@@ -43,12 +45,22 @@ interface ReminderSettingsScreenProps {
 
 export function ReminderSettingsScreen({ visible, onClose }: ReminderSettingsScreenProps) {
   const theme = useTheme();
+  const { user, updateCachedUser } = useAuth();
   const { home, track, refreshHome, refreshTrack } = usePeptaData();
   const groups = useMemo(() => deriveReminderGroups({ home, track }), [home, track]);
   const [state, setState] = useState<Record<string, boolean>>(() => defaultReminderState(groups));
   const [permissionStatus, setPermissionStatus] = useState<ReminderPermissionStatus>("undetermined");
+  const [aiPushCopyConsent, setAiPushCopyConsent] = useState(
+    user?.notificationPreferences?.aiPushCopyConsent === true,
+  );
+  const [aiConsentSaving, setAiConsentSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!visible) return;
+    setAiPushCopyConsent(user?.notificationPreferences?.aiPushCopyConsent === true);
+  }, [user?.notificationPreferences?.aiPushCopyConsent, visible]);
 
   useEffect(() => {
     if (!visible) return;
@@ -119,6 +131,26 @@ export function ReminderSettingsScreen({ visible, onClose }: ReminderSettingsScr
     void applyReminderState({ ...state, [id]: value }, state);
   };
 
+  const toggleAiPushCopyConsent = (value: boolean) => {
+    Haptics.selectionAsync().catch(() => undefined);
+    const previous = aiPushCopyConsent;
+    setAiPushCopyConsent(value);
+    setAiConsentSaving(true);
+    setError(null);
+    api
+      .updateNotificationPreferences({ aiPushCopyConsent: value })
+      .then((notificationPreferences) => {
+        if (user) {
+          updateCachedUser({ ...user, notificationPreferences });
+        }
+      })
+      .catch(() => {
+        setAiPushCopyConsent(previous);
+        setError("Couldn't update Pep's AI notification setting right now.");
+      })
+      .finally(() => setAiConsentSaving(false));
+  };
+
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose} transparent={false}>
       <View style={{ flex: 1, backgroundColor: theme.colors.bg }}>
@@ -183,6 +215,43 @@ export function ReminderSettingsScreen({ visible, onClose }: ReminderSettingsScr
                     Dose cycle, protein, hydration, weigh-in, and trend reminders stay local to this phone.
                   </AppText>
                 </View>
+              </View>
+            </Card>
+
+            <Card style={{ marginTop: 12 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                <View
+                  style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: 16,
+                    backgroundColor: "#E8F8EE",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  {aiConsentSaving ? (
+                    <ActivityIndicator color="#1E8E40" />
+                  ) : (
+                    <Icon name="sparkles" size={19} color="#1E8E40" />
+                  )}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <AppText variant="bodyStrong" style={{ fontWeight: "800" }}>
+                    Personalized Pep push notes
+                  </AppText>
+                  <AppText variant="caption" color="textSecondary" style={{ marginTop: 4, lineHeight: 17 }}>
+                    Let Pep use recent logs, dose timing, goals, and OpenAI to write smarter push wording.
+                  </AppText>
+                </View>
+                <Switch
+                  value={aiPushCopyConsent}
+                  onValueChange={toggleAiPushCopyConsent}
+                  disabled={aiConsentSaving || !user}
+                  trackColor={{ false: theme.colors.surfaceAlt, true: "#BDECCD" }}
+                  thumbColor={aiPushCopyConsent ? "#1E8E40" : "#FFFFFF"}
+                  accessibilityLabel="Personalized Pep push notes"
+                />
               </View>
             </Card>
 

@@ -14,6 +14,7 @@ export interface UserEntitlementDocument {
   expiresAt: Date | null;
   willRenew: boolean;
   revenueCatCustomerId?: string;
+  revenueCatAppUserIds?: string[];
   revenueCatEntitlement?: string;
 }
 
@@ -21,6 +22,12 @@ export interface UserLegalAcceptanceDocument {
   termsVersion: string;
   privacyVersion: string;
   acceptedAt: Date;
+}
+
+export interface UserNotificationPreferencesDocument {
+  aiPushCopyConsent: boolean;
+  aiPushCopyConsentAt: Date | null;
+  aiPushCopyConsentRevokedAt: Date | null;
 }
 
 export interface UserDocument extends Document<Types.ObjectId> {
@@ -34,6 +41,7 @@ export interface UserDocument extends Document<Types.ObjectId> {
   onboardingComplete?: boolean;
   onboardingCompletedAt?: Date;
   legalAcceptance?: UserLegalAcceptanceDocument;
+  notificationPreferences: UserNotificationPreferencesDocument;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -91,6 +99,11 @@ const entitlementSchema = new Schema<UserEntitlementDocument>(
       index: true,
       sparse: true,
     },
+    revenueCatAppUserIds: {
+      type: [String],
+      default: [],
+      index: true,
+    },
     revenueCatEntitlement: {
       type: String,
       trim: true,
@@ -118,6 +131,26 @@ const legalAcceptanceSchema = new Schema<UserLegalAcceptanceDocument>(
   },
   { _id: false },
 );
+
+const notificationPreferencesSchema =
+  new Schema<UserNotificationPreferencesDocument>(
+    {
+      aiPushCopyConsent: {
+        type: Boolean,
+        required: true,
+        default: false,
+      },
+      aiPushCopyConsentAt: {
+        type: Date,
+        default: null,
+      },
+      aiPushCopyConsentRevokedAt: {
+        type: Date,
+        default: null,
+      },
+    },
+    { _id: false },
+  );
 
 const userSchema = new Schema<UserDocument>(
   {
@@ -162,6 +195,11 @@ const userSchema = new Schema<UserDocument>(
     },
     legalAcceptance: {
       type: legalAcceptanceSchema,
+    },
+    notificationPreferences: {
+      type: notificationPreferencesSchema,
+      required: true,
+      default: () => ({}),
     },
   },
   {

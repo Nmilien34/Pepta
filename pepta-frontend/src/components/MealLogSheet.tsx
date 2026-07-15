@@ -31,9 +31,14 @@ import { useTheme } from "../theme";
 import { AppText } from "./AppText";
 import { Button } from "./Button";
 import { BottomSheet } from "./BottomSheet";
+import { BarcodeScanner } from "./BarcodeScanner";
 import { MealCamera } from "./MealCamera";
 import { usePeptaData } from "../context/PeptaDataContext";
 import { api } from "../services/api";
+import {
+  hasAIDataSharingConsent,
+  saveAIDataSharingConsent,
+} from "../services/aiConsent";
 import {
   analysisToMealLog,
   foodResultToMealLog,
@@ -50,9 +55,19 @@ type View_ =
   | "voice"
   | "manual"
   | "search"
+  | "aiConsent"
   | "analyzing"
   | "result"
   | "error";
+
+type AiMealAction =
+  | "scan"
+  | "product"
+  | "barcode"
+  | "library"
+  | "voice"
+  | "search";
+type CameraMode = "meal" | "product";
 
 export interface MealLogSheetProps {
   visible: boolean;
@@ -89,6 +104,11 @@ export function MealLogSheet({
   const [searchFailed, setSearchFailed] = useState(false);
   const [cameraRequested, setCameraRequested] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
+  const [cameraMode, setCameraMode] = useState<CameraMode>("meal");
+  const [barcodeOpen, setBarcodeOpen] = useState(false);
+  const [pendingAiAction, setPendingAiAction] = useState<AiMealAction | null>(
+    null,
+  );
 
   // Debounced food search (only while the search view is open).
   useEffect(() => {
@@ -133,6 +153,9 @@ export function MealLogSheet({
       setSearchFailed(false);
       setCameraRequested(false);
       setCameraOpen(false);
+      setCameraMode("meal");
+      setBarcodeOpen(false);
+      setPendingAiAction(null);
     }
   }, [visible]);
 
@@ -165,23 +188,52 @@ export function MealLogSheet({
   // read base64 here, AFTER the picker/camera dismisses — passing `base64: true`
   // to the picker does a massive synchronous bridge transfer on a full-res photo
   // and freezes iOS; reading via expo-file-system here is off the hot path.
-  const analyzeUri = async (uri: string, mimeType?: string) => {
+  const analyzeUri = async (
+    uri: string,
+    mimeType?: string,
+    mode: CameraMode = "meal",
+  ) => {
     setPreview(uri);
-    setSource("scan");
+    setSource(mode === "product" ? "product_scan" : "scan");
     setView("analyzing");
     try {
       const imageData = await new File(uri).base64();
-      const scan = await api.analyzeMealPhoto({
+      const body = {
         imageData,
         imageMimeType: pickImageMime(mimeType, uri),
         capturedAt: now(),
-      });
+      };
+      const scan =
+        mode === "product"
+          ? await api.analyzeProductPhoto(body)
+          : await api.analyzeMealPhoto(body);
       setResult(scan);
       setPortion(1);
       setView("result");
     } catch {
       setErrorMsg(
         "Couldn’t analyze that photo. Try again, or log it manually.",
+      );
+      setView("error");
+    }
+  };
+
+  const analyzeBarcode = async (barcode: string) => {
+    setBarcodeOpen(false);
+    setPreview(null);
+    setSource("barcode");
+    setView("analyzing");
+    try {
+      const scan = await api.analyzeMealBarcode({
+        barcode,
+        scannedAt: now(),
+      });
+      setResult(scan);
+      setPortion(1);
+      setView("result");
+    } catch {
+      setErrorMsg(
+        "Couldn’t find that barcode. Try product scan, search, or log it manually.",
       );
       setView("error");
     }
@@ -289,13 +341,79 @@ export function MealLogSheet({
 
   const back = () => {
     Haptics.selectionAsync().catch(() => undefined);
+    setPendingAiAction(null);
     setView("chooser");
+  };
+
+  const performAiAction = (action: AiMealAction) => {
+    switch (action) {
+      case "scan":
+        setCameraMode("meal");
+        setView("chooser");
+        setCameraRequested(true);
+        return;
+      case "product":
+        setCameraMode("product");
+        setView("chooser");
+        setCameraRequested(true);
+        return;
+      case "barcode":
+        setView("chooser");
+        setBarcodeOpen(true);
+        return;
+      case "library":
+        setView("chooser");
+        void pickFromLibrary();
+        return;
+      case "voice":
+        setView("voice");
+        return;
+      case "search":
+        setView("search");
+        return;
+    }
+  };
+
+  const requestAiAction = async (action: AiMealAction) => {
+    Haptics.selectionAsync().catch(() => undefined);
+    try {
+      if (await hasAIDataSharingConsent()) {
+        performAiAction(action);
+        return;
+      }
+    } catch {
+      // Treat storage failures as no consent. The user can still log manually.
+    }
+    setPendingAiAction(action);
+    setView("aiConsent");
+  };
+
+  const continueWithAi = async () => {
+    Haptics.selectionAsync().catch(() => undefined);
+    try {
+      await saveAIDataSharingConsent();
+    } catch {
+      // Consent was given in-session; persistence can retry next time.
+    }
+    const action = pendingAiAction;
+    setPendingAiAction(null);
+    if (action) {
+      performAiAction(action);
+    } else {
+      setView("chooser");
+    }
+  };
+
+  const useManualInstead = () => {
+    Haptics.selectionAsync().catch(() => undefined);
+    setPendingAiAction(null);
+    setView("manual");
   };
 
   return (
     <>
       <BottomSheet
-        visible={visible && !cameraRequested && !cameraOpen}
+        visible={visible && !cameraRequested && !cameraOpen && !barcodeOpen}
         onClose={onClose}
         onDismissed={() => {
           if (cameraRequested) {
@@ -374,23 +492,24 @@ export function MealLogSheet({
         {view === "chooser" ? (
           <MealChooser
             theme={theme}
-            onScan={() => {
-              Haptics.selectionAsync().catch(() => undefined);
-              setCameraRequested(true);
-            }}
-            onLibrary={() => void pickFromLibrary()}
-            onVoice={() => {
-              Haptics.selectionAsync().catch(() => undefined);
-              setView("voice");
-            }}
-            onSearch={() => {
-              Haptics.selectionAsync().catch(() => undefined);
-              setView("search");
-            }}
+            onScan={() => void requestAiAction("scan")}
+            onProduct={() => void requestAiAction("product")}
+            onBarcode={() => void requestAiAction("barcode")}
+            onLibrary={() => void requestAiAction("library")}
+            onVoice={() => void requestAiAction("voice")}
+            onSearch={() => void requestAiAction("search")}
             onManual={() => {
               Haptics.selectionAsync().catch(() => undefined);
               setView("manual");
             }}
+          />
+        ) : null}
+
+        {view === "aiConsent" ? (
+          <AIConsentView
+            theme={theme}
+            onContinue={() => void continueWithAi()}
+            onManual={useManualInstead}
           />
         ) : null}
 
@@ -482,20 +601,33 @@ export function MealLogSheet({
           onCapture={(uri) => {
             setCameraOpen(false);
             setCameraRequested(false);
-            void analyzeUri(uri);
+            void analyzeUri(uri, undefined, cameraMode);
           }}
           onSearch={() => {
             setCameraOpen(false);
             setCameraRequested(false);
-            setView("search");
+            void requestAiAction("search");
           }}
           onVoice={() => {
             setCameraOpen(false);
             setCameraRequested(false);
-            setView("voice");
+            void requestAiAction("voice");
           }}
+          frameHint={
+            cameraMode === "product" ? "Point at the label" : undefined
+          }
+          activeLabel={cameraMode === "product" ? "Product" : undefined}
         />
       ) : null}
+      <BarcodeScanner
+        visible={barcodeOpen}
+        onClose={() => setBarcodeOpen(false)}
+        onScanned={(code) => void analyzeBarcode(code)}
+        onManual={() => {
+          setBarcodeOpen(false);
+          setView("manual");
+        }}
+      />
     </>
   );
 }
@@ -510,6 +642,10 @@ const HEADINGS: Record<View_, { title: string; sub: string }> = {
   voice: { title: "Say what you ate", sub: "Tap the mic, or type a sentence." },
   manual: { title: "Enter a meal", sub: "Food name + macros." },
   search: { title: "Search foods", sub: "Find a food and add it." },
+  aiConsent: {
+    title: "AI data sharing",
+    sub: "Review before using AI features.",
+  },
   analyzing: {
     title: "Analyzing…",
     sub: "Estimating protein, calories & fiber.",
@@ -521,9 +657,71 @@ const HEADINGS: Record<View_, { title: string; sub: string }> = {
   error: { title: "Hmm", sub: "That didn’t work." },
 };
 
+function AIConsentView({
+  theme,
+  onContinue,
+  onManual,
+}: {
+  theme: Theme;
+  onContinue: () => void;
+  onManual: () => void;
+}) {
+  return (
+    <View style={{ marginTop: 18, gap: 16 }}>
+      <View
+        style={{
+          borderRadius: 22,
+          padding: 16,
+          backgroundColor: theme.colors.surfaceAlt,
+          gap: 12,
+        }}
+      >
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+          <View
+            style={{
+              width: 42,
+              height: 42,
+              borderRadius: 16,
+              backgroundColor: theme.colors.surface,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Icon name="sparkles" size={22} color={theme.colors.primary} />
+          </View>
+          <AppText variant="cardTitle" style={{ flex: 1, fontSize: 18 }}>
+            AI features use OpenAI
+          </AppText>
+        </View>
+        <AppText variant="body" color="textSecondary" style={{ lineHeight: 22 }}>
+          To estimate meals or create AI notes, Pepta sends the photo, audio or
+          transcript, barcode or meal search text, and relevant tracker context
+          to Pepta's backend, OpenAI, Together AI, and food data providers.
+        </AppText>
+        <AppText variant="body" color="textSecondary" style={{ lineHeight: 22 }}>
+          Continue only if you agree to share that data for AI processing. You
+          can use manual logging without sending meal data to OpenAI.
+        </AppText>
+      </View>
+      <Button
+        label="Continue with AI"
+        accessibilityLabel="Continue with AI features"
+        onPress={onContinue}
+      />
+      <Button
+        label="Use manual logging"
+        variant="secondary"
+        onPress={onManual}
+      />
+    </View>
+  );
+}
+
 function MealChooser({
   theme,
   onScan,
+  onProduct,
+  onBarcode,
   onLibrary,
   onVoice,
   onSearch,
@@ -531,6 +729,8 @@ function MealChooser({
 }: {
   theme: Theme;
   onScan: () => void;
+  onProduct: () => void;
+  onBarcode: () => void;
   onLibrary: () => void;
   onVoice: () => void;
   onSearch: () => void;
@@ -567,7 +767,7 @@ function MealChooser({
         </View>
         <View style={{ flex: 1 }}>
           <AppText variant="cardTitle" style={{ fontSize: 20 }}>
-            Scan a photo
+            Scan a meal
           </AppText>
           <AppText
             variant="body"
@@ -600,6 +800,24 @@ function MealChooser({
           title="Voice"
           hint="Say it"
           onPress={onVoice}
+        />
+      </View>
+      <View style={{ flexDirection: "row", gap: 10 }}>
+        <CompactMealAction
+          theme={theme}
+          icon="cube"
+          color={theme.colors.protein}
+          title="Product"
+          hint="Scan label"
+          onPress={onProduct}
+        />
+        <CompactMealAction
+          theme={theme}
+          icon="barcode-outline"
+          color={theme.colors.textPrimary}
+          title="Barcode"
+          hint="Read UPC"
+          onPress={onBarcode}
         />
       </View>
       <View style={{ flexDirection: "row", gap: 10 }}>

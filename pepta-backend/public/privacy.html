@@ -242,9 +242,10 @@
             schedule, and dose history
           </li>
           <li>
-            Meal logs from scan, voice, search, or manual entry, including food
-            name, serving size, calories, protein, carbs, fat, fiber,
-            timestamps, notes, and source
+            Meal logs from meal scan, product scan, barcode, voice, search, or
+            manual entry, including food name, serving size, calories, protein,
+            carbs, fat, fiber, timestamps, notes, product lookup metadata, and
+            source
           </li>
           <li>
             Water, protein, fiber, activity, steps, workout minutes, and
@@ -266,12 +267,18 @@
         <h3>Camera, Microphone, Photos, and Uploaded Files</h3>
         <p>
           If you choose to use camera, photo library, microphone, avatar, meal
-          scan, voice meal, or progress-photo features, Pepta may process:
+          scan, product scan, barcode, voice meal, or progress-photo features,
+          Pepta may process:
         </p>
         <ul>
           <li>
             Meal photos and image metadata needed to analyze and save a meal
             scan
+          </li>
+          <li>
+            Product label photos, visible label text, barcode numbers, brand or
+            product names, and public nutrition lookup results used to estimate
+            packaged foods
           </li>
           <li>
             Audio recordings and transcripts used to turn spoken meal entries
@@ -302,8 +309,8 @@
         </p>
         <ul>
           <li>
-            Subscription status, such as free, trialing, active, canceled, past
-            due, refunded, or expired
+            Subscription status, such as free, active, canceled, past due,
+            refunded, or expired
           </li>
           <li>
             Product identifiers, entitlement identifiers, renewal state,
@@ -339,6 +346,13 @@
           infrastructure to send dose reminders, logging nudges, progress
           prompts, or account messages. You can turn notifications off in the
           App or in iOS Settings.
+        </p>
+        <p>
+          If you separately turn on AI-personalized Pep push notes, Pepta may
+          use recent logs, dose timing, nutrition totals, goals, and trend
+          context to write notification wording. This AI notification
+          personalization is optional and can be turned off without disabling
+          ordinary reminders.
         </p>
 
         <h2>Apple Health / HealthKit Data</h2>
@@ -391,8 +405,8 @@
           </li>
           <li>Store and serve private uploads through signed URLs</li>
           <li>
-            Process subscriptions, trials, restores, entitlements, and
-            RevenueCat webhooks
+            Process subscriptions, restores, entitlements, and RevenueCat
+            webhooks
           </li>
           <li>Send reminders and notifications you have enabled</li>
           <li>
@@ -405,32 +419,49 @@
           </li>
         </ul>
 
-        <h2>AI Features and OpenAI</h2>
-        <p>Pepta uses OpenAI-powered features for things like:</p>
+        <h2>AI Features, Product Lookup, and Providers</h2>
+        <p>Pepta uses AI and food-data providers for things like:</p>
         <ul>
           <li>Meal photo analysis</li>
+          <li>Packaged-product label extraction and barcode lookup</li>
           <li>Meal voice transcription and cleanup</li>
           <li>Typed or spoken food-to-nutrition parsing</li>
           <li>Meal scan notes and companion-style tracker copy</li>
           <li>
             Insight prose around deterministic signals already computed by Pepta
           </li>
+          <li>
+            Optional AI-personalized Pep push notification wording, if you turn
+            that setting on
+          </li>
         </ul>
         <p>
-          When you use one of these features, we send relevant context to OpenAI
-          so it can generate the requested output. This may include a meal
-          image, audio file, transcript, food text, nutrition target, daily or
-          weekly protein context, biggest concern, or other tracker context
-          needed for that feature. We try to send only what is needed for the
+          When you use one of these features, we send relevant context to the
+          provider needed for that feature. This may include a meal image,
+          product label image, barcode, visible label text, audio file,
+          transcript, food text, nutrition target, daily or weekly protein
+          context, dose timing, recent logs, biggest concern, goals, or other
+          tracker context needed for that feature. Product scans may use
+          Together AI to read a product label, Open Food Facts to look up public
+          nutrition data, and OpenAI to structure nutrition results or perform
+          fallback web lookup. We try to send only what is needed for the
           specific feature, not your entire account.
         </p>
         <p>
-          We do not allow OpenAI to use your data to train its general models.
+          Before the mobile app sends meal photos, audio, transcripts, meal
+          search text, product label photos, barcode text, or tracker context
+          to AI or food-data providers for processing, Pepta shows an in-app
+          disclosure and asks you to continue with AI features.
+          AI-personalized push notification wording has its own separate
+          in-app setting and server-side consent record.
+          We do not allow OpenAI or Together AI to use your data to train their
+          general models.
           AI output can be inaccurate or incomplete, so you should review and
           edit results before saving or relying on them. If you do not want data
-          sent to OpenAI, avoid AI-powered features such as meal scans, voice
-          parsing, food text parsing, and generated insight copy. Core manual
-          tracking features do not require OpenAI.
+          sent to AI or food-data providers, choose manual logging or avoid
+          AI-powered features such as meal scans, product scans, barcode
+          lookup, voice parsing, food text parsing, and generated insight copy.
+          Core manual tracking features do not require AI providers.
         </p>
 
         <h2>Photos and User Content</h2>
@@ -453,7 +484,7 @@
         <h2>Subscriptions and Payments</h2>
         <p>
           Apple handles payment processing for App Store purchases. RevenueCat
-          helps us manage subscription state, renewals, trials, restores, and
+          helps us manage subscription state, renewals, restores, and
           entitlements. You can manage or cancel subscriptions through your
           Apple ID account settings. We do not receive or store your full
           payment card information.
@@ -464,9 +495,9 @@
         <ul>
           <li>
             <strong>Service providers</strong> that help us operate Pepta,
-            including Apple, Google, RevenueCat, OpenAI, Amazon Web Services,
-            MongoDB Atlas, Render, Expo and app infrastructure providers, and
-            support or email providers.
+            including Apple, Google, RevenueCat, OpenAI, Together AI, Open Food
+            Facts, Amazon Web Services, MongoDB Atlas, Render, Expo and app
+            infrastructure providers, and support or email providers.
           </li>
           <li>
             <strong>Legal and safety reasons.</strong> We may share data if

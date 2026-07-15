@@ -19,6 +19,8 @@ import {
   doseLogResponseSchema,
   mealLogInputSchema,
   mealLogResponseSchema,
+  mealBarcodeInputSchema,
+  mealProductScanInputSchema,
   mealScanInputSchema,
   mealScanResponseSchema,
   mealTranscriptResponseSchema,
@@ -26,8 +28,12 @@ import {
   mealVoiceInputSchema,
   measurementInputSchema,
   measurementResponseSchema,
+  notificationPreferencesPatchSchema,
+  notificationPreferencesResponseSchema,
   onboardingCompleteInputSchema,
   onboardingResultResponseSchema,
+  pepChatRequestSchema,
+  pepChatResponseSchema,
   progressPhotoConfirmInputSchema,
   progressPhotoInputSchema,
   progressPhotoSchema,
@@ -37,6 +43,8 @@ import {
   proteinLogResponseSchema,
   fiberLogInputSchema,
   fiberLogResponseSchema,
+  pushTokenRegistrationRequestSchema,
+  pushTokenRegistrationResponseSchema,
   sideEffectLogInputSchema,
   sideEffectLogResponseSchema,
   trackResponseSchema,
@@ -62,6 +70,8 @@ import {
   type UserProfileSettingsPatch,
   type MealLogInput,
   type MealLogResponse,
+  type MealBarcodeInput,
+  type MealProductScanInput,
   type MealScanInput,
   type MealScanResponse,
   type MealTranscriptResponse,
@@ -69,8 +79,12 @@ import {
   type MealVoiceInput,
   type MeasurementInput,
   type MeasurementResponse,
+  type NotificationPreferencesPatch,
+  type NotificationPreferencesResponse,
   type OnboardingCompleteInput,
   type OnboardingResultResponse,
+  type PepChatMessage,
+  type PepChatResponse,
   type ProgressPhoto,
   type ProgressPhotoConfirmInput,
   type ProgressPhotoInput,
@@ -80,6 +94,8 @@ import {
   type ProteinLogResponse,
   type FiberLogInput,
   type FiberLogResponse,
+  type PushTokenRegistrationRequest,
+  type PushTokenRegistrationResponse,
   type SideEffectLogInput,
   type SideEffectLogResponse,
   type TrackResponse,
@@ -97,6 +113,10 @@ import type { FoodSearchResult } from "../screens/app/mealLog";
 import type { CompanionNote } from "../screens/app/companionNotes";
 
 type ResponseSchema<T> = z.ZodType<T, z.ZodTypeDef, unknown>;
+
+interface HomeRequestOptions {
+  aiDataSharingConsent?: boolean;
+}
 
 // Frontend-defined contract for the (pending) AI companion-notes endpoint
 // (backend /coach → OpenAI, key server-side). See docs/coach-endpoint.md.
@@ -299,10 +319,17 @@ class PeptaApi {
     );
   }
 
-  public getHome(range?: HomeRangeKey): Promise<HomeResponse> {
+  public getHome(
+    range?: HomeRangeKey,
+    options: HomeRequestOptions = {},
+  ): Promise<HomeResponse> {
     const suffix =
       range && range !== "today" ? `?range=${encodeURIComponent(range)}` : "";
-    return this.request(`/home${suffix}`, homeResponseSchema);
+    return this.request(`/home${suffix}`, homeResponseSchema, {
+      headers: options.aiDataSharingConsent
+        ? { "x-pepta-ai-consent": "true" }
+        : undefined,
+    });
   }
 
   // PATCH /me → updated profile settings. Used by Account preferences (units,
@@ -353,6 +380,32 @@ class PeptaApi {
 
   public getAvatarViewUrl(): Promise<AvatarViewUrlResponse> {
     return this.request("/me/avatar/view-url", avatarViewUrlResponseSchema);
+  }
+
+  public registerPushToken(
+    body: PushTokenRegistrationRequest,
+  ): Promise<PushTokenRegistrationResponse> {
+    return this.request(
+      "/me/push-tokens",
+      pushTokenRegistrationResponseSchema,
+      {
+        method: "POST",
+        body: JSON.stringify(pushTokenRegistrationRequestSchema.parse(body)),
+      },
+    );
+  }
+
+  public updateNotificationPreferences(
+    body: NotificationPreferencesPatch,
+  ): Promise<NotificationPreferencesResponse> {
+    return this.request(
+      "/me/notification-preferences",
+      notificationPreferencesResponseSchema,
+      {
+        method: "PATCH",
+        body: JSON.stringify(notificationPreferencesPatchSchema.parse(body)),
+      },
+    );
   }
 
   // POST /compounds → CompoundResponse (201). Adds a medication to track.
@@ -441,6 +494,28 @@ class PeptaApi {
     });
   }
 
+  // POST /meal-scans/product → MealScanResponse. Packaged-product label scan
+  // using backend-only Together/OpenAI keys.
+  public analyzeProductPhoto(
+    body: MealProductScanInput,
+  ): Promise<MealScanResponse> {
+    return this.request("/meal-scans/product", mealScanResponseSchema, {
+      method: "POST",
+      body: JSON.stringify(mealProductScanInputSchema.parse(body)),
+    });
+  }
+
+  // POST /meal-scans/barcode → MealScanResponse. Deterministic barcode lookup
+  // with Open Food Facts/OpenAI fallback on the backend.
+  public analyzeMealBarcode(
+    body: MealBarcodeInput,
+  ): Promise<MealScanResponse> {
+    return this.request("/meal-scans/barcode", mealScanResponseSchema, {
+      method: "POST",
+      body: JSON.stringify(mealBarcodeInputSchema.parse(body)),
+    });
+  }
+
   // POST /meal-scans/voice → MealScanResponse. Analyzes a spoken/typed description.
   public analyzeMealVoice(body: MealVoiceInput): Promise<MealScanResponse> {
     return this.request("/meal-scans/voice", mealScanResponseSchema, {
@@ -471,6 +546,15 @@ class PeptaApi {
     return this.request("/coach", coachNotesResponseSchema).then(
       (r) => r.notes,
     );
+  }
+
+  // POST /coach/chat → Pep's grounded back-and-forth chat. OpenAI stays
+  // server-side; the app sends only the user's current chat transcript.
+  public coachChat(messages: PepChatMessage[]): Promise<PepChatResponse> {
+    return this.request("/coach/chat", pepChatResponseSchema, {
+      method: "POST",
+      body: JSON.stringify(pepChatRequestSchema.parse({ messages })),
+    });
   }
 
   // GET /meal-scans/foods?q= → nutrition search results for the meal picker.

@@ -37,6 +37,22 @@ describe('buildCompanionNotes', () => {
     expect(note.text).toBe('You’re 60g from today’s protein — a snack closes it.');
     expect(note.action).toBe('meal');
   });
+  it('puts an important due shot before routine food and water nudges', () => {
+    const notes = buildCompanionNotes(home({
+      nextDose: {
+        compoundId: 'c1',
+        compoundName: 'Tirzepatide',
+        nextDoseAt: '2026-07-14T18:00:00.000Z',
+        hoursUntilNextDose: 1,
+      },
+    }));
+
+    expect(notes[0]).toMatchObject({
+      id: 'dose-due',
+      action: 'dose',
+      tone: 'nudge',
+    });
+  });
   it('celebrates protein when the target is hit', () => {
     const notes = buildCompanionNotes(home({ todayProteinGrams: 130 }));
     expect(notes.find((n) => n.id === 'protein-win')?.tone).toBe('win');

@@ -9,6 +9,7 @@ import { errorHandler, notFoundHandler } from "./middleware/error.middleware";
 import { createInMemoryRateLimiter } from "./middleware/rate-limit.middleware";
 import { requestLogger } from "./middleware/request-logger.middleware";
 import authRoutes from "./routes/auth.routes";
+import coachRoutes from "./routes/coach.routes";
 import {
   activityLogInputSchema,
   doseLogInputSchema,
@@ -22,6 +23,7 @@ import {
 import {
   activityLogService,
   doseLogService,
+  mealLogService,
   measurementService,
   proteinLogService,
   fiberLogService,
@@ -41,7 +43,7 @@ import diagnosticsRoutes from "./routes/diagnostics.routes";
 import homeRoutes from "./routes/home.routes";
 import insightsRoutes from "./routes/insights.routes";
 import { createLegalRouter } from "./routes/legal.routes";
-import mealLogsRoutes from "./routes/meal-logs.routes";
+import { createMealLogsRouter } from "./routes/meal-logs.routes";
 import mealScansRoutes from "./routes/meal-scans.routes";
 import medicationLevelRoutes from "./routes/medication-level.routes";
 import meRoutes from "./routes/me.routes";
@@ -51,6 +53,7 @@ import progressPhotosRoutes from "./routes/progress-photos.routes";
 import trackRoutes from "./routes/track.routes";
 import webhookRoutes from "./routes/webhook.routes";
 import weeklyRetentionRoutes from "./routes/weekly-retention.routes";
+import { withPepMemoryRefreshAfterLogCreate } from "./services/pepMemory.service";
 
 const LOCAL_ORIGIN_PATTERN = /^http:\/\/(localhost|127\.0\.0\.1):\d+$/;
 
@@ -89,6 +92,24 @@ interface CreateAppOptions {
 export function createApp(options: CreateAppOptions = {}): Express {
   const app = express();
   const healthCheck = options.healthCheck ?? isDatabaseReachable;
+  const trackedDoseLogService =
+    withPepMemoryRefreshAfterLogCreate(doseLogService);
+  const trackedWeightLogService =
+    withPepMemoryRefreshAfterLogCreate(weightLogService);
+  const trackedMealLogService =
+    withPepMemoryRefreshAfterLogCreate(mealLogService);
+  const trackedWaterLogService =
+    withPepMemoryRefreshAfterLogCreate(waterLogService);
+  const trackedProteinLogService =
+    withPepMemoryRefreshAfterLogCreate(proteinLogService);
+  const trackedFiberLogService =
+    withPepMemoryRefreshAfterLogCreate(fiberLogService);
+  const trackedActivityLogService =
+    withPepMemoryRefreshAfterLogCreate(activityLogService);
+  const trackedSideEffectLogService =
+    withPepMemoryRefreshAfterLogCreate(sideEffectLogService);
+  const trackedMeasurementService =
+    withPepMemoryRefreshAfterLogCreate(measurementService);
 
   app.use("/legal", createLegalRouter());
   app.disable("x-powered-by");
@@ -119,6 +140,7 @@ export function createApp(options: CreateAppOptions = {}): Express {
   app.use("/track", trackRoutes);
   app.use("/progress", progressRoutes);
   app.use("/medication-level", medicationLevelRoutes);
+  app.use("/coach", coachRoutes);
   app.use(
     "/insights",
     requireAuth,
@@ -146,32 +168,32 @@ export function createApp(options: CreateAppOptions = {}): Express {
   app.use("/compounds", createCompoundsRouter());
   app.use("/cycles", createCyclesRouter());
   app.use("/schedules", createSchedulesRouter());
-  app.use("/dose-logs", createLogRouter(doseLogInputSchema, doseLogService));
+  app.use("/dose-logs", createLogRouter(doseLogInputSchema, trackedDoseLogService));
   app.use(
     "/weight-logs",
-    createLogRouter(weightLogInputSchema, weightLogService),
+    createLogRouter(weightLogInputSchema, trackedWeightLogService),
   );
-  app.use("/meal-logs", mealLogsRoutes);
-  app.use("/water-logs", createLogRouter(waterLogInputSchema, waterLogService));
+  app.use("/meal-logs", createMealLogsRouter(trackedMealLogService));
+  app.use("/water-logs", createLogRouter(waterLogInputSchema, trackedWaterLogService));
   app.use(
     "/protein-logs",
-    createLogRouter(proteinLogInputSchema, proteinLogService),
+    createLogRouter(proteinLogInputSchema, trackedProteinLogService),
   );
   app.use(
     "/fiber-logs",
-    createLogRouter(fiberLogInputSchema, fiberLogService),
+    createLogRouter(fiberLogInputSchema, trackedFiberLogService),
   );
   app.use(
     "/activity-logs",
-    createLogRouter(activityLogInputSchema, activityLogService),
+    createLogRouter(activityLogInputSchema, trackedActivityLogService),
   );
   app.use(
     "/side-effect-logs",
-    createLogRouter(sideEffectLogInputSchema, sideEffectLogService),
+    createLogRouter(sideEffectLogInputSchema, trackedSideEffectLogService),
   );
   app.use(
     "/measurements",
-    createLogRouter(measurementInputSchema, measurementService),
+    createLogRouter(measurementInputSchema, trackedMeasurementService),
   );
   app.use("/progress-photos", progressPhotosRoutes);
   app.use("/research-library", createResearchLibraryRouter());

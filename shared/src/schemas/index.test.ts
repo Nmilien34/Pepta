@@ -4,13 +4,21 @@ import {
   avatarUploadIntentRequestSchema,
   avatarUploadIntentResponseSchema,
   avatarViewUrlResponseSchema,
+  authResponseSchema,
   compoundResponseSchema,
   insightSchema,
+  mealBarcodeInputSchema,
   mealLogScanDetailResponseSchema,
+  mealLogSourceSchema,
+  mealProductScanInputSchema,
   mealScanResponseSchema,
   medicationCatalogItemSchema,
+  notificationPreferencesPatchSchema,
+  notificationPreferencesResponseSchema,
   onboardingCompleteInputSchema,
   onboardingResultResponseSchema,
+  pushTokenRegistrationRequestSchema,
+  pushTokenRegistrationResponseSchema,
   sideEffectLogInputSchema,
   userAccountPatchSchema,
   userResponseSchema,
@@ -132,6 +140,28 @@ describe("shared profile schemas", () => {
     expect(result.success).toBe(true);
   });
 
+  it("allows auth responses to say whether the provider sign-in created a new user", () => {
+    const result = authResponseSchema.safeParse({
+      token: "token_1",
+      isNewUser: true,
+      user: {
+        id: "user_1",
+        emailVerified: true,
+        hasAvatar: false,
+        authProviders: [],
+        entitlement: { status: "free", expiresAt: null, willRenew: false },
+        onboardingComplete: false,
+        createdAt: "2026-06-21T00:00:00.000Z",
+        updatedAt: "2026-06-21T00:00:00.000Z",
+      },
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.isNewUser).toBe(true);
+    }
+  });
+
   it("allows additive insight copy versions", () => {
     const result = insightSchema.safeParse({
       id: "insight-1",
@@ -145,6 +175,60 @@ describe("shared profile schemas", () => {
     });
 
     expect(result.success).toBe(true);
+  });
+
+  it("accepts product scan and barcode contracts with source metadata", () => {
+    expect(mealLogSourceSchema.safeParse("product_scan").success).toBe(true);
+    expect(mealLogSourceSchema.safeParse("barcode").success).toBe(true);
+
+    expect(
+      mealProductScanInputSchema.safeParse({
+        imageData: "iVBORw0KGgo=",
+        imageMimeType: "image/png",
+        capturedAt: "2026-07-14T12:00:00.000Z",
+        idempotencyKey: "product-scan-1",
+      }).success,
+    ).toBe(true);
+
+    expect(
+      mealBarcodeInputSchema.safeParse({
+        barcode: "012345678905",
+        scannedAt: "2026-07-14T12:00:00.000Z",
+      }).success,
+    ).toBe(true);
+
+    const response = mealScanResponseSchema.safeParse({
+      scanId: "scan-1",
+      photoS3Key: "pepta/meal-scans/user-1/product.png",
+      analysis: {
+        foodName: "Acme Protein Yogurt",
+        servingSize: "1 cup",
+        protein: 18,
+        calories: 160,
+        carbs: 12,
+        fat: 4,
+        fiber: 1,
+        confidence: 0.84,
+      },
+      coachContent: null,
+      note: "Review this packaged product before logging.",
+      visionEngineVersion: "product-scan-v1",
+      product: {
+        mode: "product_scan",
+        barcode: "012345678905",
+        brand: "Acme",
+        productName: "Protein Yogurt",
+        source: "open_food_facts",
+        citations: [
+          {
+            title: "Acme Protein Yogurt nutrition facts",
+            url: "https://example.com/acme-yogurt",
+          },
+        ],
+      },
+    });
+
+    expect(response.success).toBe(true);
   });
 
   it("accepts date of birth, gender identity, medication status, and no sex in profile input", () => {
@@ -352,5 +436,36 @@ describe("shared profile schemas", () => {
     });
 
     expect(result.success).toBe(true);
+  });
+
+  it("describes backend push token registration and AI notification consent", () => {
+    expect(
+      pushTokenRegistrationRequestSchema.safeParse({
+        token: "ExponentPushToken[abc123]",
+        platform: "ios",
+        deviceId: "device-1",
+        appVersion: "1.0.0",
+      }).success,
+    ).toBe(true);
+    expect(
+      pushTokenRegistrationResponseSchema.safeParse({
+        token: "ExponentPushToken[abc123]",
+        platform: "ios",
+        enabled: true,
+        lastSeenAt: "2026-06-21T00:00:00.000Z",
+      }).success,
+    ).toBe(true);
+    expect(
+      notificationPreferencesPatchSchema.safeParse({
+        aiPushCopyConsent: true,
+      }).success,
+    ).toBe(true);
+    expect(
+      notificationPreferencesResponseSchema.safeParse({
+        aiPushCopyConsent: true,
+        aiPushCopyConsentAt: "2026-06-21T00:00:00.000Z",
+        aiPushCopyConsentRevokedAt: null,
+      }).success,
+    ).toBe(true);
   });
 });

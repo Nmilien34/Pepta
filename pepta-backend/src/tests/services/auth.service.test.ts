@@ -120,6 +120,7 @@ describe("auth service", () => {
     expect(verifySessionJwt(result.token).sub).toBe("507f1f77bcf86cd799439011");
     expect(result.user.email).toBe("user@example.com");
     expect(result.user.authProviders).toHaveLength(1);
+    expect(result.isNewUser).toBe(true);
   });
 
   it("returns the same user for a repeated Google provider identity", async () => {
@@ -149,6 +150,7 @@ describe("auth service", () => {
     expect(existing.authProviders).toHaveLength(1);
     expect(existing.save).toHaveBeenCalled();
     expect(result.user.id).toBe("507f1f77bcf86cd799439011");
+    expect(result.isNewUser).toBe(false);
   });
 
   it("links an Apple identity to an existing verified email account", async () => {
@@ -186,5 +188,6 @@ describe("auth service", () => {
     );
     expect(existing.save).toHaveBeenCalled();
     expect(result.user.authProviders).toHaveLength(2);
+    expect(result.isNewUser).toBe(false);
   });
 });

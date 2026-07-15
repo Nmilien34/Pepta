@@ -23,6 +23,7 @@ export interface ButtonProps {
   disabled?: boolean;
   loading?: boolean;
   fullWidth?: boolean;
+  accessibilityLabel?: string;
   // Optional leading element (icon).
   leading?: React.ReactNode;
   style?: ViewStyle;
@@ -35,6 +36,7 @@ export function Button({
   disabled,
   loading,
   fullWidth = true,
+  accessibilityLabel,
   leading,
   style,
 }: ButtonProps) {
@@ -119,6 +121,7 @@ export function Button({
         onPressOut={pressOut}
         disabled={isDisabled}
         accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel}
         accessibilityState={{
           disabled: Boolean(isDisabled),
           busy: Boolean(loading),

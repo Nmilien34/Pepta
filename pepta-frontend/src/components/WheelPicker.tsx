@@ -22,6 +22,11 @@ import tickSound from '../../assets/tick.wav';
 
 const ITEM_H = 44;
 
+// Exported so a parent that composes several columns (DateWheel) can draw ONE
+// unified selection band across all of them instead of one band per column.
+export const WHEEL_ITEM_HEIGHT = ITEM_H;
+export const WHEEL_HEIGHT = 176;
+
 export interface WheelItem {
   label: string;
   value: number;
@@ -34,15 +39,19 @@ export interface WheelPickerProps {
   height?: number;
   fontSize?: number;
   centerScale?: number;
+  // Draw the highlighted center band. Off when a parent draws one shared band
+  // across several columns (so the columns read as one picker card).
+  band?: boolean;
 }
 
 export function WheelPicker({
   items,
   value,
   onChange,
-  height = 176,
+  height = WHEEL_HEIGHT,
   fontSize = 18,
   centerScale = 1.35,
+  band = true,
 }: WheelPickerProps) {
   const theme = useTheme();
   const pad = (height - ITEM_H) / 2;
@@ -96,18 +105,20 @@ export function WheelPicker({
 
   return (
     <View style={{ height }}>
-      <View
-        pointerEvents="none"
-        style={{
-          position: 'absolute',
-          left: 4,
-          right: 4,
-          top: pad,
-          height: ITEM_H,
-          borderRadius: 13,
-          backgroundColor: theme.colors.surfaceAlt,
-        }}
-      />
+      {band ? (
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            left: 4,
+            right: 4,
+            top: pad,
+            height: ITEM_H,
+            borderRadius: 13,
+            backgroundColor: theme.colors.surfaceAlt,
+          }}
+        />
+      ) : null}
       <Animated.ScrollView
         ref={scrollRef}
         showsVerticalScrollIndicator={false}

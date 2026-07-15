@@ -3,7 +3,8 @@
 // are used for accessibility since the letters repeat (S, T).
 
 import React, { useEffect, useRef } from 'react';
-import { Animated, Easing, Pressable, View } from 'react-native';
+import { Animated, Easing, Platform, Pressable, View } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { useTheme } from '../../theme';
 import { AppText } from '../AppText';
 
@@ -25,7 +26,10 @@ export function DayOfWeekPicker({ value, onToggle }: DayOfWeekPickerProps) {
           letter={letter}
           name={DAY_NAMES[index] ?? letter}
           selected={value.includes(index)}
-          onPress={() => onToggle(index)}
+          onPress={() => {
+            if (Platform.OS !== 'web') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            onToggle(index);
+          }}
         />
       ))}
     </View>

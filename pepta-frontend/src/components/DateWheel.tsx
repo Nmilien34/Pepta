@@ -5,7 +5,8 @@
 
 import React from 'react';
 import { View } from 'react-native';
-import { WheelPicker, type WheelItem } from './WheelPicker';
+import { WheelPicker, WHEEL_HEIGHT, WHEEL_ITEM_HEIGHT, type WheelItem } from './WheelPicker';
+import { useTheme } from '../theme';
 import {
   MONTHS_SHORT,
   clampDay,
@@ -28,7 +29,9 @@ export interface DateWheelProps {
 const MONTH_ITEMS: WheelItem[] = MONTHS_SHORT.map((label, value) => ({ label, value }));
 
 export function DateWheel({ value, onChange, minYear, maxYear, maxToday, now }: DateWheelProps) {
+  const theme = useTheme();
   const reference = now ?? new Date();
+  const bandTop = (WHEEL_HEIGHT - WHEEL_ITEM_HEIGHT) / 2;
   const dayItems: WheelItem[] = numberRange(1, daysInMonth(value.year, value.month)).map((d) => ({
     label: String(d),
     value: d,
@@ -44,28 +47,47 @@ export function DateWheel({ value, onChange, minYear, maxYear, maxToday, now }: 
   };
 
   return (
-    <View style={{ flexDirection: 'row', gap: 6 }}>
-      <View style={{ flex: 1.4 }}>
-        <WheelPicker
-          items={MONTH_ITEMS}
-          value={value.month}
-          onChange={(month) => commit({ ...value, month })}
-        />
-      </View>
-      <View style={{ flex: 1 }}>
-        <WheelPicker
-          key={`${value.year}-${value.month}`}
-          items={dayItems}
-          value={value.day}
-          onChange={(day) => commit({ ...value, day })}
-        />
-      </View>
-      <View style={{ flex: 1.2 }}>
-        <WheelPicker
-          items={yearItems}
-          value={value.year}
-          onChange={(year) => commit({ ...value, year })}
-        />
+    <View style={{ position: 'relative' }}>
+      {/* One shared selection band behind all three columns — the picker reads
+          as a single card, not three separate bands. */}
+      <View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          left: 4,
+          right: 4,
+          top: bandTop,
+          height: WHEEL_ITEM_HEIGHT,
+          borderRadius: 13,
+          backgroundColor: theme.colors.surfaceAlt,
+        }}
+      />
+      <View style={{ flexDirection: 'row', gap: 6 }}>
+        <View style={{ flex: 1.4 }}>
+          <WheelPicker
+            band={false}
+            items={MONTH_ITEMS}
+            value={value.month}
+            onChange={(month) => commit({ ...value, month })}
+          />
+        </View>
+        <View style={{ flex: 1 }}>
+          <WheelPicker
+            band={false}
+            key={`${value.year}-${value.month}`}
+            items={dayItems}
+            value={value.day}
+            onChange={(day) => commit({ ...value, day })}
+          />
+        </View>
+        <View style={{ flex: 1.2 }}>
+          <WheelPicker
+            band={false}
+            items={yearItems}
+            value={value.year}
+            onChange={(year) => commit({ ...value, year })}
+          />
+        </View>
       </View>
     </View>
   );

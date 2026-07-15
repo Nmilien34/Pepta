@@ -1,72 +1,87 @@
-// Onboarding screen 1 — Welcome / hero. Sets the premium, calm tone: Pep waving
-// and gently floating, a confident one-line promise, and the entry CTA. Both
-// "Get started" and "Sign in" lead to the provider sign-in screen (screen 1b).
+// Screen 1 — The gift (T1). The app is alive from the very first open: the
+// greeting types itself at reading speed with haptic ticks, then gives before
+// it asks — the 1-in-8 stat (cited), the faces on the same road, and only then
+// the entry CTA. Both CTAs lead to the provider sign-in screen.
 
-import React from 'react';
-import { Pressable, StatusBar, StyleSheet, View } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useTheme } from '../../theme';
-import { AppText, Button, Float, Mascot, Reveal } from '../../components';
+import React, { useState } from 'react';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import * as Haptics from 'expo-haptics';
+import { CitedStat, ConvoButton, ConvoScreen, convo } from '../../components';
+import { typography } from '../../theme/typography';
 
 export interface WelcomeScreenProps {
   onContinue(): void;
 }
 
+const FACES = [
+  { initial: 'M', tone: '#EAD9C4' },
+  { initial: 'J', tone: '#D4E3D2' },
+  { initial: 'R', tone: '#DCD2EE' },
+  { initial: 'T', tone: '#CFE0EA' },
+  { initial: 'S', tone: '#EADFD0' },
+];
+
 export function WelcomeScreen({ onContinue }: WelcomeScreenProps) {
-  const theme = useTheme();
+  const [typed, setTyped] = useState(false);
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.colors.bg }}>
-      <StatusBar barStyle="dark-content" />
-      <LinearGradient
-        colors={['#F1ECFF', theme.colors.bg] as const}
-        locations={[0, 0.5] as const}
-        style={StyleSheet.absoluteFill}
-      />
-      <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1 }}>
-        <View
-          style={{
-            flex: 1,
-            paddingHorizontal: theme.spacing['2xl'],
-            paddingBottom: theme.spacing['2xl'],
-          }}
-        >
-          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: theme.spacing['2xl'] }}>
-            <Reveal>
-              <Float>
-                <Mascot pose="wave" size={186} />
-              </Float>
-            </Reveal>
-            <View style={{ alignItems: 'center', gap: theme.spacing.md }}>
-              <Reveal delay={140}>
-                <AppText variant="screenTitle" align="center">
-                  Your trusted{'\n'}GLP-1 partner.
-                </AppText>
-              </Reveal>
-              <Reveal delay={220}>
-                <AppText variant="body" color="textSecondary" align="center" style={{ maxWidth: 290 }}>
-                  Lose the fat, keep the muscle — Pepta tracks the whole journey.
-                </AppText>
-              </Reveal>
-            </View>
-          </View>
-
-          <Reveal delay={340}>
-            <Button label="Get started" onPress={onContinue} />
-          </Reveal>
-          <Reveal delay={420} style={{ marginTop: theme.spacing.lg, alignItems: 'center' }}>
-            <Pressable onPress={onContinue} hitSlop={theme.sizes.hitSlop} accessibilityRole="button">
-              <AppText variant="caption" color="textSecondary">
-                Already have an account?{' '}
-                <AppText variant="caption" color="primary" style={{ fontWeight: '700' }}>
-                  Sign in
-                </AppText>
-              </AppText>
-            </Pressable>
-          </Reveal>
+    <ConvoScreen
+      progress={1 / 35}
+      context="Hi. Before anything else, one thing."
+      question="You’re not doing this alone."
+      onTyped={() => {
+        setTyped(true);
+        // The stat lands with the thump as it reveals.
+        if (Platform.OS !== 'web') {
+          setTimeout(() => void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success), 220);
+        }
+      }}
+      footer={
+        <View style={{ gap: 4 }}>
+          <ConvoButton label="I’m ready" onPress={onContinue} />
+          <Pressable accessibilityRole="button" accessibilityLabel="Sign in" onPress={onContinue} style={styles.quiet}>
+            <Text style={styles.quietText}>
+              Already have an account? <Text style={{ color: convo.ink, fontFamily: typography.fonts.bold }}>Sign in</Text>
+            </Text>
+          </Pressable>
         </View>
-      </SafeAreaView>
-    </View>
+      }
+    >
+      {typed ? (
+        <View style={styles.stat}>
+          <CitedStat
+            value="1 in 8"
+            line="American adults has taken a GLP-1. Millions are on this exact road with you."
+            cite="KFF Health Tracking Poll, May 2024"
+          />
+          <View style={styles.faces}>
+            {FACES.map((face, i) => (
+              <View key={face.initial} style={[styles.face, { backgroundColor: face.tone, marginLeft: i === 0 ? 0 : -8 }]}>
+                <Text style={styles.faceText}>{face.initial}</Text>
+              </View>
+            ))}
+            <Text style={styles.facesMore}>15 million+ right now</Text>
+          </View>
+        </View>
+      ) : null}
+    </ConvoScreen>
   );
 }
+
+const styles = StyleSheet.create({
+  stat: { paddingTop: 44 },
+  faces: { flexDirection: 'row', alignItems: 'center', marginTop: 18 },
+  face: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 2,
+    borderColor: convo.ground,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  faceText: { fontFamily: typography.fonts.bold, fontSize: 12, color: convo.ink },
+  facesMore: { fontFamily: typography.fonts.semiBold, fontSize: 12.5, color: convo.soft, marginLeft: 10 },
+  quiet: { alignItems: 'center', paddingVertical: 13 },
+  quietText: { fontFamily: typography.fonts.medium, fontSize: 13.5, color: convo.soft },
+});

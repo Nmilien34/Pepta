@@ -8,9 +8,8 @@ import { Icon } from "../../components/Icon";
 import * as Haptics from 'expo-haptics';
 import { useNavigation, type NavigationProp } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Svg, { Circle, Path } from 'react-native-svg';
 import { useTheme } from '../../theme';
-import { AddCompoundSheet, AppText, BodyMap, Button, Card, Mascot, ProgressRing, Reveal, ScreenHeader, SectionErrorBanner } from '../../components';
+import { AddCompoundSheet, AppText, BodyMap, Button, Card, Mascot, ProgressRing, Reveal, ScreenHeader, SectionErrorBanner, TrendLineChart } from '../../components';
 import { usePeptaData } from '../../context/PeptaDataContext';
 import { useLogSheets } from '../../context/LogSheetsContext';
 import { formatCountdown } from './homeView';
@@ -306,25 +305,14 @@ export function TrackScreen() {
   );
 }
 
+// Medication-level curve — rendered by react-native-chart-kit via the shared
+// TrendLineChart brand config. `levels` is the REAL pharmacokinetic curve from
+// the /home response (ml.curve), never placeholder data.
 function LevelChart({ levels, color }: { levels: number[]; color: string }) {
-  const W = 300;
-  const H = 78;
-  const max = Math.max(...levels, 1);
-  const path = levels
-    .map((v, i) => {
-      const x = (i / (levels.length - 1)) * W;
-      const y = H - (v / max) * (H - 12) - 6;
-      return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)} ${y.toFixed(1)}`;
-    })
-    .join(' ');
-  const lastX = W;
-  const lastY = H - (levels[levels.length - 1]! / max) * (H - 12) - 6;
   return (
-    <Svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 78, marginTop: 12 }}>
-      <Path d={`${path} L${W} ${H} L0 ${H} Z`} fill={color} opacity={0.1} />
-      <Path d={path} stroke={color} strokeWidth={3} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-      <Circle cx={lastX} cy={lastY} r={4.5} fill={color} />
-    </Svg>
+    <View style={{ marginTop: 12 }}>
+      <TrendLineChart values={levels} color={color} height={96} fillOpacity={0.1} showLastDot />
+    </View>
   );
 }
 

@@ -5,6 +5,8 @@ import {
   isRevenueCatPurchaseCancelled,
 } from "./revenueCat";
 
+type RevenueCatSdkOption = Parameters<typeof createRevenueCatClient>[0]["sdk"];
+
 function customerInfo(active = true) {
   return {
     entitlements: {
@@ -33,15 +35,20 @@ function makePackage(identifier: string, productIdentifier: string) {
   };
 }
 
-function makeSdk() {
+function makeSdk(calls: string[] = []) {
   const monthly = makePackage("$rc_monthly", "monthly");
   const yearly = makePackage("$rc_annual", "yearly");
-  return {
-    monthly,
-    yearly,
-    sdk: {
-      configure: vi.fn(),
-      getOfferings: vi.fn().mockResolvedValue({
+  const sdk = {
+    configure: vi.fn(),
+    collectDeviceIdentifiers: vi.fn(async () => {
+      calls.push("collect-device-identifiers");
+    }),
+    setAppsflyerID: vi.fn(async (appsFlyerId: string | null) => {
+      calls.push(`set-appsflyer-id:${appsFlyerId ?? "null"}`);
+    }),
+    getOfferings: vi.fn(async () => {
+      calls.push("get-offerings");
+      return {
         current: {
           identifier: "default",
           monthly,
@@ -49,22 +56,34 @@ function makeSdk() {
           availablePackages: [monthly, yearly],
         },
         all: {},
-      }),
-      logIn: vi.fn().mockResolvedValue({ customerInfo: customerInfo(), created: false }),
-      logOut: vi.fn().mockResolvedValue(customerInfo(false)),
-      purchasePackage: vi.fn().mockResolvedValue({
+      };
+    }),
+    logIn: vi.fn(async (appUserId: string) => {
+      calls.push(`login:${appUserId}`);
+      return { customerInfo: customerInfo(), created: false };
+    }),
+    logOut: vi.fn().mockResolvedValue(customerInfo(false)),
+    purchasePackage: vi.fn(async () => {
+      calls.push("purchase");
+      return {
         productIdentifier: "yearly",
         customerInfo: customerInfo(),
-      }),
-      restorePurchases: vi.fn().mockResolvedValue(customerInfo()),
-      setLogHandler: vi.fn(),
-      setLogLevel: vi.fn().mockResolvedValue(undefined),
-    },
+      };
+    }),
+    restorePurchases: vi.fn().mockResolvedValue(customerInfo()),
+    setLogHandler: vi.fn(),
+    setLogLevel: vi.fn().mockResolvedValue(undefined),
+  };
+
+  return {
+    monthly,
+    yearly,
+    sdk: sdk as typeof sdk & RevenueCatSdkOption,
   };
 }
 
 describe("RevenueCat client", () => {
-  it("configures with the iOS key and backend user id, then logs in when the user changes", async () => {
+  it("configures anonymously, then logs in with the backend user id", async () => {
     const { sdk } = makeSdk();
     const client = createRevenueCatClient({
       sdk,
@@ -79,10 +98,11 @@ describe("RevenueCat client", () => {
 
     expect(sdk.configure).toHaveBeenCalledTimes(1);
     expect(sdk.configure).toHaveBeenCalledWith(
-      expect.objectContaining({ apiKey: "appl_test_key", appUserID: "user_1" }),
+      expect.objectContaining({ apiKey: "appl_test_key", appUserID: null }),
     );
-    expect(sdk.logIn).toHaveBeenCalledTimes(1);
-    expect(sdk.logIn).toHaveBeenCalledWith("user_2");
+    expect(sdk.logIn).toHaveBeenCalledTimes(2);
+    expect(sdk.logIn).toHaveBeenNthCalledWith(1, "user_1");
+    expect(sdk.logIn).toHaveBeenNthCalledWith(2, "user_2");
   });
 
   it("routes RevenueCat dev errors through warn so LogBox does not red-screen", async () => {
@@ -138,6 +158,39 @@ describe("RevenueCat client", () => {
 
     expect(sdk.purchasePackage).toHaveBeenCalledWith(yearly);
     expect(result.entitlementActive).toBe(true);
+  });
+
+  it("sends AppsFlyer attribution identifiers to RevenueCat before purchases", async () => {
+    const calls: string[] = [];
+    const { sdk } = makeSdk(calls);
+    const getAppsFlyerId = vi.fn(async (appUserId?: string) => {
+      calls.push(`get-appsflyer-id:${appUserId ?? "anonymous"}`);
+      return "af-uid-1";
+    });
+    const client = createRevenueCatClient({
+      sdk,
+      apiKey: "appl_test_key",
+      platformOS: "ios",
+      devMode: false,
+      getAppsFlyerId,
+    });
+
+    await client.purchasePlan("user_1", "yearly");
+
+    expect(getAppsFlyerId).toHaveBeenCalledWith("user_1");
+    expect(sdk.collectDeviceIdentifiers).toHaveBeenCalledTimes(2);
+    expect(sdk.setAppsflyerID).toHaveBeenCalledWith("af-uid-1");
+    expect(calls).toEqual([
+      "login:user_1",
+      "get-appsflyer-id:user_1",
+      "collect-device-identifiers",
+      "set-appsflyer-id:af-uid-1",
+      "get-offerings",
+      "get-appsflyer-id:user_1",
+      "collect-device-identifiers",
+      "set-appsflyer-id:af-uid-1",
+      "purchase",
+    ]);
   });
 
   it("restores purchases and reports active pro access", async () => {

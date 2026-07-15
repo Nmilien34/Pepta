@@ -35,40 +35,29 @@ vi.mock("../../config", () => ({
   TERMS_URL: "https://pepta.test/terms",
 }));
 
-vi.mock("../../theme", () => ({
-  useTheme: () => ({
-    colors: {
-      primary: "#8B5CF6",
-      surface: "#fff",
-      surfaceAlt: "#f4f4f5",
-      textSecondary: "#666",
-      textTertiary: "#999",
-    },
-    spacing: {
-      sm: 8,
-      md: 12,
-      lg: 16,
-    },
-  }),
+vi.mock("../../theme/typography", () => ({
+  typography: { fonts: { medium: "m", semiBold: "sb", bold: "b", heavy: "h" } },
 }));
 
+// The conversation scaffold renders its children (where the legal link rows
+// live), so the test can find them; the token bag is inert.
 vi.mock("../../components", () => ({
-  AppText: ({ children, ...props }: { children?: React.ReactNode }) =>
-    React.createElement("Text", props, children),
-  Button: ({ label, onPress }: { label: string; onPress?: () => void }) =>
-    React.createElement(
-      "Pressable",
-      { accessibilityRole: "button", accessibilityLabel: label, onPress },
-      label,
-    ),
-  Mascot: "Mascot",
-  OnboardingScaffold: ({
+  ConvoScreen: ({
     children,
     footer,
   }: {
     children?: React.ReactNode;
     footer?: React.ReactNode;
   }) => React.createElement("View", null, children, footer),
+  convo: {
+    ground: "#fff",
+    ink: "#111",
+    soft: "#555",
+    faint: "#999",
+    hairline: "#eee",
+    surface: "#fff",
+    primary: "#8B5CF6",
+  },
 }));
 
 vi.mock("../../components/Icon", () => ({

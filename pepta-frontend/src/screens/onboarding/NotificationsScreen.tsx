@@ -1,61 +1,42 @@
-// Onboarding screen 21 — Notifications. "Continue" requests local reminder
-// permission through the navigator; "Not now" skips without saving defaults.
+// Onboarding — Notifications (T23). A single Continue that flows STRAIGHT into
+// the iOS permission prompt — no skip chip, no pre-permission choice (App
+// Review 5.1.1(iv)); declining lives in the system dialog itself.
 
 import React, { useState } from 'react';
-import { Pressable, View } from 'react-native';
-import { Icon } from "../../components/Icon";
-import { LinearGradient } from 'expo-linear-gradient';
-import { useTheme } from '../../theme';
-import { AppText, Button, OnboardingScaffold } from '../../components';
+import { ConvoButton, ConvoScreen } from '../../components';
 
 export interface NotificationsScreenProps {
   progress: number;
   onBack?(): void;
+  context?: string;
+  /** e.g. "Sundays around 8 PM." */
+  sub?: string;
   onAllow?(): Promise<void> | void;
   onContinue(): void;
 }
 
-export function NotificationsScreen({ progress, onBack, onAllow, onContinue }: NotificationsScreenProps) {
-  const theme = useTheme();
-  const [loading, setLoading] = useState(false);
+export function NotificationsScreen({ progress, onBack, context, sub, onAllow, onContinue }: NotificationsScreenProps) {
+  const [busy, setBusy] = useState(false);
 
   const handleAllow = async () => {
-    setLoading(true);
+    if (busy) return;
+    setBusy(true);
     try {
       await onAllow?.();
     } finally {
-      setLoading(false);
+      setBusy(false);
       onContinue();
     }
   };
 
   return (
-    <OnboardingScaffold
+    <ConvoScreen
       progress={progress}
       onBack={onBack}
-      tintColor="#F1ECFF"
-      // 5.1.1(iv): a pre-permission screen must flow INTO the system prompt —
-      // no skip/exit. Denying lives in the iOS dialog itself.
-      footer={<Button label="Continue" onPress={handleAllow} loading={loading} />}
-    >
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: theme.spacing.xl }}>
-        <LinearGradient
-          colors={[theme.colors.primaryGradientStart, theme.colors.primaryGradientEnd] as const}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={{ width: 96, height: 96, borderRadius: 26, alignItems: 'center', justifyContent: 'center' }}
-        >
-          <Icon name="notifications" size={44} color="#FFFFFF" />
-        </LinearGradient>
-        <View style={{ alignItems: 'center', gap: theme.spacing.md }}>
-          <AppText variant="obTitle" align="center">
-            Never miss a shot
-          </AppText>
-          <AppText variant="body" color="textSecondary" align="center" style={{ maxWidth: 260 }}>
-            Gentle reminders for your dose, water and protein — only when they help.
-          </AppText>
-        </View>
-      </View>
-    </OnboardingScaffold>
+      context={context}
+      question="Want shot-day pings?"
+      sub={sub ?? 'Dose, water and protein reminders — only when they help.'}
+      footer={<ConvoButton label="Continue" disabled={busy} onPress={handleAllow} />}
+    />
   );
 }

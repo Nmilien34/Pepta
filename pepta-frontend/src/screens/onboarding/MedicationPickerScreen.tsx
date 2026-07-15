@@ -1,63 +1,64 @@
-// Onboarding screen 4 — Medication picker. A searchable, single-select catalog
-// list. The chosen item's `route` drives later gating (oral hides injection
-// site; daily-default frequency). Selection is held in navigator flow state for
-// now and mapped to the typed `compound` draft once dose/start-date are captured.
+// Onboarding — Medication (T4). A live-filtered, single-select catalog list
+// inside the conversation turn. Tapping a row speaks it: haptic tap + a short
+// beat, then auto-advance (no Continue). The chosen item's route drives later
+// gating (oral hides injection turns; ambiguous meds get the route question).
 
-import React, { useMemo, useState } from 'react';
-import { View } from 'react-native';
-import { Icon } from "../../components/Icon";
-import { useTheme } from '../../theme';
-import { AppText, Button, OnboardingScaffold, OptionCard, SearchField } from '../../components';
+import React, { useMemo, useRef, useState } from 'react';
+import { Platform, View } from 'react-native';
+import * as Haptics from 'expo-haptics';
+import { Icon } from '../../components/Icon';
+import { AppText, ConvoScreen, OptionCard, SearchField } from '../../components';
 import { MEDICATION_CATALOG, searchMedications, type MedicationOption } from '../../data/medicationCatalog';
 
 export interface MedicationPickerScreenProps {
   progress: number;
   onBack?(): void;
+  context?: string;
   value?: MedicationOption;
-  onChange(item: MedicationOption): void;
-  onContinue(): void;
+  onAnswer(item: MedicationOption): void;
 }
 
-export function MedicationPickerScreen({
-  progress,
-  onBack,
-  value,
-  onChange,
-  onContinue,
-}: MedicationPickerScreenProps) {
-  const theme = useTheme();
+export function MedicationPickerScreen({ progress, onBack, context, value, onAnswer }: MedicationPickerScreenProps) {
   const [query, setQuery] = useState('');
+  const [picked, setPicked] = useState<MedicationOption | undefined>(value);
+  const advanced = useRef(false);
   const results = useMemo(() => searchMedications(MEDICATION_CATALOG, query), [query]);
 
+  const handlePick = (item: MedicationOption) => {
+    if (advanced.current) return;
+    advanced.current = true;
+    setPicked(item);
+    if (Platform.OS !== 'web') {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      setTimeout(() => void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success), 220);
+    }
+    // A brief beat so the selection state lands before the turn advances.
+    setTimeout(() => onAnswer(item), 420);
+  };
+
   return (
-    <OnboardingScaffold
+    <ConvoScreen
       progress={progress}
       onBack={onBack}
-      footer={<Button label="Continue" onPress={onContinue} disabled={!value} />}
+      context={context}
+      question="Which medication?"
     >
-      <AppText variant="obTitle">What are you taking?</AppText>
-      <View style={{ marginTop: theme.spacing.md }}>
+      <View style={{ marginTop: 22 }}>
         <SearchField value={query} onChangeText={setQuery} placeholder="Search medications" />
       </View>
-
-      <View style={{ gap: 9, marginTop: theme.spacing.md }}>
+      <View style={{ gap: 9, marginTop: 14 }}>
         {results.map((item) => (
           <OptionCard
             key={item.id}
             title={item.name}
             subtitle={item.subtitle}
             icon={<MedIcon item={item} />}
-            selected={value?.id === item.id}
-            onPress={() => onChange(item)}
+            selected={picked?.id === item.id}
+            onPress={() => handlePick(item)}
           />
         ))}
-        {results.length === 0 ? (
-          <AppText variant="caption" color="textSecondary" align="center" style={{ paddingVertical: theme.spacing.lg }}>
-            No matches. You can add it later in Settings.
-          </AppText>
-        ) : null}
       </View>
-    </OnboardingScaffold>
+    </ConvoScreen>
   );
 }
 

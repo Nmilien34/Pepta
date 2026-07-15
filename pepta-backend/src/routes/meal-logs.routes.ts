@@ -5,13 +5,19 @@ import { mealLogService } from '../services/logs.service';
 import { getMealLogScanDetail } from '../services/meal-scan.service';
 import { createLogRouter } from './log-routes.factory';
 
-const router = createLogRouter(mealLogInputSchema, mealLogService);
+type MealLogService = typeof mealLogService;
 
-router.get(
-  '/:id/scan',
-  asyncHandler(async (req, res) => {
-    sendData(res, await getMealLogScanDetail(req.user!.id, req.params.id as string));
-  }),
-);
+export function createMealLogsRouter(service: MealLogService = mealLogService) {
+  const router = createLogRouter(mealLogInputSchema, service);
 
-export default router;
+  router.get(
+    '/:id/scan',
+    asyncHandler(async (req, res) => {
+      sendData(res, await getMealLogScanDetail(req.user!.id, req.params.id as string));
+    }),
+  );
+
+  return router;
+}
+
+export default createMealLogsRouter();

@@ -1,19 +1,17 @@
-// Onboarding screen 15 — Goal pace. An expressive slider (walk → car → rocket)
-// with a live estimated-goal-date chip and a reassuring, tracker-toned line. The
-// projection is a frontend preview (projectGoal); the real date arrives from the
-// backend later. profile.goalPace isn't in the current schema → navigator-local.
+// Onboarding — Pace (T17). Three named paces with THEIR computed goal date in
+// each sub-line; Steady comes pre-selected (recommended default). Ambitious
+// warns in its own sub-line, never forbids. Sticky select → Continue.
 
 import React, { useMemo } from 'react';
-import { View } from 'react-native';
-import { Icon } from "../../components/Icon";
-import { useTheme } from '../../theme';
-import { AppText, Button, OnboardingScaffold, Slider } from '../../components';
+import { ConvoButton, ConvoScreen } from '../../components';
 import { formatShortDate } from '../../utils/dateParts';
 import { projectGoal } from '../../utils/goalProjection';
 
 export interface GoalPaceScreenProps {
   progress: number;
   onBack?(): void;
+  context?: string;
+  /** 0..1 slider-compatible pace value (paceToEnum maps it to the schema enum). */
   pace: number;
   onPaceChange(value: number): void;
   currentWeight: number;
@@ -22,11 +20,13 @@ export interface GoalPaceScreenProps {
   onContinue(): void;
 }
 
-const ICONS: ('walk' | 'car' | 'rocket-launch')[] = ['walk', 'car', 'rocket-launch'];
+// Representative points inside each of paceToEnum's zones.
+export const PACE_VALUES = { gentle: 0.25, steady: 0.55, ambitious: 0.85 } as const;
 
 export function GoalPaceScreen({
   progress,
   onBack,
+  context,
   pace,
   onPaceChange,
   currentWeight,
@@ -34,75 +34,43 @@ export function GoalPaceScreen({
   unit,
   onContinue,
 }: GoalPaceScreenProps) {
-  const theme = useTheme();
-  const projection = useMemo(
-    () => projectGoal({ currentWeight, goalWeight, pace, now: new Date() }),
-    [currentWeight, goalWeight, pace],
-  );
-
-  const zoneIndex = Math.min(2, Math.floor(pace * 3));
-  const descriptor =
-    pace < 0.4
-      ? 'gentle and sustainable, and easier on your muscle.'
-      : pace < 0.72
-        ? 'steady and sustainable — a good balance.'
-        : 'ambitious — keep protein high to protect your muscle.';
-
-  const hasGoal = projection.estimatedDate !== null;
-  const chipLabel = hasGoal
-    ? `Estimated goal · ${formatShortDate(projection.estimatedDate!)}`
-    : 'Holding steady';
-  const line = hasGoal
-    ? `~${projection.weeklyLoss} ${unit} / week — ${descriptor}`
-    : 'Holding steady — we’ll keep your muscle and energy up.';
+  const options = useMemo(() => {
+    const now = new Date();
+    const describe = (p: number) => projectGoal({ currentWeight, goalWeight, pace: p, now });
+    const gentle = describe(PACE_VALUES.gentle);
+    const steady = describe(PACE_VALUES.steady);
+    const ambitious = describe(PACE_VALUES.ambitious);
+    const dateLine = (proj: ReturnType<typeof projectGoal>) =>
+      proj.estimatedDate ? ` · ${goalWeight} by ${formatShortDate(proj.estimatedDate)}` : '';
+    return [
+      {
+        label: 'Gentle',
+        sub: `~${gentle.weeklyLoss} ${unit} a week${dateLine(gentle)}`,
+        value: PACE_VALUES.gentle as number,
+      },
+      {
+        label: 'Steady — recommended',
+        sub: `~${steady.weeklyLoss} ${unit} a week${dateLine(steady)}`,
+        value: PACE_VALUES.steady as number,
+      },
+      {
+        label: 'Ambitious',
+        sub: `~${ambitious.weeklyLoss} ${unit} a week · harder to hold muscle`,
+        value: PACE_VALUES.ambitious as number,
+      },
+    ];
+  }, [currentWeight, goalWeight, unit]);
 
   return (
-    <OnboardingScaffold
+    <ConvoScreen<number>
       progress={progress}
       onBack={onBack}
-      footer={<Button label="Continue" onPress={onContinue} />}
-    >
-      <AppText variant="obTitle">How fast feels right?</AppText>
-
-      <View style={{ flex: 1, justifyContent: 'center', gap: theme.spacing['2xl'] }}>
-        <View style={{ alignItems: 'center' }}>
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 6,
-              backgroundColor: '#EFEBFF',
-              paddingVertical: 7,
-              paddingHorizontal: 13,
-              borderRadius: theme.radii.pill,
-            }}
-          >
-            <Icon name="flag-outline" size={14} color="#5B45C9" />
-            <AppText variant="caption" style={{ color: '#5B45C9', fontWeight: '700' }}>
-              {chipLabel}
-            </AppText>
-          </View>
-        </View>
-
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-          {ICONS.map((icon, i) => (
-            <Icon
-              key={icon}
-              name={icon}
-              size={24}
-              color={i === zoneIndex ? theme.colors.primary : theme.colors.textSecondary}
-            />
-          ))}
-        </View>
-
-        <Slider value={pace} onChange={onPaceChange} />
-
-        <View style={{ padding: 14, borderRadius: 16, backgroundColor: theme.colors.surfaceAlt }}>
-          <AppText variant="caption" color="textPrimary" align="center">
-            {line}
-          </AppText>
-        </View>
-      </View>
-    </OnboardingScaffold>
+      context={context}
+      question="Pick your pace."
+      options={options}
+      value={pace}
+      onSelect={onPaceChange}
+      footer={<ConvoButton label="Continue" onPress={onContinue} />}
+    />
   );
 }

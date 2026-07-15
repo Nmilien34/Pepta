@@ -17,6 +17,8 @@ interface DuplicateKeyError extends Error {
   code?: number;
 }
 
+type RevenueCatEvent = RevenueCatWebhook['event'];
+
 function statusForEvent(type: string): SubscriptionStatus {
   if (['INITIAL_PURCHASE', 'RENEWAL', 'UNCANCELLATION', 'PRODUCT_CHANGE'].includes(type)) {
     return 'active';
@@ -77,9 +79,68 @@ export function verifyRevenueCatSecret(headerValue: string | undefined): void {
   }
 }
 
-async function findRevenueCatUser(appUserId: string): Promise<UserDocument | null> {
-  if (Types.ObjectId.isValid(appUserId)) {
-    const byId = await UserModel.findById(appUserId);
+function uniqueNonEmptyStrings(values: Array<string | undefined | null>): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  for (const value of values) {
+    const normalized = value?.trim();
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    result.push(normalized);
+  }
+
+  return result;
+}
+
+function revenueCatEventKey(event: RevenueCatEvent): string | undefined {
+  return event.id ?? (event.transaction_id ? `${event.transaction_id}:${event.type}` : undefined);
+}
+
+function revenueCatLookupCandidates(event: RevenueCatEvent): string[] {
+  if (event.type === 'TRANSFER') {
+    return uniqueNonEmptyStrings([
+      ...(event.transferred_to ?? []),
+      ...(event.transferred_from ?? []),
+      event.app_user_id,
+      event.original_app_user_id,
+      ...(event.aliases ?? []),
+    ]);
+  }
+
+  return uniqueNonEmptyStrings([
+    event.app_user_id,
+    event.original_app_user_id,
+    ...(event.aliases ?? []),
+  ]);
+}
+
+function revenueCatIdsToAssociate(event: RevenueCatEvent): string[] {
+  return uniqueNonEmptyStrings([
+    event.app_user_id,
+    event.original_app_user_id,
+    ...(event.transferred_from ?? []),
+    ...(event.transferred_to ?? []),
+    ...(event.aliases ?? []),
+  ]);
+}
+
+function primaryRevenueCatId(event: RevenueCatEvent): string | undefined {
+  if (event.type === 'TRANSFER') {
+    return uniqueNonEmptyStrings([
+      ...(event.transferred_to ?? []),
+      event.app_user_id,
+      event.original_app_user_id,
+    ])[0];
+  }
+
+  return uniqueNonEmptyStrings([event.app_user_id, event.original_app_user_id])[0];
+}
+
+async function findRevenueCatUser(candidates: string[]): Promise<UserDocument | null> {
+  for (const candidate of candidates) {
+    if (!Types.ObjectId.isValid(candidate)) continue;
+    const byId = await UserModel.findById(candidate);
 
     if (byId) {
       return byId;
@@ -87,13 +148,19 @@ async function findRevenueCatUser(appUserId: string): Promise<UserDocument | nul
   }
 
   return UserModel.findOne({
-    'entitlement.revenueCatCustomerId': appUserId,
+    $or: [
+      { 'entitlement.revenueCatCustomerId': { $in: candidates } },
+      { 'entitlement.revenueCatAppUserIds': { $in: candidates } },
+    ],
   });
 }
 
-async function markProcessed(eventId: string | undefined, appUserId: string): Promise<void> {
+async function reserveProcessedEvent(
+  eventId: string | undefined,
+  appUserId: string,
+): Promise<boolean> {
   if (!eventId) {
-    return;
+    return false;
   }
 
   try {
@@ -103,28 +170,47 @@ async function markProcessed(eventId: string | undefined, appUserId: string): Pr
       appUserId,
       processedAt: new Date(),
     });
+    return false;
   } catch (error) {
-    if (!isDuplicateKey(error)) {
-      throw error;
+    if (isDuplicateKey(error)) {
+      logger.info({ eventId, appUserId }, '[revenuecat] duplicate webhook ignored');
+      return true;
     }
+    throw error;
   }
 }
 
-export async function applyRevenueCatWebhook(input: RevenueCatWebhook): Promise<{ received: true }> {
-  const userId = input.event.app_user_id;
+function applyRevenueCatIdsToUser(user: UserDocument, event: RevenueCatEvent): void {
+  const primaryId = primaryRevenueCatId(event);
+  const revenueCatAppUserIds = uniqueNonEmptyStrings([
+    ...(user.entitlement.revenueCatAppUserIds ?? []),
+    ...revenueCatIdsToAssociate(event),
+  ]);
 
-  if (!userId) {
+  if (primaryId) {
+    user.entitlement.revenueCatCustomerId = primaryId;
+  }
+  user.entitlement.revenueCatAppUserIds = revenueCatAppUserIds;
+}
+
+export async function applyRevenueCatWebhook(input: RevenueCatWebhook): Promise<{ received: true }> {
+  const event = input.event;
+  const candidates = revenueCatLookupCandidates(event);
+  const customerId = primaryRevenueCatId(event) ?? candidates[0];
+  const eventId = revenueCatEventKey(event);
+
+  if (!customerId || candidates.length === 0) {
     throw new AppError({
       code: 'BAD_REQUEST',
-      message: 'RevenueCat webhook is missing app_user_id',
+      message: 'RevenueCat webhook is missing a resolvable app user id',
       statusCode: 400,
     });
   }
 
-  if (input.event.id) {
+  if (eventId) {
     const processed = await ProcessedWebhookEventModel.findOne({
       provider: 'revenuecat',
-      eventId: input.event.id,
+      eventId,
     });
 
     if (processed) {
@@ -132,18 +218,26 @@ export async function applyRevenueCatWebhook(input: RevenueCatWebhook): Promise<
     }
   }
 
-  const user = await findRevenueCatUser(userId);
+  const alreadyProcessed = await reserveProcessedEvent(eventId, customerId);
+  if (alreadyProcessed) {
+    return { received: true };
+  }
+
+  const user = await findRevenueCatUser(candidates);
 
   if (!user) {
-    logger.warn({ appUserId: userId, eventId: input.event.id }, '[revenuecat] unknown user');
+    logger.warn(
+      { candidateRevenueCatIds: candidates, eventId },
+      '[revenuecat] unknown user; acknowledged without retry',
+    );
     return { received: true };
   }
 
   const expiresAt =
-    typeof input.event.expiration_at_ms === 'number'
-      ? new Date(input.event.expiration_at_ms)
+    typeof event.expiration_at_ms === 'number'
+      ? new Date(event.expiration_at_ms)
       : null;
-  const nextStatus = statusForEvent(input.event.type);
+  const nextStatus = statusForEvent(event.type);
   const currentExpiresAt = user.entitlement.expiresAt;
   const isStaleDowngrade =
     expiresAt !== null &&
@@ -151,18 +245,29 @@ export async function applyRevenueCatWebhook(input: RevenueCatWebhook): Promise<
     expiresAt.getTime() < currentExpiresAt.getTime() &&
     DOWNGRADE_STATUSES.includes(nextStatus);
 
+  if (event.type === 'TRANSFER') {
+    applyRevenueCatIdsToUser(user, event);
+    await user.save();
+    return { received: true };
+  }
+
   if (!isStaleDowngrade) {
+    const revenueCatCustomerId = primaryRevenueCatId(event) ?? customerId;
+    const revenueCatAppUserIds = uniqueNonEmptyStrings([
+      ...(user.entitlement.revenueCatAppUserIds ?? []),
+      ...revenueCatIdsToAssociate(event),
+    ]);
+
     user.entitlement = {
       status: nextStatus,
       expiresAt,
-      willRenew: !['CANCELLATION', 'EXPIRATION', 'REFUND'].includes(input.event.type),
-      revenueCatCustomerId: userId,
-      revenueCatEntitlement: input.event.entitlement_id,
+      willRenew: !['CANCELLATION', 'EXPIRATION', 'REFUND'].includes(event.type),
+      revenueCatCustomerId,
+      revenueCatAppUserIds,
+      revenueCatEntitlement: event.entitlement_id,
     };
     await user.save();
   }
-
-  await markProcessed(input.event.id, userId);
 
   return { received: true };
 }

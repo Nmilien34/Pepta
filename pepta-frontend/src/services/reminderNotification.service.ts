@@ -1,7 +1,9 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import type { PushTokenRegistrationRequest } from "@pepta/shared";
 import { Platform } from "react-native";
 import * as Notifications from "expo-notifications";
 import type { ReminderGroup, ReminderScheduleRule } from "../screens/app/reminderSettings";
+import { api } from "./api";
 
 export const REMINDER_STORAGE_KEY = "pepta.reminders.state";
 const REMINDER_IDENTIFIER_PREFIX = "pepta.reminder.";
@@ -28,6 +30,7 @@ export interface ReminderNotificationAdapter {
   getAllScheduledNotificationsAsync: () => Promise<Array<{ identifier: string }>>;
   getPermissionsAsync: () => Promise<{ status: string; granted: boolean; canAskAgain?: boolean }>;
   requestPermissionsAsync: () => Promise<{ status: string; granted: boolean; canAskAgain?: boolean }>;
+  getExpoPushTokenAsync?: () => Promise<{ data: string }>;
   scheduleNotificationAsync: (request: {
     identifier: string;
     content: { title: string; body: string; data: Record<string, string> };
@@ -38,32 +41,32 @@ export interface ReminderNotificationAdapter {
 
 const reminderCopy: Record<string, { title: string; body: string }> = {
   dose_due: {
-    title: "Dose reminder",
-    body: "A gentle reminder to log your GLP-1 dose when you take it.",
+    title: "Pep: shot time",
+    body: "I have your dose on the board. Log it when it's done, and I'll keep the cycle lined up with you.",
   },
   post_dose_checkin: {
-    title: "How are you feeling today?",
-    body: "Track appetite, side effects, water, and protein while this dose settles in.",
+    title: "Pep: post-shot check-in",
+    body: "Quick read for me: appetite, side effects, water, and protein while this dose settles in.",
   },
   protein_anchor: {
-    title: "Protein anchor",
-    body: "A steady protein choice now can make the rest of today easier.",
+    title: "Pep: protein checkpoint",
+    body: "Protein first on the next meal. Future-you and your muscles both like that plan.",
   },
   hydration_check: {
-    title: "Hydration + fiber check",
-    body: "Water and fiber can help your GLP-1 routine feel smoother.",
+    title: "Pep: water + fiber check",
+    body: "Water and fiber check. Small, boring, useful. My favorite category.",
   },
   weekly_weigh_in: {
-    title: "Weekly weigh-in",
-    body: "Log a consistent morning weight so Pepta can read your trend.",
+    title: "Pep: scale check",
+    body: "Same kind of morning read, no drama. Log it and I’ll watch the trend, not one noisy number.",
   },
   trend_review: {
-    title: "Your Pepta trend is ready",
-    body: "Review your dose cycle, protein, hydration, and weight direction.",
+    title: "Pep: weekly read",
+    body: "I’ve got your dose cycle, logs, and trend waiting. Open Pepta and we’ll read the week together.",
   },
   progress_photo: {
-    title: "Progress photo",
-    body: "Take a consistent photo when the lighting is steady.",
+    title: "Pep: photo check-in",
+    body: "Same mirror, same light. One quick photo gives us another way to see the journey.",
   },
 };
 
@@ -100,6 +103,7 @@ const expoReminderNotificationAdapter: ReminderNotificationAdapter = {
         allowSound: true,
       },
     }),
+  getExpoPushTokenAsync: () => Notifications.getExpoPushTokenAsync(),
   scheduleNotificationAsync: (request) =>
     Notifications.scheduleNotificationAsync({
       identifier: request.identifier,
@@ -200,7 +204,7 @@ export function buildReminderNotificationRequests(
   for (const group of groups) {
     for (const item of group.items) {
       if (!state[item.id]) continue;
-      const copy = reminderCopy[item.id];
+      const copy = item.notification ?? reminderCopy[item.id];
       if (!copy) continue;
       requests.push(...buildTriggerRequests(item.id, copy, item.schedule));
     }
@@ -231,6 +235,30 @@ export async function saveReminderState(state: Record<string, boolean>): Promise
   await AsyncStorage.setItem(REMINDER_STORAGE_KEY, JSON.stringify(state));
 }
 
+export interface SyncReminderNotificationsOptions {
+  registerBackendPushToken?: (input: PushTokenRegistrationRequest) => Promise<unknown>;
+}
+
+function currentPushPlatform(): PushTokenRegistrationRequest["platform"] {
+  if (Platform.OS === "android") return "android";
+  if (Platform.OS === "web") return "web";
+  return "ios";
+}
+
+async function registerBackendPushTokenIfPossible(
+  adapter: ReminderNotificationAdapter,
+  registerBackendPushToken: (input: PushTokenRegistrationRequest) => Promise<unknown>,
+): Promise<void> {
+  if (!adapter.getExpoPushTokenAsync) return;
+  const token = await adapter.getExpoPushTokenAsync();
+  const data = token.data.trim();
+  if (!data) return;
+  await registerBackendPushToken({
+    token: data,
+    platform: currentPushPlatform(),
+  });
+}
+
 async function cancelPeptaReminderNotifications(adapter: ReminderNotificationAdapter): Promise<number> {
   const scheduled = await adapter.getAllScheduledNotificationsAsync();
   const peptaReminders = scheduled.filter((request) => request.identifier.startsWith(REMINDER_IDENTIFIER_PREFIX));
@@ -250,6 +278,7 @@ export async function syncReminderNotifications(
   groups: ReminderGroup[],
   state: Record<string, boolean>,
   adapter: ReminderNotificationAdapter = expoReminderNotificationAdapter,
+  options: SyncReminderNotificationsOptions = {},
 ): Promise<{ permissionStatus: ReminderPermissionStatus; scheduledCount: number; canceledCount: number }> {
   await adapter.prepareAsync?.();
   const canceledCount = await cancelPeptaReminderNotifications(adapter);
@@ -263,6 +292,10 @@ export async function syncReminderNotifications(
   if (permissionStatus !== "granted") {
     return { permissionStatus, scheduledCount: 0, canceledCount };
   }
+
+  const registerBackendPushToken =
+    options.registerBackendPushToken ?? api.registerPushToken.bind(api);
+  await registerBackendPushTokenIfPossible(adapter, registerBackendPushToken).catch(() => undefined);
 
   await Promise.all(
     requests.map((request) =>

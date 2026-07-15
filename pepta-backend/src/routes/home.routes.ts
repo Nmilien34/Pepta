@@ -11,7 +11,12 @@ router.use(requireAuth);
 router.get(
   '/',
   asyncHandler(async (req, res) => {
-    sendData(res, await getHome(req.user!.id, new Date(), req.query.range));
+    sendData(
+      res,
+      await getHome(req.user!.id, new Date(), req.query.range, {
+        allowAIInsightProse: req.get("x-pepta-ai-consent") === "true",
+      }),
+    );
   }),
 );
 

@@ -1,5 +1,8 @@
 import {
   mealLogScanDetailResponseSchema,
+  type MealBarcodeInput,
+  type MealProductScanInput,
+  type MealProductScanMetadata,
   mealScanResponseSchema,
   type MealScanAnalysis,
   type MealScanCoachContent,
@@ -30,6 +33,14 @@ import {
   generateMealScanVision,
   MEAL_SCAN_VISION_ENGINE_VERSION,
 } from "./meal-scan-vision.service";
+import {
+  resolveProductNutrition,
+  type ProductNutritionResult,
+} from "./product-nutrition.service";
+import {
+  generateProductCluesFromImage,
+  PRODUCT_SCAN_VISION_ENGINE_VERSION,
+} from "./product-scan-vision.service";
 import { createPresignedGetUrl, putS3Object } from "./s3.service";
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
@@ -339,6 +350,9 @@ function serializeScan(scan: MealScanDocument | Record<string, unknown>) {
       (value.coachContent as MealScanCoachContent | null | undefined) ?? null,
     note: value.note,
     visionEngineVersion: value.visionEngineVersion,
+    product:
+      (value.product as MealProductScanMetadata | null | undefined) ??
+      undefined,
   });
 }
 
@@ -462,6 +476,121 @@ export async function parseVoiceMeal(userId: string, input: MealVoiceInput) {
     coachContent: buildCoachContent(analysis),
     note,
     visionEngineVersion,
+  });
+}
+
+function productMetadata(
+  mode: MealProductScanMetadata["mode"],
+  nutrition: ProductNutritionResult,
+): MealProductScanMetadata {
+  return {
+    mode,
+    ...(nutrition.barcode ? { barcode: nutrition.barcode } : {}),
+    ...(nutrition.brand ? { brand: nutrition.brand } : {}),
+    ...(nutrition.productName ? { productName: nutrition.productName } : {}),
+    source: nutrition.source,
+    citations: nutrition.citations,
+  };
+}
+
+export async function analyzeProductScan(
+  userId: string,
+  input: MealProductScanInput,
+) {
+  const existing = await findSuccessfulIdempotentScan(
+    userId,
+    input.idempotencyKey,
+  );
+  if (existing) {
+    return serializeScan(existing);
+  }
+
+  const imageBytes = decodeAndValidateImage(
+    input.imageData,
+    input.imageMimeType,
+  );
+  const normalizedImage = input.imageData.trim();
+  const photoS3Key = buildMealScanObjectKey(userId, input.imageMimeType);
+  const capturedAt = input.capturedAt ? new Date(input.capturedAt) : new Date();
+
+  try {
+    await putS3Object({
+      key: photoS3Key,
+      body: imageBytes,
+      contentType: input.imageMimeType,
+    });
+  } catch {
+    throw storageFailed();
+  }
+
+  const clues = await generateProductCluesFromImage(
+    normalizedImage,
+    input.imageMimeType,
+  );
+  const nutrition = await resolveProductNutrition(clues);
+  const analysis = nutrition.analysis;
+  const { snapshot, biggestWorry } = await computeProteinSnapshot({
+    userId,
+    capturedAt,
+    analysis,
+  });
+  const coachContent = buildCoachContent(analysis);
+  const note = await resolveTrackerNote({ analysis, snapshot, biggestWorry });
+  const product = productMetadata("product_scan", nutrition);
+
+  try {
+    const scan = await MealScanModel.create({
+      userId,
+      photoS3Key,
+      imageMimeType: input.imageMimeType,
+      analysis,
+      coachContent,
+      product,
+      note,
+      idempotencyKey: input.idempotencyKey,
+      visionEngineVersion: PRODUCT_SCAN_VISION_ENGINE_VERSION,
+      coachContentVersion: coachContent.copyVersion,
+    });
+
+    return serializeScan(scan);
+  } catch (error) {
+    if (input.idempotencyKey && isDuplicateIdempotencyError(error)) {
+      const idempotentScan = await findSuccessfulIdempotentScan(
+        userId,
+        input.idempotencyKey,
+      );
+      if (idempotentScan) {
+        return serializeScan(idempotentScan);
+      }
+    }
+
+    throw error;
+  }
+}
+
+export async function lookupBarcodeMeal(
+  userId: string,
+  input: MealBarcodeInput,
+) {
+  const nutrition = await resolveProductNutrition({
+    barcodeText: input.barcode,
+    confidence: 1,
+  });
+  const analysis = nutrition.analysis;
+  const capturedAt = input.scannedAt ? new Date(input.scannedAt) : new Date();
+  const { snapshot, biggestWorry } = await computeProteinSnapshot({
+    userId,
+    capturedAt,
+    analysis,
+  });
+
+  return mealScanResponseSchema.parse({
+    scanId: `barcode-${Date.now()}`,
+    analysis,
+    coachContent: buildCoachContent(analysis),
+    note: await resolveTrackerNote({ analysis, snapshot, biggestWorry }),
+    visionEngineVersion: "barcode-lookup-v1",
+    product: productMetadata("barcode", nutrition),
   });
 }
 

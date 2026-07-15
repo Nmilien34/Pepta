@@ -25,14 +25,12 @@ interface PricePackage {
   product: StoreProductPrice;
 }
 
-// App Review guideline 3.1.2(c): the BILLED amount must be the most conspicuous
-// price on each plan. `price` is the big element in PlanCard, so it always
-// carries the amount actually charged; calculated equivalents (per-month,
-// per-day) live in the subordinate `sub` line.
+// App Review guideline 3.1.2(c): the BILLED amount must be the clear price.
+// Do not market the annual plan using a calculated monthly equivalent.
 const FALLBACK_PRICING: PaywallPricingCopy = {
   yearly: {
     title: "Yearly",
-    sub: "just $3.33 a month",
+    sub: "billed yearly",
     price: "$40.00",
     per: "/yr",
     badge: "SAVE 63%",
@@ -44,8 +42,8 @@ const FALLBACK_PRICING: PaywallPricingCopy = {
     per: "/mo",
   },
   footer: {
-    yearly: "$40/yr ($3.33/mo). Cancel anytime · Terms & Privacy",
-    monthly: "$9/mo. Cancel anytime · Terms & Privacy",
+    yearly: "$40.00/year. Cancel anytime · Terms & Privacy",
+    monthly: "$9.00/month. Cancel anytime · Terms & Privacy",
   },
 };
 
@@ -57,24 +55,6 @@ function priceString(pkg: PricePackage | null | undefined, fallback: string): st
 function numericPrice(pkg: PricePackage | null | undefined): number | null {
   const value = pkg?.product.price;
   return typeof value === "number" && Number.isFinite(value) ? value : null;
-}
-
-function currencyCode(pkg: PricePackage | null | undefined): string {
-  const value = pkg?.product.currencyCode;
-  return typeof value === "string" && value.trim().length > 0 ? value : "USD";
-}
-
-function formatCurrency(value: number, currency: string): string {
-  try {
-    return new Intl.NumberFormat(undefined, {
-      style: "currency",
-      currency,
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(value);
-  } catch {
-    return `$${value.toFixed(2)}`;
-  }
 }
 
 function savingsBadge(monthly: PricePackage, yearly: PricePackage): string | undefined {
@@ -96,15 +76,11 @@ export function buildPaywallPricing(
   const yearly = packages.yearly;
   const monthlyPrice = priceString(monthly, FALLBACK_PRICING.monthly.price);
   const annualPrice = priceString(yearly, "$40.00");
-  const annualAmount = numericPrice(yearly);
-  const monthlyEquivalent = annualAmount
-    ? formatCurrency(annualAmount / 12, currencyCode(yearly))
-    : FALLBACK_PRICING.yearly.price;
 
   return {
     yearly: {
       title: "Yearly",
-      sub: `just ${monthlyEquivalent} a month`,
+      sub: "billed yearly",
       price: annualPrice,
       per: "/yr",
       badge: savingsBadge(monthly, yearly),
@@ -116,8 +92,8 @@ export function buildPaywallPricing(
       per: "/mo",
     },
     footer: {
-      yearly: `${annualPrice}/yr (${monthlyEquivalent}/mo). Cancel anytime · Terms & Privacy`,
-      monthly: `${monthlyPrice}/mo. Cancel anytime · Terms & Privacy`,
+      yearly: `${annualPrice}/year. Cancel anytime · Terms & Privacy`,
+      monthly: `${monthlyPrice}/month. Cancel anytime · Terms & Privacy`,
     },
   };
 }

@@ -22,6 +22,15 @@ export {
 } from "./onboarding/OnboardingScaffold";
 export { OptionCard, type OptionCardProps } from "./onboarding/OptionCard";
 export { Chip, type ChipProps } from "./onboarding/Chip";
+export { Typewriter } from "./onboarding/Typewriter";
+export {
+  ConvoScreen,
+  ConvoButton,
+  OnboardingMotionContext,
+  type ConvoOption,
+} from "./onboarding/ConvoScreen";
+export { CitedStat, type CitedStatProps } from "./onboarding/CitedStat";
+export { convo } from "./onboarding/convoTokens";
 export { SelectTile, type SelectTileProps } from "./onboarding/SelectTile";
 export {
   DayOfWeekPicker,
@@ -54,8 +63,10 @@ export {
   type WeightChartPoint,
   type WeightChartProps,
 } from "./WeightChart";
+export { TrendLineChart, type TrendLineChartProps } from "./TrendLineChart";
 export { WaterCup, type WaterCupProps } from "./WaterCup";
 export { BottomSheet, type BottomSheetProps } from "./BottomSheet";
+export { BarcodeScanner, type BarcodeScannerProps } from "./BarcodeScanner";
 export { QuickLogSheet, type QuickLogSheetProps } from "./QuickLogSheet";
 export { MealLogSheet, type MealLogSheetProps } from "./MealLogSheet";
 export {

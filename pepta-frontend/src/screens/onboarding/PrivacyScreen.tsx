@@ -1,13 +1,13 @@
-// Onboarding screen 2 — Privacy & legal. Reassuring (not legalese-heavy): a calm
-// title, a supportive line, two tappable link rows (Terms, Privacy), and an
-// "Accept & continue" CTA. Tracker-toned, no judgment.
+// Onboarding — Privacy (T2). The app's first promise types itself: your data
+// stays yours. Terms/Privacy are quiet link rows; "Sounds good" speaks and
+// auto-advances. Tracker-toned, no legalese wall.
 
 import React from 'react';
-import { Linking, Pressable, View } from 'react-native';
-import { Icon } from "../../components/Icon";
+import { Linking, Pressable, Text, View } from 'react-native';
+import { Icon } from '../../components/Icon';
 import { PRIVACY_URL, TERMS_URL } from '../../config';
-import { useTheme } from '../../theme';
-import { AppText, Button, Mascot, OnboardingScaffold } from '../../components';
+import { ConvoScreen, convo } from '../../components';
+import { typography } from '../../theme/typography';
 
 export interface PrivacyScreenProps {
   progress: number;
@@ -17,79 +17,52 @@ export interface PrivacyScreenProps {
 }
 
 export function PrivacyScreen({ progress, showBack, onBack, onAccept }: PrivacyScreenProps) {
-  const theme = useTheme();
-
   return (
-    <OnboardingScaffold
+    <ConvoScreen<'ok'>
       progress={progress}
-      showBack={showBack}
-      onBack={onBack}
-      footer={<Button label="Accept & continue" onPress={onAccept} />}
+      onBack={showBack ? onBack : undefined}
+      context="Glad you’re here."
+      question="First — your data stays yours"
+      questionAccent
+      sub="Health data is encrypted, never sold, and you can export or delete it anytime."
+      options={[{ label: 'Sounds good', value: 'ok' }]}
+      onAnswer={onAccept}
     >
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: theme.spacing.lg }}>
-        <Mascot pose="idle" size={96} />
-        <AppText variant="obTitle" align="center">
-          Your privacy{'\n'}comes first.
-        </AppText>
-        <AppText variant="body" color="textSecondary" align="center" style={{ maxWidth: 300 }}>
-          Your health data is encrypted and never sold. You’re always in control.
-        </AppText>
-        <View style={{ width: '100%', gap: theme.spacing.sm, marginTop: theme.spacing.sm }}>
-          <LinkRow
-            icon={<Icon name="document-text-outline" size={18} color={theme.colors.textSecondary} />}
-            label="Terms of Service"
-            onPress={() => Linking.openURL(TERMS_URL)}
-          />
-          <LinkRow
-            icon={<Icon name="lock-closed-outline" size={18} color={theme.colors.primary} />}
-            label="Privacy Policy"
-            onPress={() => Linking.openURL(PRIVACY_URL)}
-          />
-        </View>
+      <View style={{ marginTop: 26, gap: 9 }}>
+        <LinkRow label="Terms of Service" onPress={() => Linking.openURL(TERMS_URL)} />
+        <LinkRow label="Privacy Policy" onPress={() => Linking.openURL(PRIVACY_URL)} />
       </View>
-    </OnboardingScaffold>
+    </ConvoScreen>
   );
 }
 
 interface LinkRowProps {
-  icon: React.ReactNode;
   label: string;
   onPress(): void;
 }
 
-function LinkRow({ icon, label, onPress }: LinkRowProps) {
-  const theme = useTheme();
+function LinkRow({ label, onPress }: LinkRowProps) {
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="link"
       accessibilityLabel={label}
       style={({ pressed }) => ({
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: theme.spacing.md,
-        padding: 15,
+        flexDirection: 'row' as const,
+        alignItems: 'center' as const,
+        gap: 10,
+        paddingVertical: 13,
+        paddingHorizontal: 16,
         borderRadius: 16,
-        backgroundColor: theme.colors.surfaceAlt,
+        borderWidth: 1,
+        borderColor: convo.hairline,
+        backgroundColor: convo.surface,
         opacity: pressed ? 0.7 : 1,
       })}
     >
-      <View
-        style={{
-          width: 34,
-          height: 34,
-          borderRadius: 10,
-          backgroundColor: theme.colors.surface,
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        {icon}
-      </View>
-      <AppText variant="bodyStrong" style={{ flex: 1, fontWeight: '700' }}>
-        {label}
-      </AppText>
-      <Icon name="chevron-forward" size={18} color={theme.colors.textTertiary} />
+      <Icon name="document-text-outline" size={17} color={convo.soft} />
+      <Text style={{ fontFamily: typography.fonts.semiBold, fontSize: 14.5, color: convo.ink, flex: 1 }}>{label}</Text>
+      <Icon name="chevron-forward" size={16} color={convo.faint} />
     </Pressable>
   );
 }

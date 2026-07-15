@@ -175,7 +175,12 @@ function nextDoseFromLevels(levels: Awaited<ReturnType<typeof getMedicationLevel
   };
 }
 
-export async function getHome(userId: string, now = new Date(), rangeInput: unknown = 'today') {
+export async function getHome(
+  userId: string,
+  now = new Date(),
+  rangeInput: unknown = 'today',
+  options: { allowAIInsightProse?: boolean } = {},
+) {
   const selectedRange = parseHomeRange(rangeInput);
   const [
     profileResult,
@@ -196,7 +201,7 @@ export async function getHome(userId: string, now = new Date(), rangeInput: unkn
     getRangeTotals(userId, now, 'today'),
     getRangeAvailability(userId, now),
     getLatestWeight(userId),
-    getInsights(userId, now),
+    getInsights(userId, now, { allowAIProse: options.allowAIInsightProse === true }),
     getWeeklyRetention(userId, now),
     getStreak(userId, now),
   ]);

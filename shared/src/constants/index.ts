@@ -71,7 +71,14 @@ export const INJECTION_SITES = [
   "buttock_left",
   "buttock_right",
 ] as const;
-export const MEAL_LOG_SOURCES = ["scan", "voice", "search", "manual"] as const;
+export const MEAL_LOG_SOURCES = [
+  "scan",
+  "product_scan",
+  "barcode",
+  "voice",
+  "search",
+  "manual",
+] as const;
 export const SIDE_EFFECT_TYPES = [
   "nausea",
   "constipation",

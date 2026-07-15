@@ -1,4 +1,8 @@
-import type { MealScanAnalysis, MealScanCoachContent } from "@pepta/shared";
+import type {
+  MealProductScanMetadata,
+  MealScanAnalysis,
+  MealScanCoachContent,
+} from "@pepta/shared";
 import mongoose, { Schema } from "mongoose";
 import type { Document, Types } from "mongoose";
 import { applyApiTransforms } from "./model-utils";
@@ -22,6 +26,7 @@ export interface MealScanDocument extends Document<Types.ObjectId> {
   imageMimeType: "image/jpeg" | "image/png" | "image/webp";
   analysis: MealScanAnalysis | null;
   coachContent: MealScanCoachContent | null;
+  product?: MealProductScanMetadata | null;
   note?: string | null;
   idempotencyKey?: string;
   visionEngineVersion: string;
@@ -199,6 +204,36 @@ const mealScanCoachContentSchema = new Schema<MealScanCoachContent>(
   { _id: false, versionKey: false },
 );
 
+const mealProductCitationSchema = new Schema(
+  {
+    title: { type: String, required: true, trim: true },
+    url: { type: String, required: true, trim: true },
+  },
+  { _id: false, versionKey: false },
+);
+
+const mealProductScanMetadataSchema = new Schema<MealProductScanMetadata>(
+  {
+    mode: { type: String, enum: ["product_scan", "barcode"], required: true },
+    barcode: { type: String, trim: true },
+    brand: { type: String, trim: true },
+    productName: { type: String, trim: true },
+    source: {
+      type: String,
+      enum: [
+        "cache",
+        "open_food_facts",
+        "openai_web_search",
+        "together_vision",
+        "manual_label",
+      ],
+      required: true,
+    },
+    citations: { type: [mealProductCitationSchema], default: [] },
+  },
+  { _id: false, versionKey: false },
+);
+
 const mealScanSchema = new Schema<MealScanDocument>(
   {
     userId: {
@@ -224,6 +259,10 @@ const mealScanSchema = new Schema<MealScanDocument>(
     },
     coachContent: {
       type: mealScanCoachContentSchema,
+      default: null,
+    },
+    product: {
+      type: mealProductScanMetadataSchema,
       default: null,
     },
     note: {

@@ -10,6 +10,7 @@ import React, {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { AppleAuth, AuthResponse, User } from "@pepta/shared";
 import { api } from "../services/api";
+import { appsFlyer } from "../services/appsflyer";
 import { revenueCat } from "../services/revenueCat";
 import {
   AUTH_STORAGE_KEY,
@@ -38,6 +39,8 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+type AuthMethod = "apple" | "demo" | "google";
+
 // Persist (or clear) the session blob. Fire-and-forget — a storage hiccup must
 // never block the UI; the in-memory state stays the source of truth this session.
 function persistAuth(next: AuthResponse | null): void {
@@ -47,6 +50,52 @@ function persistAuth(next: AuthResponse | null): void {
     );
   } else {
     AsyncStorage.removeItem(AUTH_STORAGE_KEY).catch(() => undefined);
+  }
+}
+
+function isDevRuntime(): boolean {
+  return typeof __DEV__ !== "undefined" ? __DEV__ : false;
+}
+
+function warnInDev(message: string, error?: unknown): void {
+  if (!isDevRuntime()) return;
+  if (error) {
+    console.warn(message, error);
+    return;
+  }
+  console.warn(message);
+}
+
+async function initializeAppsFlyerForUser(
+  userId?: string,
+): Promise<boolean> {
+  return appsFlyer.initialize(userId).catch((error) => {
+    warnInDev("[AppsFlyer] Could not initialize attribution.", error);
+    return false;
+  });
+}
+
+async function identifyRevenueCatUser(userId: string): Promise<void> {
+  await revenueCat.identify(userId).catch((error) => {
+    warnInDev("[RevenueCat] Could not identify user.", error);
+  });
+}
+
+async function logCompleteRegistrationIfNeeded(
+  response: AuthResponse,
+  method: AuthMethod,
+): Promise<void> {
+  if (response.isNewUser === true) {
+    await appsFlyer.logCompleteRegistration({ method }).catch((error) => {
+      warnInDev(`[AppsFlyer] Failed to log af_complete_registration for ${method}.`, error);
+    });
+    return;
+  }
+
+  if (response.isNewUser === undefined) {
+    warnInDev(
+      `[AppsFlyer] Auth response for ${method} is missing isNewUser; skipping af_complete_registration.`,
+    );
   }
 }
 
@@ -60,11 +109,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let active = true;
     AsyncStorage.getItem(AUTH_STORAGE_KEY)
       .then(parseStoredAuth)
-      .then((stored) => {
+      .then(async (stored) => {
         if (active && stored) {
-          setAuth(stored);
           api.setAuthToken(stored.token);
+          await initializeAppsFlyerForUser(stored.user.id);
+          await identifyRevenueCatUser(stored.user.id);
+          if (active) setAuth(stored);
+          return;
         }
+        await initializeAppsFlyerForUser();
+        await revenueCat.configure().catch((error) => {
+          warnInDev("[RevenueCat] Could not configure anonymous customer.", error);
+        });
       })
       .catch(() => undefined)
       .finally(() => {
@@ -75,35 +131,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const finalizeAuth = useCallback((response: AuthResponse): User => {
-    setAuth(response);
+  const finalizeAuth = useCallback(async (response: AuthResponse, method: AuthMethod): Promise<User> => {
     api.setAuthToken(response.token);
     persistAuth(response);
+    await initializeAppsFlyerForUser(response.user.id);
+    await logCompleteRegistrationIfNeeded(response, method);
+    await identifyRevenueCatUser(response.user.id);
+    setAuth(response);
     return response.user;
   }, []);
 
   const signInWithGoogle = useCallback(
     async (idToken: string): Promise<User> =>
-      finalizeAuth(await api.signInWithGoogle({ idToken })),
+      finalizeAuth(await api.signInWithGoogle({ idToken }), "google"),
     [finalizeAuth],
   );
 
   const signInWithApple = useCallback(
     async (body: AppleAuth): Promise<User> =>
-      finalizeAuth(await api.signInWithApple(body)),
+      finalizeAuth(await api.signInWithApple(body), "apple"),
     [finalizeAuth],
   );
 
   // App Store review demo login — scoped server-side to the seeded demo account.
   const signInWithDemo = useCallback(
     async (email: string, password: string): Promise<User> =>
-      finalizeAuth(await api.signInWithDemo(email, password)),
+      finalizeAuth(await api.signInWithDemo(email, password), "demo"),
     [finalizeAuth],
   );
 
   const devSignIn = useCallback(() => {
     const now = new Date().toISOString();
-    finalizeAuth({
+    void finalizeAuth({
       token: "dev-token",
       user: {
         id: "dev-user",
@@ -115,7 +174,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         createdAt: now,
         updatedAt: now,
       },
-    });
+    }, "demo");
   }, [finalizeAuth]);
 
   const markOnboardingComplete = useCallback(() => {
@@ -144,6 +203,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(() => {
+    void revenueCat.reset().catch((error) => {
+      warnInDev("[RevenueCat] Could not log out.", error);
+    });
     setAuth(null);
     api.setAuthToken(null);
     persistAuth(null);
@@ -155,15 +217,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     api.setUnauthorizedHandler(() => logout());
     return () => api.setUnauthorizedHandler(undefined);
   }, [logout]);
-
-  useEffect(() => {
-    const userId = auth?.user.id;
-    if (!userId) {
-      revenueCat.reset().catch(() => undefined);
-      return;
-    }
-    revenueCat.identify(userId).catch(() => undefined);
-  }, [auth?.user.id]);
 
   const value = useMemo<AuthContextValue>(
     () => ({

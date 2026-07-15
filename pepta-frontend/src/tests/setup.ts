@@ -57,6 +57,7 @@ vi.mock("expo-notifications", () => ({
   getAllScheduledNotificationsAsync: vi.fn(async () => []),
   getPermissionsAsync: vi.fn(async () => ({ status: "granted", granted: true })),
   requestPermissionsAsync: vi.fn(async () => ({ status: "granted", granted: true })),
+  getExpoPushTokenAsync: vi.fn(async () => ({ data: "ExponentPushToken[test]" })),
   scheduleNotificationAsync: vi.fn(async (request: { identifier?: string }) => request.identifier ?? "test-notification"),
   cancelScheduledNotificationAsync: vi.fn(async () => undefined),
   setNotificationChannelAsync: vi.fn(async () => undefined),

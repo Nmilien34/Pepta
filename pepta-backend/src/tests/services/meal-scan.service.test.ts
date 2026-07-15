@@ -5,11 +5,13 @@ const mocks = vi.hoisted(() => ({
   generateMealScanNote: vi.fn(),
   generateMealTextAnalysis: vi.fn(),
   generateMealScanVision: vi.fn(),
+  generateProductCluesFromImage: vi.fn(),
   mealFind: vi.fn(),
   mealLogFindOne: vi.fn(),
   mealScanCreate: vi.fn(),
   mealScanFindOne: vi.fn(),
   proteinFind: vi.fn(),
+  resolveProductNutrition: vi.fn(),
   userProfileFindOne: vi.fn(),
   putS3Object: vi.fn(),
 }));
@@ -51,9 +53,20 @@ vi.mock("../../services/meal-scan-text.service", () => ({
   generateMealTextAnalysis: mocks.generateMealTextAnalysis,
 }));
 
+vi.mock("../../services/product-scan-vision.service", () => ({
+  PRODUCT_SCAN_VISION_ENGINE_VERSION: "product-scan-v1",
+  generateProductCluesFromImage: mocks.generateProductCluesFromImage,
+}));
+
+vi.mock("../../services/product-nutrition.service", () => ({
+  resolveProductNutrition: mocks.resolveProductNutrition,
+}));
+
 import {
   analyzeMealScan,
+  analyzeProductScan,
   getMealLogScanDetail,
+  lookupBarcodeMeal,
   parseVoiceMeal,
 } from "../../services/meal-scan.service";
 
@@ -97,6 +110,34 @@ describe("meal scan service", () => {
       ...analysis,
       foodName: "Chicken and rice",
       confidence: 0.76,
+    });
+    mocks.generateProductCluesFromImage.mockResolvedValue({
+      brand: "Chobani",
+      productName: "Zero Sugar Greek Yogurt",
+      barcodeText: "081212903020",
+      confidence: 0.88,
+    });
+    mocks.resolveProductNutrition.mockResolvedValue({
+      source: "open_food_facts",
+      barcode: "081212903020",
+      brand: "Chobani",
+      productName: "Zero Sugar Greek Yogurt",
+      citations: [
+        {
+          title: "Chobani Zero Sugar Greek Yogurt",
+          url: "https://world.openfoodfacts.org/product/081212903020",
+        },
+      ],
+      analysis: {
+        foodName: "Chobani Zero Sugar Greek Yogurt",
+        servingSize: "1 container",
+        protein: 11,
+        calories: 60,
+        carbs: 5,
+        fat: 0,
+        fiber: 0,
+        confidence: 0.88,
+      },
     });
     mocks.generateMealScanNote.mockResolvedValue(
       "This would put you at 96g of 120g protein today.",
@@ -220,6 +261,103 @@ describe("meal scan service", () => {
       "This would put you at 96g of 120g protein today.",
     );
     expect(result.visionEngineVersion).toBe("meal-scan-text-v1");
+  });
+
+  it("stores a product photo, resolves packaged-food nutrition, and persists product metadata", async () => {
+    const result = await analyzeProductScan("user-1", {
+      imageData: onePixelPng,
+      imageMimeType: "image/png",
+      idempotencyKey: "product-scan-key-1",
+    });
+
+    expect(mocks.putS3Object).toHaveBeenCalledWith(
+      expect.objectContaining({
+        key: expect.stringMatching(/^pepta\/meal-scans\/user-1\/.+\.png$/),
+        contentType: "image/png",
+      }),
+    );
+    expect(mocks.generateProductCluesFromImage).toHaveBeenCalledWith(
+      onePixelPng,
+      "image/png",
+    );
+    expect(mocks.resolveProductNutrition).toHaveBeenCalledWith(
+      expect.objectContaining({
+        brand: "Chobani",
+        productName: "Zero Sugar Greek Yogurt",
+        barcodeText: "081212903020",
+      }),
+    );
+    expect(mocks.mealScanCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: "user-1",
+        imageMimeType: "image/png",
+        idempotencyKey: "product-scan-key-1",
+        visionEngineVersion: "product-scan-v1",
+        product: {
+          mode: "product_scan",
+          barcode: "081212903020",
+          brand: "Chobani",
+          productName: "Zero Sugar Greek Yogurt",
+          source: "open_food_facts",
+          citations: [
+            {
+              title: "Chobani Zero Sugar Greek Yogurt",
+              url: "https://world.openfoodfacts.org/product/081212903020",
+            },
+          ],
+        },
+      }),
+    );
+    expect(result).toEqual(
+      expect.objectContaining({
+        scanId: "scan-1",
+        analysis: expect.objectContaining({
+          foodName: "Chobani Zero Sugar Greek Yogurt",
+          protein: 11,
+          calories: 60,
+        }),
+        product: {
+          mode: "product_scan",
+          barcode: "081212903020",
+          brand: "Chobani",
+          productName: "Zero Sugar Greek Yogurt",
+          source: "open_food_facts",
+          citations: [
+            {
+              title: "Chobani Zero Sugar Greek Yogurt",
+              url: "https://world.openfoodfacts.org/product/081212903020",
+            },
+          ],
+        },
+        visionEngineVersion: "product-scan-v1",
+      }),
+    );
+  });
+
+  it("looks up a barcode and returns a meal-scan-shaped result without uploading a photo", async () => {
+    const result = await lookupBarcodeMeal("user-1", {
+      barcode: "081212903020",
+    });
+
+    expect(mocks.putS3Object).not.toHaveBeenCalled();
+    expect(mocks.resolveProductNutrition).toHaveBeenCalledWith(
+      expect.objectContaining({
+        barcodeText: "081212903020",
+      }),
+    );
+    expect(result).toEqual(
+      expect.objectContaining({
+        scanId: expect.stringMatching(/^barcode-/),
+        product: expect.objectContaining({
+          mode: "barcode",
+          barcode: "081212903020",
+          source: "open_food_facts",
+        }),
+        analysis: expect.objectContaining({
+          foodName: "Chobani Zero Sugar Greek Yogurt",
+        }),
+      }),
+    );
   });
 
   it("falls back safely when voice meal parsing is unavailable", async () => {

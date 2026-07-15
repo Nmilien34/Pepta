@@ -22,6 +22,13 @@ const envSchema = z
     AWS_ACCESS_KEY_ID: z.string().min(1).optional(),
     AWS_SECRET_ACCESS_KEY: z.string().min(1).optional(),
     OPENAI_API_KEY: z.string().min(1).optional(),
+    OPENAI_PRODUCT_SEARCH_MODEL: z.string().min(1).default('gpt-5.5'),
+    TOGETHER_API_KEY: z.string().min(1).optional(),
+    TOGETHER_VISION_MODEL: z.string().min(1).default('Qwen/Qwen3.5-9B'),
+    OPEN_FOOD_FACTS_USER_AGENT: z
+      .string()
+      .min(1)
+      .default('Pepta/1.0 (support@pepta.app)'),
     REVENUECAT_WEBHOOK_SECRET: z.string().min(1).optional(),
     APPLE_TEAM_ID: z.string().min(1).optional(),
     APPLE_CLIENT_ID: z.string().min(1).optional(),
@@ -30,6 +37,7 @@ const envSchema = z
     SCHEDULER_TIMEZONE: z.string().min(1).default('America/New_York'),
     WEEKLY_RETENTION_CRON: z.string().min(1).default('0 8 * * 1'),
     MEDICATION_LEVEL_CRON: z.string().min(1).default('0 3 * * *'),
+    PEP_PUSH_CRON: z.string().min(1).default('*/15 * * * *'),
   })
   .superRefine((value, context) => {
     if (value.NODE_ENV !== 'production') {
@@ -42,6 +50,7 @@ const envSchema = z
       'AWS_ACCESS_KEY_ID',
       'AWS_SECRET_ACCESS_KEY',
       'OPENAI_API_KEY',
+      'TOGETHER_API_KEY',
       'REVENUECAT_WEBHOOK_SECRET',
     ] as const;
 
@@ -105,6 +114,14 @@ export const env = {
   },
   openai: {
     apiKey: parsed.data.OPENAI_API_KEY,
+    productSearchModel: parsed.data.OPENAI_PRODUCT_SEARCH_MODEL,
+  },
+  together: {
+    apiKey: parsed.data.TOGETHER_API_KEY,
+    visionModel: parsed.data.TOGETHER_VISION_MODEL,
+  },
+  openFoodFacts: {
+    userAgent: parsed.data.OPEN_FOOD_FACTS_USER_AGENT,
   },
   revenueCat: {
     webhookSecret: parsed.data.REVENUECAT_WEBHOOK_SECRET,
@@ -113,5 +130,6 @@ export const env = {
     timezone: parsed.data.SCHEDULER_TIMEZONE,
     weeklyRetentionCron: parsed.data.WEEKLY_RETENTION_CRON,
     medicationLevelCron: parsed.data.MEDICATION_LEVEL_CRON,
+    pepPushCron: parsed.data.PEP_PUSH_CRON,
   },
 } as const;

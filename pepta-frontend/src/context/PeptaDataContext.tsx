@@ -33,6 +33,7 @@ import type {
   WeightLogResponse,
 } from "@pepta/shared";
 import { api } from "../services/api";
+import { hasAIDataSharingConsent } from "../services/aiConsent";
 import { extractApiError, isOffline } from "../services/apiError";
 
 type RangeTotalPatch = Partial<
@@ -203,7 +204,8 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
       if (hasData.current) setHomeRefreshing(true);
       else setHomeLoading(true);
       try {
-        const data = await api.getHome(nextRange);
+        const aiDataSharingConsent = await hasAIDataSharingConsent().catch(() => false);
+        const data = await api.getHome(nextRange, { aiDataSharingConsent });
         setHome(data);
         hasData.current = true;
       } catch (error) {

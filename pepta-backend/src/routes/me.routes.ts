@@ -1,6 +1,8 @@
 import {
   avatarConfirmRequestSchema,
   avatarUploadIntentRequestSchema,
+  notificationPreferencesPatchSchema,
+  pushTokenRegistrationRequestSchema,
   userAccountPatchSchema,
   userProfileSettingsPatchSchema,
 } from "@pepta/shared";
@@ -20,6 +22,11 @@ import {
   updateCurrentUser,
   updateProfileSettings,
 } from "../services/user.service";
+import {
+  getNotificationPreferences,
+  registerPushToken,
+  updateNotificationPreferences,
+} from "../services/pushToken.service";
 
 const router = Router();
 
@@ -37,6 +44,29 @@ router.post(
   validateBody(avatarUploadIntentRequestSchema),
   asyncHandler(async (req, res) => {
     sendData(res, await createAvatarUploadIntent(req.user!.id, req.body));
+  }),
+);
+
+router.post(
+  "/push-tokens",
+  validateBody(pushTokenRegistrationRequestSchema),
+  asyncHandler(async (req, res) => {
+    sendData(res, await registerPushToken(req.user!.id, req.body));
+  }),
+);
+
+router.get(
+  "/notification-preferences",
+  asyncHandler(async (req, res) => {
+    sendData(res, await getNotificationPreferences(req.user!.id));
+  }),
+);
+
+router.patch(
+  "/notification-preferences",
+  validateBody(notificationPreferencesPatchSchema),
+  asyncHandler(async (req, res) => {
+    sendData(res, await updateNotificationPreferences(req.user!.id, req.body));
   }),
 );
 

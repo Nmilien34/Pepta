@@ -51,6 +51,9 @@ function adapter(args?: { granted?: boolean; existingIds?: string[] }) {
     async cancelScheduledNotificationAsync(identifier) {
       canceled.push(identifier);
     },
+    async getExpoPushTokenAsync() {
+      return { data: "ExponentPushToken[abc123]" };
+    },
   };
 
   return { fake, scheduled, canceled };
@@ -93,7 +96,14 @@ describe("Pepta reminder notification scheduling", () => {
       "pepta.reminder.trend_review.2",
     ]);
     expect(requests[0]?.trigger).toEqual({ kind: "date", datetime: "2026-07-03T13:00:00.000Z" });
+    expect(requests[0]).toMatchObject({
+      title: "Pep: shot time",
+      body: expect.stringContaining("Semaglutide"),
+    });
     expect(requests[2]?.trigger).toEqual({ kind: "daily", hour: 15, minute: 30 });
+    for (const request of requests) {
+      expect(request.title.startsWith("Pep:")).toBe(true);
+    }
   });
 
   it("persists reminder state merged with current defaults", async () => {
@@ -123,6 +133,24 @@ describe("Pepta reminder notification scheduling", () => {
       "pepta.reminder.dose_due",
       "pepta.reminder.protein_anchor",
     ]);
+  });
+
+  it("registers the Expo push token with the backend after notification permission is granted", async () => {
+    const { fake } = adapter();
+    const registerBackendPushToken = vi.fn(async () => undefined);
+
+    const result = await syncReminderNotifications(
+      groups(),
+      { dose_due: true },
+      fake,
+      { registerBackendPushToken },
+    );
+
+    expect(result.permissionStatus).toBe("granted");
+    expect(registerBackendPushToken).toHaveBeenCalledWith({
+      token: "ExponentPushToken[abc123]",
+      platform: "ios",
+    });
   });
 
   it("cancels existing reminders and schedules none when permission is denied", async () => {

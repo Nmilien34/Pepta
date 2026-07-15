@@ -31,9 +31,15 @@ const FEATURES = [
   "Muscle-protection tracking",
   "Unlimited AI insights",
   "Meal scan & voice",
-  "Apple Health & export",
+  "Report export",
 ];
 const LEGAL_FOOTER_LABEL = "Terms & Privacy";
+const PREMIUM_ENTITLEMENT_STATUSES = new Set([
+  "trialing",
+  "active",
+  "active_canceled",
+  "past_due",
+]);
 
 function openLegalUrl(url: string) {
   Linking.openURL(url).catch(() => undefined);
@@ -49,6 +55,7 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
   const [paywallPackages, setPaywallPackages] =
     useState<PaywallPackages | null>(null);
   const pricing = buildPaywallPricing(paywallPackages);
+  const plansReady = paywallPackages !== null;
 
   useEffect(() => {
     let mounted = true;
@@ -77,21 +84,31 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
   const refreshEntitlement = async (optimisticActive: boolean) => {
     if (!auth.user) return;
 
+    const optimisticEntitlement = {
+      ...auth.user.entitlement,
+      status: "active" as const,
+      willRenew: true,
+      revenueCatCustomerId: auth.user.id,
+      revenueCatEntitlement: "pro",
+    };
+
     if (optimisticActive) {
       auth.updateCachedUser({
         ...auth.user,
-        entitlement: {
-          ...auth.user.entitlement,
-          status: "active",
-          willRenew: true,
-          revenueCatCustomerId: auth.user.id,
-          revenueCatEntitlement: "pro",
-        },
+        entitlement: optimisticEntitlement,
       });
     }
 
     try {
-      auth.updateCachedUser(await api.getCurrentUser());
+      const refreshedUser = await api.getCurrentUser();
+      const backendHasPremium = PREMIUM_ENTITLEMENT_STATUSES.has(
+        refreshedUser.entitlement.status,
+      );
+      auth.updateCachedUser(
+        optimisticActive && !backendHasPremium
+          ? { ...refreshedUser, entitlement: optimisticEntitlement }
+          : refreshedUser,
+      );
     } catch {
       // The webhook can trail the SDK result by a moment; the optimistic state
       // keeps the UI unlocked while the backend catches up.
@@ -104,7 +121,7 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
   };
 
   const handleStart = async () => {
-    if (!auth.user?.id || completing) return;
+    if (!auth.user?.id || completing || !plansReady) return;
     setMessage(null);
     setFailed(false);
     setCompleting(true);
@@ -269,10 +286,20 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
                 "We couldn’t save your setup. Check your connection and try again."}
             </AppText>
           ) : null}
+          {!plansReady && !failed && !message ? (
+            <AppText
+              variant="caption"
+              color="textSecondary"
+              align="center"
+              style={{ marginBottom: theme.spacing.sm }}
+            >
+              Loading App Store plans…
+            </AppText>
+          ) : null}
           <Button
             label={completing ? "Working…" : "Subscribe"}
             onPress={() => void handleStart()}
-            disabled={completing}
+            disabled={completing || !plansReady}
           />
           <PaywallLegalFooter text={pricing.footer[plan]} />
         </View>

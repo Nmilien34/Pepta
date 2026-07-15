@@ -19,18 +19,18 @@ describe("buildPaywallPricing", () => {
     });
 
     expect(pricing.monthly.price).toBe("$9.99");
-    // Guideline 3.1.2(c): the BILLED amount is the conspicuous price element;
-    // the per-month equivalent lives in the subordinate sub line.
     expect(pricing.yearly.price).toBe("$39.99");
     expect(pricing.yearly.per).toBe("/yr");
-    expect(pricing.yearly.sub).toBe("just $3.33 a month");
+    expect(pricing.yearly.sub).toBe("billed yearly");
     expect(pricing.yearly.badge).toBe("SAVE 67%");
     expect(pricing.footer.yearly).toBe(
-      "$39.99/yr ($3.33/mo). Cancel anytime · Terms & Privacy",
+      "$39.99/year. Cancel anytime · Terms & Privacy",
     );
     expect(pricing.footer.monthly).toBe(
-      "$9.99/mo. Cancel anytime · Terms & Privacy",
+      "$9.99/month. Cancel anytime · Terms & Privacy",
     );
+    expect(pricing.yearly.sub.toLowerCase()).not.toContain("month");
+    expect(pricing.footer.yearly.toLowerCase()).not.toContain("/mo");
     expect(pricing.footer.yearly.toLowerCase()).not.toContain("free");
     expect(pricing.footer.monthly.toLowerCase()).not.toContain("trial");
   });
@@ -41,14 +41,16 @@ describe("buildPaywallPricing", () => {
     expect(pricing.monthly.price).toBe("$9.00");
     expect(pricing.yearly.price).toBe("$40.00");
     expect(pricing.yearly.per).toBe("/yr");
-    expect(pricing.yearly.sub).toBe("just $3.33 a month");
+    expect(pricing.yearly.sub).toBe("billed yearly");
     expect(pricing.yearly.badge).toBe("SAVE 63%");
     expect(pricing.footer.yearly).toBe(
-      "$40/yr ($3.33/mo). Cancel anytime · Terms & Privacy",
+      "$40.00/year. Cancel anytime · Terms & Privacy",
     );
     expect(pricing.footer.monthly).toBe(
-      "$9/mo. Cancel anytime · Terms & Privacy",
+      "$9.00/month. Cancel anytime · Terms & Privacy",
     );
+    expect(pricing.yearly.sub.toLowerCase()).not.toContain("month");
+    expect(pricing.footer.yearly.toLowerCase()).not.toContain("/mo");
     expect(pricing.footer.yearly.toLowerCase()).not.toContain("free");
     expect(pricing.footer.monthly.toLowerCase()).not.toContain("trial");
   });

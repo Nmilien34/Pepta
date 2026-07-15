@@ -1,4 +1,6 @@
 import {
+  mealBarcodeInputSchema,
+  mealProductScanInputSchema,
   mealScanInputSchema,
   mealTranscriptionInputSchema,
   mealVoiceInputSchema,
@@ -8,7 +10,12 @@ import { asyncHandler } from "../lib/async-handler";
 import { sendData } from "../lib/responses";
 import { validateBody } from "../middleware/validate.middleware";
 import { searchFoods } from "../services/food-search.service";
-import { analyzeMealScan, parseVoiceMeal } from "../services/meal-scan.service";
+import {
+  analyzeMealScan,
+  analyzeProductScan,
+  lookupBarcodeMeal,
+  parseVoiceMeal,
+} from "../services/meal-scan.service";
 import { transcribeMealAudio } from "../services/meal-scan-transcription.service";
 
 const router = Router();
@@ -18,6 +25,22 @@ router.post(
   validateBody(mealScanInputSchema),
   asyncHandler(async (req, res) => {
     sendData(res, await analyzeMealScan(req.user!.id, req.body));
+  }),
+);
+
+router.post(
+  "/product",
+  validateBody(mealProductScanInputSchema),
+  asyncHandler(async (req, res) => {
+    sendData(res, await analyzeProductScan(req.user!.id, req.body));
+  }),
+);
+
+router.post(
+  "/barcode",
+  validateBody(mealBarcodeInputSchema),
+  asyncHandler(async (req, res) => {
+    sendData(res, await lookupBarcodeMeal(req.user!.id, req.body));
   }),
 );
 

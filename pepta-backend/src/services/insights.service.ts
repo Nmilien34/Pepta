@@ -52,6 +52,7 @@ interface InsightProseInput extends InsightDraft {
 }
 
 interface InsightServiceOptions {
+  allowAIProse?: boolean;
   generateProse?: (input: InsightProseInput) => Promise<InsightCopy | null>;
   cacheTtlMs?: number;
 }
@@ -398,6 +399,9 @@ export async function getInsights(
   now = new Date(),
   options: InsightServiceOptions = {},
 ) {
+  const generateProse = options.allowAIProse
+    ? options.generateProse ?? generateOpenAIInsightProse
+    : async () => null;
   const medicationLevels = await getMedicationLevels(userId, now);
   const drafts: InsightDraft[] = [];
 
@@ -441,7 +445,7 @@ export async function getInsights(
         draft,
         now,
         cacheTtlMs: options.cacheTtlMs ?? INSIGHT_CACHE_TTL_MS,
-        generateProse: options.generateProse ?? generateOpenAIInsightProse,
+        generateProse,
       }),
     ),
   );

@@ -127,11 +127,6 @@ export function AccountScreen() {
     ).catch(() => Alert.alert("No mail app", `Reach us at ${SUPPORT_EMAIL}.`));
   };
 
-  const openAppSettings = () => {
-    Haptics.selectionAsync().catch(() => undefined);
-    Linking.openSettings().catch(() => undefined);
-  };
-
   const handleSubscriptionPress = () => {
     Haptics.selectionAsync().catch(() => undefined);
     if (ent.premium) {
@@ -220,13 +215,16 @@ export function AccountScreen() {
       icon: "heart",
       iconBg: "#FCEBEB",
       iconColor: "#D14343",
-      label: "Apple Health",
+      label: "Health data import",
       badge: {
         text: "Not connected",
         color: theme.colors.textSecondary,
         bg: theme.colors.surfaceAlt,
       },
-      onPress: openAppSettings,
+      onPress: comingSoon(
+        "Health data import",
+        "Health import is not connected in this version of Pepta. You can keep logging weight, meals, doses, and progress manually.",
+      ),
       chevron: true,
     },
     {

@@ -6,6 +6,7 @@ import type {
   PurchasesPackage,
 } from "react-native-purchases";
 import { REVENUECAT_IOS_API_KEY } from "../config";
+import { appsFlyer } from "./appsflyer";
 
 export const REVENUECAT_ENTITLEMENT_ID = "pro";
 export const REVENUECAT_OFFERING_ID = "default";
@@ -32,6 +33,8 @@ interface RevenueCatSdk {
     productIdentifier: string;
   }>;
   restorePurchases(): Promise<CustomerInfo>;
+  collectDeviceIdentifiers?(): Promise<void>;
+  setAppsflyerID?(appsflyerID: string | null): Promise<void>;
   setLogHandler?(handler: LogHandler): void;
   setLogLevel?(level: unknown): Promise<void>;
 }
@@ -41,6 +44,7 @@ interface RevenueCatClientOptions {
   apiKey: string;
   platformOS: string;
   devMode: boolean;
+  getAppsFlyerId?: (appUserId?: string) => Promise<string | undefined>;
 }
 
 function assertPackage(
@@ -75,7 +79,7 @@ export function isRevenueCatPurchaseCancelled(error: unknown): boolean {
 }
 
 export function createRevenueCatClient(options: RevenueCatClientOptions) {
-  const { sdk, apiKey, platformOS, devMode } = options;
+  const { sdk, apiKey, platformOS, devMode, getAppsFlyerId } = options;
   let configured = false;
   let logHandlerInstalled = false;
   let currentUserId: string | null = null;
@@ -108,21 +112,48 @@ export function createRevenueCatClient(options: RevenueCatClientOptions) {
     logHandlerInstalled = true;
   }
 
-  async function identify(appUserId: string): Promise<void> {
-    assertAvailable();
+  async function configure(): Promise<boolean> {
+    if (!isAvailable()) {
+      return false;
+    }
 
     if (!configured) {
       installDevLogHandler();
-      sdk.configure({ apiKey, appUserID: appUserId });
+      sdk.configure({ apiKey, appUserID: null });
       configured = true;
-      currentUserId = appUserId;
-      return;
     }
+
+    return true;
+  }
+
+  async function syncAppsFlyerAttribution(appUserId?: string): Promise<void> {
+    if (!configured) return;
+
+    let appsFlyerId: string | undefined;
+    try {
+      appsFlyerId = await getAppsFlyerId?.(appUserId);
+    } catch (error) {
+      if (devMode) {
+        console.warn("[RevenueCat] Could not read AppsFlyer ID.", error);
+      }
+    }
+
+    await sdk.collectDeviceIdentifiers?.();
+    if (appsFlyerId) {
+      await sdk.setAppsflyerID?.(appsFlyerId);
+    }
+  }
+
+  async function identify(appUserId: string): Promise<void> {
+    assertAvailable();
+    await configure();
 
     if (currentUserId !== appUserId) {
       await sdk.logIn(appUserId);
       currentUserId = appUserId;
     }
+
+    await syncAppsFlyerAttribution(appUserId);
   }
 
   async function getPaywallPackages(appUserId: string): Promise<PaywallPackages> {
@@ -152,6 +183,7 @@ export function createRevenueCatClient(options: RevenueCatClientOptions) {
   ): Promise<RevenueCatResult> {
     const packages = await getPaywallPackages(appUserId);
     const selectedPackage = plan === "yearly" ? packages.yearly : packages.monthly;
+    await syncAppsFlyerAttribution(appUserId);
     const result = await sdk.purchasePackage(selectedPackage);
     return {
       customerInfo: result.customerInfo,
@@ -176,6 +208,7 @@ export function createRevenueCatClient(options: RevenueCatClientOptions) {
 
   return {
     isAvailable,
+    configure,
     identify,
     getPaywallPackages,
     purchasePlan,
@@ -191,4 +224,19 @@ export const revenueCat = createRevenueCatClient({
   apiKey: REVENUECAT_IOS_API_KEY,
   platformOS: Platform.OS,
   devMode,
+  getAppsFlyerId: async (appUserId?: string) => {
+    const initialized = await appsFlyer.initialize(appUserId).catch((error) => {
+      if (devMode) {
+        console.warn("[RevenueCat] Could not initialize AppsFlyer.", error);
+      }
+      return false;
+    });
+    if (!initialized) return undefined;
+    return appsFlyer.getAppsFlyerUID().catch((error) => {
+      if (devMode) {
+        console.warn("[RevenueCat] Could not read AppsFlyer ID.", error);
+      }
+      return undefined;
+    });
+  },
 });

@@ -12,9 +12,12 @@ const mocks = vi.hoisted(() => ({
     MealLogModel: vi.fn(),
     MealScanModel: vi.fn(),
     MeasurementModel: vi.fn(),
+    PepMemoryModel: vi.fn(),
+    PepPushDeliveryModel: vi.fn(),
     ProcessedWebhookEventModel: vi.fn(),
     ProgressPhotoModel: vi.fn(),
     ProteinLogModel: vi.fn(),
+    PushTokenModel: vi.fn(),
     ScheduleModel: vi.fn(),
     SideEffectLogModel: vi.fn(),
     UserProfileModel: vi.fn(),
@@ -48,6 +51,12 @@ vi.mock("../../models", () => ({
     find: mocks.mealScanFind,
   },
   MeasurementModel: { deleteMany: mocks.modelDeleteMany.MeasurementModel },
+  PepMemoryModel: {
+    deleteMany: mocks.modelDeleteMany.PepMemoryModel,
+  },
+  PepPushDeliveryModel: {
+    deleteMany: mocks.modelDeleteMany.PepPushDeliveryModel,
+  },
   ProcessedWebhookEventModel: {
     deleteMany: mocks.modelDeleteMany.ProcessedWebhookEventModel,
   },
@@ -56,6 +65,7 @@ vi.mock("../../models", () => ({
     find: mocks.progressPhotoFind,
   },
   ProteinLogModel: { deleteMany: mocks.modelDeleteMany.ProteinLogModel },
+  PushTokenModel: { deleteMany: mocks.modelDeleteMany.PushTokenModel },
   ScheduleModel: { deleteMany: mocks.modelDeleteMany.ScheduleModel },
   SideEffectLogModel: {
     deleteMany: mocks.modelDeleteMany.SideEffectLogModel,

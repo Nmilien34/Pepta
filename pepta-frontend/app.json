@@ -9,13 +9,14 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "ai.boltzman.peptaapp",
-      "buildNumber": "8",
+      "buildNumber": "9",
       "usesAppleSignIn": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "Pepta uses your camera to scan meals and capture progress photos.",
         "NSPhotoLibraryUsageDescription": "Pepta uses your photo library so you can upload progress photos and meal images.",
-        "NSMicrophoneUsageDescription": "Pepta uses your microphone so you can log meals by voice."
+        "NSMicrophoneUsageDescription": "Pepta uses your microphone so you can log meals by voice.",
+        "NSUserTrackingUsageDescription": "Pepta uses attribution data to understand which campaigns help people discover the app."
       },
       "appleTeamId": "N8J23B3BBW"
     },
@@ -67,6 +68,20 @@
           "ios": {
             "useFrameworks": "static"
           }
+        }
+      ],
+      [
+        "react-native-appsflyer",
+        {
+          "shouldUseStrictMode": false,
+          "shouldUsePurchaseConnector": false,
+          "preferAppsFlyerBackupRules": false
+        }
+      ],
+      [
+        "expo-tracking-transparency",
+        {
+          "userTrackingPermission": "Pepta uses attribution data to understand which campaigns help people discover the app."
         }
       ]
     ]

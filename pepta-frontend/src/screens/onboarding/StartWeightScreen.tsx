@@ -1,22 +1,13 @@
-// Onboarding screen 13 — Start weight + date (the GLP-1 baseline). Two
-// tappable fields that reveal an inline picker each: starting weight (wheel) and
-// start date (date wheel, past-only). Maps to baselineWeight{value,unit} +
-// profile.journeyStartDate. The Pep note derives "X down already" live.
+// Onboarding — Start weight (T15). Where they began: weight + start date, each
+// a tappable field revealing an inline wheel. The context line echoes their
+// current numbers forward ("5'10", 226 today."). Maps to baselineWeight +
+// profile.journeyStartDate.
 
 import React, { useMemo, useState } from 'react';
-import { Pressable } from 'react-native';
-import { Icon } from "../../components/Icon";
-import { useTheme } from '../../theme';
-import {
-  AppText,
-  Button,
-  Card,
-  DateWheel,
-  Mascot,
-  OnboardingScaffold,
-  WheelPicker,
-  type WheelItem,
-} from '../../components';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Icon } from '../../components/Icon';
+import { ConvoButton, ConvoScreen, DateWheel, WheelPicker, convo, type WheelItem } from '../../components';
+import { typography } from '../../theme/typography';
 import { formatLongDate, numberRange, recentYears, type DateParts } from '../../utils/dateParts';
 import type { UnitSystem } from '../../utils/units';
 
@@ -25,6 +16,7 @@ type OpenField = 'weight' | 'date' | null;
 export interface StartWeightScreenProps {
   progress: number;
   onBack?(): void;
+  context?: string;
   units: UnitSystem;
   currentWeight: number;
   startWeight: number;
@@ -37,6 +29,7 @@ export interface StartWeightScreenProps {
 export function StartWeightScreen({
   progress,
   onBack,
+  context,
   units,
   currentWeight,
   startWeight,
@@ -45,7 +38,6 @@ export function StartWeightScreen({
   onStartDateChange,
   onContinue,
 }: StartWeightScreenProps) {
-  const theme = useTheme();
   const [open, setOpen] = useState<OpenField>(null);
   const unitLabel = units === 'metric' ? 'kg' : 'lb';
 
@@ -58,92 +50,94 @@ export function StartWeightScreen({
   );
 
   const lost = startWeight - currentWeight;
-  const note =
+  const sub =
     lost > 0
-      ? `${lost} ${unitLabel} down already — we’ll chart every step from here.`
-      : 'We’ll chart every step from here.';
+      ? `${lost} ${unitLabel} down already — that's real. Every step gets charted from here.`
+      : 'Your weight when you began your GLP-1.';
 
   const toggle = (field: OpenField) => setOpen((current) => (current === field ? null : field));
 
   return (
-    <OnboardingScaffold
+    <ConvoScreen
       progress={progress}
       onBack={onBack}
-      footer={<Button label="Continue" onPress={onContinue} />}
+      context={context}
+      question="Where did you start?"
+      sub={sub}
+      footer={<ConvoButton label="Continue" onPress={onContinue} />}
     >
-      <AppText variant="obTitle">Where did you start?</AppText>
-      <AppText variant="caption" color="textSecondary" style={{ marginTop: theme.spacing.sm }}>
-        Your weight when you began your GLP-1.
-      </AppText>
+      <View style={{ marginTop: 26 }}>
+        <Text style={styles.fieldLabel}>STARTING WEIGHT</Text>
+        <PickerField
+          icon="scale-bathroom"
+          value={`${startWeight} ${unitLabel}`}
+          open={open === 'weight'}
+          onPress={() => toggle('weight')}
+        />
+        {open === 'weight' ? (
+          <View style={styles.panel}>
+            <WheelPicker items={weightItems} value={startWeight} onChange={onStartWeightChange} />
+          </View>
+        ) : null}
 
-      <AppText variant="sectionHeader" color="textTertiary" style={{ marginTop: theme.spacing.xl }}>
-        Starting weight
-      </AppText>
-      <PickerField
-        icon={<Icon name="scale-bathroom" size={18} color={theme.colors.textSecondary} />}
-        value={`${startWeight} ${unitLabel}`}
-        open={open === 'weight'}
-        onPress={() => toggle('weight')}
-      />
-      {open === 'weight' ? (
-        <Card style={{ marginTop: theme.spacing.sm }} padding={theme.spacing.sm}>
-          <WheelPicker items={weightItems} value={startWeight} onChange={onStartWeightChange} />
-        </Card>
-      ) : null}
-
-      <AppText variant="sectionHeader" color="textTertiary" style={{ marginTop: theme.spacing.lg }}>
-        Start date
-      </AppText>
-      <PickerField
-        icon={<Icon name="calendar-outline" size={18} color={theme.colors.textSecondary} />}
-        value={formatLongDate(startDate)}
-        open={open === 'date'}
-        onPress={() => toggle('date')}
-      />
-      {open === 'date' ? (
-        <Card style={{ marginTop: theme.spacing.sm }} padding={theme.spacing.sm}>
-          <DateWheel value={startDate} onChange={onStartDateChange} minYear={minYear} maxYear={maxYear} maxToday />
-        </Card>
-      ) : null}
-
-      <Card style={{ marginTop: theme.spacing.lg, flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }} flat>
-        <Mascot pose="idle" size={40} />
-        <AppText variant="caption" color="textPrimary" style={{ flex: 1 }}>
-          {note}
-        </AppText>
-      </Card>
-    </OnboardingScaffold>
+        <Text style={[styles.fieldLabel, { marginTop: 18 }]}>START DATE</Text>
+        <PickerField
+          icon="calendar-outline"
+          value={formatLongDate(startDate)}
+          open={open === 'date'}
+          onPress={() => toggle('date')}
+        />
+        {open === 'date' ? (
+          <View style={styles.panel}>
+            <DateWheel value={startDate} onChange={onStartDateChange} minYear={minYear} maxYear={maxYear} maxToday />
+          </View>
+        ) : null}
+      </View>
+    </ConvoScreen>
   );
 }
 
 interface PickerFieldProps {
-  icon: React.ReactNode;
+  icon: string;
   value: string;
   open: boolean;
   onPress(): void;
 }
 
 function PickerField({ icon, value, open, onPress }: PickerFieldProps) {
-  const theme = useTheme();
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: theme.spacing.sm,
-        marginTop: theme.spacing.sm,
-        padding: 15,
-        borderRadius: 16,
-        backgroundColor: theme.colors.surfaceAlt,
-      }}
+      style={({ pressed }) => [styles.field, pressed && { opacity: 0.7 }]}
     >
-      {icon}
-      <AppText variant="bodyStrong" style={{ flex: 1, fontWeight: '700' }}>
-        {value}
-      </AppText>
-      <Icon name={open ? 'chevron-up' : 'chevron-down'} size={18} color={theme.colors.textTertiary} />
+      <Icon name={icon} size={18} color={convo.soft} />
+      <Text style={styles.fieldValue}>{value}</Text>
+      <Icon name={open ? 'chevron-up' : 'chevron-down'} size={16} color={convo.faint} />
     </Pressable>
   );
 }
+
+const styles = StyleSheet.create({
+  fieldLabel: { fontFamily: typography.fonts.semiBold, fontSize: 12, letterSpacing: 0.6, color: convo.faint, marginBottom: 8 },
+  field: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: convo.hairline,
+    backgroundColor: convo.surface,
+  },
+  fieldValue: { fontFamily: typography.fonts.bold, fontSize: 15.5, color: convo.ink, flex: 1 },
+  panel: {
+    marginTop: 9,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: convo.hairline,
+    backgroundColor: convo.surface,
+    paddingVertical: 6,
+  },
+});

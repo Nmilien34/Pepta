@@ -238,4 +238,254 @@ describe("PeptaApi resilience", () => {
     });
     expect(fetchMock).toHaveBeenCalledTimes(1); // 403 is 4xx → not retried
   });
+
+  it("sends the AI consent header only when Home explicitly asks for AI prose", async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({ error: { code: "FORBIDDEN", message: "Upgrade required" } }),
+          { status: 403, headers: { "content-type": "application/json" } },
+        ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      api.getHome("today", { aiDataSharingConsent: true }),
+    ).rejects.toThrow();
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:8080/home",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          "x-pepta-ai-consent": "true",
+        }),
+      }),
+    );
+  });
+});
+
+describe("PeptaApi coach chat", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    api.setAuthToken(null);
+  });
+
+  it("posts Pep chat messages to the backend coach endpoint", async () => {
+    api.setAuthToken("session-token");
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            data: {
+              reply: "You have enough context to focus on protein next.",
+              refused: false,
+            },
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await api.coachChat([
+      { role: "user", text: "What should I focus on today?" },
+    ]);
+
+    expect(result.reply).toContain("protein");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:8080/coach/chat",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          Authorization: "Bearer session-token",
+        }),
+        body: JSON.stringify({
+          messages: [{ role: "user", text: "What should I focus on today?" }],
+        }),
+      }),
+    );
+  });
+});
+
+describe("PeptaApi meal product scans", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    api.setAuthToken(null);
+  });
+
+  const scanResponse = {
+    data: {
+      scanId: "scan-1",
+      analysis: {
+        foodName: "Chobani Zero Sugar Greek Yogurt",
+        servingSize: "1 container",
+        protein: 11,
+        calories: 60,
+        carbs: 5,
+        fat: 0,
+        fiber: 0,
+        confidence: 0.88,
+      },
+      coachContent: null,
+      note: "Review this packaged product before logging.",
+      visionEngineVersion: "product-scan-v1",
+      product: {
+        mode: "product_scan",
+        barcode: "081212903020",
+        brand: "Chobani",
+        productName: "Zero Sugar Greek Yogurt",
+        source: "open_food_facts",
+        citations: [
+          {
+            title: "Chobani Zero Sugar Greek Yogurt",
+            url: "https://world.openfoodfacts.org/product/081212903020",
+          },
+        ],
+      },
+    },
+  };
+
+  it("posts product package photos to the product scan endpoint", async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify(scanResponse), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await api.analyzeProductPhoto({
+      imageData: "base64-image",
+      imageMimeType: "image/png",
+      capturedAt: NOW.toISOString(),
+    });
+
+    expect(result.product?.mode).toBe("product_scan");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:8080/meal-scans/product",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          imageData: "base64-image",
+          imageMimeType: "image/png",
+          capturedAt: NOW.toISOString(),
+        }),
+      }),
+    );
+  });
+
+  it("posts barcode scans to the barcode endpoint", async () => {
+    const response = {
+      data: {
+        ...scanResponse.data,
+        scanId: "barcode-1",
+        visionEngineVersion: "barcode-lookup-v1",
+        product: {
+          ...scanResponse.data.product,
+          mode: "barcode",
+        },
+      },
+    };
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify(response), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await api.analyzeMealBarcode({
+      barcode: "081212903020",
+      scannedAt: NOW.toISOString(),
+    });
+
+    expect(result.product?.mode).toBe("barcode");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:8080/meal-scans/barcode",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          barcode: "081212903020",
+          scannedAt: NOW.toISOString(),
+        }),
+      }),
+    );
+  });
+});
+
+describe("PeptaApi notification preferences", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    api.setAuthToken(null);
+  });
+
+  it("registers the current device Expo push token with the backend", async () => {
+    api.setAuthToken("session-token");
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            data: {
+              token: "ExponentPushToken[abc123]",
+              platform: "ios",
+              enabled: true,
+              lastSeenAt: NOW.toISOString(),
+            },
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await api.registerPushToken({
+      token: "ExponentPushToken[abc123]",
+      platform: "ios",
+    });
+
+    expect(result.enabled).toBe(true);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:8080/me/push-tokens",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          Authorization: "Bearer session-token",
+        }),
+        body: JSON.stringify({
+          token: "ExponentPushToken[abc123]",
+          platform: "ios",
+        }),
+      }),
+    );
+  });
+
+  it("updates AI-personalized push consent separately from notification permission", async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            data: {
+              aiPushCopyConsent: true,
+              aiPushCopyConsentAt: NOW.toISOString(),
+              aiPushCopyConsentRevokedAt: null,
+            },
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await api.updateNotificationPreferences({
+      aiPushCopyConsent: true,
+    });
+
+    expect(result.aiPushCopyConsent).toBe(true);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:8080/me/notification-preferences",
+      expect.objectContaining({
+        method: "PATCH",
+        body: JSON.stringify({ aiPushCopyConsent: true }),
+      }),
+    );
+  });
 });

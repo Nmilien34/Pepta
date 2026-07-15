@@ -1,69 +1,33 @@
-// Onboarding — medication route. Shown only when the picked medication doesn't
-// pin how it's taken (compounded meds and "something else" ship as injections
-// AND as oral drops/troches). The explicit answer overrides the catalog's
-// default route and gates the injection-only steps (device type, shot day).
+// Onboarding — Route (T5). Shown only when the picked medication doesn't pin
+// how it's taken (compounded meds ship as injections AND oral drops/troches).
+// The explicit answer overrides the catalog default and gates injection-only
+// turns (device, concentration, shot day/time).
 
 import React from 'react';
-import { View } from 'react-native';
-import { Icon } from '../../components/Icon';
-import { useTheme } from '../../theme';
-import { AppText, Button, OnboardingScaffold, OptionCard } from '../../components';
+import { ConvoScreen } from '../../components';
 
 export type MedicationRoute = 'injection' | 'oral' | 'unsure';
 
 export interface RouteScreenProps {
   progress: number;
   onBack?(): void;
-  medicationName?: string;
-  value?: MedicationRoute;
-  onChange(value: MedicationRoute): void;
-  onContinue(): void;
+  context?: string;
+  onAnswer(value: MedicationRoute): void;
 }
 
-export function RouteScreen({
-  progress,
-  onBack,
-  medicationName,
-  value,
-  onChange,
-  onContinue,
-}: RouteScreenProps) {
-  const theme = useTheme();
-
+export function RouteScreen({ progress, onBack, context, onAnswer }: RouteScreenProps) {
   return (
-    <OnboardingScaffold
+    <ConvoScreen<MedicationRoute>
       progress={progress}
       onBack={onBack}
-      footer={<Button label="Continue" onPress={onContinue} disabled={!value} />}
-    >
-      <AppText variant="obTitle">How do you take it?</AppText>
-      <AppText variant="caption" color="textSecondary" style={{ marginTop: theme.spacing.sm }}>
-        {medicationName ? `${medicationName} comes in a few forms.` : 'This tailors your tracking.'}
-      </AppText>
-
-      <View style={{ gap: 11, marginTop: theme.spacing.xl }}>
-        <OptionCard
-          title="Injection"
-          subtitle="Pen, auto-injector, or syringe"
-          icon={<Icon name="needle" size={22} color={theme.colors.primary} />}
-          selected={value === 'injection'}
-          onPress={() => onChange('injection')}
-        />
-        <OptionCard
-          title="Pill or oral"
-          subtitle="Tablets, drops, or troches"
-          icon={<Icon name="pill" size={22} color={theme.colors.fiber} />}
-          selected={value === 'oral'}
-          onPress={() => onChange('oral')}
-        />
-        <OptionCard
-          title="Not sure"
-          subtitle="We'll start with injection tracking — change anytime"
-          icon={<Icon name="help-circle" size={22} color={theme.colors.warning} />}
-          selected={value === 'unsure'}
-          onPress={() => onChange('unsure')}
-        />
-      </View>
-    </OnboardingScaffold>
+      context={context}
+      question="How do you take it?"
+      options={[
+        { label: 'Injection', sub: 'pen, auto-injector, or syringe', value: 'injection' },
+        { label: 'Pill or oral', sub: 'tablets, drops, or troches', value: 'oral' },
+        { label: 'Not sure', sub: 'we’ll start with injection tracking', value: 'unsure' },
+      ]}
+      onAnswer={onAnswer}
+    />
   );
 }

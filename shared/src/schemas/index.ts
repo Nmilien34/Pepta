@@ -70,6 +70,7 @@ export const researchArticleCategorySchema = z.enum(
   RESEARCH_ARTICLE_CATEGORIES,
 );
 export const subscriptionStatusSchema = z.enum(SUBSCRIPTION_STATUSES);
+export const pushPlatformSchema = z.enum(["ios", "android", "web"]);
 
 export const apiErrorSchema = z
   .object({
@@ -112,6 +113,38 @@ export const legalAcceptanceSchema = z
   })
   .strict();
 
+export const notificationPreferencesResponseSchema = z
+  .object({
+    aiPushCopyConsent: z.boolean(),
+    aiPushCopyConsentAt: isoDateTimeSchema.nullable(),
+    aiPushCopyConsentRevokedAt: isoDateTimeSchema.nullable(),
+  })
+  .strict();
+
+export const notificationPreferencesPatchSchema = z
+  .object({
+    aiPushCopyConsent: z.boolean(),
+  })
+  .strict();
+
+export const pushTokenRegistrationRequestSchema = z
+  .object({
+    token: z.string().trim().min(1),
+    platform: pushPlatformSchema,
+    deviceId: z.string().trim().min(1).optional(),
+    appVersion: z.string().trim().min(1).optional(),
+  })
+  .strict();
+
+export const pushTokenRegistrationResponseSchema = z
+  .object({
+    token: z.string().trim().min(1),
+    platform: pushPlatformSchema,
+    enabled: z.boolean(),
+    lastSeenAt: isoDateTimeSchema,
+  })
+  .strict();
+
 export const userResponseSchema = z
   .object({
     id: idSchema,
@@ -125,6 +158,7 @@ export const userResponseSchema = z
     onboardingComplete: z.boolean(),
     onboardingCompletedAt: isoDateTimeSchema.optional(),
     legalAcceptance: legalAcceptanceSchema.optional(),
+    notificationPreferences: notificationPreferencesResponseSchema.optional(),
     createdAt: isoDateTimeSchema,
     updatedAt: isoDateTimeSchema,
   })
@@ -199,6 +233,7 @@ export const authResponseSchema = z
   .object({
     token: z.string().min(1),
     user: userResponseSchema,
+    isNewUser: z.boolean().optional(),
   })
   .strict();
 
@@ -677,6 +712,19 @@ export const mealScanInputSchema = z
   })
   .strict();
 
+export const mealProductScanInputSchema = mealScanInputSchema;
+
+export const mealBarcodeInputSchema = z
+  .object({
+    barcode: z
+      .string()
+      .trim()
+      .regex(/^\d{6,20}$/, "Expected a numeric barcode"),
+    scannedAt: isoDateTimeSchema.optional(),
+    idempotencyKey: z.string().trim().min(1).optional(),
+  })
+  .strict();
+
 export const mealVoiceInputSchema = z
   .object({
     transcript: z.string().trim().min(1),
@@ -747,6 +795,30 @@ export const mealScanCoachContentSchema = z
   })
   .strict();
 
+export const mealProductCitationSchema = z
+  .object({
+    title: z.string().trim().min(1),
+    url: z.string().url(),
+  })
+  .strict();
+
+export const mealProductScanMetadataSchema = z
+  .object({
+    mode: z.enum(["product_scan", "barcode"]),
+    barcode: z.string().trim().min(1).optional(),
+    brand: z.string().trim().min(1).optional(),
+    productName: z.string().trim().min(1).optional(),
+    source: z.enum([
+      "cache",
+      "open_food_facts",
+      "openai_web_search",
+      "together_vision",
+      "manual_label",
+    ]),
+    citations: z.array(mealProductCitationSchema).default([]),
+  })
+  .strict();
+
 export const mealScanResponseSchema = z
   .object({
     scanId: idSchema,
@@ -755,6 +827,7 @@ export const mealScanResponseSchema = z
     coachContent: mealScanCoachContentSchema.nullable(),
     note: z.string().trim().min(1).optional(),
     visionEngineVersion: z.string().min(1),
+    product: mealProductScanMetadataSchema.optional(),
   })
   .strict();
 
@@ -893,6 +966,11 @@ export const revenueCatWebhookSchema = z
         id: z.string().min(1).optional(),
         type: z.string().min(1),
         app_user_id: z.string().min(1).optional(),
+        original_app_user_id: z.string().min(1).optional(),
+        aliases: z.array(z.string().min(1)).optional(),
+        transferred_from: z.array(z.string().min(1)).optional(),
+        transferred_to: z.array(z.string().min(1)).optional(),
+        transaction_id: z.string().min(1).optional(),
         product_id: z.string().min(1).optional(),
         entitlement_id: z.string().min(1).optional(),
         period_type: z.string().min(1).optional(),
@@ -922,3 +1000,26 @@ export const errorCodeSchema = z.enum([
   ERROR_CODES.serviceUnavailable,
   ERROR_CODES.validation,
 ]);
+
+// --- Pep chat (POST /coach/chat) ---------------------------------------------
+// The mascot's back-and-forth chat. Grounded server-side in the user's own
+// tracking data; clinical questions are refused and redirected to the
+// prescriber (mirrors Leanient's constrained coach-chat guardrails).
+export const pepChatRoleSchema = z.enum(["user", "pep"]);
+export const pepChatMessageSchema = z
+  .object({
+    role: pepChatRoleSchema,
+    text: z.string().trim().min(1).max(600),
+  })
+  .strict();
+export const pepChatRequestSchema = z
+  .object({
+    messages: z.array(pepChatMessageSchema).min(1).max(16),
+  })
+  .strict();
+export const pepChatResponseSchema = z
+  .object({
+    reply: z.string().min(1),
+    refused: z.boolean(),
+  })
+  .strict();

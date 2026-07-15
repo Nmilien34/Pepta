@@ -1,6 +1,7 @@
 import React from "react";
 import TestRenderer, { act } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { User } from "@pepta/shared";
 import { AuthProvider, useAuth } from "../../context/AuthContext";
 import { AUTH_STORAGE_KEY, serializeAuth } from "../../context/authPersistence";
 import { testStorage } from "../testStorage";
@@ -8,7 +9,7 @@ import { mockAuthResponse, makeAuthResponse } from "../../mocks/auth";
 
 // AuthProvider uses the api singleton directly, so replace the whole module with
 // a controllable mock (the methods AuthContext calls).
-const { mockApi } = vi.hoisted(() => ({
+const { mockApi, mockAppsFlyer, mockRevenueCat } = vi.hoisted(() => ({
   mockApi: {
     signInWithGoogle: vi.fn(),
     signInWithApple: vi.fn(),
@@ -16,8 +17,19 @@ const { mockApi } = vi.hoisted(() => ({
     setAuthToken: vi.fn(),
     setUnauthorizedHandler: vi.fn(),
   },
+  mockAppsFlyer: {
+    initialize: vi.fn(),
+    logCompleteRegistration: vi.fn(),
+  },
+  mockRevenueCat: {
+    configure: vi.fn(),
+    identify: vi.fn(),
+    reset: vi.fn(),
+  },
 }));
 vi.mock("../../services/api", () => ({ api: mockApi }));
+vi.mock("../../services/appsflyer", () => ({ appsFlyer: mockAppsFlyer }));
+vi.mock("../../services/revenueCat", () => ({ revenueCat: mockRevenueCat }));
 
 type AuthValue = ReturnType<typeof useAuth>;
 
@@ -53,6 +65,16 @@ describe("AuthContext", () => {
     mockApi.signInWithDemo.mockReset();
     mockApi.setAuthToken.mockReset();
     mockApi.setUnauthorizedHandler.mockReset();
+    mockAppsFlyer.initialize.mockReset();
+    mockAppsFlyer.initialize.mockResolvedValue(true);
+    mockAppsFlyer.logCompleteRegistration.mockReset();
+    mockAppsFlyer.logCompleteRegistration.mockResolvedValue(undefined);
+    mockRevenueCat.configure.mockReset();
+    mockRevenueCat.configure.mockResolvedValue(true);
+    mockRevenueCat.identify.mockReset();
+    mockRevenueCat.identify.mockResolvedValue(undefined);
+    mockRevenueCat.reset.mockReset();
+    mockRevenueCat.reset.mockResolvedValue(undefined);
   });
   afterEach(() => {
     vi.clearAllMocks();
@@ -71,6 +93,65 @@ describe("AuthContext", () => {
     expect(harness.value().user?.id).toBe("user_1");
     expect(mockApi.setAuthToken).toHaveBeenCalledWith("token_1");
     expect(testStorage.snapshot()[AUTH_STORAGE_KEY]).toBeDefined();
+  });
+
+  it("sets AppsFlyer and RevenueCat identities before exposing authenticated UI", async () => {
+    let resolveAppsFlyer: ((value: boolean) => void) | undefined;
+    mockApi.signInWithGoogle.mockResolvedValue(makeAuthResponse());
+    mockAppsFlyer.initialize.mockImplementation(
+      () =>
+        new Promise<boolean>((resolve) => {
+          resolveAppsFlyer = resolve;
+        }),
+    );
+    const harness = await renderAuthHarness();
+
+    let signInPromise: Promise<User> | undefined;
+    await act(async () => {
+      signInPromise = harness.value().signInWithGoogle("id-token");
+      await Promise.resolve();
+    });
+
+    expect(harness.value().isAuthenticated).toBe(false);
+    expect(mockAppsFlyer.initialize).toHaveBeenCalledWith("user_1");
+
+    resolveAppsFlyer?.(true);
+    await act(async () => {
+      await signInPromise;
+    });
+
+    expect(mockRevenueCat.identify).toHaveBeenCalledWith("user_1");
+    expect(harness.value().isAuthenticated).toBe(true);
+  });
+
+  it("logs AppsFlyer registration only when auth confirms a new user", async () => {
+    mockApi.signInWithGoogle.mockResolvedValue({
+      ...makeAuthResponse(),
+      isNewUser: true,
+    });
+    const harness = await renderAuthHarness();
+
+    await act(async () => {
+      await harness.value().signInWithGoogle("id-token");
+    });
+
+    expect(mockAppsFlyer.logCompleteRegistration).toHaveBeenCalledWith({
+      method: "google",
+    });
+  });
+
+  it("does not log AppsFlyer registration for returning users", async () => {
+    mockApi.signInWithGoogle.mockResolvedValue({
+      ...makeAuthResponse(),
+      isNewUser: false,
+    });
+    const harness = await renderAuthHarness();
+
+    await act(async () => {
+      await harness.value().signInWithGoogle("id-token");
+    });
+
+    expect(mockAppsFlyer.logCompleteRegistration).not.toHaveBeenCalled();
   });
 
   it("persists the session + sets the token after reviewer demo sign-in", async () => {
@@ -99,6 +180,7 @@ describe("AuthContext", () => {
       await harness.value().signInWithGoogle("id-token");
     });
     expect(harness.value().isAuthenticated).toBe(true);
+    mockRevenueCat.reset.mockClear();
 
     await act(async () => {
       harness.value().logout();
@@ -107,6 +189,7 @@ describe("AuthContext", () => {
     expect(harness.value().isAuthenticated).toBe(false);
     expect(harness.value().user).toBeNull();
     expect(mockApi.setAuthToken).toHaveBeenLastCalledWith(null);
+    expect(mockRevenueCat.reset).toHaveBeenCalledTimes(1);
     expect(testStorage.snapshot()).toEqual({});
   });
 
@@ -142,6 +225,8 @@ describe("AuthContext", () => {
     expect(harness.value().isAuthenticated).toBe(true);
     expect(harness.value().user?.id).toBe("user_1");
     expect(mockApi.setAuthToken).toHaveBeenCalledWith("token_1");
+    expect(mockAppsFlyer.initialize).toHaveBeenCalledWith("user_1");
+    expect(mockRevenueCat.identify).toHaveBeenCalledWith("user_1");
   });
 
   it("registers a 401 handler that signs the user out", async () => {

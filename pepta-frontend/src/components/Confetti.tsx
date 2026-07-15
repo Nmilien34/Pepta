@@ -1,78 +1,66 @@
-// Confetti — a contained burst of falling, rotating pieces for the reveal. Each
-// piece loops on its own timing (RN Animated, native driver). Fixed configs so
-// it's deterministic. Sits in a normal-flow box at the top of the screen.
+// Confetti — a ONE-SHOT celebratory burst for the reveal's payoff moment. Mount
+// it (e.g. when the goal line reaches the flag) and each piece falls once with
+// its own drift + spin, fading near the floor. Not a loop: a burst that plays
+// and settles. Ported from Leanient's PlanReady celebration onto Pepta's palette.
 
-import React, { useEffect, useRef } from 'react';
-import { Animated, Easing, View } from 'react-native';
-import { useTheme } from '../theme';
+import React, { useEffect, useMemo, useRef } from 'react';
+import { Animated, Easing, StyleSheet, View, useWindowDimensions } from 'react-native';
 
-interface Piece {
-  left: number; // 0..1 fraction of width
-  color: string;
-  size: number;
-  delay: number;
-  duration: number;
-  round?: boolean;
-}
+// Purple-led, per the v2.2 spec ("confetti burst, subtle, purple") with a few
+// data-color accents for life.
+const COLORS = ['#7C5CFC', '#E25CC4', '#2FA8FF', '#34C759', '#FF8A3D', '#7C5CFC'];
 
 export interface ConfettiProps {
-  height?: number;
+  count?: number;
 }
 
-export function Confetti({ height = 200 }: ConfettiProps) {
-  const theme = useTheme();
-  const c = theme.colors;
-  const pieces: Piece[] = [
-    { left: 0.08, color: c.protein, size: 7, delay: 0, duration: 2600 },
-    { left: 0.2, color: c.fiber, size: 6, delay: 320, duration: 2900, round: true },
-    { left: 0.34, color: c.water, size: 8, delay: 120, duration: 2500 },
-    { left: 0.48, color: c.weight, size: 6, delay: 480, duration: 3000 },
-    { left: 0.62, color: c.primary, size: 7, delay: 200, duration: 2700, round: true },
-    { left: 0.76, color: c.protein, size: 6, delay: 560, duration: 2850 },
-    { left: 0.88, color: c.primaryGradientEnd, size: 8, delay: 80, duration: 2600 },
-  ];
-
+export function Confetti({ count = 24 }: ConfettiProps) {
+  const { width, height } = useWindowDimensions();
   return (
-    <View pointerEvents="none" style={{ height, overflow: 'hidden' }}>
-      {pieces.map((p, i) => (
-        <ConfettiPiece key={i} piece={p} height={height} />
+    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+      {Array.from({ length: count }, (_, i) => (
+        <Confetto key={i} index={i} screenW={width} screenH={height} />
       ))}
     </View>
   );
 }
 
-function ConfettiPiece({ piece, height }: { piece: Piece; height: number }) {
-  const t = useRef(new Animated.Value(0)).current;
+function Confetto({ index, screenW, screenH }: { index: number; screenW: number; screenH: number }) {
+  const fall = useRef(new Animated.Value(0)).current;
+  const startX = useMemo(() => Math.random() * screenW, [screenW]);
+  const drift = useMemo(() => (Math.random() - 0.5) * 100, []);
+  const size = useMemo(() => 6 + Math.random() * 5, []);
+  const round = useMemo(() => Math.random() > 0.6, []);
+  const color = COLORS[index % COLORS.length];
+  const spin = useMemo(() => `${Math.round((Math.random() - 0.5) * 720)}deg`, []);
 
   useEffect(() => {
-    const loop = Animated.loop(
-      Animated.timing(t, {
-        toValue: 1,
-        duration: piece.duration,
-        delay: piece.delay,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      }),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [t, piece.duration, piece.delay]);
-
-  const translateY = t.interpolate({ inputRange: [0, 1], outputRange: [-20, height + 20] });
-  const rotate = t.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '320deg'] });
-  const opacity = t.interpolate({ inputRange: [0, 0.1, 0.85, 1], outputRange: [0, 1, 1, 0] });
+    Animated.timing(fall, {
+      toValue: 1,
+      duration: 1700 + Math.random() * 900,
+      delay: index * 26,
+      easing: Easing.in(Easing.quad),
+      useNativeDriver: true,
+    }).start();
+  }, [fall, index]);
 
   return (
     <Animated.View
+      pointerEvents="none"
       style={{
         position: 'absolute',
-        left: `${piece.left * 100}%`,
-        width: piece.size,
-        height: piece.round ? piece.size : piece.size * 1.6,
-        borderRadius: piece.round ? piece.size : 2,
-        backgroundColor: piece.color,
-        opacity,
-        transform: [{ translateY }, { rotate }],
+        top: -24,
+        left: startX,
+        width: size,
+        height: round ? size : size * 1.6,
+        borderRadius: round ? size : 2,
+        backgroundColor: color,
+        opacity: fall.interpolate({ inputRange: [0, 0.78, 1], outputRange: [1, 1, 0] }),
+        transform: [
+          { translateY: fall.interpolate({ inputRange: [0, 1], outputRange: [0, screenH + 40] }) },
+          { translateX: fall.interpolate({ inputRange: [0, 1], outputRange: [0, drift] }) },
+          { rotate: fall.interpolate({ inputRange: [0, 1], outputRange: ['0deg', spin] }) },
+        ],
       }}
     />
   );

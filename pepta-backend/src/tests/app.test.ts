@@ -54,21 +54,25 @@ describe("Pepta app", () => {
     expect(terms.text).toContain("Acceptance of These Terms");
     expect(terms.text).toContain("App Store Terms of Service");
     expect(terms.text).toContain("Bundle ID: ai.boltzman.peptaapp");
+    expect(terms.text.toLowerCase()).not.toContain("free trial");
     expect(privacy.text).toContain("Privacy Policy for Pepta");
     expect(privacy.text).toContain("dev@boltzman.ai");
     expect(privacy.text).toContain("Data We Collect");
     expect(privacy.text).toContain(
       "Camera, Microphone, Photos, and Uploaded Files",
     );
-    expect(privacy.text).toContain("AI Features and OpenAI");
     expect(privacy.text).toContain(
-      "We do not allow OpenAI to use your data to train its general models",
+      "AI Features, Product Lookup, and Providers",
     );
+    expect(privacy.text).toContain("We do not allow OpenAI or Together AI");
+    expect(privacy.text).toContain("general models");
+    expect(privacy.text).toContain("Open Food Facts");
     expect(privacy.text).toContain("HealthKit is not currently connected");
     expect(privacy.text).toContain("Data Export and Account Deletion");
     expect(privacy.text).toContain("OpenAI");
     expect(privacy.text).toContain("RevenueCat");
     expect(privacy.text).toContain("Bundle ID: ai.boltzman.peptaapp");
+    expect(privacy.text.toLowerCase()).not.toContain("trialing");
   });
 
   it("handles invalid Apple auth according to current Apple configuration", async () => {

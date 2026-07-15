@@ -21,7 +21,13 @@ platform :ios, podfile_properties['ios.deploymentTarget'] || '15.1'
 prepare_react_native_project!
 
 target 'Pepta' do
+# @generated begin AppsFlyer Strict Mode - expo prebuild (DO NOT MODIFY) sync-b29372208dd0dbd1274e957795cd756926086c3a
+$RNAppsFlyerStrictMode=false
+# @generated end AppsFlyer Strict Mode
   use_expo_modules!
+# @generated begin AppsFlyer Purchase Connector - expo prebuild (DO NOT MODIFY) sync-40d043aa4472dc51990344aee6329be6fe164eba
+$AppsFlyerPurchaseConnector=false
+# @generated end AppsFlyer Purchase Connector
 
   if ENV['EXPO_USE_COMMUNITY_AUTOLINKING'] == '1'
     config_command = ['node', '-e', "process.argv=['', '', 'config'];require('@react-native-community/cli').run()"];
@@ -59,5 +65,26 @@ target 'Pepta' do
       :mac_catalyst_enabled => false,
       :ccache_enabled => ccache_enabled?(podfile_properties),
     )
+
+    # Xcode 16/26 + new iOS SDK: RevenueCat (a static Swift lib) imports SwiftUI,
+    # whose symbols now live in the client-restricted private SwiftUICore. Unless
+    # the APP itself links the public SwiftUI umbrella, ld tries to link
+    # SwiftUICore directly and fails ("not an allowed client of it"). Force the
+    # app target to link SwiftUI so those symbols resolve through the public
+    # framework. Idempotent; re-applied on every pod install.
+    installer.aggregate_targets.each do |aggregate_target|
+      user_project = aggregate_target.user_project
+      next unless user_project
+      user_project.native_targets.each do |native_target|
+        next unless native_target.name == 'Pepta'
+        native_target.build_configurations.each do |build_config|
+          ldflags = build_config.build_settings['OTHER_LDFLAGS'] || ['$(inherited)']
+          ldflags = [ldflags] if ldflags.is_a?(String)
+          next if ldflags.include?('SwiftUI')
+          build_config.build_settings['OTHER_LDFLAGS'] = ldflags + ['-framework', 'SwiftUI']
+        end
+      end
+      user_project.save
+    end
   end
 end

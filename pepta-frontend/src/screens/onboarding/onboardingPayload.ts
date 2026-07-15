@@ -1,10 +1,18 @@
 // Pure mapper: navigator flow answers → the typed OnboardingCompleteInput the
-// backend expects. No RN imports → unit-testable. Where the lab collected fields
-// the schema doesn't have (genderIdentity → sex, goalWeight/goalPace), we resolve
-// to the closest schema field or drop them (flagged TODO). The api call is real
-// and correct so wiring the live backend is a no-op swap.
+// backend expects. No RN imports → unit-testable. Where the flow collects fields
+// the schema doesn't have (experience, needs, alsoTracking, momentum), they stay
+// navigator-local (flagged TODO for the schema). The v2.2 turns now feed real
+// schema surfaces the old flow left empty: compound.concentration (vial users),
+// schedule{frequency, daysOfWeek, nextDoseAt} and lastDose (arms the level model
+// server-side from the last-shot + shot-time answers).
 
-import type { ActivityLevel, BiggestWorry, InjectionDeviceType, OnboardingCompleteInput, TrainingStatus } from '@pepta/shared';
+import type {
+  ActivityLevel,
+  BiggestWorry,
+  InjectionDeviceType,
+  OnboardingCompleteInput,
+  TrainingStatus,
+} from '@pepta/shared';
 import type { MedicationOption } from '../../data/medicationCatalog';
 import { toIsoDate, type DateParts } from '../../utils/dateParts';
 import type { BodyMeasure } from '../../utils/units';
@@ -16,16 +24,30 @@ import type { GenderIdentity } from './SexGenderScreen';
 import type { WeightUnit } from './GoalWeightScreen';
 import type { SideEffectType } from './SideEffectsScreen';
 import type { MedicationRoute } from './RouteScreen';
+import type { ExperienceLevel } from './ExperienceScreen';
+import type { NeedType } from './NeedsScreen';
+import type { ConcentrationValue } from './ConcentrationScreen';
+import type { AlsoTracking } from './AlsoTrackingScreen';
+import type { MomentumAnswer } from './MomentumScreen';
 
 export interface OnboardingAnswers {
   journeyStage?: JourneyStage;
+  // TODO(schema): experience/needs/alsoTracking/momentum are conversation
+  // signals with no backend field yet — persisted in the draft only.
+  experience?: ExperienceLevel;
+  needs?: NeedType[];
+  alsoTracking?: AlsoTracking;
+  momentum?: MomentumAnswer;
   medication?: MedicationOption;
   route?: MedicationRoute;
   deviceType?: InjectionDeviceType;
+  concentration?: ConcentrationValue;
   dose?: DoseValue;
   frequency?: DoseFrequency;
   lastShot?: DateParts;
   shotDays?: number[];
+  /** 0–23, from the shot-time turn; times reminders + nextDoseAt. */
+  shotHour?: number;
   goalType?: GoalType;
   genderIdentity?: GenderIdentity;
   birthday?: DateParts;
@@ -56,7 +78,7 @@ function sexFromGender(gender: GenderIdentity | undefined): 'male' | 'female' {
   return gender === 'man' ? 'male' : 'female';
 }
 
-// The pace slider (0..1) maps to the schema's goalPace enum.
+// The pace value (0..1) maps to the schema's goalPace enum.
 function paceToEnum(pace: number | undefined): 'gentle' | 'steady' | 'ambitious' {
   const p = pace ?? 0.5;
   if (p < 0.4) return 'gentle';
@@ -67,6 +89,36 @@ function paceToEnum(pace: number | undefined): 'gentle' | 'steady' | 'ambitious'
 function isoDatetime(parts: DateParts | undefined, now: Date): string {
   if (!parts) return now.toISOString();
   return new Date(parts.year, parts.month, parts.day).toISOString();
+}
+
+// The last shot at the user's usual hour, clamped to now (the log must not
+// land in the future when the shot was earlier today).
+function lastDoseDatetime(lastShot: DateParts, shotHour: number | undefined, now: Date): string {
+  const at = new Date(lastShot.year, lastShot.month, lastShot.day, shotHour ?? 12, 0, 0, 0);
+  return (at > now ? now : at).toISOString();
+}
+
+const FREQUENCY_INTERVAL_DAYS: Record<Exclude<DoseFrequency, 'custom'>, number> = {
+  daily: 1,
+  weekly: 7,
+  biweekly: 14,
+};
+
+// Next dose = last shot + interval at the usual hour, rolled forward until it
+// lands in the future (the user may be mid-cycle when onboarding).
+function nextDoseAt(
+  lastShot: DateParts,
+  frequency: DoseFrequency,
+  shotHour: number | undefined,
+  now: Date,
+): string | undefined {
+  if (frequency === 'custom') return undefined;
+  const interval = FREQUENCY_INTERVAL_DAYS[frequency];
+  const next = new Date(lastShot.year, lastShot.month, lastShot.day, shotHour ?? 12, 0, 0, 0);
+  do {
+    next.setDate(next.getDate() + interval);
+  } while (next <= now);
+  return next.toISOString();
 }
 
 export function buildOnboardingPayload(answers: OnboardingAnswers, now: Date): OnboardingCompleteInput {
@@ -109,29 +161,60 @@ export function buildOnboardingPayload(answers: OnboardingAnswers, now: Date): O
   // Only attach a compound for users actively on a GLP-1 with a medication picked.
   // Our seed-catalog ids aren't real backend catalog ids, so we send the
   // medication's own fields rather than a medicationCatalogId.
-  const compound =
-    answers.journeyStage === 'active' && answers.medication
+  const active = answers.journeyStage === 'active' && answers.medication != null;
+  const compound = active
+    ? ({
+        name: answers.medication!.name,
+        drugClass: answers.medication!.drugClass,
+        // The explicit route answer (asked for ambiguous meds) overrides the
+        // catalog default; "unsure" falls back to the catalog route.
+        route:
+          answers.route === 'injection' || answers.route === 'oral'
+            ? answers.route
+            : answers.medication!.route,
+        ...(answers.deviceType && answers.route !== 'oral' ? { deviceType: answers.deviceType } : {}),
+        halfLifeDays: answers.medication!.halfLifeDays,
+        doseUnit: answers.medication!.doseUnit,
+        ...(typeof answers.dose === 'number' ? { plannedDose: answers.dose } : {}),
+        // Vial users told us their mg/mL — powers the draw-to-units math.
+        ...(typeof answers.concentration === 'number'
+          ? { concentration: answers.concentration, concentrationUnit: 'mg/mL' }
+          : {}),
+        startDate: journeyStartDate,
+        status: 'active' as const,
+      } satisfies NonNullable<OnboardingCompleteInput['compound']>)
+    : undefined;
+
+  // The dosing rhythm arms the level model server-side.
+  const schedule =
+    active && answers.frequency
       ? ({
-          name: answers.medication.name,
-          drugClass: answers.medication.drugClass,
-          // The explicit route answer (asked for ambiguous meds) overrides the
-          // catalog default; "unsure" falls back to the catalog route.
-          route:
-            answers.route === 'injection' || answers.route === 'oral'
-              ? answers.route
-              : answers.medication.route,
-          ...(answers.deviceType && answers.route !== 'oral' ? { deviceType: answers.deviceType } : {}),
-          halfLifeDays: answers.medication.halfLifeDays,
-          doseUnit: answers.medication.doseUnit,
-          ...(typeof answers.dose === 'number' ? { plannedDose: answers.dose } : {}),
-          startDate: journeyStartDate,
-          status: 'active' as const,
-        } satisfies NonNullable<OnboardingCompleteInput['compound']>)
+          frequency: answers.frequency,
+          daysOfWeek: answers.shotDays ?? [],
+          active: true,
+          ...(answers.lastShot
+            ? (() => {
+                const next = nextDoseAt(answers.lastShot!, answers.frequency!, answers.shotHour, now);
+                return next ? { nextDoseAt: next } : {};
+              })()
+            : {}),
+        } satisfies NonNullable<OnboardingCompleteInput['schedule']>)
+      : undefined;
+
+  const lastDose =
+    active && answers.lastShot && typeof answers.dose === 'number'
+      ? ({
+          amount: answers.dose,
+          unit: answers.medication!.doseUnit,
+          datetime: lastDoseDatetime(answers.lastShot, answers.shotHour, now),
+        } satisfies NonNullable<OnboardingCompleteInput['lastDose']>)
       : undefined;
 
   return {
     profile,
     ...(compound ? { compound } : {}),
+    ...(schedule ? { schedule } : {}),
+    ...(lastDose ? { lastDose } : {}),
     baselineWeight: {
       value: answers.startWeight ?? body.weight,
       unit: weightUnit,
