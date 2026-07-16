@@ -83,12 +83,12 @@ function experienceEcho(level?: ExperienceLevel): string {
 }
 
 function medEcho(med?: MedicationOption): string {
-  return med ? `${med.name}. Got it.` : 'Got it.';
+  return med ? `${med.name} — strong pick, and you’re far from alone on it.` : 'Got it.';
 }
 
 function doseEcho(dose?: DoseValue, unit = 'mg'): string {
-  if (typeof dose === 'number') return `${dose} ${unit}. Noted.`;
-  return 'Custom dose. Noted.';
+  if (typeof dose === 'number') return `${dose} ${unit}. We’ll track every shot.`;
+  return 'Custom dose. We’ll track every shot.';
 }
 
 function deviceEcho(device?: InjectionDeviceType): string {
@@ -233,7 +233,7 @@ export function echoFor(step: OnboardingStep, a: EchoAnswers, now: Date = new Da
     case 'sexGender':
       return a.alsoTracking ? alsoTrackingEcho(a.alsoTracking) : goalTypeEcho(a.goalType);
     case 'birthday':
-      return 'Got it.';
+      return 'Perfect — that sharpens your targets.';
     case 'heightWeight':
       return 'Almost there on the numbers.';
     case 'startWeight':

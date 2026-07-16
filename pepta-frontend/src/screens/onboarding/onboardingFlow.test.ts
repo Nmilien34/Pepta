@@ -8,10 +8,19 @@ import {
 } from './onboardingFlow';
 
 describe('onboarding flow', () => {
-  it('starts at privacy and ends at welcomeIn (post-purchase)', () => {
-    expect(ONBOARDING_STEPS[0]).toBe('privacy');
+  it('starts at welcome, sits sign-in right before the paywall, ends at welcomeIn', () => {
+    expect(ONBOARDING_STEPS[0]).toBe('welcome');
+    expect(ONBOARDING_STEPS[1]).toBe('privacy');
     expect(ONBOARDING_STEPS[ONBOARDING_STEPS.length - 1]).toBe('welcomeIn');
+    expect(nextStep('welcome')).toBe('privacy');
+    expect(nextStep('reveal')).toBe('auth');
+    expect(nextStep('auth')).toBe('paywall');
     expect(nextStep('paywall')).toBe('welcomeIn');
+  });
+
+  it('skips the sign-in step once authenticated', () => {
+    expect(shouldSkipStep('auth', {})).toBe(false);
+    expect(shouldSkipStep('auth', { authenticated: true })).toBe(true);
   });
 
   it('advances forward in order through the new turns', () => {
@@ -36,7 +45,8 @@ describe('onboarding flow', () => {
 
   it('walks back, with no step before the first', () => {
     expect(prevStep('journeyStage')).toBe('privacy');
-    expect(prevStep('privacy')).toBeNull();
+    expect(prevStep('privacy')).toBe('welcome');
+    expect(prevStep('welcome')).toBeNull();
   });
 
   it('keeps the rating step out of the flow (review ask moved post-purchase)', () => {
@@ -44,9 +54,11 @@ describe('onboarding flow', () => {
   });
 
   it('matches the funnel progress values', () => {
-    // 35-slot funnel: Welcome=1, privacy=#2, welcomeIn=last.
-    expect(progressForStep('privacy')).toBeCloseTo(2 / 35, 5);
-    expect(progressForStep('journeyStage')).toBeCloseTo(3 / 35, 5);
+    // welcome=#1, privacy=#2, welcomeIn=last (denominator = full step count).
+    const n = ONBOARDING_STEPS.length;
+    expect(progressForStep('welcome')).toBeCloseTo(1 / n, 5);
+    expect(progressForStep('privacy')).toBeCloseTo(2 / n, 5);
+    expect(progressForStep('journeyStage')).toBeCloseTo(3 / n, 5);
     expect(progressForStep('welcomeIn')).toBe(1);
   });
 });

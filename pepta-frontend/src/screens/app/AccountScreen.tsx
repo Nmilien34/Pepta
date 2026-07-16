@@ -112,6 +112,10 @@ export function AccountScreen() {
     Linking.openURL(url).catch(() => undefined);
   };
 
+  const openSettings = () => {
+    Linking.openSettings().catch(() => undefined);
+  };
+
   const comingSoon = (title: string, message: string) => () => {
     Haptics.selectionAsync().catch(() => undefined);
     Alert.alert(title, message);
@@ -181,6 +185,51 @@ export function AccountScreen() {
     navigation.navigate("AccountDetails");
   };
 
+  const planWeightUnit =
+    effectiveProfile?.weightUnit ??
+    (effectiveProfile?.heightUnit === "cm" ? "kg" : "lb");
+  // Your plan — a read-only summary of the tracker setup (real values from the
+  // profile/home). Display-only for now: no detail editors are wired yet, so we
+  // don't fake navigation.
+  const plan: Row[] = [
+    {
+      icon: "needle",
+      label: "Medication",
+      value: home?.activeCompounds?.[0]?.name ?? "Not set",
+    },
+    {
+      icon: "target",
+      label: "Goal",
+      value:
+        effectiveProfile?.goalWeight != null
+          ? `${effectiveProfile.goalWeight} ${planWeightUnit}`
+          : "Not set",
+    },
+    {
+      icon: "flame",
+      label: "Daily targets",
+      value:
+        effectiveProfile?.dailyProteinTargetGrams != null
+          ? `${effectiveProfile.dailyProteinTargetGrams}g protein`
+          : "Not set",
+    },
+    { icon: "camera", label: "Photo day", value: "Shot day" },
+  ];
+  const permissions: Row[] = [
+    {
+      icon: "notifications",
+      label: "Notifications",
+      onPress: () => setRemindersOpen(true),
+      chevron: true,
+    },
+    { icon: "camera", label: "Camera", onPress: openSettings, chevron: true },
+    {
+      icon: "images",
+      label: "Photo library",
+      onPress: openSettings,
+      chevron: true,
+    },
+  ];
   const preferences: Row[] = [
     {
       icon: "resize",
@@ -194,12 +243,6 @@ export function AccountScreen() {
       label: "Dose units",
       value: doseUnitLabel(effectiveProfile),
       onPress: chooseDoseUnit,
-      chevron: true,
-    },
-    {
-      icon: "notifications",
-      label: "Notifications",
-      onPress: () => setRemindersOpen(true),
       chevron: true,
     },
     {
@@ -395,10 +438,12 @@ export function AccountScreen() {
             </Pressable>
           </Reveal>
 
-          <Section title="Preferences" delay={180} rows={preferences} />
-          <Section title="Data & reports" delay={240} rows={dataReports} />
-          <Section title="Support" delay={300} rows={support} />
-          <Section title="About" delay={360} rows={about} />
+          <Section title="Your plan" delay={150} rows={plan} />
+          <Section title="Preferences" delay={210} rows={preferences} />
+          <Section title="Permissions" delay={270} rows={permissions} />
+          <Section title="Data & reports" delay={330} rows={dataReports} />
+          <Section title="Support" delay={390} rows={support} />
+          <Section title="About" delay={450} rows={about} />
 
           {/* sign out */}
           <Reveal delay={420} style={{ marginTop: 12 }}>

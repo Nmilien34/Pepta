@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { NavigationContainer } from '@react-navigation/native';
@@ -8,8 +8,6 @@ import { AppErrorBoundary } from './src/components/AppErrorBoundary';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { OnboardingProvider } from './src/context/OnboardingContext';
 import { PeptaDataProvider } from './src/context/PeptaDataContext';
-import { WelcomeScreen } from './src/screens/auth/WelcomeScreen';
-import { SignInScreen } from './src/screens/auth/SignInScreen';
 import { OnboardingNavigator } from './src/screens/onboarding/OnboardingNavigator';
 import { MainTabs } from './src/navigation/MainTabs';
 
@@ -24,16 +22,6 @@ function FontGate({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-// Unauthenticated phase: Welcome (splash/hero) → Sign in (Apple/Google).
-// A successful sign-in flips auth.isAuthenticated and AppShell advances.
-function AuthNavigator() {
-  const [step, setStep] = useState<'welcome' | 'signin'>('welcome');
-  if (step === 'signin') {
-    return <SignInScreen onBack={() => setStep('welcome')} />;
-  }
-  return <WelcomeScreen onContinue={() => setStep('signin')} />;
-}
-
 function AppShell() {
   const auth = useAuth();
   const theme = useTheme();
@@ -42,19 +30,20 @@ function AppShell() {
     return <View style={{ flex: 1, backgroundColor: theme.colors.bg }} />;
   }
 
-  if (!auth.isAuthenticated) {
-    return <AuthNavigator />;
+  // Signed in AND onboarded → the app. Everyone else — brand-new visitors and
+  // users who signed in partway — runs the onboarding funnel, which now owns the
+  // welcome hook and the sign-in step. Auth moved late (right before the paywall),
+  // so newcomers are pulled straight into the questions before being asked to
+  // commit an account.
+  if (auth.isAuthenticated && auth.user?.onboardingComplete) {
+    return (
+      <NavigationContainer>
+        <MainTabs />
+      </NavigationContainer>
+    );
   }
 
-  if (!auth.user?.onboardingComplete) {
-    return <OnboardingNavigator />;
-  }
-
-  return (
-    <NavigationContainer>
-      <MainTabs />
-    </NavigationContainer>
-  );
+  return <OnboardingNavigator />;
 }
 
 export default function App() {

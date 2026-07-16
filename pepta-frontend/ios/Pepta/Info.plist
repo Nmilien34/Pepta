@@ -46,7 +46,7 @@
       </dict>
     </array>
     <key>CFBundleVersion</key>
-    <string>10</string>
+    <string>12</string>
     <key>ITSAppUsesNonExemptEncryption</key>
     <false/>
     <key>LSMinimumSystemVersion</key>
@@ -66,6 +66,8 @@
     <string>Pepta uses your microphone so you can log meals by voice.</string>
     <key>NSPhotoLibraryUsageDescription</key>
     <string>Pepta uses your photos for progress and meal images.</string>
+    <key>NSUserTrackingUsageDescription</key>
+    <string>Pepta uses attribution data to understand which campaigns help people discover the app.</string>
     <key>RCTNewArchEnabled</key>
     <true/>
     <key>UILaunchStoryboardName</key>

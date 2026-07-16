@@ -10,6 +10,7 @@
 // Beat C can answer the fear directly.
 
 export const ONBOARDING_STEPS = [
+  'welcome',
   'privacy',
   'journeyStage',
   'experience',
@@ -42,16 +43,17 @@ export const ONBOARDING_STEPS = [
   'notifications',
   'crafting',
   'reveal',
+  'auth',
   'paywall',
   'welcomeIn',
 ] as const;
 
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
 
-// The progress bar counts the full funnel (Welcome=1, then these), so the
-// first onboarding step (privacy) reads as 2/35.
-const FUNNEL_LENGTH = 35;
-const FUNNEL_OFFSET = 2; // privacy is screen #2
+// The progress bar counts the full funnel — welcome (#1) through welcomeIn — so
+// the count auto-adjusts if steps are added/removed.
+const FUNNEL_LENGTH = ONBOARDING_STEPS.length;
+const FUNNEL_OFFSET = 1; // welcome is screen #1
 
 export function stepIndex(step: OnboardingStep): number {
   return ONBOARDING_STEPS.indexOf(step);
@@ -78,6 +80,8 @@ export function progressForStep(step: OnboardingStep): number {
 // Answers that gate which steps apply. Kept as plain literals so this module
 // stays free of screen imports.
 export interface FlowContext {
+  // Whether the user has signed in — the `auth` step is skipped once true.
+  authenticated?: boolean;
   journeyStage?: 'active' | 'starting_soon' | 'none';
   route?: 'injection' | 'oral';
   // True when the picked medication pins its route (branded meds) — the
@@ -100,6 +104,8 @@ const MEDICATION_BLOCK: readonly OnboardingStep[] = [
 ];
 
 export function shouldSkipStep(step: OnboardingStep, ctx: FlowContext): boolean {
+  // Already signed in → the sign-in step is unnecessary.
+  if (step === 'auth' && ctx.authenticated) return true;
   // Not actively dosing → skip the dose/frequency/shot-day block (and the
   // instrument beat — there's no level model to arm yet).
   if (ctx.journeyStage && ctx.journeyStage !== 'active' && MEDICATION_BLOCK.includes(step)) {

@@ -38,11 +38,19 @@ import { runGoogleSignIn } from "./googleSignIn";
 
 export interface SignInScreenProps {
   onBack(): void;
+  // Copy adapts to context: the default is the post-quiz "save your plan" moment
+  // (auth step); the returning-user sheet passes a "welcome back" variant.
+  title?: string;
+  subtitle?: string;
 }
 
 type Provider = "apple" | "google" | "demo";
 
-export function SignInScreen({ onBack }: SignInScreenProps) {
+export function SignInScreen({
+  onBack,
+  title = "Save your plan",
+  subtitle = "Sign in to save the plan you just built and unlock everything Pepta tracks.",
+}: SignInScreenProps) {
   const theme = useTheme();
   const auth = useAuth();
   const [busy, setBusy] = useState<Provider | null>(null);
@@ -185,7 +193,7 @@ export function SignInScreen({ onBack }: SignInScreenProps) {
             <View style={{ alignItems: "center", gap: theme.spacing.md }}>
               <Reveal delay={140}>
                 <AppText variant="screenTitle" align="center">
-                  Welcome to Pepta
+                  {title}
                 </AppText>
               </Reveal>
               <Reveal delay={220}>
@@ -195,8 +203,7 @@ export function SignInScreen({ onBack }: SignInScreenProps) {
                   align="center"
                   style={{ maxWidth: 280 }}
                 >
-                  Create your account to start tracking — lose the fat, keep the
-                  muscle.
+                  {subtitle}
                 </AppText>
               </Reveal>
             </View>

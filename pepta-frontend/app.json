@@ -9,14 +9,13 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "ai.boltzman.peptaapp",
-      "buildNumber": "10",
+      "buildNumber": "12",
       "usesAppleSignIn": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "Pepta uses your camera to scan meals and capture progress photos.",
         "NSPhotoLibraryUsageDescription": "Pepta uses your photo library so you can upload progress photos and meal images.",
-        "NSMicrophoneUsageDescription": "Pepta uses your microphone so you can log meals by voice.",
-        "NSUserTrackingUsageDescription": "Pepta uses attribution data to understand which campaigns help people discover the app."
+        "NSMicrophoneUsageDescription": "Pepta uses your microphone so you can log meals by voice."
       },
       "appleTeamId": "N8J23B3BBW"
     },

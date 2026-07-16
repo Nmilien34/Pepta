@@ -8,7 +8,7 @@
 // from stale answers.
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View } from 'react-native';
+import { Modal, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   ONBOARDING_STEPS,
@@ -23,6 +23,8 @@ import { OnboardingMotionContext, convo } from '../../components';
 import { ONBOARDING_DRAFT_KEY, parseDraft, serializeDraft } from './onboardingDraft';
 import { echoFor, instrumentContext, companyContext } from './onboardingEcho';
 import { PrivacyScreen } from './PrivacyScreen';
+import { WelcomeScreen } from '../auth/WelcomeScreen';
+import { SignInScreen } from '../auth/SignInScreen';
 import { JourneyStageScreen, type JourneyStage } from './JourneyStageScreen';
 import { ExperienceScreen, type ExperienceLevel } from './ExperienceScreen';
 import { NeedsScreen, type NeedType } from './NeedsScreen';
@@ -190,7 +192,7 @@ function buildCraftingSteps(answers: FlowAnswers): string[] {
 // AsyncStorage draft (which was the "flash to splash, then back to where I was").
 // Reset on completion so a later run starts clean.
 const flowCache: { step: OnboardingStep; answers: FlowAnswers; hydrated: boolean } = {
-  step: 'privacy',
+  step: 'welcome',
   answers: {},
   hydrated: false,
 };
@@ -204,6 +206,8 @@ export function OnboardingNavigator() {
   // Forward arrivals type their entrance; stepping BACK — or restoring after a
   // remount (already hydrated this session) — renders instantly.
   const [animateEntrance, setAnimateEntrance] = useState(!flowCache.hydrated);
+  // Returning-user sign-in sheet, opened from the welcome screen's "Sign in".
+  const [signInOpen, setSignInOpen] = useState(false);
 
   // Keep the module cache in lockstep with state so a remount reads the latest.
   const setStep = useCallback((next: OnboardingStep) => {
@@ -255,17 +259,20 @@ export function OnboardingNavigator() {
   }, [hydrated, step, answers]);
 
   const progress = progressForStep(step);
-  const ctx = ctxFromAnswers(answers);
+  const ctx = { ...ctxFromAnswers(answers), authenticated: auth.isAuthenticated };
   const context = useMemo(() => echoFor(step, answers), [step, answers]);
 
   // Step over any gated-out steps in the given direction, using the passed ctx.
-  const advanceWith = (from: OnboardingStep, dir: 1 | -1, withCtx: FlowContext): OnboardingStep | null => {
-    let s = dir === 1 ? nextStep(from) : prevStep(from);
-    while (s && shouldSkipStep(s, withCtx)) {
-      s = dir === 1 ? nextStep(s) : prevStep(s);
-    }
-    return s;
-  };
+  const advanceWith = useCallback(
+    (from: OnboardingStep, dir: 1 | -1, withCtx: FlowContext): OnboardingStep | null => {
+      let s = dir === 1 ? nextStep(from) : prevStep(from);
+      while (s && shouldSkipStep(s, withCtx)) {
+        s = dir === 1 ? nextStep(s) : prevStep(s);
+      }
+      return s;
+    },
+    [],
+  );
 
   const showBack = advanceWith(step, -1, ctx) !== null;
 
@@ -274,7 +281,10 @@ export function OnboardingNavigator() {
   const commit = (patch: Partial<FlowAnswers>) => {
     const merged = { ...answers, ...patch };
     setAnswers(merged);
-    const next = advanceWith(step, 1, ctxFromAnswers(merged));
+    const next = advanceWith(step, 1, {
+      ...ctxFromAnswers(merged),
+      authenticated: auth.isAuthenticated,
+    });
     if (next) {
       setAnimateEntrance(true);
       setStep(next);
@@ -290,13 +300,32 @@ export function OnboardingNavigator() {
     }
   };
 
+  // Signing in — at the `auth` step, or via the welcome's returning-user "Sign
+  // in" — is the trigger to move on: close the sheet, and if we're on the auth
+  // step, advance to the paywall. (An already-onboarded returning user is routed
+  // straight to the app by AppShell, which unmounts this navigator.)
+  useEffect(() => {
+    if (!auth.isAuthenticated) return;
+    setSignInOpen(false);
+    if (step === 'auth') {
+      const next = advanceWith('auth', 1, {
+        ...ctxFromAnswers(answers),
+        authenticated: true,
+      });
+      if (next) {
+        setAnimateEntrance(true);
+        setStep(next);
+      }
+    }
+  }, [auth.isAuthenticated, step, answers, advanceWith, setStep]);
+
   const handleComplete = async () => {
     const payload = buildOnboardingPayload(answers, new Date());
     updateDraft(payload);
     await api.completeOnboarding(payload);
     // Draft is done — clear it (and the in-memory cache) so a future run starts fresh.
     await AsyncStorage.removeItem(ONBOARDING_DRAFT_KEY).catch(() => undefined);
-    flowCache.step = 'privacy';
+    flowCache.step = 'welcome';
     flowCache.answers = {};
     flowCache.hydrated = false;
     // Only enter the app after profile + medication setup have persisted.
@@ -321,6 +350,8 @@ export function OnboardingNavigator() {
   // its entrance (forward) or appear instantly (back).
   const screen = ((): React.ReactNode => {
   switch (step) {
+    case 'welcome':
+      return <WelcomeScreen onContinue={goNext} onSignIn={() => setSignInOpen(true)} />;
     case 'privacy':
       return <PrivacyScreen progress={progress} showBack={showBack} onBack={goBack} onAccept={goNext} />;
     case 'journeyStage':
@@ -658,6 +689,8 @@ export function OnboardingNavigator() {
         />
       );
     }
+    case 'auth':
+      return <SignInScreen onBack={goBack} />;
     case 'paywall':
       return <PaywallScreen onComplete={goNext} />;
     case 'welcomeIn':
@@ -670,6 +703,18 @@ export function OnboardingNavigator() {
   return (
     <OnboardingMotionContext.Provider value={{ animate: animateEntrance }}>
       {screen}
+      <Modal
+        visible={signInOpen}
+        animationType="slide"
+        presentationStyle="fullScreen"
+        onRequestClose={() => setSignInOpen(false)}
+      >
+        <SignInScreen
+          onBack={() => setSignInOpen(false)}
+          title="Welcome back"
+          subtitle="Sign in to pick up right where you left off."
+        />
+      </Modal>
     </OnboardingMotionContext.Provider>
   );
 }

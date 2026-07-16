@@ -11,6 +11,8 @@ import { typography } from '../../theme/typography';
 
 export interface WelcomeScreenProps {
   onContinue(): void;
+  // Returning user tapping "Already have an account? Sign in".
+  onSignIn(): void;
 }
 
 const FACES = [
@@ -21,12 +23,12 @@ const FACES = [
   { initial: 'S', tone: '#EADFD0' },
 ];
 
-export function WelcomeScreen({ onContinue }: WelcomeScreenProps) {
+export function WelcomeScreen({ onContinue, onSignIn }: WelcomeScreenProps) {
   const [typed, setTyped] = useState(false);
 
   return (
     <ConvoScreen
-      progress={1 / 35}
+      progress={1 / 36}
       context="Hi. Before anything else, one thing."
       question="You’re not doing this alone."
       onTyped={() => {
@@ -39,7 +41,7 @@ export function WelcomeScreen({ onContinue }: WelcomeScreenProps) {
       footer={
         <View style={{ gap: 4 }}>
           <ConvoButton label="I’m ready" onPress={onContinue} />
-          <Pressable accessibilityRole="button" accessibilityLabel="Sign in" onPress={onContinue} style={styles.quiet}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Sign in" onPress={onSignIn} style={styles.quiet}>
             <Text style={styles.quietText}>
               Already have an account? <Text style={{ color: convo.ink, fontFamily: typography.fonts.bold }}>Sign in</Text>
             </Text>
