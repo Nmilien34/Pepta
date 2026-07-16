@@ -14,7 +14,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { PepChatMessage } from '@pepta/shared';
 import * as Haptics from 'expo-haptics';
 import { Icon } from './Icon';
@@ -40,6 +40,7 @@ const PEP_CHAT_SUGGESTIONS = [
 
 export function PepCompanion() {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const { home } = usePeptaData();
   const { openQuickLog, openMeal } = useLogSheets();
 
@@ -131,6 +132,8 @@ export function PepCompanion() {
 
   if (!home || notes.length === 0) return null;
   const note = notes[Math.min(index, notes.length - 1)]!;
+  const chatTopInset = Math.max(insets.top, Platform.OS === 'ios' ? 48 : 0);
+  const chatBottomInset = Math.max(insets.bottom, Platform.OS === 'ios' ? 22 : 0);
 
   const openPepChat = () => {
     openRef.current = false;
@@ -293,9 +296,9 @@ export function PepCompanion() {
       </Pressable>
 
       <Modal visible={chatOpen} animationType="slide" presentationStyle="fullScreen" onRequestClose={closePepChat}>
-        <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bg }}>
+        <SafeAreaView edges={['left', 'right']} style={{ flex: 1, backgroundColor: theme.colors.bg }}>
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 18, paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: theme.colors.border, backgroundColor: theme.colors.surface }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 18, paddingTop: chatTopInset + 12, paddingBottom: 12, borderBottomWidth: 0.5, borderBottomColor: theme.colors.border, backgroundColor: theme.colors.surface }}>
               <View style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: theme.colors.surfaceAlt, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
                 <Mascot pose="idle" size={30} />
               </View>
@@ -410,7 +413,7 @@ export function PepCompanion() {
               </AppText>
             </ScrollView>
 
-            <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 9, padding: 12, borderTopWidth: 0.5, borderTopColor: theme.colors.border, backgroundColor: theme.colors.surface }}>
+            <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 9, paddingHorizontal: 12, paddingTop: 12, paddingBottom: chatBottomInset + 12, borderTopWidth: 0.5, borderTopColor: theme.colors.border, backgroundColor: theme.colors.surface }}>
               <TextInput
                 value={chatInput}
                 onChangeText={setChatInput}

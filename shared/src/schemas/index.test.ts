@@ -19,6 +19,7 @@ import {
   onboardingResultResponseSchema,
   pushTokenRegistrationRequestSchema,
   pushTokenRegistrationResponseSchema,
+  revenueCatWebhookSchema,
   sideEffectLogInputSchema,
   userAccountPatchSchema,
   userResponseSchema,
@@ -467,5 +468,71 @@ describe("shared profile schemas", () => {
         aiPushCopyConsentRevokedAt: null,
       }).success,
     ).toBe(true);
+  });
+});
+
+describe("revenueCatWebhookSchema", () => {
+  // Minimal RevenueCat INITIAL_PURCHASE event with the `null` fields RC actually
+  // sends for anything that doesn't apply (entitlement_id, offer_code, metadata,
+  // discount_*, presented_offering_id). Regression guard: these must NOT 400.
+  const nullHeavyEvent = {
+    api_version: "1.0",
+    event: {
+      id: "CDE78DE2-991D-4214-9878-AC8BBD20BA46",
+      type: "INITIAL_PURCHASE",
+      app_user_id: "6a584d866f169a3d62e03b94",
+      original_app_user_id: "$RCAnonymousID:659d5e2d671f4e4e9001589909e14122",
+      aliases: [
+        "$RCAnonymousID:659d5e2d671f4e4e9001589909e14122",
+        "6a584d866f169a3d62e03b94",
+      ],
+      product_id: "ai.boltzman.pepta.monthly",
+      period_type: "NORMAL",
+      expiration_at_ms: 1784258342000,
+      // The fields RevenueCat delivers as literal null:
+      entitlement_id: null,
+      offer_code: null,
+      metadata: null,
+      presented_offering_id: null,
+      discount_amount: null,
+      discount_identifier: null,
+      discount_percentage: null,
+      // Unknown-to-us keys must pass through, not fail:
+      entitlement_ids: ["pro"],
+      store: "APP_STORE",
+      environment: "SANDBOX",
+    },
+  };
+
+  it("accepts events whose optional fields arrive as null (not undefined)", () => {
+    const result = revenueCatWebhookSchema.safeParse(nullHeavyEvent);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.event.type).toBe("INITIAL_PURCHASE");
+      expect(result.data.event.entitlement_id).toBeNull();
+      // aliases survive for identity resolution
+      expect(result.data.event.aliases).toHaveLength(2);
+    }
+  });
+
+  it("passes unknown top-level and event keys through untouched", () => {
+    const result = revenueCatWebhookSchema.safeParse(nullHeavyEvent);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect((result.data.event as Record<string, unknown>).entitlement_ids).toEqual(["pro"]);
+      expect((result.data as Record<string, unknown>).api_version).toBe("1.0");
+    }
+  });
+
+  it("still requires a non-empty event.type", () => {
+    expect(
+      revenueCatWebhookSchema.safeParse({ event: { app_user_id: "u1" } }).success,
+    ).toBe(false);
+    expect(
+      revenueCatWebhookSchema.safeParse({ event: { type: "", app_user_id: "u1" } }).success,
+    ).toBe(false);
+    expect(
+      revenueCatWebhookSchema.safeParse({ event: { type: null, app_user_id: "u1" } }).success,
+    ).toBe(false);
   });
 });

@@ -92,6 +92,7 @@ import IconHelpCircle from '@tabler/icons-react-native/IconHelpCircle';
 import IconFlag2 from '@tabler/icons-react-native/IconFlag2';
 import IconBarcode from '@tabler/icons-react-native/IconBarcode';
 import IconPackage from '@tabler/icons-react-native/IconPackage';
+import IconUsers from '@tabler/icons-react-native/IconUsers';
 
 type TablerIcon = ComponentType<{
   size?: number | string;
@@ -211,6 +212,8 @@ const MAP: Record<string, TablerIcon> = {
   cube: IconPackage,
   bolt: IconBolt,
   'bolt-off': IconBoltOff,
+  users: IconUsers,
+  community: IconUsers,
 };
 
 export interface IconProps {

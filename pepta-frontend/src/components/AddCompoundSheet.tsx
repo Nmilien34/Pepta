@@ -65,7 +65,7 @@ export function AddCompoundSheet({ visible, onClose }: AddCompoundSheetProps) {
   };
 
   return (
-    <BottomSheet visible={visible} onClose={onClose}>
+    <BottomSheet visible={visible} onClose={onClose} avoidKeyboard={false} scrollable>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 4 }}>
         {selected ? (
           <Pressable onPress={() => setSelected(null)} hitSlop={8} style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: theme.colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
@@ -80,6 +80,15 @@ export function AddCompoundSheet({ visible, onClose }: AddCompoundSheetProps) {
             {selected ? 'Set your dose and save.' : 'Search and pick your medication.'}
           </AppText>
         </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Close medication picker"
+          onPress={onClose}
+          hitSlop={8}
+          style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: theme.colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}
+        >
+          <Icon name="close" size={18} color={theme.colors.textPrimary} />
+        </Pressable>
       </View>
 
       {!selected ? (

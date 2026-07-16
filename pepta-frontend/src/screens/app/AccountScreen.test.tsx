@@ -527,6 +527,22 @@ describe("AccountScreen settings", () => {
     expect(mocks.navigate).toHaveBeenCalledWith("AccountFAQ");
   });
 
+  it("opens the Pepta WhatsApp community channel from settings", async () => {
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+
+    await act(async () => {
+      tree = TestRenderer.create(<AccountScreen />);
+    });
+
+    await act(async () => {
+      pressableContaining(tree!.root, "WhatsAppJoin").props.onPress();
+    });
+
+    expect(mocks.openURL).toHaveBeenCalledWith(
+      "https://whatsapp.com/channel/0029Vb8nBGCCXC3Ke92xss0H",
+    );
+  });
+
   it("opens Pepta legal pages from account settings", async () => {
     let tree: TestRenderer.ReactTestRenderer | undefined;
 

@@ -264,7 +264,7 @@ export async function applyRevenueCatWebhook(input: RevenueCatWebhook): Promise<
       willRenew: !['CANCELLATION', 'EXPIRATION', 'REFUND'].includes(event.type),
       revenueCatCustomerId,
       revenueCatAppUserIds,
-      revenueCatEntitlement: event.entitlement_id,
+      revenueCatEntitlement: event.entitlement_id ?? undefined,
     };
     await user.save();
   }

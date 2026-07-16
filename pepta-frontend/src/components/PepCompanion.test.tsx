@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   saveAIDataSharingConsent: vi.fn(),
   openMeal: vi.fn(),
   openQuickLog: vi.fn(),
+  safeAreaInsets: { top: 59, bottom: 34, left: 0, right: 0 },
 }));
 
 vi.mock("react-native", () => ({
@@ -54,6 +55,7 @@ vi.mock("react-native", () => ({
 vi.mock("react-native-safe-area-context", () => ({
   SafeAreaView: ({ children, ...props }: { children?: React.ReactNode }) =>
     React.createElement("SafeAreaView", props, children),
+  useSafeAreaInsets: () => mocks.safeAreaInsets,
 }));
 
 vi.mock("expo-haptics", () => ({
@@ -180,6 +182,33 @@ function allText(root: TestRenderer.ReactTestRenderer["root"]): string {
     .join("\n");
 }
 
+function styleObject(style: unknown): Record<string, unknown> {
+  if (Array.isArray(style)) {
+    return Object.assign({}, ...style.map(styleObject));
+  }
+  return style && typeof style === "object" ? (style as Record<string, unknown>) : {};
+}
+
+async function openChat(tree: TestRenderer.ReactTestRenderer): Promise<void> {
+  await act(async () => {
+    vi.runOnlyPendingTimers();
+  });
+
+  if (!allText(tree.root).includes("First Pep note.")) {
+    await act(async () => {
+      await button(tree.root, "Pep — tips and next steps").props.onPress();
+    });
+  }
+
+  await act(async () => {
+    await button(tree.root, "Pep — tips and next steps").props.onPress();
+  });
+
+  await act(async () => {
+    await button(tree.root, "Pep — tips and next steps").props.onPress();
+  });
+}
+
 describe("PepCompanion chat handoff", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -196,6 +225,43 @@ describe("PepCompanion chat handoff", () => {
     mocks.saveAIDataSharingConsent.mockResolvedValue(undefined);
     mocks.openMeal.mockClear();
     mocks.openQuickLog.mockClear();
+    mocks.safeAreaInsets = { top: 59, bottom: 34, left: 0, right: 0 };
+  });
+
+  it("keeps the full-screen chat chrome clear of device safe areas", async () => {
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+    await act(async () => {
+      tree = TestRenderer.create(<PepCompanion />);
+    });
+
+    await openChat(tree!);
+
+    const header = tree!.root
+      .findAll((node) => {
+        const style = styleObject(node.props.style);
+        return (
+          (node.type as unknown) === "View" &&
+          style.borderBottomWidth === 0.5 &&
+          nodeText(node).includes("Ask Pep")
+        );
+      })
+      .at(0);
+    const composer = tree!.root
+      .findAll((node) => {
+        const style = styleObject(node.props.style);
+        return (node.type as unknown) === "View" && style.borderTopWidth === 0.5;
+      })
+      .at(0);
+
+    if (!header) throw new Error("No Ask Pep header found");
+    if (!composer) throw new Error("No Ask Pep input composer found");
+
+    expect(styleObject(header.props.style).paddingTop).toBeGreaterThanOrEqual(
+      mocks.safeAreaInsets.top + 10,
+    );
+    expect(styleObject(composer.props.style).paddingBottom).toBeGreaterThanOrEqual(
+      mocks.safeAreaInsets.bottom + 12,
+    );
   });
 
   it("opens chat after the user taps through every current Pep note", async () => {

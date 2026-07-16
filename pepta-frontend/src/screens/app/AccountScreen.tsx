@@ -45,6 +45,8 @@ import {
 
 const SUPPORT_EMAIL = "dev@boltzman.ai";
 const APPLE_SUBSCRIPTIONS_URL = "https://apps.apple.com/account/subscriptions";
+const WHATSAPP_COMMUNITY_URL =
+  "https://whatsapp.com/channel/0029Vb8nBGCCXC3Ke92xss0H";
 const DOSE_UNIT_OPTIONS = ["mg", "mcg", "ml", "units"] as const;
 type SettingsSheet = "units" | "doseUnit" | null;
 type AccountNavigationParamList = {
@@ -284,6 +286,15 @@ export function AccountScreen() {
       chevron: true,
     },
   ];
+  const community: Row[] = [
+    {
+      icon: "community",
+      label: "WhatsApp",
+      value: "Join",
+      onPress: openUrl(WHATSAPP_COMMUNITY_URL),
+      chevron: true,
+    },
+  ];
   const support: Row[] = [
     {
       icon: "help-circle",
@@ -442,6 +453,7 @@ export function AccountScreen() {
           <Section title="Preferences" delay={210} rows={preferences} />
           <Section title="Permissions" delay={270} rows={permissions} />
           <Section title="Data & reports" delay={330} rows={dataReports} />
+          <Section title="Community" delay={360} rows={community} />
           <Section title="Support" delay={390} rows={support} />
           <Section title="About" delay={450} rows={about} />
 

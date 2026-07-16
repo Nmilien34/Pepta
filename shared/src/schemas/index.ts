@@ -963,18 +963,25 @@ export const revenueCatWebhookSchema = z
   .object({
     event: z
       .object({
-        id: z.string().min(1).optional(),
+        // RevenueCat sends `null` (not omission) for fields that don't apply to
+        // a given event — e.g. `entitlement_id: null`, `expiration_at_ms: null`.
+        // `.optional()` accepts `undefined` but REJECTS `null`, so every declared
+        // field except `type` must be `.nullish()` (null | undefined). The handler
+        // is already null-tolerant (uniqueNonEmptyStrings takes null, `?? []`, the
+        // `typeof === 'number'` guard). Same null-vs-undefined trap as the stored
+        // Mongoose snapshot fields.
+        id: z.string().min(1).nullish(),
         type: z.string().min(1),
-        app_user_id: z.string().min(1).optional(),
-        original_app_user_id: z.string().min(1).optional(),
-        aliases: z.array(z.string().min(1)).optional(),
-        transferred_from: z.array(z.string().min(1)).optional(),
-        transferred_to: z.array(z.string().min(1)).optional(),
-        transaction_id: z.string().min(1).optional(),
-        product_id: z.string().min(1).optional(),
-        entitlement_id: z.string().min(1).optional(),
-        period_type: z.string().min(1).optional(),
-        expiration_at_ms: z.number().optional(),
+        app_user_id: z.string().min(1).nullish(),
+        original_app_user_id: z.string().min(1).nullish(),
+        aliases: z.array(z.string().min(1)).nullish(),
+        transferred_from: z.array(z.string().min(1)).nullish(),
+        transferred_to: z.array(z.string().min(1)).nullish(),
+        transaction_id: z.string().min(1).nullish(),
+        product_id: z.string().min(1).nullish(),
+        entitlement_id: z.string().min(1).nullish(),
+        period_type: z.string().min(1).nullish(),
+        expiration_at_ms: z.number().nullish(),
       })
       .passthrough(),
   })
