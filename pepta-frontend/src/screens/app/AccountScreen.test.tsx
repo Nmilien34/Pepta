@@ -122,6 +122,7 @@ vi.mock("../../components", () => ({
   Reveal: ({ children }: { children?: React.ReactNode }) =>
     React.createElement("View", null, children),
   UserAvatar: () => React.createElement("UserAvatar"),
+  Mascot: () => React.createElement("Mascot"),
 }));
 
 vi.mock("../../components/Icon", () => ({
@@ -481,7 +482,7 @@ describe("AccountScreen settings", () => {
     await act(async () => {
       pressableContaining(
         tree!.root,
-        "Pepta PlusUnlock your full planUpgrade",
+        "Pepta PlusTap to upgrade",
       ).props.onPress();
     });
 
@@ -504,7 +505,7 @@ describe("AccountScreen settings", () => {
     });
 
     await act(async () => {
-      pressableContaining(tree!.root, "Pepta PlusActive").props.onPress();
+      pressableContaining(tree!.root, "Pepta PlusTap to manage subscription").props.onPress();
     });
 
     expect(mocks.openURL).toHaveBeenCalledWith(

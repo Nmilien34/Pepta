@@ -303,8 +303,8 @@ PODS:
   - PromisesObjC (2.4.1)
   - PromisesSwift (2.4.1):
     - PromisesObjC (= 2.4.1)
-  - PurchasesHybridCommon (18.15.1):
-    - RevenueCat (= 5.78.0)
+  - PurchasesHybridCommon (18.10.0):
+    - RevenueCat (= 5.76.0)
   - RCTDeprecation (0.81.5)
   - RCTRequired (0.81.5)
   - RCTTypeSafety (0.81.5):
@@ -2007,7 +2007,7 @@ PODS:
     - ReactNativeDependencies
   - ReactNativeDependencies (0.81.5)
   - RecaptchaInterop (101.0.0)
-  - RevenueCat (5.78.0)
+  - RevenueCat (5.76.0)
   - RNCAsyncStorage (2.2.0):
     - hermes-engine
     - RCTRequired
@@ -2076,8 +2076,8 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
-  - RNPurchases (10.4.0):
-    - PurchasesHybridCommon (= 18.15.1)
+  - RNPurchases (10.2.2):
+    - PurchasesHybridCommon (= 18.10.0)
     - React-Core
   - RNReanimated (4.1.7):
     - hermes-engine
@@ -2422,7 +2422,7 @@ DEPENDENCIES:
   - "RNCAsyncStorage (from `../../node_modules/@react-native-async-storage/async-storage`)"
   - RNGestureHandler (from `../../node_modules/react-native-gesture-handler`)
   - "RNGoogleSignin (from `../../node_modules/@react-native-google-signin/google-signin`)"
-  - RNPurchases (from `../../node_modules/react-native-purchases`)
+  - RNPurchases (from `../node_modules/react-native-purchases`)
   - RNReanimated (from `../../node_modules/react-native-reanimated`)
   - RNScreens (from `../../node_modules/react-native-screens`)
   - RNSVG (from `../../node_modules/react-native-svg`)
@@ -2642,7 +2642,7 @@ EXTERNAL SOURCES:
   RNGoogleSignin:
     :path: "../../node_modules/@react-native-google-signin/google-signin"
   RNPurchases:
-    :path: "../../node_modules/react-native-purchases"
+    :path: "../node_modules/react-native-purchases"
   RNReanimated:
     :path: "../../node_modules/react-native-reanimated"
   RNScreens:
@@ -2692,7 +2692,7 @@ SPEC CHECKSUMS:
   hermes-engine: 9f4dfe93326146a1c99eb535b1cb0b857a3cd172
   PromisesObjC: 752c3227f599e3467650e47ea36f433eeb10c273
   PromisesSwift: 217dea0fd5d2ad65222a109c48698add13cc1c5b
-  PurchasesHybridCommon: eed735a411c1aee8c05d62933fa7c4a40ede4009
+  PurchasesHybridCommon: 3e650c7f56ebcd63b37a708685fbf98515305d14
   RCTDeprecation: 943572d4be82d480a48f4884f670135ae30bf990
   RCTRequired: 8f3cfc90cc25cf6e420ddb3e7caaaabc57df6043
   RCTTypeSafety: 16a4144ca3f959583ab019b57d5633df10b5e97c
@@ -2760,11 +2760,11 @@ SPEC CHECKSUMS:
   ReactCommon: 08810150b1206cc44aecf5f6ae19af32f29151a8
   ReactNativeDependencies: 71ce9c28beb282aa720ea7b46980fff9669f428a
   RecaptchaInterop: 11e0b637842dfb48308d242afc3f448062325aba
-  RevenueCat: f3641992451c1426da8d8d1466cec3bbdb765962
+  RevenueCat: 792388288b4207a5056550fbf8f673090f1fbe22
   RNCAsyncStorage: c8407cc394627a3a4cf56b457d594bfa822b6ab8
   RNGestureHandler: c3831b3b1b5014c6afab7fff7e4171394a3419ab
   RNGoogleSignin: 4590097b5c265e55e01bf2e824e0f5f5f66d2dfd
-  RNPurchases: 1436e2381a4a06bfd6378158f9ebd11993e684cc
+  RNPurchases: 3138a73091d78c9ddaa86a405488cd9b5f8404e7
   RNReanimated: bb5f60b2bfe29a986bdde3534c11bae51d74821f
   RNScreens: 33bbd1d0f86ed957557620dc94054b71db0a94ee
   RNSVG: ac3047fdd9c0ebac9d0b731a352bddf216af6242
@@ -2772,6 +2772,6 @@ SPEC CHECKSUMS:
   Yoga: 65431d43277b661ebc7289c6c5d82f64ce42cfe0
   ZXingObjC: 8898711ab495761b2dbbdec76d90164a6d7e14c5
 
-PODFILE CHECKSUM: 291732a82ae38a7573227a0d020cd56e781bdc96
+PODFILE CHECKSUM: aa68c03ee9e58df99e775b61a55832f4e4528bbf
 
 COCOAPODS: 1.16.2

@@ -16,11 +16,10 @@ import {
 } from "react-native";
 import { Icon } from "../../components/Icon";
 import * as Haptics from "expo-haptics";
-import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation, type NavigationProp } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "../../theme";
-import { AppText, Card, Reveal, UserAvatar } from "../../components";
+import { AppText, Card, Mascot, Reveal, UserAvatar } from "../../components";
 import { BottomSheet } from "../../components/BottomSheet";
 import { useAuth } from "../../context/AuthContext";
 import { usePeptaData } from "../../context/PeptaDataContext";
@@ -57,8 +56,6 @@ type AccountNavigationParamList = {
 
 interface Row {
   icon: string;
-  iconBg: string;
-  iconColor: string;
   label: string;
   value?: string;
   badge?: { text: string; color: string; bg: string };
@@ -187,8 +184,6 @@ export function AccountScreen() {
   const preferences: Row[] = [
     {
       icon: "resize",
-      iconBg: "#F1EFE8",
-      iconColor: "#5F5E5A",
       label: "Units",
       value: unitsLabel(effectiveProfile),
       onPress: chooseUnits,
@@ -196,8 +191,6 @@ export function AccountScreen() {
     },
     {
       icon: "needle",
-      iconBg: "#EFEBFF",
-      iconColor: theme.colors.primary,
       label: "Dose units",
       value: doseUnitLabel(effectiveProfile),
       onPress: chooseDoseUnit,
@@ -205,16 +198,12 @@ export function AccountScreen() {
     },
     {
       icon: "notifications",
-      iconBg: "#FFF1E7",
-      iconColor: "#C75B16",
       label: "Notifications",
       onPress: () => setRemindersOpen(true),
       chevron: true,
     },
     {
       icon: "heart",
-      iconBg: "#FCEBEB",
-      iconColor: "#D14343",
       label: "Health data import",
       badge: {
         text: "Not connected",
@@ -229,8 +218,6 @@ export function AccountScreen() {
     },
     {
       icon: "language",
-      iconBg: "#E7F4FF",
-      iconColor: "#1E7FCC",
       label: "Language",
       value: "English",
       onPress: comingSoon(
@@ -243,16 +230,12 @@ export function AccountScreen() {
   const dataReports: Row[] = [
     {
       icon: "file-export",
-      iconBg: "#E8F8EE",
-      iconColor: "#1E8E40",
       label: "Export report",
       onPress: () => void exportReport(),
       chevron: true,
     },
     {
       icon: "layout-grid-add",
-      iconBg: "#EFEBFF",
-      iconColor: theme.colors.primary,
       label: "Add widgets",
       onPress: () => navigation.navigate("WidgetSetup"),
       chevron: true,
@@ -261,32 +244,24 @@ export function AccountScreen() {
   const support: Row[] = [
     {
       icon: "help-circle",
-      iconBg: "#EFEBFF",
-      iconColor: theme.colors.primary,
       label: "FAQ",
       onPress: () => navigation.navigate("AccountFAQ"),
       chevron: true,
     },
     {
       icon: "bulb",
-      iconBg: "#FBEAF6",
-      iconColor: "#A8327D",
       label: "Feature requests",
       onPress: openMail("Pepta feature request"),
       chevron: true,
     },
     {
       icon: "flag-2",
-      iconBg: "#FFF6E5",
-      iconColor: "#B5790B",
       label: "Report a problem",
       onPress: openMail("Pepta bug report"),
       chevron: true,
     },
     {
       icon: "help-circle",
-      iconBg: "#F1EFE8",
-      iconColor: "#5F5E5A",
       label: "Help",
       onPress: openMail("Pepta — I need help"),
       chevron: true,
@@ -295,24 +270,18 @@ export function AccountScreen() {
   const about: Row[] = [
     {
       icon: "document-text-outline",
-      iconBg: "#EFEBFF",
-      iconColor: theme.colors.primary,
       label: "Sources & citations",
       onPress: () => navigation.navigate("Sources"),
       chevron: true,
     },
     {
       icon: "document-text-outline",
-      iconBg: "#F1EFE8",
-      iconColor: "#5F5E5A",
       label: "Terms",
       onPress: openUrl(TERMS_URL),
       chevron: true,
     },
     {
       icon: "lock-closed-outline",
-      iconBg: "#F1EFE8",
-      iconColor: "#5F5E5A",
       label: "Privacy",
       onPress: openUrl(PRIVACY_URL),
       chevron: true,
@@ -331,7 +300,7 @@ export function AccountScreen() {
           showsVerticalScrollIndicator={false}
         >
           <AppText variant="screenTitle" style={{ paddingTop: 4 }}>
-            Account
+            Settings
           </AppText>
 
           {/* profile header */}
@@ -380,71 +349,49 @@ export function AccountScreen() {
               onPress={handleSubscriptionPress}
               accessibilityRole="button"
             >
-              <LinearGradient
-                colors={["#F3EFFF", "#FBF4FF"] as const}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
+              {/* Cream card with Pep peeking from the bottom-right — the app's
+                  one "mascot moment," calmer than a solid-purple block. Text is
+                  hard-set dark so it stays legible on the cream in any theme. */}
+              <View
                 style={[
                   {
-                    flexDirection: "row",
-                    alignItems: "center",
-                    justifyContent: "space-between",
+                    position: "relative",
+                    overflow: "hidden",
+                    minHeight: 130,
                     borderRadius: theme.sizes.card.borderRadius,
-                    padding: 16,
-                    borderWidth: 0.5,
-                    borderColor: "#E7DEFB",
+                    backgroundColor: "#F6F3EC",
+                    borderWidth: 1,
+                    borderColor: "#ECE6DB",
+                    paddingVertical: 18,
+                    paddingHorizontal: 19,
                   },
                   theme.shadows.card,
                 ]}
               >
-                <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 11,
-                    flex: 1,
-                  }}
-                >
-                  <LinearGradient
-                    colors={
-                      [
-                        theme.colors.primaryGradientStart,
-                        theme.colors.primaryGradientEnd,
-                      ] as const
-                    }
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={{
-                      width: 34,
-                      height: 34,
-                      borderRadius: 10,
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
+                <View style={{ maxWidth: "64%" }}>
+                  <AppText
+                    variant="cardTitle"
+                    style={{ fontSize: 19, letterSpacing: -0.3, color: "#171326" }}
                   >
-                    <Icon name="sparkles" size={18} color="#fff" />
-                  </LinearGradient>
-                  <View style={{ flex: 1 }}>
-                    <AppText variant="bodyStrong" style={{ fontWeight: "800" }}>
-                      {ent.title}
-                    </AppText>
-                    <AppText
-                      variant="caption"
-                      color="textSecondary"
-                      style={{ marginTop: 2 }}
-                    >
-                      {ent.detail}
-                    </AppText>
-                  </View>
+                    {ent.title}
+                  </AppText>
+                  <AppText
+                    variant="caption"
+                    style={{ marginTop: 4, color: "#7A756C" }}
+                  >
+                    {ent.premium ? "Tap to manage subscription" : "Tap to upgrade"}
+                  </AppText>
+                  <AppText
+                    variant="bodyStrong"
+                    style={{ fontWeight: "700", marginTop: 13, color: "#2C2838" }}
+                  >
+                    {ent.premium ? ent.detail : "✨ Levels, muscle & insights"}
+                  </AppText>
                 </View>
-                <AppText
-                  variant="caption"
-                  color="primary"
-                  style={{ fontWeight: "800" }}
-                >
-                  {ent.cta}
-                </AppText>
-              </LinearGradient>
+                <View style={{ position: "absolute", bottom: -6, right: 8 }}>
+                  <Mascot pose="idle" size={112} />
+                </View>
+              </View>
             </Pressable>
           </Reveal>
 
@@ -715,15 +662,15 @@ function SettingRow({ row, last }: { row: Row; last: boolean }) {
     >
       <View
         style={{
-          width: 30,
-          height: 30,
-          borderRadius: 9,
-          backgroundColor: row.iconBg,
+          width: 32,
+          height: 32,
+          borderRadius: 10,
+          backgroundColor: "rgba(124,92,252,0.12)",
           alignItems: "center",
           justifyContent: "center",
         }}
       >
-        <Icon name={row.icon} size={16} color={row.iconColor as string} />
+        <Icon name={row.icon} size={17} color={theme.colors.primary} />
       </View>
       <AppText variant="bodyStrong" style={{ flex: 1, fontWeight: "600" }}>
         {row.label}

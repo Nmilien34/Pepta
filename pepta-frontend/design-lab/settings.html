@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Pepta — Settings, improved (design)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@500;600;700;800&display=swap" rel="stylesheet" />
+<link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3/dist/tabler-icons.min.css" rel="stylesheet" />
+<style>
+  :root{
+    --bg:#FAFAFB; --surface:#FFFFFF; --alt:#F2F3F5; --border:#ECECEF;
+    --ink:#0E0E12; --sec:#6B6B76; --ter:#A1A1AC;
+    --primary:#7C5CFC; --pg1:#6751E8; --pg2:#8C63F4; --danger:#FF4D4F;
+    /* improved icon system: ONE soft-purple chip + one muted purple glyph (brand-tinted) */
+    --chip:#EFEBFF; --chip-ink:#6C52C2;
+    --f:'Hanken Grotesk',system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#E7E5EC;font-family:var(--f);color:var(--ink);padding:40px 32px 80px;-webkit-font-smoothing:antialiased}
+  h1{font-size:30px;font-weight:800;letter-spacing:-.8px}
+  h1 small{font-weight:600;color:#8C8A94;font-size:15px;letter-spacing:0}
+  .note{max-width:1180px;color:#57555F;font-size:14.5px;line-height:1.65;margin-top:14px}
+  .note b{color:#2A2831;font-weight:700}
+  .kicker{font-size:12px;font-weight:800;letter-spacing:1.4px;text-transform:uppercase;color:#9B99A3;margin:44px 0 16px}
+
+  /* what-changed chips */
+  .changes{display:flex;flex-wrap:wrap;gap:10px;max-width:1180px;margin-top:20px}
+  .change{background:#fff;border:1px solid #E1DFE8;border-radius:13px;padding:11px 14px 11px 12px;display:flex;gap:10px;align-items:flex-start;max-width:270px;box-shadow:0 1px 2px rgba(20,18,30,.04)}
+  .change i{color:var(--primary);font-size:18px;margin-top:1px}
+  .change b{display:block;font-size:12.5px;font-weight:800;margin-bottom:2px}
+  .change span{font-size:11.5px;color:#6C6A75;line-height:1.45}
+
+  .frames{display:flex;gap:40px;flex-wrap:wrap;align-items:flex-start}
+  .col{display:flex;flex-direction:column;align-items:center;gap:14px}
+  .tag{font-size:12.5px;font-weight:800;letter-spacing:.3px;padding:5px 13px;border-radius:999px}
+  .tag.now{background:#EDE7E7;color:#8A5B5B}
+  .tag.new{background:#ECE6FF;color:#5B3FD6}
+
+  /* phone */
+  .phone{width:392px;border-radius:52px;background:#0C0C10;padding:12px;box-shadow:0 40px 80px -30px rgba(24,20,40,.5),0 0 0 1px rgba(0,0,0,.15)}
+  .screen{border-radius:42px;overflow:hidden;background:var(--bg);min-height:830px;position:relative}
+  .statusbar{height:52px;display:flex;align-items:flex-end;justify-content:space-between;padding:0 26px 7px}
+  .statusbar .t{font-size:15px;font-weight:800;letter-spacing:.4px}
+  .statusbar .r{display:flex;gap:7px;align-items:center;color:var(--ink);font-size:15px}
+  .body{padding:2px 16px 24px}
+  .scr-title{font-size:26px;font-weight:800;letter-spacing:-.6px;padding:8px 4px 0}
+
+  /* cards + rows */
+  .card{background:var(--surface);border-radius:18px;border:1px solid var(--border);box-shadow:0 1px 2px rgba(20,18,30,.05),0 8px 22px -18px rgba(20,18,30,.22)}
+  .row{display:flex;align-items:center;gap:12px;padding:13px 14px}
+  .row + .row{border-top:1px solid var(--border)}
+  .chip{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex:none;font-size:18px}
+  .row .label{flex:1;font-size:15px;font-weight:600;color:var(--ink)}
+  .row .val{font-size:13.5px;color:var(--sec);font-weight:600}
+  .row .chev{color:var(--ter);font-size:18px;margin-left:2px}
+  .row .badge{font-size:11px;font-weight:800;color:var(--sec);background:var(--alt);border-radius:999px;padding:4px 9px}
+  .sec-h{font-size:11px;font-weight:800;letter-spacing:.9px;text-transform:uppercase;color:var(--ter);padding-left:6px;margin:22px 0 9px}
+
+  /* profile */
+  .profile{display:flex;align-items:center;gap:13px;padding:14px}
+  .av{width:52px;height:52px;border-radius:26px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:20px;background:linear-gradient(135deg,var(--pg1),var(--pg2));flex:none}
+  .profile .nm{font-size:17px;font-weight:800;letter-spacing:-.2px}
+  .profile .sub{font-size:13px;color:var(--sec);margin-top:3px;font-weight:600}
+
+  /* subscription */
+  .subs{display:flex;align-items:center;gap:12px;border-radius:18px;padding:15px;margin-top:12px}
+  .subs .spark{width:36px;height:36px;border-radius:11px;background:linear-gradient(135deg,var(--pg1),var(--pg2));display:flex;align-items:center;justify-content:center;color:#fff;font-size:19px;flex:none}
+  .subs .st{flex:1}
+  .subs .st b{font-size:15.5px;font-weight:800}
+  .subs .st span{display:block;font-size:12.5px;color:var(--sec);font-weight:600;margin-top:2px}
+  .subs .cta{font-size:13px;font-weight:800;color:var(--primary)}
+
+  /* Wellspoken-style subscription card: calm cream card, Pep peeking from the bottom-right */
+  .subs2{position:relative;overflow:hidden;background:#F6F3EC;border:1px solid #ECE6DB;border-radius:20px;padding:18px 18px 20px 19px;margin-top:12px;min-height:136px;box-shadow:0 1px 2px rgba(30,24,16,.05),0 16px 32px -22px rgba(40,32,18,.30)}
+  .subs2 .txt{position:relative;z-index:1;max-width:64%}
+  .subs2 .t{font-size:19px;font-weight:800;letter-spacing:-.3px;color:#171326}
+  .subs2 .tap{font-size:13px;font-weight:600;color:#7A756C;margin-top:4px}
+  .subs2 .feat{font-size:14.5px;font-weight:700;color:#2C2838;margin-top:14px}
+  .subs2 .pep{position:absolute;bottom:-6px;right:8px;height:112px;width:auto;filter:drop-shadow(0 8px 14px rgba(90,70,180,.20))}
+
+  /* signout */
+  .signout{margin-top:14px;border-radius:16px;padding:15px;text-align:center;font-weight:800;font-size:15px;color:var(--danger)}
+  .ver{text-align:center;font-size:12px;color:var(--ter);font-weight:600;margin-top:16px}
+
+  /* ── BEFORE-only overrides: the arbitrary pastel chips + noisier metrics ── */
+  .before .chip{width:30px;height:30px;border-radius:9px;font-size:16px}
+  .before .subs{border:.5px solid #E7DEFB;background:linear-gradient(135deg,#F3EFFF,#FBF4FF)}
+  .before .subs .cta{font-weight:800}
+  .before .card{border-radius:16px}
+  .before .signout{background:#fff;border:1px solid var(--border);color:var(--danger);font-weight:700}
+</style>
+</head>
+<body>
+  <h1>Settings — improved <small>· design for sign-off · not from scratch, refined from the shipped AccountScreen</small></h1>
+  <p class="note">Same screen, same information architecture (profile → subscription → Preferences / Data &amp; reports / Support / About → sign out). What changed is the <b>surface craft</b> — the thing that read as "vibe coded": the <b>rainbow of nine unrelated pastel icon chips</b> is replaced by one calm, systematic chip; <b>purple becomes the single accent</b> (subscription only), exactly like the onboarding; the mixed icon set is unified; spacing and section headers get intentional; the version reads the real build.</p>
+
+  <div class="changes">
+    <div class="change"><i class="ti ti-palette"></i><div><b>One icon system</b><span>9 arbitrary pastels → a single soft-purple chip + muted purple glyph. Calm, scannable, on-brand.</span></div></div>
+    <div class="change"><i class="ti ti-diamond"></i><div><b>Purple hierarchy</b><span>Soft-tinted chips app-wide; the subscription card stays the boldest, vivid accent above them.</span></div></div>
+    <div class="change"><i class="ti ti-icons"></i><div><b>Unified icon family</b><span>No more Ionicons+Tabler mix or two different "help" glyphs.</span></div></div>
+    <div class="change"><i class="ti ti-ruler-measure"></i><div><b>Intentional rhythm</b><span>Consistent 22px section gaps, refined headers, roomier rows.</span></div></div>
+    <div class="change"><i class="ti ti-versions"></i><div><b>Live version</b><span>Footer reads the real build (v1.0.1), not a hardcoded 1.0.0.</span></div></div>
+  </div>
+
+  <div class="kicker">Now → Improved</div>
+  <div class="frames">
+
+    <!-- ══════════ BEFORE (as shipped) ══════════ -->
+    <div class="col">
+      <span class="tag now">Now — as shipped</span>
+      <div class="phone before">
+        <div class="screen">
+          <div class="statusbar"><span class="t">9:41</span><span class="r"><i class="ti ti-signal-4g"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3"></i></span></div>
+          <div class="body">
+            <div class="scr-title">Account</div>
+
+            <div class="card profile" style="margin-top:16px">
+              <div class="av">N</div>
+              <div style="flex:1"><div class="nm">Nickson</div><div class="sub">Day 34 · Tirzepatide · lb</div></div>
+              <i class="ti ti-chevron-right chev"></i>
+            </div>
+
+            <div class="subs">
+              <div class="spark"><i class="ti ti-sparkles"></i></div>
+              <div class="st"><b>Pepta Free</b><span>Unlock levels, muscle &amp; insights</span></div>
+              <span class="cta">Upgrade</span>
+            </div>
+
+            <div class="sec-h">Preferences</div>
+            <div class="card">
+              <div class="row"><div class="chip" style="background:#F1EFE8;color:#5F5E5A"><i class="ti ti-ruler-2"></i></div><div class="label">Units</div><div class="val">Imperial</div><i class="ti ti-chevron-right chev"></i></div>
+              <div class="row"><div class="chip" style="background:#EFEBFF;color:#7C5CFC"><i class="ti ti-vaccine"></i></div><div class="label">Dose units</div><div class="val">mg</div><i class="ti ti-chevron-right chev"></i></div>
+              <div class="row"><div class="chip" style="background:#FFF1E7;color:#C75B16"><i class="ti ti-bell"></i></div><div class="label">Notifications</div><i class="ti ti-chevron-right chev"></i></div>
+              <div class="row"><div class="chip" style="background:#FCEBEB;color:#D14343"><i class="ti ti-heart"></i></div><div class="label">Health data import</div><span class="badge">Not connected</span><i class="ti ti-chevron-right chev"></i></div>
+              <div class="row"><div class="chip" style="background:#E7F4FF;color:#1E7FCC"><i class="ti ti-language"></i></div><div class="label">Language</div><div class="val">English</div><i class="ti ti-chevron-right chev"></i></div>
+            </div>
+
+            <div class="sec-h">Support</div>
+            <div class="card">
+              <div class="row"><div class="chip" style="background:#EFEBFF;color:#7C5CFC"><i class="ti ti-help-circle"></i></div><div class="label">FAQ</div><i class="ti ti-chevron-right chev"></i></div>
+              <div class="row"><div class="chip" style="background:#FBEAF6;color:#A8327D"><i class="ti ti-bulb"></i></div><div class="label">Feature requests</div><i class="ti ti-chevron-right chev"></i></div>
+              <div class="row"><div class="chip" style="background:#FFF6E5;color:#B5790B"><i class="ti ti-flag-2"></i></div><div class="label">Report a problem</div><i class="ti ti-chevron-right chev"></i></div>
+              <div class="row"><div class="chip" style="background:#F1EFE8;color:#5F5E5A"><i class="ti ti-help-circle"></i></div><div class="label">Help</div><i class="ti ti-chevron-right chev"></i></div>
+            </div>
+
+            <div class="signout">Sign out</div>
+            <div class="ver">Pepta · v1.0.0</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ AFTER (improved) ══════════ -->
+    <div class="col">
+      <span class="tag new">Improved</span>
+      <div class="phone after">
+        <div class="screen">
+          <div class="statusbar"><span class="t">9:41</span><span class="r"><i class="ti ti-signal-4g"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3"></i></span></div>
+          <div class="body">
+            <div class="scr-title">Settings</div>
+
+            <div class="card profile" style="margin-top:16px">
+              <div class="av">N</div>
+              <div style="flex:1"><div class="nm">Nickson</div><div class="sub">Day 34 · Tirzepatide · lb · in</div></div>
+              <i class="ti ti-chevron-right chev"></i>
+            </div>
+
+            <div class="subs2">
+              <div class="txt">
+                <div class="t">Pepta Plus</div>
+                <div class="tap">Tap to manage subscription</div>
+                <div class="feat">✨ Levels, muscle &amp; insights</div>
+              </div>
+              <svg class="pep" viewBox="0 0 120 142" xmlns="http://www.w3.org/2000/svg">
+                <defs><linearGradient id="qbA" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9C82FF"/><stop offset="1" stop-color="#6E4EF0"/></linearGradient></defs>
+                <rect x="34" y="1" width="52" height="7" rx="3.5" fill="#6E4EF0"/>
+                <rect x="55" y="6" width="10" height="10" rx="3" fill="#7C5CFC"/>
+                <rect x="27" y="14" width="66" height="112" rx="33" fill="url(#qbA)"/>
+                <path d="M27 70 a33 33 0 0 0 66 0 v23 a33 33 0 0 1 -66 0 Z" fill="#0E0E12" opacity=".07"/>
+                <ellipse cx="48" cy="38" rx="15" ry="11" fill="#fff" opacity=".28"/>
+                <ellipse cx="50" cy="64" rx="8" ry="9" fill="#fff"/><ellipse cx="74" cy="64" rx="8" ry="9" fill="#fff"/>
+                <circle cx="51.5" cy="66" r="3.7" fill="#1A1430"/><circle cx="75.5" cy="66" r="3.7" fill="#1A1430"/>
+                <circle cx="53" cy="64.5" r="1.3" fill="#fff"/><circle cx="77" cy="64.5" r="1.3" fill="#fff"/>
+                <ellipse cx="39" cy="80" rx="6" ry="3.8" fill="#FF9CB6" opacity=".6"/><ellipse cx="85" cy="80" rx="6" ry="3.8" fill="#FF9CB6" opacity=".6"/>
+                <path d="M53 81 q7 6.5 14 0" stroke="#1A1430" stroke-width="3.2" fill="none" stroke-linecap="round"/>
+                <g stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".6"><line x1="33" y1="94" x2="47" y2="94"/><line x1="33" y1="101" x2="42" y2="101"/><line x1="33" y1="108" x2="47" y2="108"/><line x1="33" y1="115" x2="42" y2="115"/><line x1="33" y1="122" x2="47" y2="122"/></g>
+              </svg>
+            </div>
+
+            <div class="sec-h">Your plan</div>
+            <div class="card">
+              <div class="row"><div class="chip"><i class="ti ti-vaccine"></i></div><div class="label">Medication</div><div class="val">Ozempic 0.25mg</div><i class="ti ti-chevron-right chev"></i></div>
+              <div class="row"><div class="chip"><i class="ti ti-flag-3"></i></div><div class="label">Goal</div><div class="val">176 lb · Steady</div><i class="ti ti-chevron-right chev"></i></div>
+              <div class="row"><div class="chip"><i class="ti ti-flame"></i></div><div class="label">Daily targets</div><div class="val">145g protein</div><i class="ti ti-chevron-right chev"></i></div>
+              <div class="row"><div class="chip"><i class="ti ti-camera"></i></div><div class="label">Photo day</div><div class="val">Shot day</div><i class="ti ti-chevron-right chev"></i></div>
+            </div>
+
+            <div class="sec-h">Preferences</div>
+            <div class="card">
+              <div class="row"><div class="chip"><i class="ti ti-ruler-2"></i></div><div class="label">Units</div><div class="val">Imperial</div><i class="ti ti-chevron-right chev"></i></div>
+              <div class="row"><div class="chip"><i class="ti ti-vaccine"></i></div><div class="label">Dose units</div><div class="val">mg</div><i class="ti ti-chevron-right chev"></i></div>
+              <div class="row"><div class="chip"><i class="ti ti-heart"></i></div><div class="label">Health data import</div><span class="badge">Not connected</span><i class="ti ti-chevron-right chev"></i></div>
+              <div class="row"><div class="chip"><i class="ti ti-language"></i></div><div class="label">Language</div><div class="val">English</div><i class="ti ti-chevron-right chev"></i></div>
+            </div>
+
+            <div class="sec-h">Permissions</div>
+            <div class="card">
+              <div class="row"><div class="chip"><i class="ti ti-bell"></i></div><div class="label">Notifications</div><div class="val">Allowed</div><i class="ti ti-chevron-right chev"></i></div>
+              <div class="row"><div class="chip"><i class="ti ti-camera"></i></div><div class="label">Camera</div><div class="val">Allowed</div><i class="ti ti-chevron-right chev"></i></div>
+              <div class="row"><div class="chip"><i class="ti ti-photo"></i></div><div class="label">Photo library</div><div class="val">Ask</div><i class="ti ti-chevron-right chev"></i></div>
+            </div>
+
+            <div class="sec-h">Community</div>
+            <div class="card">
+              <div class="row"><div class="chip" style="background:#EAECFE"><i class="ti ti-brand-discord" style="color:#5865F2"></i></div><div class="label">Discord</div><div class="val">Join</div><i class="ti ti-chevron-right chev"></i></div>
+              <div class="row"><div class="chip" style="background:#E4F7EC"><i class="ti ti-brand-whatsapp" style="color:#25D366"></i></div><div class="label">WhatsApp</div><div class="val">Join</div><i class="ti ti-chevron-right chev"></i></div>
+            </div>
+
+            <div class="sec-h">Support</div>
+            <div class="card">
+              <div class="row"><div class="chip"><i class="ti ti-help"></i></div><div class="label">FAQ</div><i class="ti ti-chevron-right chev"></i></div>
+              <div class="row"><div class="chip"><i class="ti ti-bulb"></i></div><div class="label">Feature requests</div><i class="ti ti-chevron-right chev"></i></div>
+              <div class="row"><div class="chip"><i class="ti ti-flag"></i></div><div class="label">Report a problem</div><i class="ti ti-chevron-right chev"></i></div>
+              <div class="row"><div class="chip"><i class="ti ti-lifebuoy"></i></div><div class="label">Help</div><i class="ti ti-chevron-right chev"></i></div>
+            </div>
+
+            <div class="card signout" style="margin-top:14px;display:flex;align-items:center;justify-content:center;gap:8px"><i class="ti ti-logout" style="font-size:17px"></i>Sign out</div>
+            <div class="ver">Pepta · v1.0.1</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <style>
+    /* uniform chip fill for the AFTER frame */
+    .after .chip{background:var(--chip);color:var(--chip-ink)}
+  </style>
+</body>
+</html>
