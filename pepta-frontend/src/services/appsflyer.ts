@@ -1,9 +1,18 @@
 import { Platform } from "react-native";
-import { APPSFLYER_APP_ID, APPSFLYER_DEV_KEY } from "../config";
+import {
+  APPSFLYER_APP_ID,
+  APPSFLYER_DEV_KEY,
+  APPSFLYER_DIAGNOSTIC_EVENT_ENABLED,
+} from "../config";
 
 type AppsFlyerAuthMethod = "apple" | "demo" | "google";
 type AppsFlyerSuccessCallback = (result?: unknown) => unknown;
 type AppsFlyerErrorCallback = (error?: unknown) => unknown;
+type AppsFlyerUIDListener = (uid: string) => void;
+type AppsFlyerUnsubscribe = () => void;
+
+const APPSFLYER_UID_RETRY_DELAYS_MS = [250, 1_000, 3_000];
+const APPSFLYER_DIAGNOSTIC_EVENT_NAME = "pepta_sdk_debug_ping";
 
 interface AppsFlyerInitOptions {
   appId?: string;
@@ -43,6 +52,7 @@ interface AppsFlyerServiceOptions {
   devKey?: string;
   platformOS?: string;
   devMode?: boolean;
+  diagnosticEventEnabled?: boolean;
   nativeClient?: AppsFlyerNativeClient;
   loadNativeClient?: () => Promise<AppsFlyerNativeClient>;
   requestTrackingPermissions?: () => Promise<TrackingPermissionResponse>;
@@ -93,17 +103,24 @@ export class AppsFlyerService {
   private readonly devKey?: string;
   private readonly platformOS: string;
   private readonly devMode: boolean;
+  private readonly diagnosticEventEnabled: boolean;
   private readonly loadNativeClient: () => Promise<AppsFlyerNativeClient>;
   private readonly requestTrackingPermissions: () => Promise<TrackingPermissionResponse>;
   private readonly isTrackingTransparencyAvailable: () => boolean;
   private nativeClient?: AppsFlyerNativeClient;
   private initialized = false;
+  private diagnosticEventSent = false;
+  private lastKnownUID?: string;
+  private readonly uidListeners = new Set<AppsFlyerUIDListener>();
+  private uidRetryTimer?: ReturnType<typeof setTimeout>;
+  private uidRetryAttempt = 0;
 
   public constructor(options: AppsFlyerServiceOptions = {}) {
     this.appId = options.appId;
     this.devKey = options.devKey;
     this.platformOS = options.platformOS ?? Platform.OS;
     this.devMode = options.devMode ?? isDevRuntime();
+    this.diagnosticEventEnabled = options.diagnosticEventEnabled ?? false;
     this.nativeClient = options.nativeClient;
     this.loadNativeClient = options.loadNativeClient ?? loadNativeClient;
     this.requestTrackingPermissions =
@@ -125,6 +142,59 @@ export class AppsFlyerService {
     return this.nativeClient;
   }
 
+  private notifyAppsFlyerUIDAvailable(uid?: string): void {
+    if (!uid || uid === this.lastKnownUID) return;
+
+    this.lastKnownUID = uid;
+    this.uidListeners.forEach((listener) => listener(uid));
+  }
+
+  private clearAppsFlyerUIDRetry(): void {
+    if (this.uidRetryTimer) {
+      clearTimeout(this.uidRetryTimer);
+      this.uidRetryTimer = undefined;
+    }
+    this.uidRetryAttempt = 0;
+  }
+
+  private scheduleAppsFlyerUIDRetry(): void {
+    if (this.lastKnownUID || this.uidRetryTimer) return;
+
+    const retryDelay = APPSFLYER_UID_RETRY_DELAYS_MS[this.uidRetryAttempt];
+    if (retryDelay === undefined) return;
+
+    this.uidRetryAttempt += 1;
+    this.uidRetryTimer = setTimeout(() => {
+      this.uidRetryTimer = undefined;
+      void this.publishCurrentAppsFlyerUID().then((uid) => {
+        if (!uid) {
+          this.scheduleAppsFlyerUIDRetry();
+        }
+      });
+    }, retryDelay);
+  }
+
+  private async publishCurrentAppsFlyerUID(): Promise<string | undefined> {
+    const uid = await this.getAppsFlyerUID().catch((error) => {
+      warnInDev("[AppsFlyer] Could not read AppsFlyer ID.", error);
+      return undefined;
+    });
+
+    if (uid) {
+      this.clearAppsFlyerUIDRetry();
+    }
+
+    return uid;
+  }
+
+  private publishCurrentAppsFlyerUIDWithRetry(): void {
+    void this.publishCurrentAppsFlyerUID().then((uid) => {
+      if (!uid) {
+        this.scheduleAppsFlyerUIDRetry();
+      }
+    });
+  }
+
   private async requestAttIfNeeded(): Promise<void> {
     if (this.platformOS !== "ios" || !this.isTrackingTransparencyAvailable()) {
       return;
@@ -143,7 +213,8 @@ export class AppsFlyerService {
   ): Promise<void> {
     await new Promise<void>((resolve, reject) => {
       try {
-        client.setCustomerUserId(userId, () => resolve());
+        client.setCustomerUserId(userId, () => undefined);
+        resolve();
       } catch (error) {
         reject(error);
       }
@@ -166,6 +237,37 @@ export class AppsFlyerService {
     });
   }
 
+  private async logEventOnClient(
+    client: AppsFlyerNativeClient,
+    eventName: string,
+    eventValues: Record<string, string>,
+  ): Promise<void> {
+    await new Promise<void>((resolve, reject) => {
+      try {
+        const maybePromise = client.logEvent(eventName, eventValues, () => resolve(), reject);
+        if (isThenable(maybePromise)) {
+          maybePromise.then(() => resolve()).catch(reject);
+        }
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  private async logDiagnosticPingIfEnabled(client: AppsFlyerNativeClient): Promise<void> {
+    if (!this.diagnosticEventEnabled || this.diagnosticEventSent) return;
+
+    try {
+      await this.logEventOnClient(client, APPSFLYER_DIAGNOSTIC_EVENT_NAME, {
+        app: "pepta",
+        source: "sdk",
+      });
+      this.diagnosticEventSent = true;
+    } catch (error) {
+      warnInDev("[AppsFlyer] Failed to log diagnostic SDK ping.", error);
+    }
+  }
+
   public async initialize(userId?: string): Promise<boolean> {
     if (!this.hasConfig()) return false;
 
@@ -174,6 +276,8 @@ export class AppsFlyerService {
       if (userId) {
         await this.setCustomerUserIdOnClient(client, userId);
       }
+      await this.logDiagnosticPingIfEnabled(client);
+      this.publishCurrentAppsFlyerUIDWithRetry();
       return true;
     }
 
@@ -196,6 +300,8 @@ export class AppsFlyerService {
     });
     client.startSdk();
     this.initialized = true;
+    await this.logDiagnosticPingIfEnabled(client);
+    this.publishCurrentAppsFlyerUIDWithRetry();
     return true;
   }
 
@@ -210,21 +316,8 @@ export class AppsFlyerService {
       return;
     }
 
-    const client = await this.getClient();
-    await new Promise<void>((resolve, reject) => {
-      try {
-        const maybePromise = client.logEvent(
-          "af_complete_registration",
-          { af_registration_method: input.method },
-          () => resolve(),
-          reject,
-        );
-        if (isThenable(maybePromise)) {
-          maybePromise.then(() => resolve()).catch(reject);
-        }
-      } catch (error) {
-        reject(error);
-      }
+    await this.logEventOnClient(await this.getClient(), "af_complete_registration", {
+      af_registration_method: input.method,
     });
   }
 
@@ -239,12 +332,24 @@ export class AppsFlyerService {
             reject(error);
             return;
           }
+          this.notifyAppsFlyerUIDAvailable(uid);
           resolve(uid);
         });
       } catch (error) {
         reject(error);
       }
     });
+  }
+
+  public onAppsFlyerUIDAvailable(listener: AppsFlyerUIDListener): AppsFlyerUnsubscribe {
+    this.uidListeners.add(listener);
+    if (this.lastKnownUID) {
+      listener(this.lastKnownUID);
+    }
+
+    return () => {
+      this.uidListeners.delete(listener);
+    };
   }
 }
 
@@ -257,4 +362,5 @@ export function createAppsFlyerService(
 export const appsFlyer = createAppsFlyerService({
   appId: APPSFLYER_APP_ID,
   devKey: APPSFLYER_DEV_KEY,
+  diagnosticEventEnabled: APPSFLYER_DIAGNOSTIC_EVENT_ENABLED,
 });

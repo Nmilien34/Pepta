@@ -45,6 +45,7 @@ interface RevenueCatClientOptions {
   platformOS: string;
   devMode: boolean;
   getAppsFlyerId?: (appUserId?: string) => Promise<string | undefined>;
+  onAppsFlyerIdAvailable?: (listener: (appsFlyerId: string) => void) => () => void;
 }
 
 function assertPackage(
@@ -79,10 +80,18 @@ export function isRevenueCatPurchaseCancelled(error: unknown): boolean {
 }
 
 export function createRevenueCatClient(options: RevenueCatClientOptions) {
-  const { sdk, apiKey, platformOS, devMode, getAppsFlyerId } = options;
+  const {
+    sdk,
+    apiKey,
+    platformOS,
+    devMode,
+    getAppsFlyerId,
+    onAppsFlyerIdAvailable,
+  } = options;
   let configured = false;
   let logHandlerInstalled = false;
   let currentUserId: string | null = null;
+  let unsubscribeAppsFlyerIdAvailable: (() => void) | undefined;
 
   function isAvailable(): boolean {
     return platformOS === "ios" && apiKey.trim().length > 0;
@@ -112,6 +121,21 @@ export function createRevenueCatClient(options: RevenueCatClientOptions) {
     logHandlerInstalled = true;
   }
 
+  function subscribeToAppsFlyerIdAvailability(): void {
+    if (!onAppsFlyerIdAvailable || unsubscribeAppsFlyerIdAvailable) return;
+
+    unsubscribeAppsFlyerIdAvailable = onAppsFlyerIdAvailable((appsFlyerId) => {
+      void syncAppsFlyerAttribution(appsFlyerId).catch((error) => {
+        if (devMode) {
+          console.warn(
+            "[RevenueCat] Could not sync AppsFlyer attribution after AppsFlyer ID became available.",
+            error,
+          );
+        }
+      });
+    });
+  }
+
   async function configure(): Promise<boolean> {
     if (!isAvailable()) {
       return false;
@@ -126,9 +150,18 @@ export function createRevenueCatClient(options: RevenueCatClientOptions) {
     return true;
   }
 
-  async function syncAppsFlyerAttribution(appUserId?: string): Promise<void> {
+  async function syncAppsFlyerAttribution(appsFlyerId?: string | null): Promise<void> {
     if (!configured) return;
 
+    await sdk.collectDeviceIdentifiers?.();
+    if (appsFlyerId) {
+      await sdk.setAppsflyerID?.(appsFlyerId);
+    }
+  }
+
+  async function syncAppsFlyerAttributionFromCurrentSdk(
+    appUserId?: string,
+  ): Promise<void> {
     let appsFlyerId: string | undefined;
     try {
       appsFlyerId = await getAppsFlyerId?.(appUserId);
@@ -138,9 +171,12 @@ export function createRevenueCatClient(options: RevenueCatClientOptions) {
       }
     }
 
-    await sdk.collectDeviceIdentifiers?.();
-    if (appsFlyerId) {
-      await sdk.setAppsflyerID?.(appsFlyerId);
+    try {
+      await syncAppsFlyerAttribution(appsFlyerId);
+    } catch (error) {
+      if (devMode) {
+        console.warn("[RevenueCat] Could not sync AppsFlyer attribution.", error);
+      }
     }
   }
 
@@ -153,7 +189,7 @@ export function createRevenueCatClient(options: RevenueCatClientOptions) {
       currentUserId = appUserId;
     }
 
-    await syncAppsFlyerAttribution(appUserId);
+    await syncAppsFlyerAttributionFromCurrentSdk(appUserId);
   }
 
   async function getPaywallPackages(appUserId: string): Promise<PaywallPackages> {
@@ -183,7 +219,7 @@ export function createRevenueCatClient(options: RevenueCatClientOptions) {
   ): Promise<RevenueCatResult> {
     const packages = await getPaywallPackages(appUserId);
     const selectedPackage = plan === "yearly" ? packages.yearly : packages.monthly;
-    await syncAppsFlyerAttribution(appUserId);
+    await syncAppsFlyerAttributionFromCurrentSdk(appUserId);
     const result = await sdk.purchasePackage(selectedPackage);
     return {
       customerInfo: result.customerInfo,
@@ -205,6 +241,8 @@ export function createRevenueCatClient(options: RevenueCatClientOptions) {
     await sdk.logOut();
     currentUserId = null;
   }
+
+  subscribeToAppsFlyerIdAvailability();
 
   return {
     isAvailable,
@@ -239,4 +277,5 @@ export const revenueCat = createRevenueCatClient({
       return undefined;
     });
   },
+  onAppsFlyerIdAvailable: (listener) => appsFlyer.onAppsFlyerUIDAvailable(listener),
 });

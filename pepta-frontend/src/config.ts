@@ -18,6 +18,8 @@ export const APPSFLYER_DEV_KEY =
   process.env.EXPO_PUBLIC_APPSFLYER_DEV_KEY ?? "";
 export const APPSFLYER_APP_ID =
   process.env.EXPO_PUBLIC_APPSFLYER_APP_ID ?? "";
+export const APPSFLYER_DIAGNOSTIC_EVENT_ENABLED =
+  process.env.EXPO_PUBLIC_APPSFLYER_DIAGNOSTIC_EVENT_ENABLED === "true";
 
 // Legal pages served by the active backend for onboarding, settings, and App Store metadata.
 export const TERMS_URL = `${API_BASE_URL}/legal/terms`;

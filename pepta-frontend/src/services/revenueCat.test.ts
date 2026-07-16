@@ -193,6 +193,39 @@ describe("RevenueCat client", () => {
     ]);
   });
 
+  it("syncs a late AppsFlyer UID to RevenueCat after the user is logged in", async () => {
+    const calls: string[] = [];
+    const { sdk } = makeSdk(calls);
+    let appsFlyerUidListener: ((appsFlyerId: string) => void) | undefined;
+    const onAppsFlyerIdAvailable = vi.fn((listener: (appsFlyerId: string) => void) => {
+      appsFlyerUidListener = listener;
+      return vi.fn();
+    });
+    const client = createRevenueCatClient({
+      sdk,
+      apiKey: "appl_test_key",
+      platformOS: "ios",
+      devMode: false,
+      getAppsFlyerId: vi.fn(async () => undefined),
+      onAppsFlyerIdAvailable,
+    });
+
+    await client.identify("user_1");
+    appsFlyerUidListener?.("af-uid-late");
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(onAppsFlyerIdAvailable).toHaveBeenCalledTimes(1);
+    expect(sdk.logIn).toHaveBeenCalledWith("user_1");
+    expect(sdk.setAppsflyerID).toHaveBeenCalledWith("af-uid-late");
+    expect(calls).toEqual([
+      "login:user_1",
+      "collect-device-identifiers",
+      "collect-device-identifiers",
+      "set-appsflyer-id:af-uid-late",
+    ]);
+  });
+
   it("restores purchases and reports active pro access", async () => {
     const { sdk } = makeSdk();
     const client = createRevenueCatClient({
