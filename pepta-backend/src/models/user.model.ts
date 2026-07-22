@@ -7,6 +7,21 @@ export interface LinkedAuthProviderDocument {
   provider: AuthProvider;
   providerUserId: string;
   linkedAt: Date;
+  // Provider-specific verified-email proof (complimentary-access claims accept
+  // ONLY a Google entry's assertion). Server-only: omitted by serializeUser.
+  verifiedEmailNormalized?: string;
+  emailVerifiedAt?: Date;
+}
+
+// One currently-active access source in the reconciled projection — current
+// facts only, never transaction history (RevenueCat owns history).
+export interface AccessSourceDocument {
+  kind: "promotional" | "app_store";
+  active: boolean;
+  expiresAt: Date | null;
+  willRenew: boolean;
+  productId?: string;
+  environment?: "sandbox" | "production";
 }
 
 export interface UserEntitlementDocument {
@@ -16,6 +31,13 @@ export interface UserEntitlementDocument {
   revenueCatCustomerId?: string;
   revenueCatAppUserIds?: string[];
   revenueCatEntitlement?: string;
+  // Reconciled projection (design doc "Effective Entitlement Projection").
+  // Exposed only through AccessDecision — serializeUser keeps the legacy shape.
+  effectiveAccess?: "active" | "inactive";
+  source?: "promotional" | "app_store" | "mixed" | "none";
+  sources?: AccessSourceDocument[];
+  lastVerifiedAt?: Date | null;
+  verificationState?: "verified" | "stale" | "unavailable";
 }
 
 export interface UserLegalAcceptanceDocument {
@@ -63,6 +85,46 @@ const linkedAuthProviderSchema = new Schema<LinkedAuthProviderDocument>(
       required: true,
       default: () => new Date(),
     },
+    verifiedEmailNormalized: {
+      type: String,
+      trim: true,
+      lowercase: true,
+    },
+    emailVerifiedAt: {
+      type: Date,
+    },
+  },
+  { _id: false },
+);
+
+const accessSourceSchema = new Schema<AccessSourceDocument>(
+  {
+    kind: {
+      type: String,
+      enum: ["promotional", "app_store"],
+      required: true,
+    },
+    active: {
+      type: Boolean,
+      required: true,
+    },
+    expiresAt: {
+      type: Date,
+      default: null,
+    },
+    willRenew: {
+      type: Boolean,
+      required: true,
+      default: false,
+    },
+    productId: {
+      type: String,
+      trim: true,
+    },
+    environment: {
+      type: String,
+      enum: ["sandbox", "production"],
+    },
   },
   { _id: false },
 );
@@ -107,6 +169,26 @@ const entitlementSchema = new Schema<UserEntitlementDocument>(
     revenueCatEntitlement: {
       type: String,
       trim: true,
+    },
+    effectiveAccess: {
+      type: String,
+      enum: ["active", "inactive"],
+    },
+    source: {
+      type: String,
+      enum: ["promotional", "app_store", "mixed", "none"],
+    },
+    sources: {
+      type: [accessSourceSchema],
+      default: undefined,
+    },
+    lastVerifiedAt: {
+      type: Date,
+      default: null,
+    },
+    verificationState: {
+      type: String,
+      enum: ["verified", "stale", "unavailable"],
     },
   },
   { _id: false },

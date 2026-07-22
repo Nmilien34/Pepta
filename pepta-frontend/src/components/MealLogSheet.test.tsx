@@ -163,8 +163,13 @@ vi.mock("./MealCamera", () => ({
 }));
 
 vi.mock("./BarcodeScanner", () => ({
-  BarcodeScanner: ({ onScanned }: { onScanned?: (code: string) => void }) =>
-    React.createElement("BarcodeScanner", { onScanned }),
+  BarcodeScanner: ({
+    onScanned,
+    visible,
+  }: {
+    onScanned?: (code: string) => void;
+    visible?: boolean;
+  }) => React.createElement("BarcodeScanner", { onScanned, visible }),
 }));
 
 function nodeText(node: TestRenderer.ReactTestInstance): string {
@@ -446,6 +451,62 @@ describe("MealLogSheet", () => {
       capturedAt: expect.any(String),
     });
     expect(nodeText(tree!.root)).toContain("Chobani Zero Sugar Greek Yogurt");
+  });
+
+  it("presents the barcode scanner only after the sheet finishes dismissing", async () => {
+    // Regression: presenting the scanner Modal while the sheet Modal is still
+    // up (mid hide-animation) wedges iOS's presentation queue — app freeze.
+    await testStorage.setItem(AI_CONSENT_STORAGE_KEY, "accepted");
+    const RN = await import("react-native");
+    const parallelMock = vi.mocked(RN.Animated.parallel);
+    const originalImpl = parallelMock.getMockImplementation();
+    const pendingAnimations: Array<() => void> = [];
+    parallelMock.mockImplementation(() => ({
+      start: (done?: (result: { finished: boolean }) => void) => {
+        if (done) pendingAnimations.push(() => done({ finished: true }));
+      },
+      stop: () => undefined,
+      reset: () => undefined,
+    }));
+
+    try {
+      let tree: TestRenderer.ReactTestRenderer | undefined;
+      await act(async () => {
+        tree = TestRenderer.create(
+          <MealLogSheet visible={true} onClose={vi.fn()} />,
+        );
+      });
+      await act(async () => {
+        pendingAnimations.splice(0).forEach((finish) => finish());
+      });
+
+      await act(async () => {
+        tree!.root
+          .findByProps({ accessibilityLabel: "Barcode meal log" })
+          .props.onPress();
+      });
+
+      const scanner = () =>
+        tree!.root.find((node) => String(node.type) === "BarcodeScanner");
+      const sheetModal = () =>
+        tree!.root.find(
+          (node) =>
+            String(node.type) === "Modal" && node.props.transparent === true,
+        );
+
+      // The sheet is mid-dismissal: its Modal is still up, so the scanner
+      // must not be presenting yet.
+      expect(sheetModal().props.visible).toBe(true);
+      expect(scanner().props.visible).toBe(false);
+
+      // Hide animation completes → onDismissed → now the scanner presents.
+      await act(async () => {
+        pendingAnimations.splice(0).forEach((finish) => finish());
+      });
+      expect(scanner().props.visible).toBe(true);
+    } finally {
+      if (originalImpl) parallelMock.mockImplementation(originalImpl);
+    }
   });
 
   it("uses the barcode endpoint and logs barcode meals with barcode source", async () => {

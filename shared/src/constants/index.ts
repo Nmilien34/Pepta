@@ -9,6 +9,12 @@ export const ERROR_CODES = {
   rateLimited: "RATE_LIMITED",
   serviceUnavailable: "SERVICE_UNAVAILABLE",
   validation: "VALIDATION",
+  // Access-gate protected-route errors. Only entitlementRequired may route
+  // the client to a paywall; the others render setup/retry UX.
+  entitlementRequired: "ENTITLEMENT_REQUIRED",
+  accessProvisioning: "ACCESS_PROVISIONING",
+  accessIdentityVerificationRequired: "ACCESS_IDENTITY_VERIFICATION_REQUIRED",
+  accessVerificationUnavailable: "ACCESS_VERIFICATION_UNAVAILABLE",
 } as const;
 
 export const AUTH_PROVIDERS = ["google", "apple"] as const;

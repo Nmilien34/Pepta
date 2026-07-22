@@ -105,6 +105,7 @@ export function MealLogSheet({
   const [cameraRequested, setCameraRequested] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraMode, setCameraMode] = useState<CameraMode>("meal");
+  const [barcodeRequested, setBarcodeRequested] = useState(false);
   const [barcodeOpen, setBarcodeOpen] = useState(false);
   const [pendingAiAction, setPendingAiAction] = useState<AiMealAction | null>(
     null,
@@ -154,6 +155,7 @@ export function MealLogSheet({
       setCameraRequested(false);
       setCameraOpen(false);
       setCameraMode("meal");
+      setBarcodeRequested(false);
       setBarcodeOpen(false);
       setPendingAiAction(null);
     }
@@ -220,6 +222,7 @@ export function MealLogSheet({
 
   const analyzeBarcode = async (barcode: string) => {
     setBarcodeOpen(false);
+    setBarcodeRequested(false);
     setPreview(null);
     setSource("barcode");
     setView("analyzing");
@@ -358,8 +361,11 @@ export function MealLogSheet({
         setCameraRequested(true);
         return;
       case "barcode":
+        // Like the camera: hide the sheet first, open the scanner from
+        // onDismissed. Presenting the scanner Modal while the sheet Modal is
+        // mid-dismiss wedges iOS's presentation queue (app-wide freeze).
         setView("chooser");
-        setBarcodeOpen(true);
+        setBarcodeRequested(true);
         return;
       case "library":
         setView("chooser");
@@ -413,11 +419,19 @@ export function MealLogSheet({
   return (
     <>
       <BottomSheet
-        visible={visible && !cameraRequested && !cameraOpen && !barcodeOpen}
+        visible={
+          visible &&
+          !cameraRequested &&
+          !cameraOpen &&
+          !barcodeRequested &&
+          !barcodeOpen
+        }
         onClose={onClose}
         onDismissed={() => {
           if (cameraRequested) {
             setCameraOpen(true);
+          } else if (barcodeRequested) {
+            setBarcodeOpen(true);
           } else {
             onDismissed?.();
           }
@@ -621,10 +635,14 @@ export function MealLogSheet({
       ) : null}
       <BarcodeScanner
         visible={barcodeOpen}
-        onClose={() => setBarcodeOpen(false)}
+        onClose={() => {
+          setBarcodeOpen(false);
+          setBarcodeRequested(false);
+        }}
         onScanned={(code) => void analyzeBarcode(code)}
         onManual={() => {
           setBarcodeOpen(false);
+          setBarcodeRequested(false);
           setView("manual");
         }}
       />

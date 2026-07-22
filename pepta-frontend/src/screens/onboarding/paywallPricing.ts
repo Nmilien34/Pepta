@@ -33,17 +33,17 @@ const FALLBACK_PRICING: PaywallPricingCopy = {
     sub: "billed yearly",
     price: "$40.00",
     per: "/yr",
-    badge: "SAVE 63%",
+    badge: "SAVE 67%",
   },
   monthly: {
     title: "Monthly",
     sub: "billed monthly",
-    price: "$9.00",
+    price: "$9.99",
     per: "/mo",
   },
   footer: {
     yearly: "$40.00/year. Cancel anytime · Terms & Privacy",
-    monthly: "$9.00/month. Cancel anytime · Terms & Privacy",
+    monthly: "$9.99/month. Cancel anytime · Terms & Privacy",
   },
 };
 

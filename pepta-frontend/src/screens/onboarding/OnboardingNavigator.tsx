@@ -23,6 +23,8 @@ import { OnboardingMotionContext, convo } from '../../components';
 import { ONBOARDING_DRAFT_KEY, parseDraft, serializeDraft } from './onboardingDraft';
 import { echoFor, instrumentContext, companyContext } from './onboardingEcho';
 import { PrivacyScreen } from './PrivacyScreen';
+import { MeetPepScreen } from './MeetPepScreen';
+import { ReferralCodeScreen } from './ReferralCodeScreen';
 import { WelcomeScreen } from '../auth/WelcomeScreen';
 import { SignInScreen } from '../auth/SignInScreen';
 import { JourneyStageScreen, type JourneyStage } from './JourneyStageScreen';
@@ -68,6 +70,7 @@ import { previewTargets } from '../../utils/planPreview';
 import { buildOnboardingPayload } from './onboardingPayload';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import { useAccess } from '../../context/AccessContext';
 import { useOnboarding } from '../../context/OnboardingContext';
 import { deriveReminderGroups, defaultReminderState } from '../app/reminderSettings';
 import { saveReminderState, syncReminderNotifications } from '../../services/reminderNotification.service';
@@ -199,6 +202,8 @@ const flowCache: { step: OnboardingStep; answers: FlowAnswers; hydrated: boolean
 
 export function OnboardingNavigator() {
   const auth = useAuth();
+  const access = useAccess();
+  const accessActive = access.decision?.state === 'active';
   const { updateDraft } = useOnboarding();
   const [step, setStepState] = useState<OnboardingStep>(flowCache.step);
   const [answers, setAnswersState] = useState<FlowAnswers>(flowCache.answers);
@@ -259,7 +264,11 @@ export function OnboardingNavigator() {
   }, [hydrated, step, answers]);
 
   const progress = progressForStep(step);
-  const ctx = { ...ctxFromAnswers(answers), authenticated: auth.isAuthenticated };
+  const ctx = {
+    ...ctxFromAnswers(answers),
+    authenticated: auth.isAuthenticated,
+    accessActive,
+  };
   const context = useMemo(() => echoFor(step, answers), [step, answers]);
 
   // Step over any gated-out steps in the given direction, using the passed ctx.
@@ -284,6 +293,7 @@ export function OnboardingNavigator() {
     const next = advanceWith(step, 1, {
       ...ctxFromAnswers(merged),
       authenticated: auth.isAuthenticated,
+      accessActive,
     });
     if (next) {
       setAnimateEntrance(true);
@@ -354,6 +364,8 @@ export function OnboardingNavigator() {
       return <WelcomeScreen onContinue={goNext} onSignIn={() => setSignInOpen(true)} />;
     case 'privacy':
       return <PrivacyScreen progress={progress} showBack={showBack} onBack={goBack} onAccept={goNext} />;
+    case 'meetPep':
+      return <MeetPepScreen progress={progress} onBack={goBack} onContinue={goNext} />;
     case 'journeyStage':
       return <JourneyStageScreen progress={progress} onBack={goBack} onAnswer={(journeyStage) => commit({ journeyStage })} />;
     case 'experience':
@@ -691,6 +703,8 @@ export function OnboardingNavigator() {
     }
     case 'auth':
       return <SignInScreen onBack={goBack} />;
+    case 'referral':
+      return <ReferralCodeScreen progress={progress} onBack={goBack} onDone={goNext} />;
     case 'paywall':
       return <PaywallScreen onComplete={goNext} />;
     case 'welcomeIn':

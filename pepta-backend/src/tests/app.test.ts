@@ -120,6 +120,28 @@ describe("Pepta app", () => {
     expect(response.headers["retry-after"]).toBeDefined();
   });
 
+  it("rate limits referral-code attempts per authenticated user", async () => {
+    const app = createApp({ healthCheck: async () => true });
+    const token = issueSessionJwt("507f1f77bcf86cd799439012");
+
+    for (let index = 0; index < 10; index += 1) {
+      await request(app)
+        .post("/referrals/claim")
+        .set("authorization", `Bearer ${token}`)
+        .send({})
+        .expect(400);
+    }
+
+    const response = await request(app)
+      .post("/referrals/claim")
+      .set("authorization", `Bearer ${token}`)
+      .send({})
+      .expect(429);
+
+    expect(response.body.error.code).toBe("RATE_LIMITED");
+    expect(response.headers["retry-after"]).toBeDefined();
+  });
+
   it("rate limits authenticated meal intelligence attempts", async () => {
     const app = createApp({ healthCheck: async () => true });
     const token = issueSessionJwt("507f1f77bcf86cd799439011");

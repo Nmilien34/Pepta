@@ -48,6 +48,11 @@ import mealScansRoutes from "./routes/meal-scans.routes";
 import medicationLevelRoutes from "./routes/medication-level.routes";
 import meRoutes from "./routes/me.routes";
 import onboardingRoutes from "./routes/onboarding.routes";
+import referralRoutes from "./routes/referral.routes";
+import accessRoutes from "./routes/access.routes";
+// Side-effect: registers the complimentary-access resolver into access decisions.
+import "./services/complimentary-access.service";
+import { requireActiveAccess } from "./middleware/require-active-access";
 import progressRoutes from "./routes/progress.routes";
 import progressPhotosRoutes from "./routes/progress-photos.routes";
 import trackRoutes from "./routes/track.routes";
@@ -134,16 +139,24 @@ export function createApp(options: CreateAppOptions = {}): Express {
     }),
   );
   app.use("/auth", authRoutes);
+  // Access resolution stays OUTSIDE the premium guard (it is how access is
+  // obtained); mounted before /me so it wins the prefix match.
+  app.use("/me/access", accessRoutes);
   app.use("/me", meRoutes);
+  // Premium product routes: requireAuth first (guard reads req.user), then
+  // persisted-projection authorization. Allowlisted (design doc): auth, me,
+  // access, onboarding, referrals, webhooks, legal, health, diagnostics.
+  const premium = [requireAuth, requireActiveAccess] as const;
   app.use("/onboarding", onboardingRoutes);
-  app.use("/home", homeRoutes);
-  app.use("/track", trackRoutes);
-  app.use("/progress", progressRoutes);
-  app.use("/medication-level", medicationLevelRoutes);
-  app.use("/coach", coachRoutes);
+  app.use("/referrals", referralRoutes);
+  app.use("/home", ...premium, homeRoutes);
+  app.use("/track", ...premium, trackRoutes);
+  app.use("/progress", ...premium, progressRoutes);
+  app.use("/medication-level", ...premium, medicationLevelRoutes);
+  app.use("/coach", ...premium, coachRoutes);
   app.use(
     "/insights",
-    requireAuth,
+    ...premium,
     createInMemoryRateLimiter({
       windowMs: 60 * 1000,
       maxRequests: 30,
@@ -152,11 +165,11 @@ export function createApp(options: CreateAppOptions = {}): Express {
     }),
     insightsRoutes,
   );
-  app.use("/weekly-retention", weeklyRetentionRoutes);
+  app.use("/weekly-retention", ...premium, weeklyRetentionRoutes);
   app.use("/diagnostics", diagnosticsRoutes);
   app.use(
     "/meal-scans",
-    requireAuth,
+    ...premium,
     createInMemoryRateLimiter({
       windowMs: 60 * 1000,
       maxRequests: 20,
@@ -165,37 +178,42 @@ export function createApp(options: CreateAppOptions = {}): Express {
     }),
     mealScansRoutes,
   );
-  app.use("/compounds", createCompoundsRouter());
-  app.use("/cycles", createCyclesRouter());
-  app.use("/schedules", createSchedulesRouter());
-  app.use("/dose-logs", createLogRouter(doseLogInputSchema, trackedDoseLogService));
+  app.use("/compounds", ...premium, createCompoundsRouter());
+  app.use("/cycles", ...premium, createCyclesRouter());
+  app.use("/schedules", ...premium, createSchedulesRouter());
+  app.use("/dose-logs", ...premium, createLogRouter(doseLogInputSchema, trackedDoseLogService));
   app.use(
     "/weight-logs",
+    ...premium,
     createLogRouter(weightLogInputSchema, trackedWeightLogService),
   );
-  app.use("/meal-logs", createMealLogsRouter(trackedMealLogService));
-  app.use("/water-logs", createLogRouter(waterLogInputSchema, trackedWaterLogService));
+  app.use("/meal-logs", ...premium, createMealLogsRouter(trackedMealLogService));
+  app.use("/water-logs", ...premium, createLogRouter(waterLogInputSchema, trackedWaterLogService));
   app.use(
     "/protein-logs",
+    ...premium,
     createLogRouter(proteinLogInputSchema, trackedProteinLogService),
   );
   app.use(
     "/fiber-logs",
+    ...premium,
     createLogRouter(fiberLogInputSchema, trackedFiberLogService),
   );
   app.use(
     "/activity-logs",
+    ...premium,
     createLogRouter(activityLogInputSchema, trackedActivityLogService),
   );
   app.use(
     "/side-effect-logs",
+    ...premium,
     createLogRouter(sideEffectLogInputSchema, trackedSideEffectLogService),
   );
   app.use(
     "/measurements",
     createLogRouter(measurementInputSchema, trackedMeasurementService),
   );
-  app.use("/progress-photos", progressPhotosRoutes);
+  app.use("/progress-photos", ...premium, progressPhotosRoutes);
   app.use("/research-library", createResearchLibraryRouter());
   app.use("/webhooks", webhookRoutes);
   app.use(notFoundHandler);

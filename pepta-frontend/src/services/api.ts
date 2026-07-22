@@ -33,6 +33,9 @@ import {
   onboardingCompleteInputSchema,
   onboardingResultResponseSchema,
   pepChatRequestSchema,
+  accessDecisionSchema,
+  referralClaimRequestSchema,
+  referralClaimResponseSchema,
   pepChatResponseSchema,
   progressPhotoConfirmInputSchema,
   progressPhotoInputSchema,
@@ -71,6 +74,9 @@ import {
   type MealLogInput,
   type MealLogResponse,
   type MealBarcodeInput,
+  type AccessDecision,
+  type ReferralClaimInput,
+  type ReferralClaimResponse,
   type MealProductScanInput,
   type MealScanInput,
   type MealScanResponse,
@@ -502,6 +508,27 @@ class PeptaApi {
     return this.request("/meal-scans/product", mealScanResponseSchema, {
       method: "POST",
       body: JSON.stringify(mealProductScanInputSchema.parse(body)),
+    });
+  }
+
+  // POST /me/access/resolve → AccessDecision. Idempotent: reconciles stale
+  // RevenueCat state and resumes complimentary provisioning. The ONLY
+  // contract the app gates access on.
+  public resolveAccess(): Promise<AccessDecision> {
+    return this.request("/me/access/resolve", accessDecisionSchema, {
+      method: "POST",
+    });
+  }
+
+  // POST /referrals/claim → creator/referral attribution only. Never affects
+  // subscription status or paywall eligibility. Backend validates the code;
+  // 404 = unknown/expired, 409 = account already claimed a different code.
+  public claimReferralCode(
+    body: ReferralClaimInput,
+  ): Promise<ReferralClaimResponse> {
+    return this.request("/referrals/claim", referralClaimResponseSchema, {
+      method: "POST",
+      body: JSON.stringify(referralClaimRequestSchema.parse(body)),
     });
   }
 

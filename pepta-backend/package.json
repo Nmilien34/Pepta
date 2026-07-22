@@ -14,7 +14,12 @@
     "test": "vitest run",
     "check:integrations": "tsx src/scripts/check-integrations.ts",
     "seed:catalogs": "tsx src/scripts/seed-catalogs.ts",
-    "seed:demo": "tsx src/scripts/seedDemoUser.ts"
+    "seed:demo": "tsx src/scripts/seedDemoUser.ts",
+    "access:invite": "tsx src/scripts/access-admin.ts invite",
+    "access:list": "tsx src/scripts/access-admin.ts list",
+    "access:inspect": "tsx src/scripts/access-admin.ts inspect",
+    "access:retry": "tsx src/scripts/access-admin.ts retry",
+    "access:revoke": "tsx src/scripts/access-admin.ts revoke"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.758.0",

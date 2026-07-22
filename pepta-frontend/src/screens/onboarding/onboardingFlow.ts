@@ -12,6 +12,7 @@
 export const ONBOARDING_STEPS = [
   'welcome',
   'privacy',
+  'meetPep',
   'journeyStage',
   'experience',
   'needs',
@@ -44,6 +45,7 @@ export const ONBOARDING_STEPS = [
   'crafting',
   'reveal',
   'auth',
+  'referral',
   'paywall',
   'welcomeIn',
 ] as const;
@@ -82,6 +84,9 @@ export function progressForStep(step: OnboardingStep): number {
 export interface FlowContext {
   // Whether the user has signed in — the `auth` step is skipped once true.
   authenticated?: boolean;
+  // Resolved active access (approved creator or existing subscriber): the
+  // referral and paywall steps are skipped — Auth → welcomeIn directly.
+  accessActive?: boolean;
   journeyStage?: 'active' | 'starting_soon' | 'none';
   route?: 'injection' | 'oral';
   // True when the picked medication pins its route (branded meds) — the
@@ -106,6 +111,8 @@ const MEDICATION_BLOCK: readonly OnboardingStep[] = [
 export function shouldSkipStep(step: OnboardingStep, ctx: FlowContext): boolean {
   // Already signed in → the sign-in step is unnecessary.
   if (step === 'auth' && ctx.authenticated) return true;
+  // Approved creators / active subscribers never see referral or the wall.
+  if ((step === 'referral' || step === 'paywall') && ctx.accessActive) return true;
   // Not actively dosing → skip the dose/frequency/shot-day block (and the
   // instrument beat — there's no level model to arm yet).
   if (ctx.journeyStage && ctx.journeyStage !== 'active' && MEDICATION_BLOCK.includes(step)) {

@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
     ProgressPhotoModel: vi.fn(),
     ProteinLogModel: vi.fn(),
     PushTokenModel: vi.fn(),
+    ReferralClaimModel: vi.fn(),
     ScheduleModel: vi.fn(),
     SideEffectLogModel: vi.fn(),
     UserProfileModel: vi.fn(),
@@ -66,6 +67,9 @@ vi.mock("../../models", () => ({
   },
   ProteinLogModel: { deleteMany: mocks.modelDeleteMany.ProteinLogModel },
   PushTokenModel: { deleteMany: mocks.modelDeleteMany.PushTokenModel },
+  ReferralClaimModel: {
+    deleteMany: mocks.modelDeleteMany.ReferralClaimModel,
+  },
   ScheduleModel: { deleteMany: mocks.modelDeleteMany.ScheduleModel },
   SideEffectLogModel: {
     deleteMany: mocks.modelDeleteMany.SideEffectLogModel,
@@ -298,6 +302,9 @@ describe("user service account settings", () => {
       mocks.modelDeleteMany.ProcessedWebhookEventModel,
     ).toHaveBeenCalledWith({
       appUserId: userId,
+    });
+    expect(mocks.modelDeleteMany.ReferralClaimModel).toHaveBeenCalledWith({
+      userId,
     });
     expect(mocks.userDeleteOne).toHaveBeenCalledWith({ _id: userId });
   });

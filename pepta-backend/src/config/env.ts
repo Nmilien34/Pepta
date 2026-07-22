@@ -30,6 +30,10 @@ const envSchema = z
       .min(1)
       .default('Pepta/1.0 (support@pepta.app)'),
     REVENUECAT_WEBHOOK_SECRET: z.string().min(1).optional(),
+    REVENUECAT_SECRET_API_KEY: z.string().min(1).optional(),
+    REVENUECAT_PRO_ENTITLEMENT_ID: z.string().min(1).default('pro'),
+    COMPLIMENTARY_ACCESS_HMAC_ACTIVE_KEY_ID: z.string().min(1).optional(),
+    COMPLIMENTARY_ACCESS_HMAC_KEYS_JSON: z.string().min(1).optional(),
     APPLE_TEAM_ID: z.string().min(1).optional(),
     APPLE_CLIENT_ID: z.string().min(1).optional(),
     APPLE_KEY_ID: z.string().min(1).optional(),
@@ -125,6 +129,12 @@ export const env = {
   },
   revenueCat: {
     webhookSecret: parsed.data.REVENUECAT_WEBHOOK_SECRET,
+    secretApiKey: parsed.data.REVENUECAT_SECRET_API_KEY,
+    proEntitlementId: parsed.data.REVENUECAT_PRO_ENTITLEMENT_ID,
+  },
+  complimentaryAccess: {
+    hmacActiveKeyId: parsed.data.COMPLIMENTARY_ACCESS_HMAC_ACTIVE_KEY_ID,
+    hmacKeysJson: parsed.data.COMPLIMENTARY_ACCESS_HMAC_KEYS_JSON,
   },
   scheduler: {
     timezone: parsed.data.SCHEDULER_TIMEZONE,

@@ -1030,3 +1030,122 @@ export const pepChatResponseSchema = z
     refused: z.boolean(),
   })
   .strict();
+
+// ── Referral attribution ─────────────────────────────────────────────────────
+// Creator/campaign attribution only — claiming NEVER touches subscription
+// state, paywall eligibility, or premium access. The backend is the authority:
+// unregistered codes 404, normalization happens server-side (trim, uppercase,
+// strip spaces/dashes/underscores), and an account can claim exactly one code
+// (a different second code = 409; re-claiming the same code is idempotent).
+export const referralClaimRequestSchema = z
+  .object({
+    code: z.string().trim().min(2).max(64),
+  })
+  .strict();
+export const referralClaimResponseSchema = z
+  .object({
+    // The normalized code that was recorded (e.g. "PEP20").
+    code: z.string().min(1),
+    // True when this user had already claimed this exact code before.
+    alreadyClaimed: z.boolean(),
+  })
+  .strict();
+
+// ── Access decision (complimentary + subscription gate) ──────────────────────
+// The single authenticated contract behind POST /me/access/resolve. RevenueCat
+// stays the source of truth; this is the reconciled decision. Invariants the
+// refinements enforce: active/cached access carries ≥1 source, "mixed" means
+// both kinds are present, and single-source labels match their sources.
+export const accessSourceKindSchema = z.enum(["promotional", "app_store"]);
+export const accessSourceSchema = z
+  .object({
+    kind: accessSourceKindSchema,
+    expiresAt: z.string().datetime().nullable(),
+    willRenew: z.boolean(),
+    productId: z.string().min(1).optional(),
+    environment: z.enum(["sandbox", "production"]).optional(),
+  })
+  .strict();
+
+const accessSourceLabelSchema = z.enum(["promotional", "app_store", "mixed"]);
+
+function sourceLabelMatches(
+  label: z.infer<typeof accessSourceLabelSchema>,
+  sources: Array<z.infer<typeof accessSourceSchema>>,
+): boolean {
+  const kinds = new Set(sources.map((s) => s.kind));
+  if (label === "mixed") return kinds.has("promotional") && kinds.has("app_store");
+  return kinds.size === 1 && kinds.has(label);
+}
+
+export const accessDecisionSchema = z
+  .discriminatedUnion("state", [
+    z
+      .object({
+        state: z.literal("active"),
+        source: accessSourceLabelSchema,
+        sources: z.array(accessSourceSchema).min(1),
+        expiresAt: z.string().datetime().nullable(),
+        willRenew: z.boolean(),
+        lastVerifiedAt: z.string().datetime(),
+      })
+      .strict(),
+    z
+      .object({
+        state: z.literal("inactive"),
+        reason: z.enum(["never_entitled", "expired", "revoked"]),
+        lastVerifiedAt: z.string().datetime(),
+      })
+      .strict(),
+    z
+      .object({
+        state: z.literal("provisioning"),
+        retryAfterMs: z.number().int().positive(),
+      })
+      .strict(),
+    z
+      .object({
+        state: z.literal("identity_verification_required"),
+        provider: z.literal("google"),
+        reason: z.literal("invited_email_requires_verified_google"),
+      })
+      .strict(),
+    z
+      .object({
+        state: z.literal("temporarily_unavailable"),
+        retryAfterMs: z.number().int().positive(),
+        cachedAccess: z
+          .object({
+            source: accessSourceLabelSchema,
+            sources: z.array(accessSourceSchema).min(1),
+            validUntil: z.string().datetime(),
+            willRenew: z.boolean(),
+            lastVerifiedAt: z.string().datetime(),
+          })
+          .strict()
+          .optional(),
+      })
+      .strict(),
+  ])
+  // discriminatedUnion members must stay plain objects, so the cross-field
+  // invariants live here: labels must match their source lists.
+  .superRefine((value, ctx) => {
+    if (value.state === "active" && !sourceLabelMatches(value.source, value.sources)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["source"],
+        message: "source label must match the source list",
+      });
+    }
+    if (
+      value.state === "temporarily_unavailable" &&
+      value.cachedAccess &&
+      !sourceLabelMatches(value.cachedAccess.source, value.cachedAccess.sources)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["cachedAccess", "source"],
+        message: "cached source label must match the source list",
+      });
+    }
+  });

@@ -2,6 +2,7 @@ import type { AppleAuth, AuthResponse } from "@pepta/shared";
 import { ERROR_CODES } from "@pepta/shared";
 import { verifyAppleIdentityToken } from "../auth/apple";
 import { verifyGoogleIdToken } from "../auth/google";
+import { bindVerifiedGoogleEmail } from "./complimentary-access.service";
 import { issueSessionJwt } from "../auth/jwt";
 import { DEMO_ACCOUNT } from "../config/demoAccount";
 import { AppError, AuthError } from "../lib/errors";
@@ -58,6 +59,11 @@ function buildAppleDisplayName(
 export async function signInWithGoogle(idToken: string): Promise<AuthResponse> {
   const identity = await verifyGoogleIdToken(idToken);
   const { user, isNewUser } = await upsertUserFromIdentityWithResult(identity);
+  // Provider-specific proof for complimentary-access claims: only a live,
+  // Google-verified email may bind (Apple/top-level flags never qualify).
+  if (identity.emailVerified && identity.email) {
+    await bindVerifiedGoogleEmail(user, identity.email).catch(() => undefined);
+  }
   const userId = user._id.toString();
 
   return {

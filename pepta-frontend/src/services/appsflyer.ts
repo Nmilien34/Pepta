@@ -321,6 +321,22 @@ export class AppsFlyerService {
     });
   }
 
+  /**
+   * Fire-and-forget product analytics event. Callers must never pass PII or
+   * raw user-entered input (e.g. send a code's status, not the code itself).
+   */
+  public async logAnalyticsEvent(
+    eventName: string,
+    eventValues: Record<string, string> = {},
+  ): Promise<void> {
+    if (!this.hasConfig()) return;
+    try {
+      await this.logEventOnClient(await this.getClient(), eventName, eventValues);
+    } catch (error) {
+      warnInDev(`[AppsFlyer] Failed to log ${eventName}.`, error);
+    }
+  }
+
   public async getAppsFlyerUID(): Promise<string | undefined> {
     if (!this.hasConfig()) return undefined;
 

@@ -14,7 +14,8 @@ describe('onboarding flow', () => {
     expect(ONBOARDING_STEPS[ONBOARDING_STEPS.length - 1]).toBe('welcomeIn');
     expect(nextStep('welcome')).toBe('privacy');
     expect(nextStep('reveal')).toBe('auth');
-    expect(nextStep('auth')).toBe('paywall');
+    expect(nextStep('auth')).toBe('referral');
+    expect(nextStep('referral')).toBe('paywall');
     expect(nextStep('paywall')).toBe('welcomeIn');
   });
 
@@ -23,8 +24,18 @@ describe('onboarding flow', () => {
     expect(shouldSkipStep('auth', { authenticated: true })).toBe(true);
   });
 
+  it('skips referral and paywall for resolved-active access (creators/subscribers)', () => {
+    expect(shouldSkipStep('referral', { accessActive: true })).toBe(true);
+    expect(shouldSkipStep('paywall', { accessActive: true })).toBe(true);
+    expect(shouldSkipStep('referral', {})).toBe(false);
+    expect(shouldSkipStep('paywall', {})).toBe(false);
+    // welcomeIn still plays for creators.
+    expect(shouldSkipStep('welcomeIn', { accessActive: true })).toBe(false);
+  });
+
   it('advances forward in order through the new turns', () => {
-    expect(nextStep('privacy')).toBe('journeyStage');
+    expect(nextStep('privacy')).toBe('meetPep');
+    expect(nextStep('meetPep')).toBe('journeyStage');
     expect(nextStep('journeyStage')).toBe('experience');
     expect(nextStep('experience')).toBe('needs');
     expect(nextStep('needs')).toBe('medication');
@@ -44,7 +55,8 @@ describe('onboarding flow', () => {
   });
 
   it('walks back, with no step before the first', () => {
-    expect(prevStep('journeyStage')).toBe('privacy');
+    expect(prevStep('journeyStage')).toBe('meetPep');
+    expect(prevStep('meetPep')).toBe('privacy');
     expect(prevStep('privacy')).toBe('welcome');
     expect(prevStep('welcome')).toBeNull();
   });
@@ -58,7 +70,8 @@ describe('onboarding flow', () => {
     const n = ONBOARDING_STEPS.length;
     expect(progressForStep('welcome')).toBeCloseTo(1 / n, 5);
     expect(progressForStep('privacy')).toBeCloseTo(2 / n, 5);
-    expect(progressForStep('journeyStage')).toBeCloseTo(3 / n, 5);
+    expect(progressForStep('meetPep')).toBeCloseTo(3 / n, 5);
+    expect(progressForStep('journeyStage')).toBeCloseTo(4 / n, 5);
     expect(progressForStep('welcomeIn')).toBe(1);
   });
 });

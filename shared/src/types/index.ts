@@ -14,6 +14,10 @@ import type {
   compoundInputSchema,
   compoundPatchSchema,
   pepChatMessageSchema,
+  accessDecisionSchema,
+  accessSourceSchema,
+  referralClaimRequestSchema,
+  referralClaimResponseSchema,
   pepChatRequestSchema,
   pepChatResponseSchema,
   injectionDeviceTypeSchema,
@@ -238,3 +242,9 @@ export type WeeklyRetentionResponse = z.infer<
 export type WeightUnit = z.infer<typeof weightUnitSchema>;
 export type WeightLogInput = z.infer<typeof weightLogInputSchema>;
 export type WeightLogResponse = z.infer<typeof weightLogResponseSchema>;
+export type ReferralClaimInput = z.infer<typeof referralClaimRequestSchema>;
+export type ReferralClaimResponse = z.infer<
+  typeof referralClaimResponseSchema
+>;
+export type AccessSource = z.infer<typeof accessSourceSchema>;
+export type AccessDecision = z.infer<typeof accessDecisionSchema>;

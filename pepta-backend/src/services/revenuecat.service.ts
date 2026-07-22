@@ -5,6 +5,7 @@ import { env } from '../config/env';
 import { AppError } from '../lib/errors';
 import { logger } from '../lib/logger';
 import { ProcessedWebhookEventModel, UserModel, type UserDocument } from '../models';
+import { reconcileUserEntitlement } from './entitlement-reconciler.service';
 
 const DOWNGRADE_STATUSES: SubscriptionStatus[] = [
   'active_canceled',
@@ -20,7 +21,13 @@ interface DuplicateKeyError extends Error {
 type RevenueCatEvent = RevenueCatWebhook['event'];
 
 function statusForEvent(type: string): SubscriptionStatus {
-  if (['INITIAL_PURCHASE', 'RENEWAL', 'UNCANCELLATION', 'PRODUCT_CHANGE'].includes(type)) {
+  // NON_RENEWING_PURCHASE covers RevenueCat promotional grants (store
+  // PROMOTIONAL) and one-off purchases — both mean access is active now.
+  if (
+    ['INITIAL_PURCHASE', 'RENEWAL', 'UNCANCELLATION', 'PRODUCT_CHANGE', 'NON_RENEWING_PURCHASE'].includes(
+      type,
+    )
+  ) {
     return 'active';
   }
 
@@ -258,15 +265,35 @@ export async function applyRevenueCatWebhook(input: RevenueCatWebhook): Promise<
       ...revenueCatIdsToAssociate(event),
     ]);
 
-    user.entitlement = {
-      status: nextStatus,
-      expiresAt,
-      willRenew: !['CANCELLATION', 'EXPIRATION', 'REFUND'].includes(event.type),
-      revenueCatCustomerId,
-      revenueCatAppUserIds,
-      revenueCatEntitlement: event.entitlement_id ?? undefined,
-    };
+    const isPromotionalEvent =
+      typeof (event as { store?: unknown }).store === 'string' &&
+      ((event as { store?: string }).store ?? '').toUpperCase() === 'PROMOTIONAL';
+
+    user.entitlement.status = nextStatus;
+    user.entitlement.expiresAt = expiresAt;
+    // Promotional grants never renew; store lifecycles keep the old rule.
+    user.entitlement.willRenew = isPromotionalEvent
+      ? false
+      : !['CANCELLATION', 'EXPIRATION', 'REFUND'].includes(event.type);
+    user.entitlement.revenueCatCustomerId = revenueCatCustomerId;
+    user.entitlement.revenueCatAppUserIds = revenueCatAppUserIds;
+    user.entitlement.revenueCatEntitlement = event.entitlement_id ?? undefined;
+    // The event alone is a hint until reconciliation confirms it.
+    user.entitlement.verificationState = 'stale';
     await user.save();
+  }
+
+  // Webhooks are signals, not the whole truth: when the server API key is
+  // configured, derive access from the customer's COMPLETE current state so
+  // an expired promo can't cancel a live paid sub (and vice versa). Failure
+  // keeps the event-level write and leaves the projection marked stale.
+  try {
+    await reconcileUserEntitlement(user);
+  } catch {
+    logger.warn(
+      { eventId, type: event.type },
+      '[revenuecat] webhook applied from event only; reconciliation deferred',
+    );
   }
 
   return { received: true };

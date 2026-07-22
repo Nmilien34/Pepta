@@ -281,7 +281,7 @@ h2{font-size:18px;font-weight:800;margin:44px 0 6px}
       </div>
       <div class="tiers">
         <div class="tier on"><b>$40<span style="font-size:11px;color:var(--ts)">/yr</span></b><small>$3.33/mo · save 63%</small></div>
-        <div class="tier off"><b>$9<span style="font-size:11px;opacity:.6">/mo</span></b><small>billed monthly</small></div>
+        <div class="tier off"><b>$9.99<span style="font-size:11px;opacity:.6">/mo</span></b><small>billed monthly</small></div>
       </div>
       <div class="cta solid" style="margin-top:16px">Start tracking</div>
       <div style="text-align:center;font-size:10.5px;color:rgba(244,242,250,.4);font-weight:600;margin-top:9px">Billed $40 yearly · cancel anytime · Restore purchase</div>
@@ -321,6 +321,45 @@ h2{font-size:18px;font-weight:800;margin:44px 0 6px}
       <div style="text-align:center;font-size:12px;color:var(--tt);font-weight:600;margin-top:12px">Terms · Privacy</div>
     </div></div>
     <div class="spec"><b>Advance:</b> auto after ack "Locked." Links open in-place sheets.</div>
+  </div>
+
+
+  <div class="fw"><div class="fl">T2b · Meet Pep (NEW)</div>
+    <svg width="0" height="0" style="position:absolute"><defs>
+      <linearGradient id="qb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9C82FF"/><stop offset="1" stop-color="#6E4EF0"/></linearGradient>
+      <symbol id="pep" viewBox="0 0 120 142"><rect x="34" y="1" width="52" height="7" rx="3.5" fill="#6E4EF0"/><rect x="55" y="6" width="10" height="10" rx="3" fill="#7C5CFC"/><rect x="27" y="14" width="66" height="112" rx="33" fill="url(#qb)"/><path d="M27 70 a33 33 0 0 0 66 0 v23 a33 33 0 0 1 -66 0 Z" fill="#0E0E12" opacity=".07"/><ellipse cx="48" cy="38" rx="15" ry="11" fill="#fff" opacity=".28"/><ellipse cx="50" cy="64" rx="8" ry="9" fill="#fff"/><ellipse cx="74" cy="64" rx="8" ry="9" fill="#fff"/><circle cx="51.5" cy="66" r="3.7" fill="#1A1430"/><circle cx="75.5" cy="66" r="3.7" fill="#1A1430"/><circle cx="53" cy="64.5" r="1.3" fill="#fff"/><circle cx="77" cy="64.5" r="1.3" fill="#fff"/><ellipse cx="39" cy="80" rx="6" ry="3.8" fill="#FF9CB6" opacity=".6"/><ellipse cx="85" cy="80" rx="6" ry="3.8" fill="#FF9CB6" opacity=".6"/><path d="M53 81 q7 6.5 14 0" stroke="#1A1430" stroke-width="3.2" fill="none" stroke-linecap="round"/><g stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".6"><line x1="33" y1="94" x2="47" y2="94"/><line x1="33" y1="101" x2="42" y2="101"/><line x1="33" y1="108" x2="47" y2="108"/><line x1="33" y1="115" x2="42" y2="115"/><line x1="33" y1="122" x2="47" y2="122"/></g></symbol>
+      <symbol id="pepwave" viewBox="0 0 120 150"><rect x="34" y="11" width="52" height="7" rx="3.5" fill="#6E4EF0"/><rect x="55" y="16" width="10" height="10" rx="3" fill="#7C5CFC"/><rect x="27" y="24" width="66" height="112" rx="33" fill="url(#qb)"/><path d="M27 80 a33 33 0 0 0 66 0 v23 a33 33 0 0 1 -66 0 Z" fill="#0E0E12" opacity=".07"/><ellipse cx="48" cy="48" rx="15" ry="11" fill="#fff" opacity=".28"/><ellipse cx="50" cy="74" rx="8" ry="9" fill="#fff"/><ellipse cx="74" cy="74" rx="8" ry="9" fill="#fff"/><circle cx="51.5" cy="76" r="3.7" fill="#1A1430"/><circle cx="75.5" cy="76" r="3.7" fill="#1A1430"/><circle cx="53" cy="74.5" r="1.3" fill="#fff"/><circle cx="77" cy="74.5" r="1.3" fill="#fff"/><path d="M53 91 q7 6.5 14 0" stroke="#1A1430" stroke-width="3.2" fill="none" stroke-linecap="round"/><g stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".6"><line x1="33" y1="104" x2="47" y2="104"/><line x1="33" y1="111" x2="42" y2="111"/><line x1="33" y1="118" x2="47" y2="118"/><line x1="33" y1="125" x2="42" y2="125"/><line x1="33" y1="132" x2="47" y2="132"/></g><g transform="rotate(22 98 64)"><ellipse cx="98" cy="48" rx="8" ry="12" fill="#7C5CFC"/></g></symbol>
+    </defs></svg>
+    <style>
+      /* Meet-Pep scene: idle → wave crossfade with two speech beats, 7s loop.
+         Bubbles reuse the received-bubble idiom (white, hairline, 18/18/18/6). */
+      .mpstage{position:relative;flex:1;display:flex;align-items:center;justify-content:center;margin-top:6px;animation:mpbob 3.5s ease-in-out infinite}
+      .mpstage svg.mp{position:absolute;left:50%;transform:translateX(-50%)}
+      .mp-idle{animation:mpidle 7s ease-in-out infinite}
+      .mp-wave{animation:mpwave 7s ease-in-out infinite}
+      .mpbub{position:absolute;background:#fff;border:1px solid var(--hair);border-radius:18px 18px 18px 6px;padding:10px 13px;font-weight:700;font-size:13.5px;box-shadow:0 10px 24px -14px rgba(20,16,40,.25);opacity:0;transform:scale(.7);transform-origin:bottom left}
+      .mpb1{top:6px;left:8px;animation:mpb1 7s ease infinite}
+      .mpb2{bottom:14px;right:2px;border-radius:18px 18px 6px 18px;transform-origin:bottom right;animation:mpb2 7s ease infinite}
+      @keyframes mpbob{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+      @keyframes mpidle{0%,44%{opacity:1}50%,92%{opacity:0}97%,100%{opacity:1}}
+      @keyframes mpwave{0%,44%{opacity:0}50%,92%{opacity:1}97%,100%{opacity:0}}
+      @keyframes mpb1{0%,6%{opacity:0;transform:scale(.7)}11%,42%{opacity:1;transform:scale(1)}48%,100%{opacity:0;transform:scale(.7)}}
+      @keyframes mpb2{0%,50%{opacity:0;transform:scale(.7)}56%,90%{opacity:1;transform:scale(1)}96%,100%{opacity:0;transform:scale(.7)}}
+    </style>
+    <div class="dev"><div class="orbs"><i></i><i></i><i></i></div><div class="scr">
+      <div class="top"><span class="back">&#8249;</span><div class="prog"><i style="width:9%"></i></div></div>
+      <div class="echo">That&rsquo;s settled.</div>
+      <div class="q">Now &mdash; meet Pep<span class="sq">.</span></div>
+      <div class="subq">Your guide in here. Pep turns your answers into your plan &mdash; and explains any number you ever wonder about.</div>
+      <div class="mpstage">
+        <svg class="mp mp-idle" width="148" height="175" viewBox="0 0 120 142"><use href="#pep"/></svg>
+        <svg class="mp mp-wave" width="148" height="185" viewBox="0 0 120 150"><use href="#pepwave"/></svg>
+        <div class="mpbub mpb1">Hi &mdash; I&rsquo;m Pep! &#128075;</div>
+        <div class="mpbub mpb2">Ask me anything, anytime.</div>
+      </div>
+      <div class="cta">Wave back &#128075;</div>
+    </div></div>
+    <div class="spec"><b>Place:</b> after T2 Privacy, before the first question — from here every dim echo in the funnel is Pep talking. <b>Motion:</b> Pep bobs idle; bubble 1 types in; pressing the CTA fires the wave pose + haptic, bubble 2 lands, auto-advance ~900ms. Back-nav returns here without replaying. <b>Voice note:</b> Pep is the warmth; the questions stay the tracker.</div>
   </div>
 
 
@@ -665,6 +704,25 @@ h2{font-size:18px;font-weight:800;margin:44px 0 6px}
       <div class="rvconfetti"><i style="left:18%"></i><i style="left:30%"></i><i style="left:42%"></i><i style="left:54%"></i><i style="left:64%"></i><i style="left:74%"></i><i style="left:84%"></i><i style="left:26%"></i><i style="left:60%"></i><i style="left:48%"></i></div>
     </div></div>
     <div class="spec"><b>Placement:</b> white reveal BEFORE the wall — "it's ready" then "claim it." Confetti burst on entry (subtle, purple).</div>
+  </div>
+
+
+  <div class="fw"><div class="fl">T-Ref · Referral code (NEW · auth &rarr; paywall)</div>
+    <div class="dev"><div class="orbs"><i></i><i></i><i></i></div><div class="scr">
+      <div class="top"><span class="back">&#8249;</span><div class="prog"><i style="width:97%"></i></div></div>
+      <div class="echo">You&rsquo;re in.</div>
+      <div class="q">Got a referral code<span class="sq">?</span></div>
+      <div class="subq">From a creator or a friend? Drop it here &mdash; you can skip this if you don&rsquo;t have one.</div>
+      <div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+        <div style="display:flex;justify-content:center;margin-bottom:20px">
+          <svg width="104" height="123" viewBox="0 0 120 142"><use href="#pep"/></svg>
+        </div>
+        <div style="border:1px solid var(--hair);background:#fff;border-radius:18px;padding:15px 16px;font-weight:600;font-size:16px;letter-spacing:1px;color:var(--tt)">Enter code</div>
+      </div>
+      <div class="cta" style="margin-top:0">Apply</div>
+      <div style="text-align:center;font-weight:700;font-size:14px;color:var(--ts);padding:12px 0 0">Skip</div>
+    </div></div>
+    <div class="spec"><b>Place:</b> after sign-in, before the wall. Attribution only — never touches pricing or access. <b>States:</b> Apply disabled until input; applying&hellip; spinner label; inline red error keeps user here; success = Pep waves + "PEP20 applied" + auto-advance one beat. Backend is the code authority. <b>Analytics:</b> viewed/applied/invalid/skipped — never the raw code.</div>
   </div>
 
 </div>
