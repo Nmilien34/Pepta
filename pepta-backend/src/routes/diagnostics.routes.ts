@@ -1,14 +1,11 @@
 import { stallDiagnosticInputSchema } from '@pepta/shared';
 import { Router } from 'express';
-import { requireAuth } from '../auth/middleware';
 import { asyncHandler } from '../lib/async-handler';
 import { sendData } from '../lib/responses';
 import { validateBody } from '../middleware/validate.middleware';
 import { getStallDiagnostic } from '../services/stall-diagnostic.service';
 
 const router = Router();
-
-router.use(requireAuth);
 
 router.post(
   '/stall',

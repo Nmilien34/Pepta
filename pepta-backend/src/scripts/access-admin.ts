@@ -16,11 +16,17 @@ import { env } from "../config/env";
 import {
   createInvite,
   inspectInvite,
+  linkAppleInvite,
   listInvites,
   maskEmail,
   retryInvite,
   revokeInvite,
 } from "../services/complimentary-access.service";
+import {
+  listCleanups,
+  retryCleanup,
+  runDueCleanups,
+} from "../services/complimentary-access-cleanup.service";
 
 function arg(name: string): string | undefined {
   const index = process.argv.indexOf(`--${name}`);
@@ -122,9 +128,64 @@ async function main(): Promise<void> {
       console.log(`Grant status: ${status}`);
       break;
     }
+    case "link-apple": {
+      const inviteEmail = requireArg("invite-email");
+      const accountEmail = requireArg("account-email");
+      const reason = requireArg("reason");
+      if (hasFlag("dry-run")) {
+        await linkAppleInvite({
+          inviteEmail,
+          accountEmail,
+          operator,
+          reason,
+          dryRun: true,
+        });
+        console.log(
+          `[dry-run] validated link ${maskEmail(inviteEmail)} → ${maskEmail(accountEmail)} — reason: ${reason}`,
+        );
+        break;
+      }
+      confirmProductionMutation("link an Apple account to an invitation");
+      const result = await linkAppleInvite({
+        inviteEmail,
+        accountEmail,
+        operator,
+        reason,
+      });
+      console.log(
+        result.alreadyLinked
+          ? `Already linked — status: ${result.status}`
+          : `Linked ${maskEmail(inviteEmail)} → ${maskEmail(accountEmail)} — status: ${result.status}`,
+      );
+      break;
+    }
+    case "cleanup-list": {
+      const rows = await listCleanups();
+      if (rows.length === 0) {
+        console.log("No pending cleanup tasks.");
+        break;
+      }
+      for (const row of rows) {
+        console.log(
+          `${row.id}  attempts=${row.attempts}${row.lastErrorCode ? ` lastError=${row.lastErrorCode}` : ""}${row.nextAttemptAt ? ` next=${row.nextAttemptAt.toISOString()}` : " (parked — retry manually)"}`,
+        );
+      }
+      break;
+    }
+    case "cleanup-retry": {
+      confirmProductionMutation("retry a deletion cleanup");
+      const id = arg("task-id") ?? arg("id");
+      if (id) {
+        console.log((await retryCleanup(id)) ? "Cleanup succeeded." : "Cleanup still pending.");
+      } else {
+        const summary = await runDueCleanups("admin");
+        console.log(`Attempted ${summary.attempted}, succeeded ${summary.succeeded}.`);
+      }
+      break;
+    }
     default:
       console.error(
-        "Usage: access-admin.ts <invite|list|inspect|retry|revoke> [--email ...] [--category creator|friend] [--reason ...] [--months N] [--dry-run]",
+        "Usage: access-admin.ts <invite|list|inspect|retry|revoke|link-apple|cleanup-list|cleanup-retry> [--email ...] [--invite-email ...] [--account-email ...] [--category creator|friend] [--reason ...] [--months N] [--task-id ...] [--dry-run]",
       );
       process.exit(1);
   }

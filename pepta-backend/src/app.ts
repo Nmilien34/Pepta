@@ -145,7 +145,7 @@ export function createApp(options: CreateAppOptions = {}): Express {
   app.use("/me", meRoutes);
   // Premium product routes: requireAuth first (guard reads req.user), then
   // persisted-projection authorization. Allowlisted (design doc): auth, me,
-  // access, onboarding, referrals, webhooks, legal, health, diagnostics.
+  // access, onboarding, referrals, webhooks, legal, health.
   const premium = [requireAuth, requireActiveAccess] as const;
   app.use("/onboarding", onboardingRoutes);
   app.use("/referrals", referralRoutes);
@@ -166,7 +166,7 @@ export function createApp(options: CreateAppOptions = {}): Express {
     insightsRoutes,
   );
   app.use("/weekly-retention", ...premium, weeklyRetentionRoutes);
-  app.use("/diagnostics", diagnosticsRoutes);
+  app.use("/diagnostics", ...premium, diagnosticsRoutes);
   app.use(
     "/meal-scans",
     ...premium,
@@ -211,10 +211,11 @@ export function createApp(options: CreateAppOptions = {}): Express {
   );
   app.use(
     "/measurements",
+    ...premium,
     createLogRouter(measurementInputSchema, trackedMeasurementService),
   );
   app.use("/progress-photos", ...premium, progressPhotosRoutes);
-  app.use("/research-library", createResearchLibraryRouter());
+  app.use("/research-library", ...premium, createResearchLibraryRouter());
   app.use("/webhooks", webhookRoutes);
   app.use(notFoundHandler);
   app.use(errorHandler);

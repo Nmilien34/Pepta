@@ -1,12 +1,16 @@
 import type { AppleAuth, AuthResponse } from "@pepta/shared";
 import { ERROR_CODES } from "@pepta/shared";
 import { verifyAppleIdentityToken } from "../auth/apple";
-import { verifyGoogleIdToken } from "../auth/google";
-import { bindVerifiedGoogleEmail } from "./complimentary-access.service";
+import {
+  verifyGoogleIdToken,
+  type ProviderIdentity,
+} from "../auth/google";
+import { bindVerifiedProviderEmail } from "./provider-identity-binding.service";
 import { issueSessionJwt } from "../auth/jwt";
 import { DEMO_ACCOUNT } from "../config/demoAccount";
 import { AppError, AuthError } from "../lib/errors";
-import { UserModel } from "../models/user.model";
+import { logger } from "../lib/logger";
+import { UserModel, type UserDocument } from "../models/user.model";
 import { serializeUser, upsertUserFromIdentityWithResult } from "./user.service";
 
 /**
@@ -56,14 +60,39 @@ function buildAppleDisplayName(
   return parts.length > 0 ? parts.join(" ") : undefined;
 }
 
+async function persistVerifiedIdentity(
+  user: UserDocument,
+  identity: ProviderIdentity,
+): Promise<void> {
+  if (!identity.emailVerified || !identity.email) return;
+
+  try {
+    await bindVerifiedProviderEmail({
+      userId: user._id,
+      provider: identity.provider,
+      providerUserId: identity.providerUserId,
+      email: identity.email,
+      verifiedAt: new Date(),
+    });
+  } catch (error) {
+    logger.error(
+      {
+        userId: String(user._id),
+        provider: identity.provider,
+      },
+      "[auth] verified provider email binding failed",
+    );
+    throw error;
+  }
+}
+
 export async function signInWithGoogle(idToken: string): Promise<AuthResponse> {
   const identity = await verifyGoogleIdToken(idToken);
   const { user, isNewUser } = await upsertUserFromIdentityWithResult(identity);
-  // Provider-specific proof for complimentary-access claims: only a live,
-  // Google-verified email may bind (Apple/top-level flags never qualify).
-  if (identity.emailVerified && identity.email) {
-    await bindVerifiedGoogleEmail(user, identity.email).catch(() => undefined);
-  }
+  // Provider-specific proof for complimentary-access claims. A persistence
+  // failure fails the sign-in (audit M1): a session without proof would
+  // mis-route an approved user to identity-verification/paywall UX.
+  await persistVerifiedIdentity(user, identity);
   const userId = user._id.toString();
 
   return {
@@ -79,6 +108,10 @@ export async function signInWithApple(input: AppleAuth): Promise<AuthResponse> {
     ...identity,
     name: buildAppleDisplayName(input.fullName) ?? identity.name,
   });
+  // Apple supplies the email only on FIRST authorization — persist the
+  // subject-bound proof durably so later sessions keep it. Same fail-closed
+  // rule as Google: no silent sessions without persisted proof.
+  await persistVerifiedIdentity(user, identity);
   const userId = user._id.toString();
 
   return {

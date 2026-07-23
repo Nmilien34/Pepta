@@ -7,8 +7,8 @@ export interface LinkedAuthProviderDocument {
   provider: AuthProvider;
   providerUserId: string;
   linkedAt: Date;
-  // Provider-specific verified-email proof (complimentary-access claims accept
-  // ONLY a Google entry's assertion). Server-only: omitted by serializeUser.
+  // Provider-specific verified-email proof for exact Google or Apple
+  // complimentary-access claims. Server-only: omitted by serializeUser.
   verifiedEmailNormalized?: string;
   emailVerifiedAt?: Date;
 }

@@ -10,6 +10,7 @@ import {
 } from "@pepta/shared";
 import type { ProviderIdentity } from "../auth/google";
 import { AppError, NotFoundError } from "../lib/errors";
+import { prepareComplimentaryCleanupForDeletion } from "./complimentary-access-cleanup.service";
 import { computeProfileTargets } from "../lib/profile-targets";
 import {
   ActivityLogModel,
@@ -450,6 +451,10 @@ export async function deleteCurrentUser(userId: string): Promise<void> {
     ProcessedWebhookEventModel.deleteMany({ appUserId: userId }),
   ]);
 
+  // Audit H1: after user-owned data is removed, record durable promotional
+  // cleanup immediately before the user document disappears. RevenueCat
+  // failure does not block deletion because the cleanup service queues first.
+  await prepareComplimentaryCleanupForDeletion(user);
   await UserModel.deleteOne({ _id: userId });
 }
 

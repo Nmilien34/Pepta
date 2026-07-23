@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   deleteS3Object: vi.fn(),
+  prepareComplimentaryCleanupForDeletion: vi.fn(),
   modelDeleteMany: {
     ActivityLogModel: vi.fn(),
     CompoundModel: vi.fn(),
@@ -94,6 +95,11 @@ vi.mock("../../models", () => ({
 
 vi.mock("../../services/s3.service", () => ({
   deleteS3Object: mocks.deleteS3Object,
+}));
+
+vi.mock("../../services/complimentary-access-cleanup.service", () => ({
+  prepareComplimentaryCleanupForDeletion:
+    mocks.prepareComplimentaryCleanupForDeletion,
 }));
 
 import {
@@ -205,6 +211,7 @@ describe("user service account settings", () => {
       fn.mockResolvedValue({ deletedCount: 1 });
     });
     mocks.deleteS3Object.mockResolvedValue(undefined);
+    mocks.prepareComplimentaryCleanupForDeletion.mockResolvedValue(undefined);
     mocks.mealLogFind.mockResolvedValue([]);
     mocks.mealScanFind.mockResolvedValue([]);
     mocks.progressPhotoFind.mockResolvedValue([]);
@@ -306,6 +313,21 @@ describe("user service account settings", () => {
     expect(mocks.modelDeleteMany.ReferralClaimModel).toHaveBeenCalledWith({
       userId,
     });
+    expect(
+      mocks.prepareComplimentaryCleanupForDeletion,
+    ).toHaveBeenCalledWith(expect.objectContaining({ _id: userId }));
+    const cleanupOrder =
+      mocks.prepareComplimentaryCleanupForDeletion.mock.invocationCallOrder[0]!;
+    expect(
+      Math.max(
+        ...Object.values(mocks.modelDeleteMany).map(
+          (mock) => mock.mock.invocationCallOrder[0]!,
+        ),
+      ),
+    ).toBeLessThan(cleanupOrder);
+    expect(cleanupOrder).toBeLessThan(
+      mocks.userDeleteOne.mock.invocationCallOrder[0]!,
+    );
     expect(mocks.userDeleteOne).toHaveBeenCalledWith({ _id: userId });
   });
 });

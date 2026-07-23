@@ -17,7 +17,7 @@
 //   make a future worker a drop-in addition.
 
 import { createHmac, randomUUID } from "node:crypto";
-import type { AccessDecision } from "@pepta/shared";
+import type { AccessDecision, AuthProvider } from "@pepta/shared";
 import { env } from "../config/env";
 import { logger } from "../lib/logger";
 import { ValidationError } from "../lib/errors";
@@ -35,6 +35,7 @@ import {
   registerComplimentaryResolver,
 } from "./access-decision.service";
 import { reconcileUserEntitlement } from "./entitlement-reconciler.service";
+import { normalizeEmail } from "./provider-identity-binding.service";
 import {
   getSubscriber,
   grantPromotionalEntitlement,
@@ -49,9 +50,7 @@ const MAX_AUTO_ATTEMPTS = 8;
 const BACKOFF_BASE_MS = 5_000;
 const BACKOFF_CAP_MS = 15 * 60 * 1000;
 
-export function normalizeEmail(raw: string): string {
-  return raw.trim().toLowerCase();
-}
+export { normalizeEmail };
 
 export function maskEmail(email: string): string {
   const [local, domain] = email.split("@");
@@ -159,24 +158,49 @@ function backoffMs(attempt: number): number {
   return Math.round(exp * (0.75 + Math.random() * 0.5));
 }
 
-function verifiedGoogleEmail(user: UserDocument): string | undefined {
-  return user.authProviders.find(
-    (p) => p.provider === "google" && p.verifiedEmailNormalized,
-  )?.verifiedEmailNormalized;
+/**
+ * Every provider-specific verified email on this user (Google and Apple).
+ * These are the ONLY identities that can claim an invitation automatically —
+ * the mutable account email and top-level emailVerified flag never qualify.
+ * Binding itself lives in provider-identity-binding.service.
+ */
+interface VerifiedProviderProof {
+  provider: AuthProvider;
+  email: string;
 }
 
-/** Written only from a live, verified Google token (auth service calls this). */
-export async function bindVerifiedGoogleEmail(
-  user: UserDocument,
-  email: string,
-): Promise<void> {
-  const normalized = normalizeEmail(email);
-  const entry = user.authProviders.find((p) => p.provider === "google");
-  if (!entry) return;
-  if (entry.verifiedEmailNormalized === normalized) return;
-  entry.verifiedEmailNormalized = normalized;
-  entry.emailVerifiedAt = new Date();
-  await user.save();
+function verifiedProviderProofs(user: UserDocument): VerifiedProviderProof[] {
+  const proofs = new Map<string, VerifiedProviderProof>();
+  for (const provider of user.authProviders) {
+    if (provider.verifiedEmailNormalized) {
+      const proof = {
+        provider: provider.provider,
+        email: provider.verifiedEmailNormalized,
+      };
+      proofs.set(`${proof.provider}:${proof.email}`, proof);
+    }
+  }
+  return [...proofs.values()];
+}
+
+/** Complete operator-link metadata — a bare userId can never bypass proof. */
+function hasCompleteLinkMetadata(grant: ComplimentaryAccessGrantDocument): boolean {
+  return (
+    grant.identityLinkProvider === "apple" &&
+    grant.identityLinkedAt != null &&
+    typeof grant.identityLinkedBy === "string" &&
+    grant.identityLinkedBy.length > 0 &&
+    typeof grant.identityLinkReason === "string" &&
+    grant.identityLinkReason.length > 0
+  );
+}
+
+function identityVerificationDecision(): AccessDecision {
+  return {
+    state: "identity_verification_required",
+    provider: "google",
+    reason: "invited_email_requires_verified_google",
+  };
 }
 
 function provisioningDecision(): AccessDecision {
@@ -286,12 +310,17 @@ async function acquireAttempt(
   grantId: unknown,
   fromStatus: "pending" | "retryable_failure" | "provisioning",
   patch: Record<string, unknown>,
+  // Atomic ownership recheck (Apple design §Automatic Claim): the winning
+  // update re-asserts who may claim, so a concurrent link/claim cannot be
+  // overwritten after the in-memory checks ran.
+  ownershipFilter: Record<string, unknown> = {},
 ): Promise<ComplimentaryAccessGrantDocument | null> {
   const now = new Date();
   return ComplimentaryAccessGrantModel.findOneAndUpdate(
     {
       _id: grantId,
       status: fromStatus,
+      ...ownershipFilter,
       $and: [
         {
           $or: [{ nextAttemptAt: { $exists: false } }, { nextAttemptAt: { $lte: now } }],
@@ -322,62 +351,156 @@ async function acquireAttempt(
 export async function resolveComplimentaryAccessForUser(
   user: UserDocument,
 ): Promise<AccessDecision | null> {
-  const googleEmail = verifiedGoogleEmail(user);
-  const grant =
-    (await ComplimentaryAccessGrantModel.findOne({ userId: user._id })) ??
-    (googleEmail
-      ? await ComplimentaryAccessGrantModel.findOne({
-          emailNormalized: googleEmail,
-          status: "pending",
-        })
-      : null);
+  const proofs = verifiedProviderProofs(user);
+  const proofEmails = [...new Set(proofs.map((proof) => proof.email))];
 
-  // A matching PENDING invite exists for the account email, but the session
-  // lacks Google-specific proof → guide to Google verification, never paywall.
-  if (!grant && user.email) {
-    const byAccountEmail = await ComplimentaryAccessGrantModel.findOne({
-      emailNormalized: normalizeEmail(user.email),
+  // Precedence 1+2 (Apple design §Resolver Precedence): a grant already
+  // attached to this userId — claimed sagas, terminal states, or a pending
+  // operator link — always outranks email matching.
+  const owned = await ComplimentaryAccessGrantModel.findOne({ userId: user._id });
+  if (owned) return resolveOwnedGrant(owned, user, proofs);
+
+  // Precedence 3: pending, UNLINKED invitations matching any provider proof.
+  // Deterministic: multiple matches fail closed with a conflict audit rather
+  // than letting findOne pick arbitrarily.
+  if (proofs.length > 0) {
+    const matches = await ComplimentaryAccessGrantModel.find({
+      emailNormalized: { $in: proofEmails },
       status: "pending",
-    });
-    if (byAccountEmail && !googleEmail) {
-      return {
-        state: "identity_verification_required",
-        provider: "google",
-        reason: "invited_email_requires_verified_google",
-      };
+      userId: { $exists: false },
+    }).limit(2);
+    if (matches.length > 1) {
+      await audit({
+        actor: "system",
+        reason:
+          "multiple pending invitations match one user's provider proofs — operator must revoke the duplicate",
+        subject: maskEmail(matches[0]!.emailNormalized),
+      });
+      return unavailableDecisionForApproved();
+    }
+    const match = matches[0];
+    const proof = match
+      ? proofs.find((candidate) => candidate.email === match.emailNormalized)
+      : undefined;
+    if (match && proof) {
+      return claimPendingByProof(match, user, proof.provider);
     }
   }
 
-  if (!grant) return null;
+  // A pending invite matches the mutable ACCOUNT email but no provider proof
+  // exists → guide to provider verification, never a paywall.
+  if (user.email) {
+    const byAccountEmail = await ComplimentaryAccessGrantModel.findOne({
+      emailNormalized: normalizeEmail(user.email),
+      status: "pending",
+      userId: { $exists: false },
+    });
+    if (
+      byAccountEmail &&
+      !proofEmails.includes(normalizeEmail(user.email))
+    ) {
+      return identityVerificationDecision();
+    }
+  }
 
+  return null;
+}
+
+/**
+ * Claim a pending, unlinked invitation proven by a provider email. The
+ * atomic filter re-asserts that the invitation is still unlinked, so a
+ * concurrent operator link or another session's claim cannot be overwritten.
+ */
+async function claimPendingByProof(
+  grant: ComplimentaryAccessGrantDocument,
+  user: UserDocument,
+  provider: AuthProvider,
+): Promise<AccessDecision> {
+  if (!isRevenueCatConfigured()) return unavailableDecisionForApproved();
+
+  // Consume-then-claim (see file header): tombstone first, then the
+  // single-winner transition pending → provisioning.
+  await insertRedemption(grant.emailNormalized, grant.category);
+  const requestedAt = new Date();
+  const claimed = await acquireAttempt(
+    grant._id,
+    "pending",
+    {
+      userId: user._id,
+      claimedAt: requestedAt,
+      requestedAt,
+      operationId: randomUUID(),
+      expiresAt: addUtcCalendarMonths(requestedAt, grant.durationMonths),
+    },
+    {
+      userId: { $exists: false },
+      emailNormalized: grant.emailNormalized,
+    },
+  );
+  if (!claimed) return provisioningDecision(); // another caller won
+  await audit({
+    grant: claimed,
+    previousStatus: "pending",
+    nextStatus: "provisioning",
+    actor: "authentication",
+    reason: `claimed via ${provider} provider-verified email`,
+  });
+  return provision(claimed, user, "authentication");
+}
+
+/** Resolve a grant already attached to this user (any lifecycle status). */
+async function resolveOwnedGrant(
+  grant: ComplimentaryAccessGrantDocument,
+  user: UserDocument,
+  proofs: VerifiedProviderProof[],
+): Promise<AccessDecision | null> {
   switch (grant.status) {
     case "pending": {
-      if (!googleEmail || googleEmail !== grant.emailNormalized) {
-        return {
-          state: "identity_verification_required",
-          provider: "google",
-          reason: "invited_email_requires_verified_google",
-        };
-      }
+      // A pending grant with userId is claimable only through the complete
+      // operator link metadata or a current provider proof of the invitation
+      // email. A bare userId written any other way cannot bypass validation.
+      const matchingProof = proofs.find(
+        (proof) => proof.email === grant.emailNormalized,
+      );
+      const provable =
+        hasCompleteLinkMetadata(grant) || matchingProof != null;
+      if (!provable) return identityVerificationDecision();
       if (!isRevenueCatConfigured()) return unavailableDecisionForApproved();
 
-      // Consume-then-claim (see file header): tombstone first, then the
-      // single-winner transition pending → provisioning.
       await insertRedemption(grant.emailNormalized, grant.category);
       const requestedAt = new Date();
-      const claimed = await acquireAttempt(grant._id, "pending", {
-        userId: user._id,
-        claimedAt: requestedAt,
-        requestedAt,
-        operationId: randomUUID(),
-        expiresAt: addUtcCalendarMonths(requestedAt, grant.durationMonths),
-      });
-      if (!claimed) return provisioningDecision(); // another caller won
+      const ownership = hasCompleteLinkMetadata(grant)
+        ? {
+            userId: user._id,
+            identityLinkProvider: "apple",
+            identityLinkedAt: grant.identityLinkedAt,
+            identityLinkedBy: grant.identityLinkedBy,
+            identityLinkReason: grant.identityLinkReason,
+          }
+        : {
+            userId: user._id,
+            emailNormalized: grant.emailNormalized,
+          };
+      const claimed = await acquireAttempt(
+        grant._id,
+        "pending",
+        {
+          claimedAt: requestedAt,
+          requestedAt,
+          operationId: randomUUID(),
+          expiresAt: addUtcCalendarMonths(requestedAt, grant.durationMonths),
+        },
+        ownership,
+      );
+      if (!claimed) return provisioningDecision();
       await audit({
         grant: claimed,
         previousStatus: "pending",
         nextStatus: "provisioning",
         actor: "authentication",
+        reason: hasCompleteLinkMetadata(grant)
+          ? "claimed via operator Apple link"
+          : `claimed via ${matchingProof?.provider ?? "unknown"} provider-verified email`,
       });
       return provision(claimed, user, "authentication");
     }
@@ -461,12 +584,23 @@ export async function createInvite(input: InviteInput): Promise<{
   });
   await audit({ grant, nextStatus: "pending", actor: "admin", reason: input.reason });
 
-  // Existing user with the exact verified Google binding → provision now.
-  const user = await UserModel.findOne({
-    authProviders: {
-      $elemMatch: { provider: "google", verifiedEmailNormalized: emailNormalized },
-    },
-  });
+  // Existing user with the exact provider-verified binding (Google or Apple)
+  // → provision now. Deterministic: multiple matching users leave the
+  // invitation pending with a conflict audit — never an arbitrary pick.
+  const users = await UserModel.find({
+    authProviders: { $elemMatch: { verifiedEmailNormalized: emailNormalized } },
+  }).limit(2);
+  if (users.length > 1) {
+    await audit({
+      grant,
+      actor: "admin",
+      reason:
+        "invitation email matches multiple provider-verified users — left pending for operator review",
+      subject: maskEmail(emailNormalized),
+    });
+    return { status: "pending", alreadyExisted: false, provisionedImmediately: false };
+  }
+  const user = users[0];
   if (user) {
     const decision = await resolveComplimentaryAccessForUser(user);
     return {
@@ -477,6 +611,160 @@ export async function createInvite(input: InviteInput): Promise<{
   }
 
   return { status: "pending", alreadyExisted: false, provisionedImmediately: false };
+}
+
+// ── Operator-authorized Apple private-relay link ─────────────────────────────
+
+export interface LinkAppleInviteInput {
+  inviteEmail: string;
+  accountEmail: string;
+  operator: string;
+  reason: string;
+  dryRun?: boolean;
+}
+
+export interface LinkAppleInviteResult {
+  status: string;
+  linked: boolean;
+  alreadyLinked: boolean;
+}
+
+/**
+ * Attach a pending real-email invitation to one existing, trusted
+ * Apple-authenticated account (Apple design §Operator-Authorized Apple Link).
+ * Linking never starts the clock: `claimedAt`/`requestedAt`/`operationId`/
+ * `expiresAt` stay absent until the normal saga provisions. Trusted evidence
+ * only — the Apple provider entry's subject-bound verified email, or (legacy)
+ * a verified top-level email on an Apple-ONLY account. Never a profile email
+ * on a request body, and never a Google-linked account.
+ */
+export async function linkAppleInvite(
+  input: LinkAppleInviteInput,
+): Promise<LinkAppleInviteResult> {
+  const inviteEmail = normalizeEmail(input.inviteEmail);
+  const accountEmail = normalizeEmail(input.accountEmail);
+  if (!inviteEmail.includes("@") || !accountEmail.includes("@")) {
+    throw new ValidationError("Valid invite and account emails are required");
+  }
+  if (!input.operator.trim() || !input.reason.trim()) {
+    throw new ValidationError("Operator and reason are required audit inputs");
+  }
+
+  const grant = await ComplimentaryAccessGrantModel.findOne({
+    emailNormalized: inviteEmail,
+  });
+  if (!grant) throw new ValidationError("No invitation exists for that email");
+
+  // Trusted-evidence account lookup, both paths, deterministic.
+  const byAppleProof = await UserModel.find({
+    authProviders: {
+      $elemMatch: { provider: "apple", verifiedEmailNormalized: accountEmail },
+    },
+  }).limit(2);
+  const byLegacyEmail = await UserModel.find({
+    email: accountEmail,
+    emailVerified: true,
+    "authProviders.provider": { $ne: "google" },
+    authProviders: { $elemMatch: { provider: "apple" } },
+  }).limit(2);
+  const candidates = new Map<string, UserDocument>();
+  for (const candidate of [...byAppleProof, ...byLegacyEmail]) {
+    candidates.set(String(candidate._id), candidate);
+  }
+  if (candidates.size === 0) {
+    throw new ValidationError(
+      "No Apple-authenticated account matches that email through trusted evidence",
+    );
+  }
+  if (candidates.size > 1) {
+    throw new ValidationError(
+      "Multiple accounts match that email — refusing to guess; resolve manually",
+    );
+  }
+  const user = [...candidates.values()][0]!;
+
+  // Idempotency BEFORE the pending-status requirement: same-user replay at any
+  // lifecycle status returns the current state without mutating anything.
+  if (grant.userId != null) {
+    if (String(grant.userId) === String(user._id)) {
+      return { status: grant.status, linked: true, alreadyLinked: true };
+    }
+    throw new ValidationError("Invitation is already attached to a different user");
+  }
+  if (grant.status !== "pending") {
+    throw new ValidationError(`Invitation is ${grant.status}, not pending`);
+  }
+
+  // One grant per user (cross-grant guard beyond the unique index).
+  const existingForUser = await ComplimentaryAccessGrantModel.findOne({
+    userId: user._id,
+  });
+  if (existingForUser) {
+    throw new ValidationError(
+      "That account is already attached to another complimentary grant",
+    );
+  }
+
+  if (input.dryRun) {
+    return {
+      status: grant.status,
+      linked: false,
+      alreadyLinked: false,
+    };
+  }
+
+  const now = new Date();
+  const linked = await ComplimentaryAccessGrantModel.findOneAndUpdate(
+    { _id: grant._id, status: "pending", userId: { $exists: false } },
+    {
+      $set: {
+        userId: user._id,
+        identityLinkProvider: "apple",
+        identityLinkedAt: now,
+        identityLinkedBy: input.operator.trim(),
+        identityLinkReason: input.reason.trim(),
+      },
+    },
+    { new: true },
+  );
+  if (!linked) {
+    // Lost a race with a concurrent claim/link — report the fresh state.
+    const fresh = await ComplimentaryAccessGrantModel.findById(grant._id);
+    if (fresh?.userId != null && String(fresh.userId) === String(user._id)) {
+      return { status: fresh.status, linked: true, alreadyLinked: true };
+    }
+    throw new ValidationError("Invitation changed concurrently — retry after review");
+  }
+  await audit({
+    grant: linked,
+    previousStatus: "pending",
+    nextStatus: "pending",
+    actor: "admin",
+    subject: `${maskEmail(inviteEmail)} ↔ ${maskEmail(accountEmail)}`,
+    reason: input.reason.trim(),
+  });
+
+  // Same resolver as post-auth resolution; provisioning only proceeds when
+  // RevenueCat is configured in THIS environment, otherwise the durable link
+  // waits for the next production /me/access/resolve.
+  if (isRevenueCatConfigured()) {
+    await resolveComplimentaryAccessForUser(user).catch((error) => {
+      logger.warn(
+        {
+          grantId: String(grant._id),
+          userId: String(user._id),
+          error: (error as Error).message,
+        },
+        "[complimentary] linked Apple invitation; provisioning will resume on access resolution",
+      );
+    });
+  }
+  const fresh = await ComplimentaryAccessGrantModel.findById(grant._id);
+  return {
+    status: fresh?.status ?? "pending",
+    linked: true,
+    alreadyLinked: false,
+  };
 }
 
 export async function revokeInvite(email: string, actorLabel: string): Promise<string> {

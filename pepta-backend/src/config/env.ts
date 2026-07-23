@@ -58,6 +58,39 @@ const envSchema = z
       'REVENUECAT_WEBHOOK_SECRET',
     ] as const;
 
+    // Complimentary-access hardening (audit H2): once the RevenueCat server
+    // key activates the access system in production, the HMAC redemption
+    // keyring is mandatory — without it, delete-and-recreate could reset the
+    // one-grant benefit. Startup fails on a missing or malformed keyring.
+    if (value.REVENUECAT_SECRET_API_KEY) {
+      if (!value.COMPLIMENTARY_ACCESS_HMAC_ACTIVE_KEY_ID || !value.COMPLIMENTARY_ACCESS_HMAC_KEYS_JSON) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['COMPLIMENTARY_ACCESS_HMAC_KEYS_JSON'],
+          message:
+            'COMPLIMENTARY_ACCESS_HMAC_ACTIVE_KEY_ID and COMPLIMENTARY_ACCESS_HMAC_KEYS_JSON are required in production when REVENUECAT_SECRET_API_KEY is set',
+        });
+      } else {
+        try {
+          const keys = JSON.parse(value.COMPLIMENTARY_ACCESS_HMAC_KEYS_JSON) as Record<string, string>;
+          const active = keys[value.COMPLIMENTARY_ACCESS_HMAC_ACTIVE_KEY_ID];
+          if (typeof active !== 'string' || Buffer.from(active, 'utf8').length < 32) {
+            context.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ['COMPLIMENTARY_ACCESS_HMAC_ACTIVE_KEY_ID'],
+              message: 'Active complimentary-access HMAC key is missing from the keyring or shorter than 32 bytes',
+            });
+          }
+        } catch {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['COMPLIMENTARY_ACCESS_HMAC_KEYS_JSON'],
+            message: 'COMPLIMENTARY_ACCESS_HMAC_KEYS_JSON is not valid JSON',
+          });
+        }
+      }
+    }
+
     for (const key of requiredProductionKeys) {
       if (!value[key]) {
         context.addIssue({

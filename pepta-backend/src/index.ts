@@ -3,6 +3,7 @@ import { connect, disconnect } from './db/mongo';
 import { env } from './config/env';
 import { logger } from './lib/logger';
 import { PepPushScheduler } from './services/pepPushScheduler.service';
+import { ComplimentaryCleanupScheduler } from './services/complimentary-access-cleanup.scheduler';
 
 export async function start(): Promise<void> {
   await connect();
@@ -11,15 +12,18 @@ export async function start(): Promise<void> {
     logger.info({ port: env.port, env: env.nodeEnv }, '[server] Pepta API listening');
   });
   const scheduler = PepPushScheduler.getInstance();
+  const cleanupScheduler = ComplimentaryCleanupScheduler.getInstance();
 
   if (!env.isTest) {
     scheduler.start();
+    cleanupScheduler.start();
   }
 
   const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
     logger.info({ signal }, '[server] shutting down');
     server.close(async () => {
       scheduler.stop();
+      cleanupScheduler.stop();
       await disconnect();
       process.exit(0);
     });

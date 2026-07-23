@@ -1,5 +1,29 @@
 import request from "supertest";
-import { beforeEach, describe, expect, it } from "vitest";
+import type { RequestHandler } from "express";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const mocks = vi.hoisted(() => ({
+  deleteCurrentUser: vi.fn(),
+  requireActiveAccess: vi.fn(),
+  resolveAccess: vi.fn(),
+}));
+
+vi.mock("../middleware/require-active-access", () => ({
+  requireActiveAccess: mocks.requireActiveAccess,
+}));
+
+vi.mock("../services/access-decision.service", async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import("../services/access-decision.service")
+  >()),
+  resolveAccess: mocks.resolveAccess,
+}));
+
+vi.mock("../services/user.service", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../services/user.service")>()),
+  deleteCurrentUser: mocks.deleteCurrentUser,
+}));
+
 import { createApp } from "../app";
 import { issueSessionJwt } from "../auth/jwt";
 import { env } from "../config/env";
@@ -8,6 +32,14 @@ import { resetRateLimitStore } from "../middleware/rate-limit.middleware";
 describe("Pepta app", () => {
   beforeEach(() => {
     resetRateLimitStore();
+    mocks.requireActiveAccess.mockReset();
+    mocks.requireActiveAccess.mockImplementation(
+      ((_req, _res, next) => next()) as RequestHandler,
+    );
+    mocks.resolveAccess.mockReset();
+    mocks.resolveAccess.mockResolvedValue({ state: "inactive" });
+    mocks.deleteCurrentUser.mockReset();
+    mocks.deleteCurrentUser.mockResolvedValue(undefined);
   });
 
   it("serves the public health check", async () => {
@@ -162,5 +194,91 @@ describe("Pepta app", () => {
 
     expect(response.body.error.code).toBe("RATE_LIMITED");
     expect(response.headers["retry-after"]).toBeDefined();
+  });
+});
+
+describe("access route matrix (audit H3)", () => {
+  const app = () => createApp({ healthCheck: async () => true });
+  const token = issueSessionJwt("507f1f77bcf86cd799439012");
+
+  const premiumRoutes = [
+    "/home",
+    "/track",
+    "/progress",
+    "/medication-level",
+    "/coach/notes",
+    "/insights",
+    "/weekly-retention",
+    "/diagnostics",
+    "/meal-scans",
+    "/compounds",
+    "/cycles",
+    "/schedules",
+    "/dose-logs",
+    "/weight-logs",
+    "/meal-logs",
+    "/water-logs",
+    "/protein-logs",
+    "/fiber-logs",
+    "/activity-logs",
+    "/side-effect-logs",
+    "/measurements",
+    "/research-library",
+    "/progress-photos",
+  ];
+
+  beforeEach(() => {
+    resetRateLimitStore();
+    mocks.requireActiveAccess.mockReset();
+    mocks.requireActiveAccess.mockImplementation(
+      ((_req, res) =>
+        res.status(403).json({
+          error: {
+            code: "ENTITLEMENT_REQUIRED",
+            message: "Premium access is required",
+          },
+        })) as RequestHandler,
+    );
+    mocks.resolveAccess.mockReset();
+    mocks.resolveAccess.mockResolvedValue({ state: "inactive" });
+    mocks.deleteCurrentUser.mockReset();
+    mocks.deleteCurrentUser.mockResolvedValue(undefined);
+  });
+
+  it.each(premiumRoutes)("%s reaches the persisted premium guard", async (route) => {
+    const response = await request(app())
+      .get(route)
+      .set("authorization", `Bearer ${token}`);
+
+    expect(response.status).toBe(403);
+    expect(response.body.error.code).toBe("ENTITLEMENT_REQUIRED");
+    expect(mocks.requireActiveAccess).toHaveBeenCalled();
+  });
+
+  it("keeps the recovery/account allowlist reachable without premium access", async () => {
+    await request(app()).get("/healthz").expect(200);
+    await request(app()).get("/legal/privacy").expect(200);
+    await request(app()).post("/auth/google").send({}).expect(400);
+    await request(app()).post("/webhooks/revenuecat").send({}).expect(503);
+    await request(app())
+      .post("/me/access/resolve")
+      .set("authorization", `Bearer ${token}`)
+      .expect(200);
+    await request(app())
+      .post("/onboarding/complete")
+      .set("authorization", `Bearer ${token}`)
+      .send({})
+      .expect(400);
+    await request(app())
+      .post("/referrals/claim")
+      .set("authorization", `Bearer ${token}`)
+      .send({})
+      .expect(400);
+    await request(app())
+      .delete("/me/account")
+      .set("authorization", `Bearer ${token}`)
+      .expect(204);
+
+    expect(mocks.requireActiveAccess).not.toHaveBeenCalled();
   });
 });

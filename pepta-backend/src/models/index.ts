@@ -6,6 +6,8 @@ export * from './pep-memory.model';
 export * from './pep-push-delivery.model';
 export * from './product-cache.model';
 export * from './push-token.model';
+export * from './complimentary-access-cleanup.model';
+export * from './complimentary-access.model';
 export * from './referral.model';
 export * from './user-profile.model';
 export * from './user.model';

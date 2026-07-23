@@ -219,15 +219,21 @@ export async function resolveAccess(userId: string): Promise<AccessDecision> {
 
   // Complimentary invitations first: an approved creator must resolve to
   // provisioning/active — never fall through to a paywall-bound inactive.
+  // A resolver FAILURE is not the same as "no complimentary state": an
+  // exception fails closed to temporarily_unavailable, because converting it
+  // into standard resolution could route an approved user to the paywall
+  // during a database blip (audit finding C1).
   if (complimentaryResolver) {
-    const complimentary = await complimentaryResolver(user).catch((error) => {
+    try {
+      const complimentary = await complimentaryResolver(user);
+      if (complimentary) return complimentary;
+    } catch (error) {
       logger.warn(
         { userId, error: (error as Error).message },
-        "[access-decision] complimentary resolution failed",
+        "[access-decision] complimentary resolution failed — failing closed",
       );
-      return null;
-    });
-    if (complimentary) return complimentary;
+      return { state: "temporarily_unavailable", retryAfterMs: UNAVAILABLE_RETRY_MS };
+    }
   }
 
   if (isRevenueCatConfigured()) {

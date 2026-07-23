@@ -40,6 +40,11 @@ export interface ComplimentaryAccessGrantDocument
   lastErrorCode?: string;
   leaseId?: string;
   leaseExpiresAt?: Date;
+  // Operator-authorized Apple private-relay link (absent unless linked).
+  identityLinkProvider?: "apple";
+  identityLinkedAt?: Date;
+  identityLinkedBy?: string;
+  identityLinkReason?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -70,6 +75,10 @@ const grantSchema = new Schema<ComplimentaryAccessGrantDocument>(
     lastErrorCode: { type: String, trim: true },
     leaseId: { type: String, trim: true },
     leaseExpiresAt: { type: Date },
+    identityLinkProvider: { type: String, enum: ["apple"] },
+    identityLinkedAt: { type: Date },
+    identityLinkedBy: { type: String, trim: true },
+    identityLinkReason: { type: String, trim: true },
   },
   { timestamps: true, versionKey: false },
 );
