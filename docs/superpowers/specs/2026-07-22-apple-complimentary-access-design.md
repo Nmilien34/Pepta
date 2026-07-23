@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-22
 
-**Status:** Audited design; awaiting final written-spec approval before implementation planning.
+**Status:** Approved for full implementation on 2026-07-23.
 
 **Goal:** Extend Pepta's existing complimentary-access system so an exact Apple-verified email can claim an invitation automatically, while an operator can securely link a Sign in with Apple private-relay account to a pre-approved real-email invitation. The change must work with the already-uploaded iOS build 18 and preserve the existing three-month, RevenueCat, audit, retry, and paid-subscription invariants.
 
