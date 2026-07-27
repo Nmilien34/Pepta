@@ -70,7 +70,7 @@ export function MeetPepScreen({ progress, onBack, onContinue }: MeetPepScreenPro
     <ConvoScreen
       progress={progress}
       onBack={onBack}
-      context="That’s settled."
+      context="Glad you’re here."
       question="Now — meet Pep"
       questionAccent
       sub="Your guide in here. Pep turns your answers into your plan — and explains any number you ever wonder about."

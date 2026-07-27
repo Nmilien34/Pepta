@@ -84,6 +84,15 @@
   .signout{margin-top:14px;border-radius:16px;padding:15px;text-align:center;font-weight:800;font-size:15px;color:var(--danger)}
   .ver{text-align:center;font-size:12px;color:var(--ter);font-weight:600;margin-top:16px}
 
+  /* ── Quick-access hub tiles (Peptide-Pal-inspired, Pepta idiom) ── */
+  .tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+  .tile{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:14px 14px 13px;box-shadow:0 1px 2px rgba(20,18,30,.05),0 8px 22px -18px rgba(20,18,30,.22);display:flex;flex-direction:column;align-items:flex-start}
+  .tile .chip{width:36px;height:36px;border-radius:12px;font-size:19px;margin-bottom:10px}
+  .tile b{font-size:15px;font-weight:800;letter-spacing:-.2px}
+  .tile span{font-size:11.5px;color:var(--sec);font-weight:600;line-height:1.4;margin-top:3px}
+  .tag.rec{background:#E3F4E9;color:#1F7A44}
+  .tag.alt2{background:#EDEDF1;color:#5A5964}
+
   /* ── BEFORE-only overrides: the arbitrary pastel chips + noisier metrics ── */
   .before .chip{width:30px;height:30px;border-radius:9px;font-size:16px}
   .before .subs{border:.5px solid #E7DEFB;background:linear-gradient(135deg,#F3EFFF,#FBF4FF)}
@@ -228,6 +237,143 @@
 
             <div class="card signout" style="margin-top:14px;display:flex;align-items:center;justify-content:center;gap:8px"><i class="ti ti-logout" style="font-size:17px"></i>Sign out</div>
             <div class="ver">Pepta · v1.0.1</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="kicker">Quick-access hub — Peptide-Pal-inspired (2026-07-26)</div>
+  <p class="note">Peptide Pal's "Me" tab leads with big destination cards (My Protocols / My Vials / My Health). Ported to Pepta's idiom: a <b>2×2 tile grid of real, shipped destinations</b> — My protocol (schedule · timing · cycles), Medications (compounds + mix calculator), Peptide library, My data (CSV export · reports · photos). <b>No new screens needed — every tile deep-links to something already built.</b> Their rainbow-saturated cards are exactly what we stripped out of this screen last pass, so tiles stay on the one-chip system and earn prominence through size, not color. The planned <b>"Give a friend a discount"</b> referral row (they have it too) is previewed in place. <b>Recommendation: Variant A — tiles above the billing card.</b> Settings visits are task-driven (change a protocol, export data); utility first respects that, and the cream card is loud enough to hold third position. Variant B keeps billing at the top for maximum upgrade pressure at the cost of pushing utility below the fold.</p>
+  <p class="note"><b>Signed off &amp; shipped 2026-07-27 (Variant A)</b> in <code>src/screens/app/AccountScreen.tsx</code>, with two honesty deviations from these frames: tile 2 ships as <b>“Mix calculator · Vial + water → units”</b> rather than “Medications”, because there is no distinct Medications screen — compounds are managed through the protocol screen and AddCompoundSheet, so a “Medications” label would not match its destination; and tile 4 <b>“My data”</b> reads “Exports · reports · widgets” (what the Data &amp; reports section actually contains) and <b>scrolls to that section</b> rather than pushing a screen. The <b>“Give a friend a discount”</b> row is <b>NOT shipped</b> — it stays a preview here until the referral feature exists (that work is blocked on Apple offer codes); shipping a dead row would violate the no-fake-nav rule. The peptide count is derived from <code>LIBRARY_ENTRIES.length</code>, never hardcoded.</p>
+
+  <div class="frames">
+
+    <!-- ══════════ VARIANT A — tiles ABOVE billing (recommended) ══════════ -->
+    <div class="col">
+      <span class="tag rec">A — Tiles above billing · SHIPPED 2026-07-27</span>
+      <div class="phone after">
+        <div class="screen">
+          <div class="statusbar"><span class="t">9:41</span><span class="r"><i class="ti ti-signal-4g"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3"></i></span></div>
+          <div class="body">
+            <div class="scr-title">Settings</div>
+
+            <div class="card profile" style="margin-top:16px">
+              <div class="av">N</div>
+              <div style="flex:1"><div class="nm">Nickson</div><div class="sub">Day 34 · Tirzepatide · lb · in</div></div>
+              <i class="ti ti-chevron-right chev"></i>
+            </div>
+
+            <div class="tiles">
+              <div class="tile"><div class="chip"><i class="ti ti-calendar-time"></i></div><b>My protocol</b><span>Schedule · timing · cycles</span></div>
+              <div class="tile"><div class="chip"><i class="ti ti-vaccine"></i></div><b>Medications</b><span>Compounds &amp; mix calculator</span></div>
+              <div class="tile"><div class="chip"><i class="ti ti-books"></i></div><b>Peptide library</b><span>28 peptides · evidence-ranked</span></div>
+              <div class="tile"><div class="chip"><i class="ti ti-file-export"></i></div><b>My data</b><span>CSV export · reports · photos</span></div>
+            </div>
+
+            <div class="subs2">
+              <div class="txt">
+                <div class="t">Pepta Plus</div>
+                <div class="tap">Tap to manage subscription</div>
+                <div class="feat">✨ Levels, muscle &amp; insights</div>
+              </div>
+              <svg class="pep" viewBox="0 0 120 142" xmlns="http://www.w3.org/2000/svg">
+                <defs><linearGradient id="qbB" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9C82FF"/><stop offset="1" stop-color="#6E4EF0"/></linearGradient></defs>
+                <rect x="34" y="1" width="52" height="7" rx="3.5" fill="#6E4EF0"/>
+                <rect x="55" y="6" width="10" height="10" rx="3" fill="#7C5CFC"/>
+                <rect x="27" y="14" width="66" height="112" rx="33" fill="url(#qbB)"/>
+                <path d="M27 70 a33 33 0 0 0 66 0 v23 a33 33 0 0 1 -66 0 Z" fill="#0E0E12" opacity=".07"/>
+                <ellipse cx="48" cy="38" rx="15" ry="11" fill="#fff" opacity=".28"/>
+                <ellipse cx="50" cy="64" rx="8" ry="9" fill="#fff"/><ellipse cx="74" cy="64" rx="8" ry="9" fill="#fff"/>
+                <circle cx="51.5" cy="66" r="3.7" fill="#1A1430"/><circle cx="75.5" cy="66" r="3.7" fill="#1A1430"/>
+                <circle cx="53" cy="64.5" r="1.3" fill="#fff"/><circle cx="77" cy="64.5" r="1.3" fill="#fff"/>
+                <ellipse cx="39" cy="80" rx="6" ry="3.8" fill="#FF9CB6" opacity=".6"/><ellipse cx="85" cy="80" rx="6" ry="3.8" fill="#FF9CB6" opacity=".6"/>
+                <path d="M53 81 q7 6.5 14 0" stroke="#1A1430" stroke-width="3.2" fill="none" stroke-linecap="round"/>
+                <g stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".6"><line x1="33" y1="94" x2="47" y2="94"/><line x1="33" y1="101" x2="42" y2="101"/><line x1="33" y1="108" x2="47" y2="108"/><line x1="33" y1="115" x2="42" y2="115"/><line x1="33" y1="122" x2="47" y2="122"/></g>
+              </svg>
+            </div>
+
+            <div class="card" style="margin-top:12px">
+              <div class="row"><div class="chip"><i class="ti ti-gift"></i></div><div class="label">Give a friend a discount</div><span class="badge">Next up</span><i class="ti ti-chevron-right chev"></i></div>
+            </div>
+
+            <div class="sec-h">Your plan</div>
+            <div class="card">
+              <div class="row"><div class="chip"><i class="ti ti-flag-3"></i></div><div class="label">Goal</div><div class="val">176 lb · Steady</div><i class="ti ti-chevron-right chev"></i></div>
+              <div class="row"><div class="chip"><i class="ti ti-flame"></i></div><div class="label">Daily targets</div><div class="val">145g protein</div><i class="ti ti-chevron-right chev"></i></div>
+              <div class="row"><div class="chip"><i class="ti ti-camera"></i></div><div class="label">Photo day</div><div class="val">Shot day</div><i class="ti ti-chevron-right chev"></i></div>
+            </div>
+
+            <div class="sec-h">Preferences</div>
+            <div class="card">
+              <div class="row"><div class="chip"><i class="ti ti-ruler-2"></i></div><div class="label">Units</div><div class="val">Imperial</div><i class="ti ti-chevron-right chev"></i></div>
+              <div class="row"><div class="chip"><i class="ti ti-vaccine"></i></div><div class="label">Dose units</div><div class="val">mg</div><i class="ti ti-chevron-right chev"></i></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ VARIANT B — tiles BELOW billing ══════════ -->
+    <div class="col">
+      <span class="tag alt2">B — Tiles below billing · not chosen</span>
+      <div class="phone after">
+        <div class="screen">
+          <div class="statusbar"><span class="t">9:41</span><span class="r"><i class="ti ti-signal-4g"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3"></i></span></div>
+          <div class="body">
+            <div class="scr-title">Settings</div>
+
+            <div class="card profile" style="margin-top:16px">
+              <div class="av">N</div>
+              <div style="flex:1"><div class="nm">Nickson</div><div class="sub">Day 34 · Tirzepatide · lb · in</div></div>
+              <i class="ti ti-chevron-right chev"></i>
+            </div>
+
+            <div class="subs2">
+              <div class="txt">
+                <div class="t">Pepta Plus</div>
+                <div class="tap">Tap to manage subscription</div>
+                <div class="feat">✨ Levels, muscle &amp; insights</div>
+              </div>
+              <svg class="pep" viewBox="0 0 120 142" xmlns="http://www.w3.org/2000/svg">
+                <defs><linearGradient id="qbC" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9C82FF"/><stop offset="1" stop-color="#6E4EF0"/></linearGradient></defs>
+                <rect x="34" y="1" width="52" height="7" rx="3.5" fill="#6E4EF0"/>
+                <rect x="55" y="6" width="10" height="10" rx="3" fill="#7C5CFC"/>
+                <rect x="27" y="14" width="66" height="112" rx="33" fill="url(#qbC)"/>
+                <path d="M27 70 a33 33 0 0 0 66 0 v23 a33 33 0 0 1 -66 0 Z" fill="#0E0E12" opacity=".07"/>
+                <ellipse cx="48" cy="38" rx="15" ry="11" fill="#fff" opacity=".28"/>
+                <ellipse cx="50" cy="64" rx="8" ry="9" fill="#fff"/><ellipse cx="74" cy="64" rx="8" ry="9" fill="#fff"/>
+                <circle cx="51.5" cy="66" r="3.7" fill="#1A1430"/><circle cx="75.5" cy="66" r="3.7" fill="#1A1430"/>
+                <circle cx="53" cy="64.5" r="1.3" fill="#fff"/><circle cx="77" cy="64.5" r="1.3" fill="#fff"/>
+                <ellipse cx="39" cy="80" rx="6" ry="3.8" fill="#FF9CB6" opacity=".6"/><ellipse cx="85" cy="80" rx="6" ry="3.8" fill="#FF9CB6" opacity=".6"/>
+                <path d="M53 81 q7 6.5 14 0" stroke="#1A1430" stroke-width="3.2" fill="none" stroke-linecap="round"/>
+                <g stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".6"><line x1="33" y1="94" x2="47" y2="94"/><line x1="33" y1="101" x2="42" y2="101"/><line x1="33" y1="108" x2="47" y2="108"/><line x1="33" y1="115" x2="42" y2="115"/><line x1="33" y1="122" x2="47" y2="122"/></g>
+              </svg>
+            </div>
+
+            <div class="tiles">
+              <div class="tile"><div class="chip"><i class="ti ti-calendar-time"></i></div><b>My protocol</b><span>Schedule · timing · cycles</span></div>
+              <div class="tile"><div class="chip"><i class="ti ti-vaccine"></i></div><b>Medications</b><span>Compounds &amp; mix calculator</span></div>
+              <div class="tile"><div class="chip"><i class="ti ti-books"></i></div><b>Peptide library</b><span>28 peptides · evidence-ranked</span></div>
+              <div class="tile"><div class="chip"><i class="ti ti-file-export"></i></div><b>My data</b><span>CSV export · reports · photos</span></div>
+            </div>
+
+            <div class="card" style="margin-top:12px">
+              <div class="row"><div class="chip"><i class="ti ti-gift"></i></div><div class="label">Give a friend a discount</div><span class="badge">Next up</span><i class="ti ti-chevron-right chev"></i></div>
+            </div>
+
+            <div class="sec-h">Your plan</div>
+            <div class="card">
+              <div class="row"><div class="chip"><i class="ti ti-flag-3"></i></div><div class="label">Goal</div><div class="val">176 lb · Steady</div><i class="ti ti-chevron-right chev"></i></div>
+              <div class="row"><div class="chip"><i class="ti ti-flame"></i></div><div class="label">Daily targets</div><div class="val">145g protein</div><i class="ti ti-chevron-right chev"></i></div>
+              <div class="row"><div class="chip"><i class="ti ti-camera"></i></div><div class="label">Photo day</div><div class="val">Shot day</div><i class="ti ti-chevron-right chev"></i></div>
+            </div>
+
+            <div class="sec-h">Preferences</div>
+            <div class="card">
+              <div class="row"><div class="chip"><i class="ti ti-ruler-2"></i></div><div class="label">Units</div><div class="val">Imperial</div><i class="ti ti-chevron-right chev"></i></div>
+            </div>
           </div>
         </div>
       </div>

@@ -65,6 +65,27 @@
   .today{display:inline-flex;align-items:center;gap:5px;padding:7px 11px;border-radius:999px;background:var(--surface);border:.5px solid var(--hair);box-shadow:var(--cs);font-weight:700;font-size:13px}
   .streak{display:inline-flex;align-items:center;gap:3px;font-weight:800;font-size:15px}
   .av{width:34px;height:34px;border-radius:999px;background:var(--alt);border:.5px solid var(--hair);display:flex;align-items:center;justify-content:center;overflow:hidden}
+  /* schedule additions (week strip · month sheet · rest band) */
+  .wks{display:flex;justify-content:space-between;margin-top:12px;padding-top:12px;border-top:.5px solid var(--hair)}
+  .wkd{flex:1;text-align:center}
+  .wkd .dw{font-weight:700;font-size:10px;color:var(--tt);margin-bottom:6px}
+  .wkd .dn{width:28px;height:28px;margin:0 auto;border-radius:9px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:var(--tp)}
+  .wkd.on .dn{background:var(--primary);color:#fff}
+  .wkd .dd{width:4.5px;height:4.5px;border-radius:99px;margin:4px auto 0;background:transparent}
+  .wkd .dd.due{background:var(--primary)} .wkd .dd.log{background:var(--fiber)}
+  .cal{display:grid;grid-template-columns:repeat(7,1fr)}
+  .cal .cdw{font-weight:700;font-size:9.5px;color:var(--tt);text-align:center;padding-bottom:7px}
+  .cd{position:relative;height:36px;display:flex;flex-direction:column;align-items:center;justify-content:center}
+  .cd span{font-weight:600;font-size:12.5px;color:var(--tp)}
+  .cd.out span{color:#D9D9E0}
+  .cd.now span{color:#fff;font-weight:700}
+  .cd.now:before{content:"";position:absolute;width:27px;height:27px;border-radius:9px;background:var(--primary);z-index:-1}
+  .cd.rest{background:rgba(52,199,89,.09)}
+  .cd.rest.rs{border-radius:10px 0 0 10px}.cd.rest.re{border-radius:0 10px 10px 0}
+  .cd .dd{width:4.5px;height:4.5px;border-radius:99px;margin-top:1px}
+  .dsheet{position:absolute;left:0;right:0;bottom:0;background:var(--surface);border-radius:22px 22px 0 0;padding:14px 16px 18px;box-shadow:0 -14px 40px rgba(16,16,24,.16);z-index:5}
+  .dgrab{width:34px;height:4px;border-radius:99px;background:#E4E4EA;margin:0 auto 12px}
+  .dim{position:absolute;inset:0;background:rgba(14,14,18,.32);z-index:4}
   /* segments / steppers / bars */
   .seg{height:6px;border-radius:999px;flex:1;background:#E9E9EE}.seg.on{background:linear-gradient(90deg,var(--g1),var(--g2))}
   .stepper{display:flex;align-items:center;justify-content:space-between;background:var(--alt);border-radius:999px;padding:4px}
@@ -287,6 +308,271 @@
         </div>
       </div>
     </div>
+  </div>
+
+  <!-- ============ TRACK + SCHEDULE (NEW · minimal delta) ============ -->
+  <div class="fw"><div class="fl">Track · + schedule <span style="color:var(--primary)">(NEW — 2 additions)</span></div>
+    <div class="device"><div class="sb"><span class="tt">10:42</span><span class="ri"><i class="ti ti-antenna-bars-5"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3" style="font-size:18px"></i></span></div>
+      <div class="scr">
+        <div class="pad row bt" style="padding-top:4px"><span class="h1">Track</span><div class="row" style="gap:9px"><span class="today"><i class="ti ti-calendar" style="font-size:14px;color:var(--ts)"></i>Today</span><div class="av"><i class="ti ti-adjustments-horizontal" style="font-size:18px;color:var(--ts)"></i></div></div></div>
+        <div class="pad">
+          <div class="card mt16">
+            <div class="row bt">
+              <div><div class="row" style="gap:7px"><span class="sec">Next dose</span><span class="pill" style="background:#EFEBFF;color:var(--primary)">Week 8/8</span></div><div class="big mt8">3d 9h</div><div class="lab mt8">Sat, Jun 27 · 8:00 PM · last of this cycle</div></div>
+              <div class="ringwrap" style="width:74px;height:74px"><svg width="74" height="74" viewBox="0 0 100 100"><circle cx="50" cy="50" r="43" fill="none" stroke="#EFEFF2" stroke-width="9"/><circle cx="50" cy="50" r="43" fill="none" stroke="var(--primary)" stroke-width="9" stroke-linecap="round" stroke-dasharray="270" stroke-dashoffset="97" transform="rotate(-90 50 50)"/></svg><div class="ringtxt"><span class="sv" style="color:var(--primary);font-size:14px">64%</span></div></div>
+            </div>
+            <div class="wks">
+              <div class="wkd"><div class="dw">M</div><div class="dn">22</div><div class="dd"></div></div>
+              <div class="wkd"><div class="dw">T</div><div class="dn">23</div><div class="dd"></div></div>
+              <div class="wkd on"><div class="dw">W</div><div class="dn">24</div><div class="dd"></div></div>
+              <div class="wkd"><div class="dw">T</div><div class="dn">25</div><div class="dd"></div></div>
+              <div class="wkd"><div class="dw">F</div><div class="dn">26</div><div class="dd"></div></div>
+              <div class="wkd"><div class="dw">S</div><div class="dn">27</div><div class="dd due"></div></div>
+              <div class="wkd"><div class="dw">S</div><div class="dn">28</div><div class="dd"></div></div>
+            </div>
+          </div>
+          <div class="card mt12">
+            <div class="row bt"><span class="sec">Compounds</span><span class="link"><i class="ti ti-plus" style="font-size:13px;vertical-align:-1px"></i> Add</span></div>
+            <div class="lrow mt8"><div class="lic" style="background:#EFEBFF;color:var(--primary)"><i class="ti ti-vaccine"></i></div><div style="flex:1"><div class="nm">Tirzepatide</div><div class="lab">5 mg · weekly · half-life 5d</div></div><span class="pill" style="background:#E8F8EE;color:#1E8E40">Active</span></div>
+            <div class="lrow"><div class="lic" style="background:#E1F5EE;color:#0F6E56"><i class="ti ti-flask"></i></div><div style="flex:1"><div class="nm">BPC-157</div><div class="lab">250 mcg · daily</div></div><span class="state">Paused</span></div>
+          </div>
+          <div class="card mt12">
+            <div class="row bt"><div class="ch"><i class="ti ti-current-location ic" style="color:var(--primary)"></i><span class="nm">Injection sites</span></div><span class="link">History</span></div>
+            <div class="row" style="justify-content:space-around;margin:14px 0 6px">
+              <div style="text-align:center"><svg width="84" height="156" viewBox="0 0 80 150"><use href="#body"/><circle class="dot-used" cx="33" cy="58" r="5.5"/><circle class="dot-next" cx="47" cy="58" r="5.5"/><circle class="dot-free" cx="18" cy="44" r="5"/><circle class="dot-free" cx="62" cy="44" r="5"/><circle class="dot-used" cx="34" cy="104" r="5"/><circle class="dot-free" cx="46" cy="104" r="5"/></svg><div class="den mt8" style="font-size:11px">Front</div></div>
+              <div style="text-align:center"><svg width="84" height="156" viewBox="0 0 80 150"><use href="#body"/><circle class="dot-free" cx="18" cy="44" r="5"/><circle class="dot-free" cx="62" cy="44" r="5"/><circle class="dot-used" cx="33" cy="86" r="5.5"/><circle class="dot-free" cx="47" cy="86" r="5.5"/><circle class="dot-free" cx="34" cy="112" r="5"/><circle class="dot-free" cx="46" cy="112" r="5"/></svg><div class="den mt8" style="font-size:11px">Back</div></div>
+            </div>
+            <div class="row" style="gap:14px;justify-content:center;padding-top:6px;border-top:.5px solid var(--hair)">
+              <span class="lab"><span style="display:inline-block;width:9px;height:9px;border-radius:9px;background:var(--primary);vertical-align:0"></span> Used</span>
+              <span class="lab"><span style="display:inline-block;width:9px;height:9px;border-radius:9px;border:2px solid var(--primary);vertical-align:0"></span> Next: left abdomen</span>
+            </div>
+          </div>
+          <div class="card mt12">
+            <div class="row bt"><div class="ch"><i class="ti ti-chart-line ic" style="color:var(--primary)"></i><span class="nm">Medication level</span></div></div>
+            <div class="segctl mt12"><span class="on">7d</span><span>30d</span><span>90d</span><span>1y</span></div>
+            <svg viewBox="0 0 300 100" class="mt12" style="width:100%;height:88px"><line x1="0" y1="80" x2="300" y2="80" stroke="#F0F0F3" stroke-width="1"/><line x1="0" y1="45" x2="300" y2="45" stroke="#F0F0F3" stroke-width="1"/><path d="M0 70 C40 64 60 30 98 26 C140 22 152 58 192 62 C232 66 256 38 300 30 L300 90 L0 90 Z" fill="url(#ml)"/><path d="M0 70 C40 64 60 30 98 26 C140 22 152 58 192 62 C232 66 256 38 300 30" fill="none" stroke="#7C5CFC" stroke-width="3" stroke-linecap="round"/><circle cx="192" cy="62" r="5" fill="#7C5CFC" stroke="#fff" stroke-width="2.5"/></svg>
+            <div class="row bt mt8"><span class="lab">Current 1.42 mg</span><span class="lab">Peak 2.1 · Trough 0.9</span></div>
+          </div>
+          <div class="card mt12" style="padding:14px 16px"><div class="row bt"><div class="ch"><i class="ti ti-history" style="color:var(--ts);font-size:18px"></i><span class="nm">Dose history</span></div><i class="ti ti-chevron-right" style="color:var(--tt)"></i></div></div>
+          <div class="card mt12" style="padding:14px 16px"><div class="row bt"><div class="ch"><i class="ti ti-flask-2" style="color:var(--primary);font-size:18px"></i><span class="nm">Mix calculator</span></div><i class="ti ti-chevron-right" style="color:var(--tt)"></i></div></div>
+        </div>
+        <div class="tabbar">
+          <div class="tab"><i class="ti ti-home-2"></i><span>Home</span></div>
+          <div class="tab on"><i class="ti ti-vaccine"></i><span>Track</span></div>
+          <div class="fw2"><div class="fab"><i class="ti ti-plus"></i></div></div>
+          <div class="tab"><i class="ti ti-chart-line"></i><span>Progress</span></div>
+          <div class="tab"><i class="ti ti-user-circle"></i><span>Account</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="lab mt8" style="max-width:300px">Track delta: the cycle pill + week strip in the existing Next-dose card (tap the card → month sheet; tap the pill → Cycle setup), and one visible “Mix calculator” row in the Dose-history idiom. Purple dot = due, green = logged, none = rest. Nothing is buried in settings — both features have front doors on Track.</div>
+  </div>
+
+  <div class="fw"><div class="fl">Schedule · month sheet <span style="color:var(--primary)">(NEW)</span></div>
+    <div class="device"><div class="sb"><span class="tt">10:42</span><span class="ri"><i class="ti ti-antenna-bars-5"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3" style="font-size:18px"></i></span></div>
+      <!-- min-height: the dim/sheet layers are absolute and add no flow height,
+           so without it the device collapses to the header alone. -->
+      <div class="scr" style="min-height:726px">
+        <div class="pad row bt" style="padding-top:4px"><span class="h1">Track</span><div class="row" style="gap:9px"><span class="today"><i class="ti ti-calendar" style="font-size:14px;color:var(--ts)"></i>Today</span><div class="av"><i class="ti ti-adjustments-horizontal" style="font-size:18px;color:var(--ts)"></i></div></div></div>
+        <div class="pad"><div class="card mt16 row bt"><div><span class="sec">Next dose</span><div class="big mt8">5d 9h</div></div></div></div>
+        <div class="dim"></div>
+        <div class="dsheet">
+          <div class="dgrab"></div>
+          <div class="row bt" style="margin-bottom:10px"><span class="nm" style="font-size:17px">June 2026</span><div class="row" style="gap:14px;color:var(--ts)"><i class="ti ti-chevron-left"></i><i class="ti ti-chevron-right"></i></div></div>
+          <div class="cal">
+            <div class="cdw">M</div><div class="cdw">T</div><div class="cdw">W</div><div class="cdw">T</div><div class="cdw">F</div><div class="cdw">S</div><div class="cdw">S</div>
+            <div class="cd"><span>1</span></div><div class="cd"><span>2</span></div><div class="cd"><span>3</span></div><div class="cd"><span>4</span></div><div class="cd"><span>5</span><div class="dd" style="background:var(--fiber)"></div></div><div class="cd"><span>6</span></div><div class="cd"><span>7</span></div>
+            <div class="cd"><span>8</span></div><div class="cd"><span>9</span></div><div class="cd"><span>10</span></div><div class="cd"><span>11</span></div><div class="cd"><span>12</span><div class="dd" style="background:var(--fiber)"></div></div><div class="cd"><span>13</span></div><div class="cd"><span>14</span></div>
+            <div class="cd"><span>15</span></div><div class="cd"><span>16</span></div><div class="cd"><span>17</span></div><div class="cd"><span>18</span></div><div class="cd"><span>19</span><div class="dd" style="background:var(--fiber)"></div></div><div class="cd"><span>20</span></div><div class="cd"><span>21</span></div>
+            <div class="cd"><span>22</span></div><div class="cd"><span>23</span></div><div class="cd now"><span>24</span></div><div class="cd"><span>25</span></div><div class="cd"><span>26</span></div><div class="cd"><span>27</span><div class="dd" style="background:var(--primary)"></div></div><div class="cd"><span>28</span></div>
+            <div class="cd rest rs"><span>29</span></div><div class="cd rest"><span>30</span></div><div class="cd rest out"><span>1</span></div><div class="cd rest out"><span>2</span></div><div class="cd rest out"><span>3</span></div><div class="cd rest out"><span>4</span></div><div class="cd rest re out"><span>5</span></div>
+          </div>
+          <div class="row" style="gap:13px;justify-content:center;padding-top:10px;border-top:.5px solid var(--hair);margin-top:8px">
+            <span class="lab" style="font-size:11px"><span style="display:inline-block;width:7px;height:7px;border-radius:9px;background:var(--primary)"></span> Due</span>
+            <span class="lab" style="font-size:11px"><span style="display:inline-block;width:7px;height:7px;border-radius:9px;background:var(--fiber)"></span> Logged</span>
+            <span class="lab" style="font-size:11px"><span style="display:inline-block;width:7px;height:7px;border-radius:9px;background:rgba(52,199,89,.35)"></span> Off-cycle rest</span>
+          </div>
+          <div style="background:var(--alt);border-radius:14px;padding:12px 14px;margin-top:10px">
+            <span class="sec">Sat, Jun 27</span>
+            <div class="nm mt6">Shot day — 5 mg Tirzepatide, 8:00 PM.</div>
+            <div class="lab mt4">Last dose of this cycle. Two weeks off start Jun 29 — reminders pause automatically.</div>
+          </div>
+          <div class="row bt" style="padding:12px 4px 2px"><div class="ch"><i class="ti ti-repeat" style="color:var(--primary);font-size:16px"></i><span class="nm" style="font-size:14px">Cycle · 8 wk on, 2 off</span></div><span class="link">Edit</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="lab mt8" style="max-width:300px">The sheet reuses the app’s existing bottom-sheet (grab handle, dim backdrop). Off-cycle rest is one continuous green band rounded at its two ends — the whole break reads as a single object, not 14 chips to decode.</div>
+  </div>
+
+  <div class="fw"><div class="fl">Cycle setup <span style="color:var(--primary)">(NEW · row in Dose settings)</span></div>
+    <div class="device"><div class="sb"><span class="tt">10:42</span><span class="ri"><i class="ti ti-antenna-bars-5"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3" style="font-size:18px"></i></span></div>
+      <div class="scr">
+        <div class="pad row bt" style="padding-top:4px"><div class="row" style="gap:10px"><i class="ti ti-chevron-left" style="font-size:20px;color:var(--tp)"></i><span class="h1" style="font-size:24px">Cycle</span></div><span class="link">Save</span></div>
+        <div class="pad">
+          <div class="card mt16">
+            <span class="sec">Weeks on</span>
+            <div class="stepper mt14"><div class="sbtn"><i class="ti ti-minus"></i></div><span class="sv">8 weeks</span><div class="sbtn"><i class="ti ti-plus"></i></div></div>
+          </div>
+          <div class="card mt12">
+            <span class="sec">Then rest</span>
+            <div class="stepper mt14"><div class="sbtn"><i class="ti ti-minus"></i></div><span class="sv">2 weeks</span><div class="sbtn"><i class="ti ti-plus"></i></div></div>
+            <div class="segctl mt12"><span class="on">Repeat</span><span>One cycle only</span></div>
+          </div>
+          <div class="card mt12">
+            <span class="sec">Your pattern</span>
+            <div style="display:flex;height:8px;border-radius:99px;overflow:hidden;margin-top:12px"><span style="flex:8;background:linear-gradient(135deg,var(--g1),var(--g2))"></span><span style="flex:2;background:rgba(52,199,89,.35)"></span><span style="flex:8;background:linear-gradient(135deg,var(--g1),var(--g2))"></span><span style="flex:2;background:rgba(52,199,89,.35)"></span></div>
+            <div class="row bt mt8"><span class="lab" style="font-size:11px">May 4 start</span><span class="lab" style="font-size:11px">rest Jun 29 – Jul 12</span></div>
+            <div class="lrow mt8"><div style="flex:1"><div class="nm">Last dose</div><div class="lab">Reminders pause after it</div></div><span class="nm">Jun 27</span></div>
+            <div class="lrow" style="border-bottom:0"><div style="flex:1"><div class="nm">Back on</div><div class="lab">We’ll nudge you the day before</div></div><span class="nm">Jul 13</span></div>
+          </div>
+          <div class="obbtn mt16" style="margin-bottom:30px">Save cycle</div>
+        </div>
+      </div>
+    </div>
+    <div class="lab mt8" style="max-width:300px">Opened by tapping the cycle pill on Track, or “Edit” on the month sheet’s cycle row (also listed in Dose settings for completeness). Steppers and segment control are the hub’s shipped components. The review ask verbatim: 8 weeks on, 2 off, repeat.</div>
+  </div>
+
+  <div class="fw"><div class="fl">Mix calculator <span style="color:var(--primary)">(NEW · row in Dose settings)</span></div>
+    <div class="device"><div class="sb"><span class="tt">10:42</span><span class="ri"><i class="ti ti-antenna-bars-5"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3" style="font-size:18px"></i></span></div>
+      <div class="scr">
+        <div class="pad row bt" style="padding-top:4px"><div class="row" style="gap:10px"><i class="ti ti-chevron-left" style="font-size:20px;color:var(--tp)"></i><span class="h1" style="font-size:24px">Mix calculator</span></div><span class="link">Edit</span></div>
+        <div class="pad">
+          <div class="card mt16">
+            <span class="sec">Your inputs — tap to edit</span>
+            <div class="lrow mt8"><div class="lic" style="background:#EFEBFF;color:var(--primary)"><i class="ti ti-flask-2"></i></div><div style="flex:1"><div class="nm">Peptide in the vial</div></div><span class="nm" style="color:var(--primary);border-bottom:1.5px dashed rgba(124,92,252,.4);padding-bottom:1px">10 mg</span></div>
+            <div style="padding:10px 4px 12px;border-bottom:.5px solid var(--hair)">
+              <div class="row bt"><div class="ch"><div class="lic" style="background:#E7F4FF;color:#1273C4"><i class="ti ti-vaccine"></i></div><span class="nm">Syringe</span></div></div>
+              <div class="segctl mt10"><span>0.3 mL · 30u</span><span class="on">0.5 mL · 50u</span><span>1 mL · 100u</span></div>
+            </div>
+            <div class="lrow" style="border-bottom:0"><div class="lic" style="background:#E1F5EE;color:#0F6E56"><i class="ti ti-target-arrow"></i></div><div style="flex:1"><div class="nm">Dose you want</div></div><span class="nm" style="color:var(--primary);border-bottom:1.5px dashed rgba(124,92,252,.4);padding-bottom:1px">250 mcg</span></div>
+          </div>
+          <div class="card mt12">
+            <span class="sec">Add to the vial</span>
+            <div class="row bt mt8">
+              <div class="big">2.0 mL <span class="den">BAC water</span></div>
+              <div class="row" style="gap:6px"><div class="sbtn"><i class="ti ti-minus"></i></div><div class="sbtn"><i class="ti ti-plus"></i></div></div>
+            </div>
+            <div class="lab mt6">Our suggestion for a clean draw — adjust if your prescriber said otherwise. Makes 5 mg/mL.</div>
+            <div style="background:var(--alt);border-radius:14px;padding:12px 14px;margin-top:12px">
+              <span class="sec">Then draw</span>
+              <div class="big mt6" style="color:var(--primary)">5 units</div>
+              <div class="lab mt6">to the <b style="color:var(--tp)">5</b> mark on a 50-unit syringe = 250 mcg.</div>
+              <svg viewBox="0 0 232 26" style="width:100%;margin-top:10px;display:block"><rect x="2" y="8" width="186" height="11" rx="5.5" fill="#fff" stroke="#E0E0E8"/><rect x="2" y="8" width="19" height="11" rx="5.5" fill="var(--primary)"/><g stroke="#D3D3DB" stroke-width="1"><line x1="21" y1="8" x2="21" y2="19"/><line x1="58" y1="10" x2="58" y2="17"/><line x1="95" y1="10" x2="95" y2="17"/><line x1="132" y1="10" x2="132" y2="17"/><line x1="169" y1="10" x2="169" y2="17"/></g><rect x="188" y="11" width="30" height="6" rx="3" fill="#DCDCE3"/><text x="14" y="26" font-size="7.5" font-weight="800" fill="#7C5CFC" font-family="Hanken Grotesk">5u</text><text x="163" y="26" font-size="7.5" font-weight="700" fill="#A6A6B0" font-family="Hanken Grotesk">50u</text></svg>
+            </div>
+            <div class="row mt12" style="gap:9px;background:#FFF8EA;border-radius:14px;padding:11px 12px;align-items:flex-start"><i class="ti ti-alert-triangle" style="color:var(--warning);font-size:15px;margin-top:1px"></i><span class="lab" style="color:#8A6300">250 mcg sits above what most people log for this peptide (100–200). Confirm with your prescriber.</span></div>
+          </div>
+          <div class="obbtn mt16" style="margin-bottom:30px">Save as my dose</div>
+        </div>
+      </div>
+    </div>
+    <div class="lab mt8" style="max-width:300px">One LIVE screen, no separate input step: the three inputs are editable in place (dashed-underline values open the number pad, syringe is the inline segment control) and the answers below recompute on every change. The suggested water amount is adjustable with the steppers — units to draw recalc instantly (more water = more units = finer precision). The warning appears live when a value drifts outside the FDA-labeled range (research peptides get no invented range and no warning); it advises and routes to the prescriber, never blocks, and nothing here ever recommends a dose. Impl note: RN renders the editable underline solid at 40% primary (dashed bottom borders don't render reliably); header "Edit" link dropped — the whole screen is live.</div>
+  </div>
+
+  <!-- ================= LIBRARY (NEW — competitor-informed, sourced) ================= -->
+  <div class="fw"><div class="fl">Peptide library <span style="color:var(--primary)">(NEW · stack screen from Track)</span></div>
+    <div class="device"><div class="sb"><span class="tt">10:42</span><span class="ri"><i class="ti ti-antenna-bars-5"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3" style="font-size:18px"></i></span></div>
+      <div class="scr">
+        <div class="pad row bt" style="padding-top:4px"><div class="row" style="gap:10px"><i class="ti ti-chevron-left" style="font-size:20px;color:var(--tp)"></i><span class="h1" style="font-size:24px">Library</span></div></div>
+        <div class="pad">
+          <div class="mt12" style="display:flex;align-items:center;gap:9px;background:var(--alt);border-radius:14px;padding:12px 14px"><i class="ti ti-search" style="color:var(--tt);font-size:16px"></i><span class="lab" style="font-size:14px">Search peptides &amp; stacks</span></div>
+          <div class="mt12" style="display:flex;gap:7px;overflow:hidden">
+            <span class="pill" style="background:var(--primary);color:#fff">All</span>
+            <span class="pill" style="background:var(--alt);color:var(--ts)">Recovery</span>
+            <span class="pill" style="background:var(--alt);color:var(--ts)">Weight loss</span>
+            <span class="pill" style="background:var(--alt);color:var(--ts)">GH</span>
+            <span class="pill" style="background:var(--alt);color:var(--ts)">Immu…</span>
+          </div>
+          <div class="row bt mt16"><span class="sec">Stacks</span><span class="lab" style="font-size:11px">community protocols</span></div>
+          <div class="mt8" style="display:flex;gap:10px">
+            <div class="card" style="flex:1;padding:13px 14px"><div class="lic" style="background:#E1F5EE;color:#0F6E56"><i class="ti ti-stack-2"></i></div><div class="nm mt8">Wolverine</div><div class="lab" style="font-size:11px">BPC-157 + TB-500</div><span class="pill mt8" style="background:var(--alt);color:var(--ts);font-size:10px">COMMUNITY</span></div>
+            <div class="card" style="flex:1;padding:13px 14px"><div class="lic" style="background:#EFEBFF;color:var(--primary)"><i class="ti ti-stack-2"></i></div><div class="nm mt8">GH support</div><div class="lab" style="font-size:11px">Ipamorelin + CJC-1295</div><span class="pill mt8" style="background:var(--alt);color:var(--ts);font-size:10px">COMMUNITY</span></div>
+          </div>
+          <div class="row bt mt16"><span class="sec" style="color:#0F6E56">Healing &amp; recovery</span></div>
+          <div class="card mt8">
+            <div class="lrow" style="padding-top:4px"><div class="lic" style="background:#E1F5EE;color:#0F6E56"><i class="ti ti-heart-plus"></i></div><div style="flex:1"><div class="row" style="gap:6px"><span class="nm">BPC-157</span><span class="pill" style="background:#EFEBFF;color:var(--primary);font-size:9px;padding:3px 7px">YOU TRACK THIS</span></div><div class="lab">“The Healer” · gut &amp; tendon repair studies</div></div><i class="ti ti-chevron-right" style="color:var(--tt)"></i></div>
+            <div class="lrow"><div class="lic" style="background:#E1F5EE;color:#0F6E56"><i class="ti ti-bandage"></i></div><div style="flex:1"><div class="nm">TB-500</div><div class="lab">“The Repair Agent” · muscle &amp; tissue studies</div></div><i class="ti ti-chevron-right" style="color:var(--tt)"></i></div>
+            <div class="lrow" style="border-bottom:0"><div class="lic" style="background:#E1F5EE;color:#0F6E56"><i class="ti ti-shield-plus"></i></div><div style="flex:1"><div class="nm">Larazotide</div><div class="lab">“The Gut Gatekeeper” · celiac trials</div></div><i class="ti ti-chevron-right" style="color:var(--tt)"></i></div>
+          </div>
+          <div class="row bt mt16"><span class="sec" style="color:var(--primary)">Growth hormone</span></div>
+          <div class="card mt8" style="margin-bottom:16px">
+            <div class="lrow" style="padding-top:4px"><div class="lic" style="background:#EFEBFF;color:var(--primary)"><i class="ti ti-trending-up"></i></div><div style="flex:1"><div class="nm">Ipamorelin</div><div class="lab">“The Gentle Pulse” · selective GH secretagogue</div></div><i class="ti ti-chevron-right" style="color:var(--tt)"></i></div>
+            <div class="lrow" style="border-bottom:0"><div class="lic" style="background:#EFEBFF;color:var(--primary)"><i class="ti ti-trending-up"></i></div><div style="flex:1"><div class="nm">Tesamorelin</div><div class="lab">“The Approved One” · FDA-approved GHRH analog</div></div><i class="ti ti-chevron-right" style="color:var(--tt)"></i></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="lab mt8" style="max-width:300px">Their idea, our discipline: search + goal chips + curated stacks + categorized entries with epithets (“The Healer” — great scannability, kept). Differences: light ground + one purple accent (no rainbow chips), category colors from our tinted-chip palette, stacks carry a COMMUNITY pill (they’re community protocols, not our recommendations), and “YOU TRACK THIS” ties entries to the user’s own compounds. A stack screen (back chevron, no tab bar) — NOT a fifth tab.</div>
+  </div>
+
+  <div class="fw"><div class="fl">Library · entry detail <span style="color:var(--primary)">(NEW)</span></div>
+    <div class="device"><div class="sb"><span class="tt">10:42</span><span class="ri"><i class="ti ti-antenna-bars-5"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3" style="font-size:18px"></i></span></div>
+      <div class="scr">
+        <div class="pad row bt" style="padding-top:4px"><div class="row" style="gap:10px"><i class="ti ti-chevron-left" style="font-size:20px;color:var(--tp)"></i><span class="h1" style="font-size:24px">BPC-157</span></div></div>
+        <div class="pad">
+          <div class="lab mt4">“The Healer”</div>
+          <div class="mt10" style="display:flex;gap:6px">
+            <span class="pill" style="background:#FFF8EA;color:#8A6300">PRECLINICAL EVIDENCE</span>
+            <span class="pill" style="background:#E1F5EE;color:#0F6E56">RECOVERY</span>
+          </div>
+          <div class="card mt12">
+            <span class="sec">What it is</span>
+            <div class="lab mt8" style="font-size:13px;line-height:1.55;color:var(--ts)">A synthetic fragment of a gastric protein, studied in <b style="color:var(--tp)">animal models</b> for tendon, ligament and gut-lining repair. No completed human trials have confirmed efficacy — evidence is preclinical and community-reported.</div>
+          </div>
+          <div class="card mt12">
+            <div class="row bt"><span class="sec">Community protocol</span><i class="ti ti-users" style="color:var(--tt);font-size:14px"></i></div>
+            <div class="lrow mt4"><div style="flex:1"><div class="nm" style="font-size:13.5px">Typical dose logged</div></div><span class="nm" style="font-size:13.5px">250–500 mcg</span></div>
+            <div class="lrow"><div style="flex:1"><div class="nm" style="font-size:13.5px">Timing</div></div><span class="nm" style="font-size:13.5px">1–2×/day, AM &amp; PM</span></div>
+            <div class="lrow" style="border-bottom:0"><div style="flex:1"><div class="nm" style="font-size:13.5px">Cycle</div></div><span class="nm" style="font-size:13.5px">4–8 wk on</span></div>
+            <div class="lab mt8" style="font-size:10.5px">What users commonly log — community practice, not medical advice or a recommendation.</div>
+          </div>
+          <div class="card mt12">
+            <span class="sec">Sources</span>
+            <div class="lrow mt4"><div style="flex:1"><div class="nm" style="font-size:13px">Sikirić et al. — pentadecapeptide review</div><div class="lab" style="font-size:11px">Curr Pharm Des, animal-model synthesis</div></div><i class="ti ti-external-link" style="color:var(--tt);font-size:15px"></i></div>
+            <div class="lrow" style="border-bottom:0"><div style="flex:1"><div class="nm" style="font-size:13px">Systematic review 2021 — evidence status</div><div class="lab" style="font-size:11px">No human RCTs completed</div></div><i class="ti ti-external-link" style="color:var(--tt);font-size:15px"></i></div>
+          </div>
+          <div class="obbtn mt16">Track this peptide</div>
+          <div style="text-align:center;font-weight:700;font-size:12px;color:var(--primary);margin-top:10px;margin-bottom:24px">Open the mix calculator</div>
+        </div>
+      </div>
+    </div>
+    <div class="lab mt8" style="max-width:300px">The differentiator vs every competitor: an EVIDENCE pill on every entry (FDA-APPROVED green · HUMAN TRIALS blue · PRECLINICAL amber · COMMUNITY neutral) and a sources card with real citations — same discipline as the app’s medical citations. The community-protocol block states what users log with an explicit not-advice line; nothing here recommends. “Track this peptide” prefills Add-medication; the mix-calculator link closes the loop for reconstitution users.</div>
+  </div>
+
+  <div class="fw"><div class="fl">Track · library front door <span style="color:var(--primary)">(NEW · 1 row)</span></div>
+    <div class="device"><div class="sb"><span class="tt">10:42</span><span class="ri"><i class="ti ti-antenna-bars-5"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3" style="font-size:18px"></i></span></div>
+      <!-- min-height: this delta frame shows the BOTTOM half of Track; without
+           it the device collapses to its few rows (the .device grows-with-content
+           trap — same fix as the month-sheet frame). -->
+      <div class="scr" style="min-height:726px">
+        <div class="pad row bt" style="padding-top:4px"><span class="h1">Track</span><div class="row" style="gap:9px"><span class="today"><i class="ti ti-calendar" style="font-size:14px;color:var(--ts)"></i>Today</span><div class="av"><i class="ti ti-adjustments-horizontal" style="font-size:18px;color:var(--ts)"></i></div></div></div>
+        <div class="pad">
+          <div class="card mt16">
+            <div class="row bt"><div class="ch"><i class="ti ti-chart-line ic" style="color:var(--primary)"></i><span class="nm">Medication level</span></div></div>
+            <svg viewBox="0 0 300 84" class="mt12" style="width:100%;height:70px"><line x1="0" y1="66" x2="300" y2="66" stroke="#F0F0F3" stroke-width="1"/><path d="M0 58 C40 53 60 25 98 22 C140 18 152 48 192 51 C232 55 256 32 300 25 L300 76 L0 76 Z" fill="url(#ml)"/><path d="M0 58 C40 53 60 25 98 22 C140 18 152 48 192 51 C232 55 256 32 300 25" fill="none" stroke="#7C5CFC" stroke-width="3" stroke-linecap="round"/><circle cx="192" cy="51" r="5" fill="#7C5CFC" stroke="#fff" stroke-width="2.5"/></svg>
+            <div class="row bt mt8"><span class="lab">Current 1.42 mg</span><span class="lab">Peak 2.1 · Trough 0.9</span></div>
+          </div>
+          <div class="card mt12">
+            <div class="row bt"><div class="ch"><i class="ti ti-history" style="color:var(--ts);font-size:18px"></i><span class="nm">Dose history</span></div></div>
+            <div class="lrow mt4"><div style="flex:1"><div class="nm">Tirzepatide · 5 mg</div><div class="lab">2d ago · Left abdomen</div></div><i class="ti ti-chevron-right" style="color:var(--tt)"></i></div>
+            <div class="lrow" style="border-bottom:0"><div style="flex:1"><div class="nm">BPC-157 · 250 mcg</div><div class="lab">Yesterday · Right thigh · Nausea</div></div><i class="ti ti-chevron-right" style="color:var(--tt)"></i></div>
+          </div>
+          <div class="card mt12" style="padding:14px 16px"><div class="row bt"><div class="ch"><i class="ti ti-flask-2" style="color:var(--primary);font-size:18px"></i><span class="nm">Mix calculator</span></div><i class="ti ti-chevron-right" style="color:var(--tt)"></i></div></div>
+          <div class="card mt12" style="padding:14px 16px;border:1.5px solid rgba(124,92,252,.35)"><div class="row bt"><div class="ch"><i class="ti ti-books" style="color:var(--primary);font-size:18px"></i><span class="nm">Peptide library</span></div><i class="ti ti-chevron-right" style="color:var(--tt)"></i></div></div>
+          <div class="card mt12">
+            <div class="row bt"><div class="ch"><i class="ti ti-alert-circle" style="color:#E8A13C;font-size:18px"></i><span class="nm">Side effects</span></div></div>
+            <div class="lrow mt4" style="border-bottom:0"><div style="flex:1"><div class="nm">Nausea</div><div class="lab">Yesterday · mild</div></div></div>
+          </div>
+        </div>
+        <div class="tabbar">
+          <div class="tab"><i class="ti ti-home-2"></i><span>Home</span></div>
+          <div class="tab on"><i class="ti ti-vaccine"></i><span>Track</span></div>
+          <div class="fw2"><div class="fab"><i class="ti ti-plus"></i></div></div>
+          <div class="tab"><i class="ti ti-chart-line"></i><span>Progress</span></div>
+          <div class="tab"><i class="ti ti-user-circle"></i><span>Account</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="lab mt8" style="max-width:300px">Placement: a “Peptide library” row on Track, right under Mix calculator (outlined here only to point at the new row — ships without the outline). Shown in its real context: the bottom half of the shipped Track screen, tab bar and all. Same visible-front-door pattern as the scheduling work; the second entry point is “Browse the library” inside Add medication. The 4-tab tracker IA stays untouched — the library is one tap deep exactly where compound decisions happen, not a fifth tab diluting the tracker identity.</div>
   </div>
 
   <!-- ================= PROGRESS ================= -->
@@ -875,7 +1161,7 @@
           <div class="row bt"><div class="row" style="gap:10px"><i class="ti ti-circle-check" style="color:var(--primary);font-size:20px"></i><div><div class="nm">Yearly</div><div class="lab">$40.00/yr · just $0.11 a day</div></div></div><div style="text-align:right"><span class="big" style="font-size:20px">$3.33</span><span class="lab"> /mo</span></div></div>
         </div>
         <div style="border:2px solid var(--border);border-radius:16px;padding:13px;margin-top:10px">
-          <div class="row bt"><div class="row" style="gap:10px"><i class="ti ti-circle" style="color:var(--tt);font-size:20px"></i><div><div class="nm">Monthly</div><div class="lab">billed monthly</div></div></div><div style="text-align:right"><span class="big" style="font-size:20px">$9.00</span><span class="lab"> /mo</span></div></div>
+          <div class="row bt"><div class="row" style="gap:10px"><i class="ti ti-circle" style="color:var(--tt);font-size:20px"></i><div><div class="nm">Monthly</div><div class="lab">billed monthly</div></div></div><div style="text-align:right"><span class="big" style="font-size:20px">$9.99</span><span class="lab"> /mo</span></div></div>
         </div>
         <div class="spc"></div><div class="obbtn">Start 7-day free trial</div>
         <div class="lab" style="text-align:center;font-size:10px;color:var(--tt);margin-top:8px">7 days free, then $40/yr ($3.33/mo). Cancel anytime · Terms &amp; Privacy</div>

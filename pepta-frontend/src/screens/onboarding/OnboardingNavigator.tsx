@@ -20,11 +20,10 @@ import {
   type OnboardingStep,
 } from './onboardingFlow';
 import { OnboardingMotionContext, convo } from '../../components';
+import { StepFade } from './StepFade';
 import { ONBOARDING_DRAFT_KEY, parseDraft, serializeDraft } from './onboardingDraft';
 import { echoFor, instrumentContext, companyContext } from './onboardingEcho';
-import { PrivacyScreen } from './PrivacyScreen';
 import { MeetPepScreen } from './MeetPepScreen';
-import { ReferralCodeScreen } from './ReferralCodeScreen';
 import { WelcomeScreen } from '../auth/WelcomeScreen';
 import { SignInScreen } from '../auth/SignInScreen';
 import { JourneyStageScreen, type JourneyStage } from './JourneyStageScreen';
@@ -74,6 +73,7 @@ import { useAccess } from '../../context/AccessContext';
 import { useOnboarding } from '../../context/OnboardingContext';
 import { deriveReminderGroups, defaultReminderState } from '../app/reminderSettings';
 import { saveReminderState, syncReminderNotifications } from '../../services/reminderNotification.service';
+import { logOnboardingCompleted, logOnboardingStarted, logOnboardingStep } from '../../services/funnelEvents';
 
 const DEFAULT_BODY: BodyMeasure = { units: 'imperial', height: 66, weight: 184 };
 const DAY_PLURAL = ['Sundays', 'Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays', 'Saturdays'];
@@ -263,6 +263,33 @@ export function OnboardingNavigator() {
     );
   }, [hydrated, step, answers]);
 
+  // Funnel: first onboarding screen after a fresh install (the service guards
+  // once-per-install, so remounts and resumed drafts can't re-fire it).
+  useEffect(() => {
+    if (hydrated) logOnboardingStarted();
+  }, [hydrated]);
+
+  // Funnel: per-step dropoff curve. THE single instrumentation point — the
+  // rendered step is exactly this state (the render is a `switch (step)`), so
+  // hooking here counts screens actually seen and nothing else.
+  //
+  // Gated on `hydrated` for the same reason onboarding_started is: until the
+  // saved draft resolves, `step` still holds the cache default ('welcome')
+  // while a blank frame renders, so an ungated log would report a step a
+  // resuming user never saw. Steps gated out by shouldSkipStep can never
+  // appear here at all — advanceWith walks the whole skip chain in a pure
+  // function and only the surviving step is ever passed to setStep.
+  useEffect(() => {
+    if (!hydrated) return;
+    logOnboardingStep(step, ONBOARDING_STEPS.indexOf(step));
+  }, [hydrated, step]);
+
+  // Funnel: every step is answered the moment the paywall becomes the step —
+  // fire onboarding_completed right before it presents (once per install).
+  useEffect(() => {
+    if (step === 'paywall') logOnboardingCompleted();
+  }, [step]);
+
   const progress = progressForStep(step);
   const ctx = {
     ...ctxFromAnswers(answers),
@@ -282,8 +309,6 @@ export function OnboardingNavigator() {
     },
     [],
   );
-
-  const showBack = advanceWith(step, -1, ctx) !== null;
 
   // Merge an answer patch, then advance forward from a context that already
   // includes it (so gating reads the fresh answer).
@@ -362,8 +387,6 @@ export function OnboardingNavigator() {
   switch (step) {
     case 'welcome':
       return <WelcomeScreen onContinue={goNext} onSignIn={() => setSignInOpen(true)} />;
-    case 'privacy':
-      return <PrivacyScreen progress={progress} showBack={showBack} onBack={goBack} onAccept={goNext} />;
     case 'meetPep':
       return <MeetPepScreen progress={progress} onBack={goBack} onContinue={goNext} />;
     case 'journeyStage':
@@ -703,8 +726,6 @@ export function OnboardingNavigator() {
     }
     case 'auth':
       return <SignInScreen onBack={goBack} />;
-    case 'referral':
-      return <ReferralCodeScreen progress={progress} onBack={goBack} onDone={goNext} />;
     case 'paywall':
       return <PaywallScreen onComplete={goNext} />;
     case 'welcomeIn':
@@ -716,7 +737,11 @@ export function OnboardingNavigator() {
 
   return (
     <OnboardingMotionContext.Provider value={{ animate: animateEntrance }}>
-      {screen}
+      {/* Ground-colored canvas behind the fade so the brief dip between turns
+          reads as a soft blink on the onboarding ground, never a flash. */}
+      <View style={{ flex: 1, backgroundColor: convo.ground }}>
+        <StepFade stepKey={step}>{screen}</StepFade>
+      </View>
       <Modal
         visible={signInOpen}
         animationType="slide"

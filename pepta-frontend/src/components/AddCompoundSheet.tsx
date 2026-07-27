@@ -19,9 +19,15 @@ import { buildCompoundInput, todayDateOnly } from '../screens/app/addCompound';
 export interface AddCompoundSheetProps {
   visible: boolean;
   onClose(): void;
+  /** Prefills the search (library's "Track this peptide" passes the name). */
+  initialQuery?: string;
+  /** Shows the "Browse the library" link. Omit when opened FROM the library. */
+  onBrowseLibrary?: () => void;
+  /** Fires after the sheet has fully animated out (safe hand-off point). */
+  onDismissed?: () => void;
 }
 
-export function AddCompoundSheet({ visible, onClose }: AddCompoundSheetProps) {
+export function AddCompoundSheet({ visible, onClose, initialQuery, onBrowseLibrary, onDismissed }: AddCompoundSheetProps) {
   const theme = useTheme();
   const { addCompound } = usePeptaData();
   const [query, setQuery] = useState('');
@@ -32,13 +38,13 @@ export function AddCompoundSheet({ visible, onClose }: AddCompoundSheetProps) {
 
   useEffect(() => {
     if (visible) {
-      setQuery('');
+      setQuery(initialQuery ?? '');
       setSelected(null);
       setDose(null);
       setSaving(false);
       setFailed(false);
     }
-  }, [visible]);
+  }, [visible, initialQuery]);
 
   const results = searchMedications(MEDICATION_CATALOG, query).slice(0, 6);
 
@@ -65,7 +71,7 @@ export function AddCompoundSheet({ visible, onClose }: AddCompoundSheetProps) {
   };
 
   return (
-    <BottomSheet visible={visible} onClose={onClose} avoidKeyboard={false} scrollable>
+    <BottomSheet visible={visible} onClose={onClose} onDismissed={onDismissed} avoidKeyboard={false} scrollable>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 4 }}>
         {selected ? (
           <Pressable onPress={() => setSelected(null)} hitSlop={8} style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: theme.colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
@@ -114,6 +120,24 @@ export function AddCompoundSheet({ visible, onClose }: AddCompoundSheetProps) {
               <Icon name="chevron-forward" size={18} color={theme.colors.textTertiary} />
             </Pressable>
           ))}
+          {/* Second library front door: "what even is this compound?" happens
+              right here. Omitted when the sheet was opened FROM the library. */}
+          {onBrowseLibrary ? (
+            <Pressable
+              onPress={() => {
+                Haptics.selectionAsync().catch(() => undefined);
+                onBrowseLibrary();
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Browse the peptide library"
+              style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, opacity: pressed ? 0.6 : 1 })}
+            >
+              <Icon name="books" size={16} color={theme.colors.primary} />
+              <AppText variant="caption" color="primary" style={{ fontWeight: '700' }}>
+                Not sure? Browse the peptide library
+              </AppText>
+            </Pressable>
+          ) : null}
         </View>
       ) : (
         <View style={{ marginTop: 14, gap: 14 }}>

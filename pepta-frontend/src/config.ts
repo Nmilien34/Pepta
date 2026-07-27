@@ -18,8 +18,12 @@ export const APPSFLYER_DEV_KEY =
   process.env.EXPO_PUBLIC_APPSFLYER_DEV_KEY ?? "";
 export const APPSFLYER_APP_ID =
   process.env.EXPO_PUBLIC_APPSFLYER_APP_ID ?? "";
+// SDK-verification ping (pepta_sdk_debug_ping). Dev-only by design: the env
+// flag still arms it for local verification, but production builds never fire
+// it regardless of env.
 export const APPSFLYER_DIAGNOSTIC_EVENT_ENABLED =
-  process.env.EXPO_PUBLIC_APPSFLYER_DIAGNOSTIC_EVENT_ENABLED === "true";
+  process.env.EXPO_PUBLIC_APPSFLYER_DIAGNOSTIC_EVENT_ENABLED === "true" &&
+  (typeof __DEV__ !== "undefined" ? __DEV__ : false);
 
 // Legal pages served by the active backend for onboarding, settings, and App Store metadata.
 export const TERMS_URL = `${API_BASE_URL}/legal/terms`;

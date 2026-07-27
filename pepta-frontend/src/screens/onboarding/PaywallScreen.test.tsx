@@ -7,6 +7,8 @@ const mocks = vi.hoisted(() => ({
   getCurrentUser: vi.fn(),
   getPaywallPackages: vi.fn(),
   isPurchaseCancelled: vi.fn(() => false),
+  logPaywallShown: vi.fn(),
+  logPurchaseStarted: vi.fn(),
   onComplete: vi.fn(() => Promise.resolve()),
   openURL: vi.fn(() => Promise.resolve()),
   purchasePlan: vi.fn(),
@@ -14,9 +16,26 @@ const mocks = vi.hoisted(() => ({
   updateCachedUser: vi.fn(),
 }));
 
+// Control arm: no introductory offer on the monthly product.
 const paywallPackages = {
-  monthly: { product: { price: 9, priceString: "$9.00", currencyCode: "USD" } },
+  monthly: { product: { price: 9.99, priceString: "$9.99", currencyCode: "USD" } },
   yearly: { product: { price: 40, priceString: "$40.00", currencyCode: "USD" } },
+  offeringId: "default",
+};
+
+// Treatment arm: monthly carries a 3-day free intro offer (derived, never
+// hardcoded — the "3" here is fixture data, the copy must read it).
+const trialPaywallPackages = {
+  monthly: {
+    product: {
+      price: 9.99,
+      priceString: "$9.99",
+      currencyCode: "USD",
+      introPrice: { price: 0, periodNumberOfUnits: 3, periodUnit: "DAY" },
+    },
+  },
+  yearly: { product: { price: 40, priceString: "$40.00", currencyCode: "USD" } },
+  offeringId: "trial-offer",
 };
 
 vi.mock("react-native", () => ({
@@ -132,6 +151,11 @@ vi.mock("../../services/revenueCat", () => ({
   },
 }));
 
+vi.mock("../../services/funnelEvents", () => ({
+  logPaywallShown: mocks.logPaywallShown,
+  logPurchaseStarted: mocks.logPurchaseStarted,
+}));
+
 function nodeText(node: ReactTestInstance): string {
   return node.children
     .map((child) =>
@@ -186,6 +210,8 @@ describe("PaywallScreen legal links", () => {
     mocks.getPaywallPackages.mockResolvedValue(paywallPackages);
     mocks.isPurchaseCancelled.mockReset();
     mocks.isPurchaseCancelled.mockReturnValue(false);
+    mocks.logPaywallShown.mockClear();
+    mocks.logPurchaseStarted.mockClear();
     mocks.onComplete.mockClear();
     mocks.openURL.mockClear();
     mocks.purchasePlan.mockReset();
@@ -235,6 +261,13 @@ describe("PaywallScreen legal links", () => {
     expect(button(tree!.root, "Subscribe")).toBeTruthy();
     expect(allText(tree!.root).toLowerCase()).not.toContain("free trial");
     expect(allText(tree!.root).toLowerCase()).not.toContain("7 days free");
+
+    // Yearly card: bold per-month anchor with the billed total right under it
+    // (3.1.2(c) — the anchor must never render without the billed price).
+    const text = allText(tree!.root);
+    expect(text).toContain("$3.33");
+    expect(text).toContain("$40.00/yr");
+    expect(text).toContain("$40.00/year. Cancel anytime");
   });
 
   it("keeps subscribe disabled until App Store packages are loaded", async () => {
@@ -336,5 +369,76 @@ describe("PaywallScreen legal links", () => {
     expect(
       mocks.updateCachedUser.mock.calls.at(-1)?.[0].entitlement.status,
     ).toBe("active");
+  });
+
+  it("derives trial CTA copy from the treatment offering's intro offer", async () => {
+    mocks.getPaywallPackages.mockResolvedValue(trialPaywallPackages);
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+
+    await act(async () => {
+      tree = TestRenderer.create(
+        <PaywallScreen onComplete={mocks.onComplete} />,
+      );
+    });
+
+    // Yearly (default selection) has no trial — plain Subscribe CTA.
+    expect(button(tree!.root, "Subscribe")).toBeTruthy();
+
+    // Select the monthly plan (second radio card).
+    const monthlyRadio = tree!.root.findAll(
+      (node) =>
+        (node.type as unknown) === "Pressable" &&
+        node.props.accessibilityRole === "radio",
+    )[1]!;
+    await act(async () => {
+      monthlyRadio.props.onPress();
+    });
+
+    // Duration and renewal price are derived from the product, not literals.
+    expect(button(tree!.root, "Start 3-day free trial")).toBeTruthy();
+    const text = allText(tree!.root);
+    expect(text).toContain("Then $9.99/mo. Auto-renews. Cancel anytime in Settings.");
+  });
+
+  it("fires paywall_shown once per presentation with the offering variant", async () => {
+    mocks.getPaywallPackages.mockResolvedValue(trialPaywallPackages);
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+
+    await act(async () => {
+      tree = TestRenderer.create(
+        <PaywallScreen onComplete={mocks.onComplete} />,
+      );
+    });
+    // A re-render within the same presentation must not re-fire.
+    await act(async () => {
+      tree!.update(<PaywallScreen onComplete={mocks.onComplete} />);
+    });
+
+    expect(mocks.logPaywallShown).toHaveBeenCalledTimes(1);
+    expect(mocks.logPaywallShown).toHaveBeenCalledWith("trial-offer");
+  });
+
+  it("fires purchase_started with variant and package before the store sheet", async () => {
+    mocks.purchasePlan.mockResolvedValueOnce({
+      customerInfo: {},
+      entitlementActive: false,
+    });
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+
+    await act(async () => {
+      tree = TestRenderer.create(
+        <PaywallScreen onComplete={mocks.onComplete} />,
+      );
+    });
+
+    await act(async () => {
+      await button(tree!.root, "Subscribe").props.onPress();
+    });
+
+    expect(mocks.logPurchaseStarted).toHaveBeenCalledTimes(1);
+    expect(mocks.logPurchaseStarted).toHaveBeenCalledWith("default", "annual");
+    const purchaseOrder = mocks.purchasePlan.mock.invocationCallOrder[0]!;
+    const eventOrder = mocks.logPurchaseStarted.mock.invocationCallOrder[0]!;
+    expect(eventOrder).toBeLessThan(purchaseOrder);
   });
 });

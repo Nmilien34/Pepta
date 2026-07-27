@@ -4,14 +4,25 @@
 // concentration, weekly-only shot day/time) layers on top via shouldSkipStep.
 //
 // v2.2 conversational flow. Interstitial beats (instrument/company/fearAnswered)
-// are real steps so the progress bar moves through them; `rating` is gone — the
-// review ask moved post-purchase (welcomeIn), which also removes the invented
-// social-proof screen (2.3.1 risk). Side effects now come BEFORE the worry so
-// Beat C can answer the fear directly.
+// are real steps so the progress bar moves through them. Side effects come
+// BEFORE the worry so Beat C can answer the fear directly. The standalone
+// privacy-consent turn is gone — a whole step to acknowledge a promise was pure
+// friction; the welcome screen carries "by continuing you agree" with the live
+// Terms and Privacy links instead.
+//
+// THE REVIEW ASK IS NOT A STEP IN THIS LIST. It lives post-purchase, in
+// WelcomeInScreen, as a user-initiated "Leave a rating" button. A `rateApp`
+// turn was briefly added after `reveal` (2026-07-26) on the theory that the
+// plan reveal is the emotional peak; it was removed 2026-07-27 because Apple
+// caps review prompts per user per year, and spending that cap on someone who
+// has never used the tracker and has not paid is the likely reason the app has
+// one rating. Do not reintroduce a pre-paywall rating turn.
+//
+// The `referral` code turn (auth → paywall) was also removed 2026-07-27 —
+// see the note at its old position below.
 
 export const ONBOARDING_STEPS = [
   'welcome',
-  'privacy',
   'meetPep',
   'journeyStage',
   'experience',
@@ -45,7 +56,10 @@ export const ONBOARDING_STEPS = [
   'crafting',
   'reveal',
   'auth',
-  'referral',
+  // NOTE: the 'referral' code-entry turn used to sit here (auth → paywall).
+  // Removed 2026-07-27 — near-everyone who reached it tapped Skip, so it was
+  // pure friction in front of the wall. `ReferralCodeScreen` is kept (it is the
+  // only code-claim surface in the app) pending a lower-friction home for it.
   'paywall',
   'welcomeIn',
 ] as const;
@@ -111,8 +125,8 @@ const MEDICATION_BLOCK: readonly OnboardingStep[] = [
 export function shouldSkipStep(step: OnboardingStep, ctx: FlowContext): boolean {
   // Already signed in → the sign-in step is unnecessary.
   if (step === 'auth' && ctx.authenticated) return true;
-  // Approved creators / active subscribers never see referral or the wall.
-  if ((step === 'referral' || step === 'paywall') && ctx.accessActive) return true;
+  // Approved creators / active subscribers never see the wall.
+  if (step === 'paywall' && ctx.accessActive) return true;
   // Not actively dosing → skip the dose/frequency/shot-day block (and the
   // instrument beat — there's no level model to arm yet).
   if (ctx.journeyStage && ctx.journeyStage !== 'active' && MEDICATION_BLOCK.includes(step)) {

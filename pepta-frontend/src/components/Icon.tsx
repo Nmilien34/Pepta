@@ -69,8 +69,11 @@ import IconEqual from '@tabler/icons-react-native/IconEqual';
 import IconGenderFemale from '@tabler/icons-react-native/IconGenderFemale';
 import IconGenderMale from '@tabler/icons-react-native/IconGenderMale';
 import IconGenderBigender from '@tabler/icons-react-native/IconGenderBigender';
+import IconBooks from '@tabler/icons-react-native/IconBooks';
 import IconRefresh from '@tabler/icons-react-native/IconRefresh';
+import IconRepeat from '@tabler/icons-react-native/IconRepeat';
 import IconRestore from '@tabler/icons-react-native/IconRestore';
+import IconTargetArrow from '@tabler/icons-react-native/IconTargetArrow';
 import IconMoon from '@tabler/icons-react-native/IconMoon';
 import IconSofa from '@tabler/icons-react-native/IconSofa';
 import IconPlant2 from '@tabler/icons-react-native/IconPlant2';
@@ -139,6 +142,7 @@ const MAP: Record<string, TablerIcon> = {
   flag: IconFlag,
   'flag-outline': IconFlag,
   target: IconTarget,
+  'target-arrow': IconTargetArrow,
   scale: IconScale,
   'scale-bathroom': IconScale,
   leaf: IconLeaf,
@@ -184,7 +188,9 @@ const MAP: Record<string, TablerIcon> = {
   'gender-female': IconGenderFemale,
   'gender-male': IconGenderMale,
   'gender-non-binary': IconGenderBigender,
+  books: IconBooks,
   refresh: IconRefresh,
+  repeat: IconRepeat,
   restore: IconRestore,
   sleep: IconMoon,
   sofa: IconSofa,

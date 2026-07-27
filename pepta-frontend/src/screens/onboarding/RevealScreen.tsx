@@ -9,6 +9,7 @@ import { Animated, Easing, Platform, StyleSheet, Text, View } from 'react-native
 import Svg, { Circle, Defs, LinearGradient, Path, Stop } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import { Confetti, ConvoButton, ConvoScreen, convo } from '../../components';
+import { useHapticRamp } from '../../components/useHapticRamp';
 import { typography } from '../../theme/typography';
 import { formatShortDate } from '../../utils/dateParts';
 import type { GoalProjection } from '../../utils/goalProjection';
@@ -21,6 +22,10 @@ const CURVE = 'M14 24 C 96 44, 196 82, 300 120';
 const CURVE_LENGTH = 330; // safely >= the real path length for the dash trick
 const ORIGIN = { x: 14, y: 24 };
 const DRAW_MS = 1500;
+const DRAW_DELAY_MS = 260; // the card settles before the line starts moving
+// Taps that swell as the line descends toward the goal, resolving into the
+// success thump when the flag pops. 12 across 1.5s reads as one rising sweep.
+const DRAW_PULSES = 12;
 
 export interface RevealScreenProps {
   progress: number;
@@ -101,11 +106,19 @@ function GoalPathCard({ start, startWeight, goalWeight, unit, dateChip, onArrive
   const onArriveRef = useRef(onArrive);
   onArriveRef.current = onArrive;
 
+  // The descent is felt as well as seen: soft at today's weight, heavier the
+  // closer the line gets to the goal.
+  useHapticRamp(start && !arrived.current, {
+    durationMs: DRAW_MS,
+    pulses: DRAW_PULSES,
+    delayMs: DRAW_DELAY_MS,
+  });
+
   useEffect(() => {
     if (!start || arrived.current) return;
     const seq = Animated.sequence([
       // let the card settle in first, then the line finds its way to the goal
-      Animated.delay(260),
+      Animated.delay(DRAW_DELAY_MS),
       Animated.timing(draw, { toValue: 1, duration: DRAW_MS, easing: Easing.inOut(Easing.cubic), useNativeDriver: false }),
       Animated.spring(flagPop, { toValue: 1, friction: 4, tension: 160, useNativeDriver: true }),
     ]);

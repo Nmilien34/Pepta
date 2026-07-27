@@ -2,7 +2,7 @@
 // and dose logs from /track (the injection map + dose history). Pull-to-refresh,
 // staggered entrance, mascot empty states. Renders whatever loaded (partial).
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { Icon } from "../../components/Icon";
 import * as Haptics from 'expo-haptics';
@@ -10,9 +10,12 @@ import { useNavigation, type NavigationProp } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../theme';
 import { AddCompoundSheet, AppText, BodyMap, Button, Card, Mascot, ProgressRing, Reveal, ScreenHeader, SectionErrorBanner, TrendLineChart } from '../../components';
+import { WeekStrip } from '../../components/WeekStrip';
+import { ScheduleSheet } from '../../components/ScheduleSheet';
 import { usePeptaData } from '../../context/PeptaDataContext';
 import { useLogSheets } from '../../context/LogSheetsContext';
 import { formatCountdown } from './homeView';
+import { activeCycleOf, cyclePillFor, isLastDoseOfCycle, patternOf, shortDateOnly, todayCycleStatus, weekStrip } from './scheduleView';
 import {
   compoundIconName,
   compoundStatusLabel,
@@ -21,6 +24,7 @@ import {
   formatNextDoseAt,
   siteLabel,
   sideEffectSummary,
+  sideEffectTypeLabel,
   sortDoses,
   sortSideEffects,
   suggestNextSite,
@@ -34,18 +38,39 @@ export function TrackScreen() {
   const navigation = useNavigation<NavigationProp<Record<string, undefined>>>();
   const { openQuickLog } = useLogSheets();
   const data = usePeptaData();
-  const { home, track, homeLoading, trackLoading, homeError, trackError, trackRefreshing, refreshHome, refreshTrack } =
+  const { home, track, homeLoading, trackLoading, homeError, trackError, trackRefreshing, refreshHome, refreshTrack, schedules, cycles, refreshScheduling } =
     data;
   const [addOpen, setAddOpen] = useState(false);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const doseHistoryY = useRef(0);
+  const fetchedScheduling = useRef(false);
+  const pendingCycleNav = useRef(false);
+  const pendingLibraryNav = useRef(false);
 
   useEffect(() => {
     if (!home) void refreshHome();
     if (!track) void refreshTrack();
-  }, [home, track, refreshHome, refreshTrack]);
+    if (!fetchedScheduling.current) {
+      fetchedScheduling.current = true;
+      void refreshScheduling();
+    }
+  }, [home, track, refreshHome, refreshTrack, refreshScheduling]);
 
-  const refreshAll = () => Promise.all([refreshHome(), refreshTrack()]).then(() => undefined);
+  const refreshAll = () =>
+    Promise.all([refreshHome(), refreshTrack(), refreshScheduling()]).then(() => undefined);
+
+  // Cycle + strip derivations. `today` pins to the minute the data last moved
+  // so the strip doesn't drift mid-session yet stays cheap to memoize.
+  const cycle = useMemo(() => activeCycleOf(cycles), [cycles]);
+  const pattern = useMemo(() => patternOf(cycle), [cycle]);
+  const stripDays = useMemo(
+    () => weekStrip(new Date(), schedules, track?.doseLogs ?? [], pattern),
+    [schedules, track?.doseLogs, pattern],
+  );
+  const cyclePill = useMemo(() => cyclePillFor(pattern, new Date()), [pattern]);
+  const cycleToday = useMemo(() => todayCycleStatus(pattern, new Date()), [pattern]);
+  const resting = cycleToday?.phase === 'rest';
 
   if (!home && !track && (homeError || trackError)) {
     return (
@@ -96,29 +121,68 @@ export function TrackScreen() {
 
           <SectionErrorBanner errors={sectionErrors} style={{ marginTop: theme.spacing.md }} />
 
-          {/* next dose */}
+          {/* next dose — tap the card for the month sheet, the pill for cycle setup */}
           <Reveal delay={60} style={{ marginTop: theme.spacing.lg }}>
             {ml ? (
-              <Card style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <View>
-                  <AppText variant="sectionHeader" color="textTertiary" style={{ textTransform: 'uppercase' }}>
-                    Next dose
-                  </AppText>
-                  <AppText variant="statBig" style={{ marginTop: 8 }}>
-                    {formatCountdown(nextDoseHours) ?? '—'}
-                  </AppText>
-                  <AppText variant="caption" color="textSecondary" style={{ marginTop: 6 }}>
-                    {home?.nextDose?.nextDoseAt
-                      ? `${nextDoseName ? `${nextDoseName} · ` : ''}${formatNextDoseAt(home.nextDose.nextDoseAt)}`
-                      : nextDoseName || 'No dose scheduled'}
-                  </AppText>
-                </View>
-                <ProgressRing size={74} pct={levelPct} color={theme.colors.primary}>
-                  <AppText variant="caption" color="primary" style={{ fontWeight: '700' }}>
-                    {Math.round(levelPct * 100)}%
-                  </AppText>
-                </ProgressRing>
-              </Card>
+              <Pressable
+                onPress={() => { Haptics.selectionAsync().catch(() => undefined); setScheduleOpen(true); }}
+                accessibilityRole="button"
+                accessibilityLabel="Open dose schedule"
+                style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1 })}
+              >
+                <Card>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <View>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+                        <AppText variant="sectionHeader" color="textTertiary" style={{ textTransform: 'uppercase' }}>
+                          Next dose
+                        </AppText>
+                        {cyclePill ? (
+                          <Pressable
+                            onPress={() => { Haptics.selectionAsync().catch(() => undefined); navigation.navigate('CycleSetup'); }}
+                            hitSlop={8}
+                            accessibilityRole="button"
+                            accessibilityLabel="Edit cycle"
+                            style={{
+                              backgroundColor: cyclePill.phase === 'on' ? '#EFEBFF' : '#E8F8EE',
+                              paddingVertical: 4,
+                              paddingHorizontal: 10,
+                              borderRadius: theme.radii.pill,
+                            }}
+                          >
+                            <AppText
+                              variant="caption"
+                              style={{ fontWeight: '700', color: cyclePill.phase === 'on' ? theme.colors.primary : '#1E8E40' }}
+                            >
+                              {cyclePill.label}
+                            </AppText>
+                          </Pressable>
+                        ) : null}
+                      </View>
+                      <AppText variant="statBig" style={{ marginTop: 8 }}>
+                        {resting ? 'Resting' : formatCountdown(nextDoseHours) ?? '—'}
+                      </AppText>
+                      <AppText variant="caption" color="textSecondary" style={{ marginTop: 6 }}>
+                        {resting
+                          ? cycleToday?.nextPhaseStart
+                            ? `Back on ${shortDateOnly(cycleToday.nextPhaseStart)} — reminders paused.`
+                            : 'Cycle complete — nothing scheduled.'
+                          : home?.nextDose?.nextDoseAt
+                            ? `${nextDoseName ? `${nextDoseName} · ` : ''}${formatNextDoseAt(home.nextDose.nextDoseAt)}${
+                                isLastDoseOfCycle(home.nextDose.nextDoseAt, schedules, pattern) ? ' · last of this cycle' : ''
+                              }`
+                            : nextDoseName || 'No dose scheduled'}
+                      </AppText>
+                    </View>
+                    <ProgressRing size={74} pct={levelPct} color={theme.colors.primary}>
+                      <AppText variant="caption" color="primary" style={{ fontWeight: '700' }}>
+                        {Math.round(levelPct * 100)}%
+                      </AppText>
+                    </ProgressRing>
+                  </View>
+                  <WeekStrip days={stripDays} />
+                </Card>
+              </Pressable>
             ) : (
               <EmptyCard
                 line="Log your first shot — I’ll track your next dose."
@@ -249,6 +313,9 @@ export function TrackScreen() {
                       <AppText variant="caption" color="textSecondary">
                         {formatDoseRelative(d.datetime, new Date())}
                         {d.injectionSite ? ` · ${siteLabel(d.injectionSite)}` : ''}
+                        {d.sideEffects && d.sideEffects.length > 0
+                          ? ` · ${d.sideEffects.map(sideEffectTypeLabel).join(', ')}`
+                          : ''}
                       </AppText>
                     </View>
                     <Icon name="chevron-forward" size={16} color={theme.colors.textTertiary} />
@@ -262,6 +329,50 @@ export function TrackScreen() {
             </Card>
           </Reveal>
           </View>
+
+          {/* mix calculator — visible front door (row card in the dose-history idiom) */}
+          <Reveal delay={390} style={{ marginTop: 12 }}>
+            <Pressable
+              onPress={() => { Haptics.selectionAsync().catch(() => undefined); navigation.navigate('MixCalculator'); }}
+              accessibilityRole="button"
+              accessibilityLabel="Open mix calculator"
+              style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1 })}
+            >
+              <Card style={{ paddingVertical: 14 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Icon name="flask" size={18} color={theme.colors.primary} />
+                    <AppText variant="cardTitle" style={{ fontSize: 15 }}>
+                      Mix calculator
+                    </AppText>
+                  </View>
+                  <Icon name="chevron-forward" size={16} color={theme.colors.textTertiary} />
+                </View>
+              </Card>
+            </Pressable>
+          </Reveal>
+
+          {/* peptide library — visible front door (row card in the dose-history idiom) */}
+          <Reveal delay={405} style={{ marginTop: 12 }}>
+            <Pressable
+              onPress={() => { Haptics.selectionAsync().catch(() => undefined); navigation.navigate('Library'); }}
+              accessibilityRole="button"
+              accessibilityLabel="Open peptide library"
+              style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1 })}
+            >
+              <Card style={{ paddingVertical: 14 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Icon name="books" size={18} color={theme.colors.primary} />
+                    <AppText variant="cardTitle" style={{ fontSize: 15 }}>
+                      Peptide library
+                    </AppText>
+                  </View>
+                  <Icon name="chevron-forward" size={16} color={theme.colors.textTertiary} />
+                </View>
+              </Card>
+            </Pressable>
+          </Reveal>
 
           {/* side effects */}
           <Reveal delay={420} style={{ marginTop: 12 }}>
@@ -300,7 +411,37 @@ export function TrackScreen() {
         </ScrollView>
       </SafeAreaView>
 
-      <AddCompoundSheet visible={addOpen} onClose={() => setAddOpen(false)} />
+      <AddCompoundSheet
+        visible={addOpen}
+        onClose={() => setAddOpen(false)}
+        onBrowseLibrary={() => {
+          // Close first, navigate on dismiss — the sibling-Modal race.
+          pendingLibraryNav.current = true;
+          setAddOpen(false);
+        }}
+        onDismissed={() => {
+          if (pendingLibraryNav.current) {
+            pendingLibraryNav.current = false;
+            navigation.navigate('Library');
+          }
+        }}
+      />
+      <ScheduleSheet
+        visible={scheduleOpen}
+        onClose={() => setScheduleOpen(false)}
+        onEditCycle={() => {
+          // Close first, navigate from onDismissed — pushing a screen while
+          // the Modal is mid-dismiss is the barcode-freeze race.
+          pendingCycleNav.current = true;
+          setScheduleOpen(false);
+        }}
+        onDismissed={() => {
+          if (pendingCycleNav.current) {
+            pendingCycleNav.current = false;
+            navigation.navigate('CycleSetup');
+          }
+        }}
+      />
     </View>
   );
 }

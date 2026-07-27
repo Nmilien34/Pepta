@@ -27,6 +27,8 @@ export interface DoseDraft {
   amount: number;
   unit: DoseUnit;
   site: InjectionSite;
+  // Side effects felt around this shot (optional chips on the dose form).
+  sideEffects: SideEffectType[];
 }
 
 // Smart default for "Log a shot": the first active compound at its planned dose,
@@ -40,6 +42,7 @@ export function defaultDoseDraft(home: HomeResponse | null, track: TrackResponse
     amount: compound.plannedDose ?? 0,
     unit: compound.doseUnit,
     site: suggestNextSite(track?.doseLogs ?? []),
+    sideEffects: [],
   };
 }
 
@@ -48,7 +51,14 @@ export function isDoseValid(draft: DoseDraft | null): draft is DoseDraft {
 }
 
 export function toDoseInput(draft: DoseDraft, nowIso: string): DoseLogInput {
-  return { compoundId: draft.compoundId, amount: draft.amount, unit: draft.unit, injectionSite: draft.site, datetime: nowIso };
+  return {
+    compoundId: draft.compoundId,
+    amount: draft.amount,
+    unit: draft.unit,
+    injectionSite: draft.site,
+    datetime: nowIso,
+    ...(draft.sideEffects.length > 0 ? { sideEffects: draft.sideEffects } : {}),
+  };
 }
 
 export function toWeightInput(value: number, unit: WeightUnit, nowIso: string): WeightLogInput {

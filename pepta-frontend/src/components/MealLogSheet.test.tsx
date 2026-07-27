@@ -40,6 +40,7 @@ vi.mock("react-native", () => ({
     quad: "quad",
   },
   Image: "Image",
+  Keyboard: { addListener: vi.fn(() => ({ remove: vi.fn() })) },
   KeyboardAvoidingView: "KeyboardAvoidingView",
   Modal: "Modal",
   Platform: { OS: "ios" },

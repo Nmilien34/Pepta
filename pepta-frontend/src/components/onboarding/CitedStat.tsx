@@ -4,10 +4,16 @@
 // stop, a supporting line, and its citation. One component so the look stays
 // identical wherever a cited stat appears, and no screen re-implements it.
 
-import React from 'react';
-import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { Platform, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { typography } from '../../theme/typography';
 import { convo } from './convoTokens';
+
+// The number arrives and settles: a soft touch, then a firmer one. Deliberately
+// NOT the success notification — a cited fact carries weight, but it is not an
+// achievement, and celebrating it would overplay the moment.
+const LAND_SETTLE_MS = 95;
 
 export interface CitedStatProps {
   /** The headline figure, e.g. "1 in 8", "~15%", "25–39%". Omit when the point
@@ -18,9 +24,30 @@ export interface CitedStatProps {
   /** The source (real citations only — never invented). */
   cite?: string;
   style?: StyleProp<ViewStyle>;
+  /**
+   * Flip to true when the stat becomes the thing being read (typically once the
+   * question above it has finished typing) to play the landing beat. Fires once.
+   */
+  land?: boolean;
 }
 
-export function CitedStat({ value, line, cite, style }: CitedStatProps) {
+export function CitedStat({ value, line, cite, style, land }: CitedStatProps) {
+  const landed = useRef(false);
+
+  useEffect(() => {
+    if (!land || landed.current || Platform.OS === 'web') return;
+    landed.current = true;
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft).catch(
+      () => undefined,
+    );
+    const id = setTimeout(() => {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(
+        () => undefined,
+      );
+    }, LAND_SETTLE_MS);
+    return () => clearTimeout(id);
+  }, [land]);
+
   return (
     <View style={style}>
       {value ? (

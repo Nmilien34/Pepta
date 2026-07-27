@@ -23,6 +23,7 @@ import {
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import { useTheme } from "../theme";
+import { useKeyboardVisible } from "./useKeyboardVisible";
 import { AppText } from "./AppText";
 import { Button } from "./Button";
 import { Chip } from "./onboarding/Chip";
@@ -111,6 +112,7 @@ export function QuickLogSheet({
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const window = useWindowDimensions();
+  const keyboardVisible = useKeyboardVisible();
   const {
     home,
     homeLoading,
@@ -374,7 +376,7 @@ export function QuickLogSheet({
           position: "absolute",
           left: 0,
           right: 0,
-          bottom: mode === "chooser" ? 0 : -insets.bottom,
+          bottom: keyboardVisible ? -insets.bottom : 0,
         }}
       >
         <Animated.View
@@ -393,6 +395,7 @@ export function QuickLogSheet({
                 paddingHorizontal: 16,
                 paddingTop: 10,
                 paddingBottom: 22,
+                flexShrink: 1,
               }}
             >
               <View
@@ -467,7 +470,7 @@ export function QuickLogSheet({
               </View>
 
               <ScrollView
-                style={mode === "chooser" ? { flexShrink: 1 } : undefined}
+                style={{ flexShrink: 1 }}
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
                 contentContainerStyle={{ paddingBottom: 8 }}
@@ -594,9 +597,7 @@ export function QuickLogSheet({
 
               {/* footer CTA */}
               {mode === "chooser" && isDoseValid(quickShot) ? (
-                <View
-                  style={{ marginTop: 10, marginBottom: 24, flexShrink: 0 }}
-                >
+                <View style={{ marginTop: 10, flexShrink: 0 }}>
                   <QuickShotExplainer theme={theme} dose={quickShot} />
                   <Button
                     label="Save shot now"
@@ -1121,6 +1122,45 @@ function DoseForm({
               Haptics.selectionAsync().catch(() => undefined);
               setOffsetH(p.h);
             }}
+          />
+        ))}
+      </View>
+
+      {/* side effects felt with this shot (optional) — saved on the dose record */}
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 6,
+          marginTop: 14,
+          marginBottom: 8,
+        }}
+      >
+        <Icon
+          name="alert-circle-outline"
+          size={15}
+          color={theme.colors.textSecondary}
+        />
+        <AppText variant="caption" color="textSecondary">
+          Any side effects? (optional)
+        </AppText>
+      </View>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+        {SIDE_EFFECTS.map((t) => (
+          <Chip
+            key={t}
+            label={sideEffectTypeLabel(t)}
+            selected={dose.sideEffects.includes(t)}
+            onPress={() => {
+              Haptics.selectionAsync().catch(() => undefined);
+              setDose({
+                ...dose,
+                sideEffects: dose.sideEffects.includes(t)
+                  ? dose.sideEffects.filter((x) => x !== t)
+                  : [...dose.sideEffects, t],
+              });
+            }}
+            multi
           />
         ))}
       </View>

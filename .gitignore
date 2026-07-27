@@ -16,3 +16,6 @@ android/
 .DS_Store
 .worktrees/
 worktrees/
+
+# Local tooling scratch — brainstorm servers write a PID and localhost info here.
+.superpowers/

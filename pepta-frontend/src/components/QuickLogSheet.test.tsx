@@ -16,6 +16,7 @@ vi.mock("react-native", () => ({
     out: vi.fn((value) => value),
     quad: "quad",
   },
+  Keyboard: { addListener: vi.fn(() => ({ remove: vi.fn() })) },
   KeyboardAvoidingView: "KeyboardAvoidingView",
   Modal: "Modal",
   Platform: { OS: "ios" },
@@ -217,9 +218,12 @@ describe("QuickLogSheet", () => {
     expect(scrollView.props.contentContainerStyle).toMatchObject({
       paddingBottom: 8,
     });
+    // The footer must never shrink away (the safe-area padding provides the
+    // bottom clearance instead of a hardcoded margin).
     expect(shotButton.parent?.props.style).toMatchObject({
-      marginBottom: 24,
+      flexShrink: 0,
     });
+    expect(shotButton.parent?.props.style.marginBottom).toBeUndefined();
     expect(shotButton).toBeDefined();
 
     await act(async () => {

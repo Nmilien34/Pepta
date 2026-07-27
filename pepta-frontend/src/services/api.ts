@@ -14,7 +14,12 @@ import {
   activityLogInputSchema,
   activityLogResponseSchema,
   compoundInputSchema,
+  compoundPatchSchema,
   compoundResponseSchema,
+  cycleInputSchema,
+  cycleResponseSchema,
+  schedulePatchSchema,
+  scheduleResponseSchema,
   doseLogInputSchema,
   doseLogResponseSchema,
   mealLogInputSchema,
@@ -64,7 +69,12 @@ import {
   type AvatarViewUrlResponse,
   type AuthResponse,
   type CompoundInput,
+  type CompoundPatch,
   type CompoundResponse,
+  type CycleInput,
+  type CycleResponse,
+  type SchedulePatch,
+  type ScheduleResponse,
   type DoseLogInput,
   type DoseLogResponse,
   type GoogleAuth,
@@ -261,6 +271,34 @@ class PeptaApi {
     }
   }
 
+  // Raw text GET (no JSON envelope) — the CSV export endpoint.
+  private async fetchText(path: string): Promise<string> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    let response: Response;
+    try {
+      response = await fetch(`${API_BASE_URL}${path}`, {
+        signal: controller.signal,
+        headers: this.authToken
+          ? { Authorization: `Bearer ${this.authToken}` }
+          : {},
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+    if (!response.ok) {
+      await this.failFromResponse(response); // throws an ApiError
+    }
+    return response.text();
+  }
+
+  // GET /me/export/logs.csv → the dose log as CSV text (side effects column
+  // included). tz localizes the date/time columns to the device's zone.
+  public exportDoseLogsCsv(timeZone?: string): Promise<string> {
+    const query = timeZone ? `?tz=${encodeURIComponent(timeZone)}` : "";
+    return this.fetchText(`/me/export/logs.csv${query}`);
+  }
+
   private async request<T>(
     path: string,
     schema: ResponseSchema<T>,
@@ -419,6 +457,58 @@ class PeptaApi {
     return this.request("/compounds", compoundResponseSchema, {
       method: "POST",
       body: JSON.stringify(compoundInputSchema.parse(body)),
+    });
+  }
+
+  // PATCH /compounds/:id → CompoundResponse. Mix calculator's "Save as my
+  // dose" writes plannedDose here.
+  public updateCompound(
+    compoundId: string,
+    body: CompoundPatch,
+  ): Promise<CompoundResponse> {
+    return this.request(`/compounds/${compoundId}`, compoundResponseSchema, {
+      method: "PATCH",
+      body: JSON.stringify(compoundPatchSchema.parse(body)),
+    });
+  }
+
+  // GET /schedules → ScheduleResponse[]. Dose timing per compound; the Track
+  // week strip and month calendar derive planned days from these.
+  public listSchedules(): Promise<ScheduleResponse[]> {
+    return this.request("/schedules", z.array(scheduleResponseSchema));
+  }
+
+  // PATCH /schedules/:id → ScheduleResponse. The timing editor writes
+  // timesOfDay/timing here.
+  public updateSchedule(
+    scheduleId: string,
+    body: SchedulePatch,
+  ): Promise<ScheduleResponse> {
+    return this.request(`/schedules/${scheduleId}`, scheduleResponseSchema, {
+      method: "PATCH",
+      body: JSON.stringify(schedulePatchSchema.parse(body)),
+    });
+  }
+
+  // GET /cycles → CycleResponse[]. Cycle rows carry the on/off pattern
+  // (weeksOn/weeksOff/repeats) that cycleWindows turns into rest windows.
+  public listCycles(): Promise<CycleResponse[]> {
+    return this.request("/cycles", z.array(cycleResponseSchema));
+  }
+
+  // POST /cycles → CycleResponse (201).
+  public createCycle(body: CycleInput): Promise<CycleResponse> {
+    return this.request("/cycles", cycleResponseSchema, {
+      method: "POST",
+      body: JSON.stringify(cycleInputSchema.parse(body)),
+    });
+  }
+
+  // DELETE /cycles/:id → CycleResponse. The cycles router has no PATCH, so
+  // "edit cycle" = delete + create (CycleSetupScreen does exactly that).
+  public deleteCycle(cycleId: string): Promise<CycleResponse> {
+    return this.request(`/cycles/${cycleId}`, cycleResponseSchema, {
+      method: "DELETE",
     });
   }
 

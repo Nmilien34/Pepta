@@ -2,7 +2,7 @@
 // selector. Restore-only chrome rather than the progress scaffold, matching
 // the design lab.
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Linking, Pressable, ScrollView, StatusBar, View } from "react-native";
 import { Icon } from "../../components/Icon";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -17,6 +17,7 @@ import {
   revenueCat,
   type RevenueCatPlan,
 } from "../../services/revenueCat";
+import { logPaywallShown, logPurchaseStarted } from "../../services/funnelEvents";
 import { buildPaywallPricing } from "./paywallPricing";
 
 export interface PaywallScreenProps {
@@ -56,6 +57,15 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
     useState<PaywallPackages | null>(null);
   const pricing = buildPaywallPricing(paywallPackages);
   const plansReady = paywallPackages !== null;
+  // paywall_shown fires once per presentation, when the offering load settles
+  // (so `variant` is the real experiment arm, or 'unknown' on failure).
+  const shownLogged = useRef(false);
+
+  const logShownOnce = (variant: string) => {
+    if (shownLogged.current) return;
+    shownLogged.current = true;
+    logPaywallShown(variant);
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -70,15 +80,23 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
     revenueCat
       .getPaywallPackages(auth.user.id)
       .then((packages) => {
-        if (mounted) setPaywallPackages(packages);
+        if (!mounted) return;
+        setPaywallPackages(packages);
+        logShownOnce(packages?.offeringId ?? "unknown");
       })
-      .catch(() => {
-        if (mounted) setPaywallPackages(null);
+      .catch((error) => {
+        // Loud by design: a silent fallback here would hide the experiment
+        // rendering the wrong arm or no store plans at all.
+        console.error("[Paywall] getOfferings failed:", error);
+        if (!mounted) return;
+        setPaywallPackages(null);
+        logShownOnce("unknown");
       });
 
     return () => {
       mounted = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auth.user?.id]);
 
   const refreshEntitlement = async (optimisticActive: boolean) => {
@@ -122,6 +140,11 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
 
   const handleStart = async () => {
     if (!auth.user?.id || completing || !plansReady) return;
+    // Funnel: CTA tapped, before the StoreKit sheet.
+    logPurchaseStarted(
+      paywallPackages?.offeringId ?? "unknown",
+      plan === "yearly" ? "annual" : "monthly",
+    );
     setMessage(null);
     setFailed(false);
     setCompleting(true);
@@ -255,6 +278,7 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
               sub={pricing.yearly.sub}
               price={pricing.yearly.price}
               per={pricing.yearly.per}
+              priceNote={pricing.yearly.priceNote}
               badge={pricing.yearly.badge}
             />
             <PlanCard
@@ -297,10 +321,20 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
             </AppText>
           ) : null}
           <Button
-            label={completing ? "Working…" : "Subscribe"}
+            label={completing ? "Working…" : pricing.cta[plan].label}
             onPress={() => void handleStart()}
             disabled={completing || !plansReady}
           />
+          {pricing.cta[plan].subline ? (
+            <AppText
+              variant="caption"
+              color="textSecondary"
+              align="center"
+              style={{ fontSize: 11, marginTop: theme.spacing.sm }}
+            >
+              {pricing.cta[plan].subline}
+            </AppText>
+          ) : null}
           <PaywallLegalFooter text={pricing.footer[plan]} />
         </View>
       </SafeAreaView>
@@ -364,6 +398,8 @@ interface PlanCardProps {
   sub: string;
   price: string;
   per: string;
+  /** Billed total in light type under a per-month anchor (3.1.2(c)). */
+  priceNote?: string;
   badge?: string;
 }
 
@@ -374,6 +410,7 @@ function PlanCard({
   sub,
   price,
   per,
+  priceNote,
   badge,
 }: PlanCardProps) {
   const theme = useTheme();
@@ -434,13 +471,20 @@ function PlanCard({
           </AppText>
         </View>
       </View>
-      <View style={{ flexDirection: "row", alignItems: "baseline" }}>
-        <AppText variant="statMedium" style={{ fontSize: 20 }}>
-          {price}
-        </AppText>
-        <AppText variant="caption" color="textSecondary">
-          {per}
-        </AppText>
+      <View style={{ alignItems: "flex-end" }}>
+        <View style={{ flexDirection: "row", alignItems: "baseline" }}>
+          <AppText variant="statMedium" style={{ fontSize: 20 }}>
+            {price}
+          </AppText>
+          <AppText variant="caption" color="textSecondary">
+            {per}
+          </AppText>
+        </View>
+        {priceNote ? (
+          <AppText variant="caption" color="textTertiary" style={{ marginTop: 1 }}>
+            {priceNote}
+          </AppText>
+        ) : null}
       </View>
     </Pressable>
   );

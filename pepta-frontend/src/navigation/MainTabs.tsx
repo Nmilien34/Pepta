@@ -8,6 +8,7 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useTheme } from "../theme";
 import { LogSheetsProvider, useLogSheets } from "../context/LogSheetsContext";
+import { PepChatProvider } from "../context/PepChatContext";
 import { PepCompanion } from "../components/PepCompanion";
 import { TabBar } from "./TabBar";
 import { HomeScreen } from "../screens/app/HomeScreen";
@@ -18,6 +19,10 @@ import { AccountDetailsScreen } from "../screens/app/AccountDetailsScreen";
 import { AccountFAQScreen } from "../screens/app/AccountFAQScreen";
 import { SourcesScreen } from "../screens/app/SourcesScreen";
 import { DoseSettingsScreen } from "../screens/app/DoseSettingsScreen";
+import { CycleSetupScreen } from "../screens/app/CycleSetupScreen";
+import { MixCalculatorScreen } from "../screens/app/MixCalculatorScreen";
+import { LibraryScreen } from "../screens/app/LibraryScreen";
+import { LibraryEntryScreen } from "../screens/app/LibraryEntryScreen";
 import { FoodHistoryScreen } from "../screens/app/FoodHistoryScreen";
 import { WeightDetailScreen } from "../screens/app/WeightDetailScreen";
 import { WidgetSetupScreen } from "../screens/app/WidgetSetupScreen";
@@ -28,9 +33,16 @@ const Stack = createNativeStackNavigator();
 export function MainTabs() {
   return (
     <LogSheetsProvider>
+      {/* Chat provider wraps the whole stack (not just Tabs) so detail screens
+          like the peptide library can open Ask Pep too. */}
+      <PepChatProvider>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Tabs" component={Tabs} />
         <Stack.Screen name="DoseSettings" component={DoseSettingsScreen} />
+        <Stack.Screen name="CycleSetup" component={CycleSetupScreen} />
+        <Stack.Screen name="MixCalculator" component={MixCalculatorScreen} />
+        <Stack.Screen name="Library" component={LibraryScreen} />
+        <Stack.Screen name="LibraryEntry" component={LibraryEntryScreen} />
         <Stack.Screen name="FoodHistory" component={FoodHistoryScreen} />
         <Stack.Screen name="WeightDetail" component={WeightDetailScreen} />
         <Stack.Screen name="WidgetSetup" component={WidgetSetupScreen} />
@@ -38,6 +50,7 @@ export function MainTabs() {
         <Stack.Screen name="AccountFAQ" component={AccountFAQScreen} />
         <Stack.Screen name="Sources" component={SourcesScreen} />
       </Stack.Navigator>
+      </PepChatProvider>
     </LogSheetsProvider>
   );
 }

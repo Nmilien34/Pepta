@@ -4,9 +4,11 @@
 // the entry CTA. Both CTAs lead to the provider sign-in screen.
 
 import React, { useState } from 'react';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { CitedStat, ConvoButton, ConvoScreen, convo } from '../../components';
+import { PRIVACY_URL, TERMS_URL } from '../../config';
+import { progressForStep } from '../onboarding/onboardingFlow';
 import { typography } from '../../theme/typography';
 
 export interface WelcomeScreenProps {
@@ -28,7 +30,7 @@ export function WelcomeScreen({ onContinue, onSignIn }: WelcomeScreenProps) {
 
   return (
     <ConvoScreen
-      progress={1 / 36}
+      progress={progressForStep('welcome')}
       context="Hi. Before anything else, one thing."
       question="You’re not doing this alone."
       onTyped={() => {
@@ -41,6 +43,30 @@ export function WelcomeScreen({ onContinue, onSignIn }: WelcomeScreenProps) {
       footer={
         <View style={{ gap: 4 }}>
           <ConvoButton label="I’m ready" onPress={onContinue} />
+          {/* Consent rides on the CTA instead of owning a whole turn — the
+              standalone "your data stays yours" step was friction for a
+              promise nobody disagrees with. Links stay live and tappable. */}
+          <Text style={styles.legal}>
+            By continuing you agree to our{' '}
+            <Text
+              accessibilityRole="link"
+              accessibilityLabel="Terms of Service"
+              style={styles.legalLink}
+              onPress={() => void Linking.openURL(TERMS_URL)}
+            >
+              Terms
+            </Text>{' '}
+            and{' '}
+            <Text
+              accessibilityRole="link"
+              accessibilityLabel="Privacy Policy"
+              style={styles.legalLink}
+              onPress={() => void Linking.openURL(PRIVACY_URL)}
+            >
+              Privacy Policy
+            </Text>
+            . Your health data is encrypted, never sold, and yours to delete anytime.
+          </Text>
           <Pressable accessibilityRole="button" accessibilityLabel="Sign in" onPress={onSignIn} style={styles.quiet}>
             <Text style={styles.quietText}>
               Already have an account? <Text style={{ color: convo.ink, fontFamily: typography.fonts.bold }}>Sign in</Text>
@@ -86,4 +112,18 @@ const styles = StyleSheet.create({
   facesMore: { fontFamily: typography.fonts.semiBold, fontSize: 12.5, color: convo.soft, marginLeft: 10 },
   quiet: { alignItems: 'center', paddingVertical: 13 },
   quietText: { fontFamily: typography.fonts.medium, fontSize: 13.5, color: convo.soft },
+  legal: {
+    fontFamily: typography.fonts.medium,
+    fontSize: 11.5,
+    lineHeight: 17,
+    color: convo.faint,
+    textAlign: 'center',
+    paddingHorizontal: 6,
+    paddingTop: 10,
+  },
+  legalLink: {
+    fontFamily: typography.fonts.semiBold,
+    color: convo.soft,
+    textDecorationLine: 'underline',
+  },
 });

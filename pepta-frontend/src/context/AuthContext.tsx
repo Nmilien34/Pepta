@@ -70,7 +70,10 @@ async function initializeAppsFlyerForUser(
   userId?: string,
 ): Promise<boolean> {
   return appsFlyer.initialize(userId).catch((error) => {
-    warnInDev("[AppsFlyer] Could not initialize attribution.", error);
+    // AppsFlyer is the funnel-analytics backbone — an init failure must be
+    // loud in EVERY build (a silent one means silently missing funnel data),
+    // while the app itself degrades gracefully.
+    console.error("[AppsFlyer] init failed:", error);
     return false;
   });
 }

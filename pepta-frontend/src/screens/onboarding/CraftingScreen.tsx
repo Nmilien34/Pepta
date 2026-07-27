@@ -8,11 +8,16 @@ import { Icon } from "../../components/Icon";
 import Svg, { Circle } from 'react-native-svg';
 import { useTheme } from '../../theme';
 import { AppText, Mascot, OnboardingScaffold } from '../../components';
+import { useHapticRamp } from '../../components/useHapticRamp';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 const R = 44;
 const C = 2 * Math.PI * R;
 const DURATION = 3200;
+// The ring is felt closing: taps swell and crowd as it comes back around to
+// the top. No success notification here — the reveal owns the payoff beat, and
+// two celebrations three seconds apart would cheapen both.
+const RING_PULSES = 16;
 
 export interface CraftingScreenProps {
   progress: number;
@@ -26,6 +31,8 @@ export function CraftingScreen({ progress, steps, onDone }: CraftingScreenProps)
   const [pct, setPct] = useState(0);
   const [checked, setChecked] = useState(0);
   const doneRef = useRef(false);
+
+  useHapticRamp(true, { durationMs: DURATION, pulses: RING_PULSES });
 
   useEffect(() => {
     const id = anim.addListener(({ value }) => {

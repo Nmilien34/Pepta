@@ -6,6 +6,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, View, useWindowDimensions, type ViewStyle } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../theme';
+import { useKeyboardVisible } from './useKeyboardVisible';
 
 const OFFSCREEN = 600;
 
@@ -23,6 +24,7 @@ export function BottomSheet({ visible, onClose, onDismissed, scrollable, height,
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const window = useWindowDimensions();
+  const keyboardVisible = useKeyboardVisible();
   const [render, setRender] = useState(visible);
   const backdrop = useRef(new Animated.Value(0)).current;
   const slide = useRef(new Animated.Value(OFFSCREEN)).current;
@@ -59,7 +61,7 @@ export function BottomSheet({ visible, onClose, onDismissed, scrollable, height,
       <KeyboardAvoidingView
         pointerEvents="box-none"
         behavior={avoidKeyboard && Platform.OS === 'ios' ? 'padding' : undefined}
-        style={{ position: 'absolute', left: 0, right: 0, bottom: -insets.bottom }}
+        style={{ position: 'absolute', left: 0, right: 0, bottom: avoidKeyboard && keyboardVisible ? -insets.bottom : 0 }}
       >
         <Animated.View
           style={{
@@ -74,7 +76,7 @@ export function BottomSheet({ visible, onClose, onDismissed, scrollable, height,
           <SafeAreaView edges={['bottom']} style={resolvedHeight ? { flex: 1 } : { maxHeight: '100%' }}>
             {scrollable ? (
               <ScrollView
-                style={resolvedHeight ? { flex: 1 } : undefined}
+                style={resolvedHeight ? { flex: 1 } : { flexShrink: 1 }}
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 22 }}
@@ -83,7 +85,7 @@ export function BottomSheet({ visible, onClose, onDismissed, scrollable, height,
                 {children}
               </ScrollView>
             ) : (
-              <View style={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 22 }}>
+              <View style={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 22, flexShrink: 1 }}>
                 <View style={{ width: 38, height: 5, borderRadius: 999, backgroundColor: theme.colors.border, alignSelf: 'center', marginBottom: 14 }} />
                 {children}
               </View>

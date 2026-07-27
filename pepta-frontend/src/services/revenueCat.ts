@@ -16,6 +16,8 @@ export type RevenueCatPlan = "monthly" | "yearly";
 export interface PaywallPackages {
   monthly: PurchasesPackage;
   yearly: PurchasesPackage;
+  /** Identifier of the offering these packages came from (experiment arm). */
+  offeringId: string;
 }
 
 export interface RevenueCatResult {
@@ -58,11 +60,19 @@ function assertPackage(
   return aPackage;
 }
 
+// The experiment assigns each user an offering server-side, surfaced as
+// offerings.current. current ALWAYS wins; the `default` offering is only a
+// fallback for the degenerate no-current case (pre-experiment both are the
+// same object, so behavior there is unchanged).
+function experimentOffering(offerings: PurchasesOfferings) {
+  return offerings.current ?? offerings.all[REVENUECAT_OFFERING_ID] ?? null;
+}
+
 function packageByIdentifier(
   offerings: PurchasesOfferings,
   identifier: string,
 ): PurchasesPackage | undefined {
-  const offering = offerings.all[REVENUECAT_OFFERING_ID] ?? offerings.current;
+  const offering = experimentOffering(offerings);
   return offering?.availablePackages.find((pkg) => pkg.identifier === identifier);
 }
 
@@ -195,10 +205,10 @@ export function createRevenueCatClient(options: RevenueCatClientOptions) {
   async function getPaywallPackages(appUserId: string): Promise<PaywallPackages> {
     await identify(appUserId);
     const offerings = await sdk.getOfferings();
-    const offering = offerings.all[REVENUECAT_OFFERING_ID] ?? offerings.current;
+    const offering = experimentOffering(offerings);
 
     if (!offering) {
-      throw new Error("RevenueCat default offering is not available");
+      throw new Error("RevenueCat current offering is not available");
     }
 
     return {
@@ -210,6 +220,7 @@ export function createRevenueCatClient(options: RevenueCatClientOptions) {
         offering.annual ?? packageByIdentifier(offerings, "$rc_annual"),
         "yearly",
       ),
+      offeringId: offering.identifier,
     };
   }
 
@@ -264,9 +275,9 @@ export const revenueCat = createRevenueCatClient({
   devMode,
   getAppsFlyerId: async (appUserId?: string) => {
     const initialized = await appsFlyer.initialize(appUserId).catch((error) => {
-      if (devMode) {
-        console.warn("[RevenueCat] Could not initialize AppsFlyer.", error);
-      }
+      // Loud in every build: AppsFlyer carries the funnel events, so a silent
+      // init failure would mean silently missing funnel data.
+      console.error("[AppsFlyer] init failed:", error);
       return false;
     });
     if (!initialized) return undefined;

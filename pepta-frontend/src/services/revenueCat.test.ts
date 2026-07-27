@@ -30,7 +30,7 @@ function makePackage(identifier: string, productIdentifier: string) {
     identifier,
     product: {
       identifier: productIdentifier,
-      priceString: productIdentifier === "yearly" ? "$40.00" : "$9.00",
+      priceString: productIdentifier === "yearly" ? "$40.00" : "$9.99",
     },
   };
 }
@@ -130,7 +130,7 @@ describe("RevenueCat client", () => {
     error.mockRestore();
   });
 
-  it("loads monthly and yearly packages from the default offering", async () => {
+  it("loads monthly and yearly packages from the current offering", async () => {
     const { sdk, monthly, yearly } = makeSdk();
     const client = createRevenueCatClient({
       sdk,
@@ -141,8 +141,69 @@ describe("RevenueCat client", () => {
 
     const packages = await client.getPaywallPackages("user_1");
 
-    expect(packages).toEqual({ monthly, yearly });
+    expect(packages).toEqual({ monthly, yearly, offeringId: "default" });
     expect(sdk.getOfferings).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders the experiment's assigned offering: current beats the default", async () => {
+    // Treatment user: offerings.current is the trial offering while `default`
+    // still exists in `all`. The paywall must render current.
+    const { sdk } = makeSdk();
+    const trialMonthly = makePackage("$rc_monthly", "monthly-trial");
+    const trialYearly = makePackage("$rc_annual", "yearly");
+    const controlOffering = {
+      identifier: "default",
+      monthly: makePackage("$rc_monthly", "monthly"),
+      annual: makePackage("$rc_annual", "yearly"),
+      availablePackages: [] as unknown[],
+    };
+    sdk.getOfferings.mockResolvedValueOnce({
+      current: {
+        identifier: "trial-offer",
+        monthly: trialMonthly,
+        annual: trialYearly,
+        availablePackages: [trialMonthly, trialYearly],
+      },
+      all: { default: controlOffering },
+    } as never);
+    const client = createRevenueCatClient({
+      sdk,
+      apiKey: "appl_test_key",
+      platformOS: "ios",
+      devMode: false,
+    });
+
+    const packages = await client.getPaywallPackages("user_1");
+
+    expect(packages.offeringId).toBe("trial-offer");
+    expect(packages.monthly).toBe(trialMonthly);
+  });
+
+  it("falls back to the default offering only when current is missing", async () => {
+    const { sdk } = makeSdk();
+    const monthly = makePackage("$rc_monthly", "monthly");
+    const yearly = makePackage("$rc_annual", "yearly");
+    sdk.getOfferings.mockResolvedValueOnce({
+      current: null,
+      all: {
+        default: {
+          identifier: "default",
+          monthly,
+          annual: yearly,
+          availablePackages: [monthly, yearly],
+        },
+      },
+    } as never);
+    const client = createRevenueCatClient({
+      sdk,
+      apiKey: "appl_test_key",
+      platformOS: "ios",
+      devMode: false,
+    });
+
+    const packages = await client.getPaywallPackages("user_1");
+
+    expect(packages.offeringId).toBe("default");
   });
 
   it("purchases the selected package and reports whether the pro entitlement is active", async () => {

@@ -5,18 +5,65 @@ import {
   prevStep,
   progressForStep,
   shouldSkipStep,
+  type OnboardingStep,
 } from './onboardingFlow';
 
 describe('onboarding flow', () => {
   it('starts at welcome, sits sign-in right before the paywall, ends at welcomeIn', () => {
     expect(ONBOARDING_STEPS[0]).toBe('welcome');
-    expect(ONBOARDING_STEPS[1]).toBe('privacy');
+    expect(ONBOARDING_STEPS[1]).toBe('meetPep');
     expect(ONBOARDING_STEPS[ONBOARDING_STEPS.length - 1]).toBe('welcomeIn');
-    expect(nextStep('welcome')).toBe('privacy');
+    expect(nextStep('welcome')).toBe('meetPep');
+    // The rating ask is post-purchase (WelcomeInScreen), never a quiz turn.
     expect(nextStep('reveal')).toBe('auth');
-    expect(nextStep('auth')).toBe('referral');
-    expect(nextStep('referral')).toBe('paywall');
+    // The referral code turn was removed — auth hands straight to the wall.
+    expect(nextStep('auth')).toBe('paywall');
     expect(nextStep('paywall')).toBe('welcomeIn');
+  });
+
+  it('no longer routes anyone through a referral code turn', () => {
+    expect(ONBOARDING_STEPS).not.toContain('referral');
+  });
+
+  it('never lands on a gated-out step, so per-step analytics cannot log phantom traffic', () => {
+    // Mirrors OnboardingNavigator.advanceWith: the skip chain is resolved in a
+    // pure walk BEFORE the step state is set, so a skipped step is never the
+    // current step and never renders. The instrumentation effect keyed on that
+    // state therefore cannot report a screen nobody saw.
+    const advanceWith = (
+      from: OnboardingStep,
+      ctx: Parameters<typeof shouldSkipStep>[1],
+    ): OnboardingStep | null => {
+      let s = nextStep(from);
+      while (s && shouldSkipStep(s, ctx)) s = nextStep(s);
+      return s;
+    };
+
+    // "Just exploring" gates the widest span (medication picker + dose block).
+    const ctx = { journeyStage: 'none' as const };
+    const visited: OnboardingStep[] = ['welcome'];
+    let current: OnboardingStep | null = 'welcome';
+
+    while (current) {
+      current = advanceWith(current, ctx);
+      if (current) visited.push(current);
+    }
+
+    expect(visited.at(-1)).toBe('welcomeIn');
+    visited.forEach((step) => {
+      expect(shouldSkipStep(step, ctx)).toBe(false);
+    });
+    // The gated steps really were excluded (otherwise this proves nothing).
+    expect(visited).not.toContain('medication');
+    expect(visited).not.toContain('currentDose');
+    expect(visited.length).toBeLessThan(ONBOARDING_STEPS.length);
+  });
+
+  it('never asks for an App Store rating inside the quiz', () => {
+    // Apple caps review prompts per user per year — the ask belongs
+    // post-purchase (WelcomeInScreen), not in front of a user who has neither
+    // used the tracker nor paid.
+    expect(ONBOARDING_STEPS).not.toContain('rateApp');
   });
 
   it('skips the sign-in step once authenticated', () => {
@@ -24,17 +71,18 @@ describe('onboarding flow', () => {
     expect(shouldSkipStep('auth', { authenticated: true })).toBe(true);
   });
 
-  it('skips referral and paywall for resolved-active access (creators/subscribers)', () => {
-    expect(shouldSkipStep('referral', { accessActive: true })).toBe(true);
+  it('skips the paywall for resolved-active access (creators/subscribers)', () => {
     expect(shouldSkipStep('paywall', { accessActive: true })).toBe(true);
-    expect(shouldSkipStep('referral', {})).toBe(false);
     expect(shouldSkipStep('paywall', {})).toBe(false);
     // welcomeIn still plays for creators.
     expect(shouldSkipStep('welcomeIn', { accessActive: true })).toBe(false);
   });
 
+  it('has no standalone privacy-consent turn (consent rides the welcome CTA)', () => {
+    expect(ONBOARDING_STEPS).not.toContain('privacy');
+  });
+
   it('advances forward in order through the new turns', () => {
-    expect(nextStep('privacy')).toBe('meetPep');
     expect(nextStep('meetPep')).toBe('journeyStage');
     expect(nextStep('journeyStage')).toBe('experience');
     expect(nextStep('experience')).toBe('needs');
@@ -56,8 +104,7 @@ describe('onboarding flow', () => {
 
   it('walks back, with no step before the first', () => {
     expect(prevStep('journeyStage')).toBe('meetPep');
-    expect(prevStep('meetPep')).toBe('privacy');
-    expect(prevStep('privacy')).toBe('welcome');
+    expect(prevStep('meetPep')).toBe('welcome');
     expect(prevStep('welcome')).toBeNull();
   });
 
@@ -66,12 +113,11 @@ describe('onboarding flow', () => {
   });
 
   it('matches the funnel progress values', () => {
-    // welcome=#1, privacy=#2, welcomeIn=last (denominator = full step count).
+    // welcome=#1, meetPep=#2, welcomeIn=last (denominator = full step count).
     const n = ONBOARDING_STEPS.length;
     expect(progressForStep('welcome')).toBeCloseTo(1 / n, 5);
-    expect(progressForStep('privacy')).toBeCloseTo(2 / n, 5);
-    expect(progressForStep('meetPep')).toBeCloseTo(3 / n, 5);
-    expect(progressForStep('journeyStage')).toBeCloseTo(4 / n, 5);
+    expect(progressForStep('meetPep')).toBeCloseTo(2 / n, 5);
+    expect(progressForStep('journeyStage')).toBeCloseTo(3 / n, 5);
     expect(progressForStep('welcomeIn')).toBe(1);
   });
 });

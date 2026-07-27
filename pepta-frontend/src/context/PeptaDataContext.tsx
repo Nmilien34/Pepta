@@ -17,6 +17,8 @@ import React, {
 import type {
   CompoundInput,
   CompoundResponse,
+  CycleInput,
+  CycleResponse,
   DoseLogInput,
   DoseLogResponse,
   HomeRangeKey,
@@ -26,6 +28,7 @@ import type {
   MeasurementInput,
   MeasurementResponse,
   ProgressResponse,
+  ScheduleResponse,
   SideEffectLogInput,
   SideEffectLogResponse,
   TrackResponse,
@@ -74,6 +77,17 @@ interface PeptaDataContextValue {
   trackRefreshing: boolean;
   trackError: string | null;
   refreshTrack(): Promise<void>;
+  // Scheduling (Track week strip, month sheet, cycle setup). Loaded lazily by
+  // the Track screen; null until the first fetch resolves. Failures leave them
+  // null — the strip and pill simply don't render, matching the screen's
+  // render-whatever-loaded posture.
+  schedules: ScheduleResponse[] | null;
+  cycles: CycleResponse[] | null;
+  refreshScheduling(): Promise<void>;
+  // The cycles router has no PATCH: editing = soft-delete the old row, create
+  // the new one. Sequenced create-first so a failed create never leaves the
+  // user with no cycle at all.
+  saveCycle(input: CycleInput, replaceId?: string): Promise<CycleResponse>;
   progress: ProgressResponse | null;
   progressLoading: boolean;
   progressRefreshing: boolean;
@@ -188,6 +202,8 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
   const [trackLoading, setTrackLoading] = useState(false);
   const [trackRefreshing, setTrackRefreshing] = useState(false);
   const [trackError, setTrackError] = useState<string | null>(null);
+  const [schedules, setSchedules] = useState<ScheduleResponse[] | null>(null);
+  const [cycles, setCycles] = useState<CycleResponse[] | null>(null);
   const [progress, setProgress] = useState<ProgressResponse | null>(null);
   const [progressLoading, setProgressLoading] = useState(false);
   const [progressRefreshing, setProgressRefreshing] = useState(false);
@@ -371,6 +387,55 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
       setTrackRefreshing(false);
     }
   }, []);
+
+  const refreshScheduling = useCallback(async () => {
+    // Progressive enhancement: a failure just keeps the previous value (or
+    // null), so Track renders without the strip instead of erroring.
+    const [scheduleResult, cycleResult] = await Promise.allSettled([
+      api.listSchedules(),
+      api.listCycles(),
+    ]);
+    if (scheduleResult.status === "fulfilled") setSchedules(scheduleResult.value);
+    if (cycleResult.status === "fulfilled") setCycles(cycleResult.value);
+    if (scheduleResult.status === "rejected") {
+      console.warn(
+        "[PeptaData] schedules failed:",
+        extractApiError(scheduleResult.reason).message,
+      );
+    }
+    if (cycleResult.status === "rejected") {
+      console.warn(
+        "[PeptaData] cycles failed:",
+        extractApiError(cycleResult.reason).message,
+      );
+    }
+  }, []);
+
+  const saveCycle = useCallback(
+    async (input: CycleInput, replaceId?: string) => {
+      const created = await api.createCycle(input);
+      if (replaceId) {
+        // Old cycle is superseded; a failed delete leaves a duplicate active
+        // row, which activeCycleOf resolves by taking the newest — so we log
+        // and let the next refresh reconcile rather than failing the save.
+        await api.deleteCycle(replaceId).catch((error: unknown) => {
+          console.warn(
+            "[PeptaData] replaced cycle delete failed:",
+            extractApiError(error).message,
+          );
+        });
+      }
+      setCycles((current) => [
+        created,
+        ...(current ?? []).map((cycle) =>
+          cycle.id === replaceId ? { ...cycle, active: false } : cycle,
+        ),
+      ]);
+      void refreshScheduling();
+      return created;
+    },
+    [refreshScheduling],
+  );
   const addDoseLog = useCallback((input: DoseLogInput) => {
     setTrack((t) =>
       t
@@ -480,6 +545,10 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
       trackRefreshing,
       trackError,
       refreshTrack,
+      schedules,
+      cycles,
+      refreshScheduling,
+      saveCycle,
       progress,
       progressLoading,
       progressRefreshing,
@@ -507,6 +576,10 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
       trackRefreshing,
       trackError,
       refreshTrack,
+      schedules,
+      cycles,
+      refreshScheduling,
+      saveCycle,
       progress,
       progressLoading,
       progressRefreshing,

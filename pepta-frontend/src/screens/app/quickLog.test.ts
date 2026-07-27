@@ -31,7 +31,7 @@ describe('defaultDoseDraft', () => {
 
 describe('isDoseValid', () => {
   it('requires a compound + positive amount', () => {
-    const base: DoseDraft = { compoundId: 'c1', compoundName: 'T', amount: 5, unit: 'mg', site: 'abdomen_left' };
+    const base: DoseDraft = { compoundId: 'c1', compoundName: 'T', amount: 5, unit: 'mg', site: 'abdomen_left', sideEffects: [] };
     expect(isDoseValid(base)).toBe(true);
     expect(isDoseValid({ ...base, amount: 0 })).toBe(false);
     expect(isDoseValid(null)).toBe(false);
@@ -40,7 +40,7 @@ describe('isDoseValid', () => {
 
 describe('payload builders', () => {
   it('inject datetime and keep the typed shape', () => {
-    const draft: DoseDraft = { compoundId: 'c1', compoundName: 'T', amount: 5, unit: 'mg', site: 'thigh_left' };
+    const draft: DoseDraft = { compoundId: 'c1', compoundName: 'T', amount: 5, unit: 'mg', site: 'thigh_left', sideEffects: [] };
     expect(toDoseInput(draft, NOW)).toEqual({ compoundId: 'c1', amount: 5, unit: 'mg', injectionSite: 'thigh_left', datetime: NOW });
     expect(toWeightInput(184, 'lb', NOW)).toEqual({ value: 184, unit: 'lb', datetime: NOW });
     expect(toProteinInput(30, NOW)).toEqual({ grams: 30, datetime: NOW });
@@ -52,6 +52,15 @@ describe('payload builders', () => {
     expect(toSideEffectInput(['nausea'], 2, NOW, 'after dinner')).toMatchObject({ notes: 'after dinner' });
     expect(toMeasurementInput('waist', 34, 'in', NOW, 'morning')).toMatchObject({ notes: 'morning' });
     expect(toSideEffectInput(['nausea'], 2, NOW)).not.toHaveProperty('notes');
+  });
+  it('carries dose side effects only when some are picked', () => {
+    const draft: DoseDraft = { compoundId: 'c1', compoundName: 'T', amount: 5, unit: 'mg', site: 'thigh_left', sideEffects: ['nausea', 'fatigue'] };
+    expect(toDoseInput(draft, NOW)).toMatchObject({ sideEffects: ['nausea', 'fatigue'] });
+    expect(toDoseInput({ ...draft, sideEffects: [] }, NOW)).not.toHaveProperty('sideEffects');
+  });
+  it('starts the default draft with no side effects picked', () => {
+    const home = { activeCompounds: [{ id: 'c1', name: 'T', plannedDose: 5, doseUnit: 'mg' }] } as unknown as HomeResponse;
+    expect(defaultDoseDraft(home, null)!.sideEffects).toEqual([]);
   });
 });
 

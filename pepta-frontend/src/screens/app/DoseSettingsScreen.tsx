@@ -1,25 +1,40 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, type NavigationProp } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppText, Button, Card, SectionErrorBanner } from '../../components';
 import { Icon } from '../../components/Icon';
+import { TimingSheet } from '../../components/TimingSheet';
 import { useLogSheets } from '../../context/LogSheetsContext';
 import { usePeptaData } from '../../context/PeptaDataContext';
 import { useTheme } from '../../theme';
 import { formatNextDoseAt, siteLabel, sortDoses } from './trackView';
+import { activeCycleOf, patternOf } from './scheduleView';
+import { formatTimesOfDay, primarySchedule, timingLabel } from './timingView';
 
 export function DoseSettingsScreen() {
   const theme = useTheme();
-  const navigation = useNavigation();
+  const navigation = useNavigation<NavigationProp<Record<string, undefined>>>();
   const { openQuickLog } = useLogSheets();
-  const { home, track, homeLoading, trackLoading, homeError, trackError, refreshHome, refreshTrack } = usePeptaData();
+  const { home, track, homeLoading, trackLoading, homeError, trackError, refreshHome, refreshTrack, schedules, cycles, refreshScheduling } = usePeptaData();
+  const [timingOpen, setTimingOpen] = useState(false);
 
   useEffect(() => {
     if (!home) void refreshHome();
     if (!track) void refreshTrack();
-  }, [home, track, refreshHome, refreshTrack]);
+    if (!cycles) void refreshScheduling();
+  }, [home, track, cycles, refreshHome, refreshTrack, refreshScheduling]);
+
+  const cyclePattern = useMemo(() => patternOf(activeCycleOf(cycles)), [cycles]);
+  const schedule = useMemo(() => primarySchedule(schedules), [schedules]);
+  const timingValue = useMemo(() => {
+    if (schedule?.timesOfDay && schedule.timesOfDay.length > 0) {
+      const context = timingLabel(schedule.timing);
+      return `${formatTimesOfDay(schedule.timesOfDay)}${context ? ` · ${context}` : ''}`;
+    }
+    return null;
+  }, [schedule]);
 
   const compound = home?.activeCompounds[0] ?? null;
   const ml = home?.medicationLevels[0] ?? null;
@@ -79,10 +94,25 @@ export function DoseSettingsScreen() {
                 />
                 <SettingRow
                   icon="time-outline"
-                  label="Reminder time"
-                  value={nextDose?.nextDoseAt ? formatTime(nextDose.nextDoseAt) : 'No reminder yet'}
+                  label="Dose timing"
+                  value={
+                    timingValue ??
+                    (nextDose?.nextDoseAt ? formatTime(nextDose.nextDoseAt) : 'Set your times')
+                  }
+                  onPress={() => setTimingOpen(true)}
+                />
+                <SettingRow
+                  icon="repeat"
+                  label="Cycle"
+                  value={cyclePattern ? `${cyclePattern.weeksOn} wk on, ${cyclePattern.weeksOff} off` : 'Not set'}
+                  onPress={() => navigation.navigate('CycleSetup')}
+                />
+                <SettingRow
+                  icon="flask"
+                  label="Mix calculator"
+                  value="Vial + water → units"
                   last
-                  onPress={() => openQuickLog('dose')}
+                  onPress={() => navigation.navigate('MixCalculator')}
                 />
               </Card>
 
@@ -108,6 +138,7 @@ export function DoseSettingsScreen() {
           )}
         </ScrollView>
       </SafeAreaView>
+      <TimingSheet visible={timingOpen} onClose={() => setTimingOpen(false)} />
     </View>
   );
 }

@@ -28,6 +28,15 @@ const mocks = vi.hoisted(() => ({
   track: null as TrackResponse | null,
   progress: null as ProgressResponse | null,
   user: null as User | null,
+  exportDoseLogsCsv: vi.fn(() => Promise.resolve('date,time\n')),
+  fileWrite: vi.fn(),
+}));
+
+// The CSV export imports the native file-system module; stub it so the test
+// never loads native code it doesn't exercise.
+vi.mock("expo-file-system", () => ({
+  File: vi.fn(() => ({ uri: "file:///tmp/pepta-dose-log.csv", write: mocks.fileWrite })),
+  Paths: { cache: "file:///tmp" },
 }));
 
 vi.mock("react-native", () => ({
@@ -183,6 +192,7 @@ vi.mock("../../services/api", () => ({
     getProgress: mocks.getProgress,
     updateAccount: mocks.updateAccount,
     updateProfileSettings: mocks.updateProfileSettings,
+    exportDoseLogsCsv: mocks.exportDoseLogsCsv,
   },
 }));
 
@@ -434,6 +444,29 @@ describe("AccountScreen settings", () => {
     expect(JSON.parse(content!.message).logs.mealLogs[0].foodName).toBe("Eggs");
   });
 
+  it("writes the dose-log CSV to a file and shares it", async () => {
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+
+    await act(async () => {
+      tree = TestRenderer.create(<AccountScreen />);
+    });
+
+    await act(async () => {
+      await pressableContaining(tree!.root, "Export logs (CSV)").props.onPress();
+    });
+
+    // Timezone is passed so the date/time columns render in local time.
+    expect(mocks.exportDoseLogsCsv).toHaveBeenCalledTimes(1);
+    expect(typeof mocks.exportDoseLogsCsv.mock.calls[0]?.[0]).toBe("string");
+    expect(mocks.fileWrite).toHaveBeenCalledWith("date,time\n");
+    // Shared as a file URL, not as a giant message body.
+    expect(mocks.share).toHaveBeenCalledTimes(1);
+    expect(mocks.share.mock.calls[0]?.[0]).toMatchObject({
+      url: "file:///tmp/pepta-dose-log.csv",
+    });
+    expect(mocks.alert).not.toHaveBeenCalled();
+  });
+
   it("opens the widget setup screen from Add widgets", async () => {
     let tree: TestRenderer.ReactTestRenderer | undefined;
 
@@ -582,5 +615,56 @@ describe("AccountScreen settings", () => {
     expect(mocks.openURL).toHaveBeenCalledWith(
       "mailto:dev@boltzman.ai?subject=Pepta%20bug%20report",
     );
+  });
+
+  it("opens each quick-access tile's real destination screen", async () => {
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+
+    await act(async () => {
+      tree = TestRenderer.create(<AccountScreen />);
+    });
+
+    const destinations: Array<[string, string]> = [
+      ["My protocol", "DoseSettings"],
+      ["Mix calculator", "MixCalculator"],
+      ["Peptide library", "Library"],
+    ];
+
+    for (const [label, screen] of destinations) {
+      await act(async () => {
+        pressableContaining(tree!.root, label).props.onPress();
+      });
+      expect(mocks.navigate).toHaveBeenCalledWith(screen);
+    }
+  });
+
+  it("keeps the My data tile in-screen instead of faking a destination", async () => {
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+
+    await act(async () => {
+      tree = TestRenderer.create(<AccountScreen />);
+    });
+
+    await act(async () => {
+      pressableContaining(tree!.root, "My data").props.onPress();
+    });
+
+    // It scrolls to Data & reports — no navigation, and no "coming soon" alert.
+    expect(mocks.navigate).not.toHaveBeenCalled();
+    expect(mocks.alert).not.toHaveBeenCalled();
+  });
+
+  it("moves Medication out of Your plan and into the protocol tile", async () => {
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+
+    await act(async () => {
+      tree = TestRenderer.create(<AccountScreen />);
+    });
+
+    // The old Your-plan row rendered as label+value ("MedicationNot set" with
+    // no compounds). It is gone; the protocol tile owns that destination now.
+    const screenText = nodeText(tree!.root);
+    expect(screenText).not.toContain("MedicationNot set");
+    expect(screenText).toContain("My protocol");
   });
 });

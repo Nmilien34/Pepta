@@ -2,6 +2,17 @@ import React from "react";
 import TestRenderer, { act, type ReactTestInstance } from "react-test-renderer";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PepCompanion } from "./PepCompanion";
+import { PepChatProvider } from "../context/PepChatContext";
+
+// The chat modal now lives in PepChatProvider (so any screen can open it);
+// PepCompanion drives it via context, so the tests mount both together.
+function Companion() {
+  return (
+    <PepChatProvider>
+      <PepCompanion />
+    </PepChatProvider>
+  );
+}
 
 const mocks = vi.hoisted(() => ({
   coachChat: vi.fn(),
@@ -231,7 +242,7 @@ describe("PepCompanion chat handoff", () => {
   it("keeps the full-screen chat chrome clear of device safe areas", async () => {
     let tree: TestRenderer.ReactTestRenderer | undefined;
     await act(async () => {
-      tree = TestRenderer.create(<PepCompanion />);
+      tree = TestRenderer.create(<Companion />);
     });
 
     await openChat(tree!);
@@ -267,7 +278,7 @@ describe("PepCompanion chat handoff", () => {
   it("opens chat after the user taps through every current Pep note", async () => {
     let tree: TestRenderer.ReactTestRenderer | undefined;
     await act(async () => {
-      tree = TestRenderer.create(<PepCompanion />);
+      tree = TestRenderer.create(<Companion />);
     });
 
     await act(async () => {

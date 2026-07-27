@@ -4,7 +4,7 @@
 // Sign out → confirm + logout); the rest are inert until their detail screens
 // exist (so they don't pretend to do something).
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Alert,
   Linking,
@@ -16,6 +16,7 @@ import {
 } from "react-native";
 import { Icon } from "../../components/Icon";
 import * as Haptics from "expo-haptics";
+import { File, Paths } from "expo-file-system";
 import { useNavigation, type NavigationProp } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "../../theme";
@@ -36,6 +37,7 @@ import {
   profileSubtitle,
   unitsLabel,
 } from "./accountView";
+import { LIBRARY_ENTRIES } from "../../data/peptideLibrary";
 import { ReminderSettingsScreen } from "./ReminderSettingsScreen";
 import { PaywallScreen } from "../onboarding/PaywallScreen";
 import {
@@ -54,6 +56,9 @@ type AccountNavigationParamList = {
   AccountFAQ: undefined;
   WidgetSetup: undefined;
   Sources: undefined;
+  DoseSettings: undefined;
+  MixCalculator: undefined;
+  Library: undefined;
 };
 
 interface Row {
@@ -158,6 +163,20 @@ export function AccountScreen() {
     }
   };
 
+  // Dose log as CSV (competitor-review ask): backend builds the file in the
+  // device's timezone; we land it in cache and hand it to the share sheet.
+  const exportLogsCsv = async () => {
+    try {
+      const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const csv = await api.exportDoseLogsCsv(timeZone);
+      const file = new File(Paths.cache, "pepta-dose-log.csv");
+      file.write(csv);
+      await Share.share({ url: file.uri, title: "Pepta dose log" });
+    } catch {
+      Alert.alert("Export could not start", "Try again in a moment.");
+    }
+  };
+
   const patchSettings = (patch: UserProfileSettingsPatch) => {
     Haptics.selectionAsync().catch(() => undefined);
     setSettingsSheet(null);
@@ -187,18 +206,51 @@ export function AccountScreen() {
     navigation.navigate("AccountDetails");
   };
 
+  // Quick access — Peptide-Pal-style destination tiles for what users actually
+  // come to Settings to reach (design: design-lab/settings.html, variant A).
+  // Every tile is a real shipped screen; "My data" scrolls to Data & reports.
+  const scrollRef = useRef<ScrollView>(null);
+  const dataReportsY = useRef(0);
+  const scrollToDataReports = () => {
+    scrollRef.current?.scrollTo({
+      y: Math.max(dataReportsY.current - 8, 0),
+      animated: true,
+    });
+  };
+  const quickAccess: QuickTileSpec[] = [
+    {
+      icon: "calendar-week",
+      label: "My protocol",
+      sub: "Schedule · timing · cycles",
+      onPress: () => navigation.navigate("DoseSettings"),
+    },
+    {
+      icon: "flask",
+      label: "Mix calculator",
+      sub: "Vial + water → units",
+      onPress: () => navigation.navigate("MixCalculator"),
+    },
+    {
+      icon: "books",
+      label: "Peptide library",
+      sub: `${LIBRARY_ENTRIES.length} peptides · evidence-ranked`,
+      onPress: () => navigation.navigate("Library"),
+    },
+    {
+      icon: "file-export",
+      label: "My data",
+      sub: "Exports · reports · widgets",
+      onPress: scrollToDataReports,
+    },
+  ];
+
   const planWeightUnit =
     effectiveProfile?.weightUnit ??
     (effectiveProfile?.heightUnit === "cm" ? "kg" : "lb");
   // Your plan — a read-only summary of the tracker setup (real values from the
-  // profile/home). Display-only for now: no detail editors are wired yet, so we
-  // don't fake navigation.
+  // profile/home). Medication moved into the My protocol tile's destination;
+  // the rest stays display-only (no detail editors yet, so no fake navigation).
   const plan: Row[] = [
-    {
-      icon: "needle",
-      label: "Medication",
-      value: home?.activeCompounds?.[0]?.name ?? "Not set",
-    },
     {
       icon: "target",
       label: "Goal",
@@ -280,6 +332,12 @@ export function AccountScreen() {
       chevron: true,
     },
     {
+      icon: "list",
+      label: "Export logs (CSV)",
+      onPress: () => void exportLogsCsv(),
+      chevron: true,
+    },
+    {
       icon: "layout-grid-add",
       label: "Add widgets",
       onPress: () => navigation.navigate("WidgetSetup"),
@@ -346,6 +404,7 @@ export function AccountScreen() {
     <View style={{ flex: 1, backgroundColor: theme.colors.bg }}>
       <SafeAreaView edges={["top"]} style={{ flex: 1 }}>
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={{
             paddingHorizontal: 16,
             paddingTop: 4,
@@ -395,6 +454,15 @@ export function AccountScreen() {
                 </Card>
               )}
             </Pressable>
+          </Reveal>
+
+          {/* quick access tiles */}
+          <Reveal delay={90} style={{ marginTop: 12 }}>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
+              {quickAccess.map((tile) => (
+                <QuickTile key={tile.label} tile={tile} />
+              ))}
+            </View>
           </Reveal>
 
           {/* subscription */}
@@ -452,7 +520,13 @@ export function AccountScreen() {
           <Section title="Your plan" delay={150} rows={plan} />
           <Section title="Preferences" delay={210} rows={preferences} />
           <Section title="Permissions" delay={270} rows={permissions} />
-          <Section title="Data & reports" delay={330} rows={dataReports} />
+          <View
+            onLayout={(e) => {
+              dataReportsY.current = e.nativeEvent.layout.y;
+            }}
+          >
+            <Section title="Data & reports" delay={330} rows={dataReports} />
+          </View>
           <Section title="Community" delay={360} rows={community} />
           <Section title="Support" delay={390} rows={support} />
           <Section title="About" delay={450} rows={about} />
@@ -665,6 +739,55 @@ function SelectorOption({
       <AppText variant="bodyStrong" style={{ flex: 1, fontWeight: "800" }}>
         {label}
       </AppText>
+    </Pressable>
+  );
+}
+
+interface QuickTileSpec {
+  icon: string;
+  label: string;
+  sub: string;
+  onPress(): void;
+}
+
+function QuickTile({ tile }: { tile: QuickTileSpec }) {
+  const theme = useTheme();
+  const press = () => {
+    Haptics.selectionAsync().catch(() => undefined);
+    tile.onPress();
+  };
+  return (
+    <Pressable
+      onPress={press}
+      accessibilityRole="button"
+      accessibilityLabel={tile.label}
+      style={({ pressed }) => ({
+        flexBasis: "48%",
+        flexGrow: 1,
+        opacity: pressed ? 0.6 : 1,
+      })}
+    >
+      <Card style={{ alignItems: "flex-start", paddingVertical: 14 }}>
+        <View
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 12,
+            backgroundColor: "rgba(124,92,252,0.12)",
+            alignItems: "center",
+            justifyContent: "center",
+            marginBottom: 10,
+          }}
+        >
+          <Icon name={tile.icon} size={19} color={theme.colors.primary} />
+        </View>
+        <AppText variant="bodyStrong" style={{ fontWeight: "800", fontSize: 15 }}>
+          {tile.label}
+        </AppText>
+        <AppText variant="caption" color="textSecondary" style={{ marginTop: 3 }}>
+          {tile.sub}
+        </AppText>
+      </Card>
     </Pressable>
   );
 }
