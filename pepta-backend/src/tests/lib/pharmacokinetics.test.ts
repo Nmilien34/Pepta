@@ -71,4 +71,158 @@ describe('computeMedicationLevel', () => {
     expect(result.nextDoseAt).toBe('2026-06-15T09:00:00.000Z');
     expect(result.hoursUntilNextDose).toBe(21);
   });
+
+  // On/off cycle: Jun 1 start, 8 weeks on, 2 weeks rest = rest Jul 27 – Aug 9.
+  describe('cycle rest windows', () => {
+    const cyclePattern = {
+      startDate: '2026-06-01',
+      weeksOn: 8,
+      weeksOff: 2,
+      repeats: true,
+    };
+
+    it('interval projection lands past the rest window, keeping time-of-day', () => {
+      const result = computeMedicationLevel({
+        compoundId: 'compound-1',
+        compoundName: 'semaglutide',
+        halfLifeDays: 7,
+        doses: [{ amount: 10, datetime: '2026-07-25T20:00:00.000Z' }],
+        now: new Date('2026-07-26T00:00:00.000Z'),
+        scheduleIntervalDays: 7,
+        cyclePattern,
+      });
+
+      // Raw next = Aug 1, inside rest → first on-day is Aug 10.
+      expect(result.nextDoseAt).toBe('2026-08-10T20:00:00.000Z');
+    });
+
+    it('weekly weekday projection skips rest Saturdays', () => {
+      const result = computeMedicationLevel({
+        compoundId: 'compound-1',
+        compoundName: 'semaglutide',
+        halfLifeDays: 7,
+        doses: [{ amount: 10, datetime: '2026-07-25T09:00:00.000Z' }],
+        now: new Date('2026-07-26T00:00:00.000Z'),
+        schedule: {
+          frequency: 'weekly',
+          intervalDays: 7,
+          daysOfWeek: [6],
+        },
+        cyclePattern,
+      });
+
+      // Aug 1 and Aug 8 are rest Saturdays; Aug 15 is the first on-cycle one.
+      expect(result.nextDoseAt).toBe('2026-08-15T09:00:00.000Z');
+    });
+
+    it('a finished one-cycle-only pattern projects no next dose at all', () => {
+      const result = computeMedicationLevel({
+        compoundId: 'compound-1',
+        compoundName: 'semaglutide',
+        halfLifeDays: 7,
+        doses: [{ amount: 10, datetime: '2026-07-25T20:00:00.000Z' }],
+        now: new Date('2026-08-12T00:00:00.000Z'),
+        scheduleIntervalDays: 7,
+        cyclePattern: { ...cyclePattern, repeats: false },
+      });
+
+      expect(result.nextDoseAt).toBeNull();
+      expect(result.hoursUntilNextDose).toBeNull();
+    });
+
+    it('without a pattern the legacy projection is untouched', () => {
+      const result = computeMedicationLevel({
+        compoundId: 'compound-1',
+        compoundName: 'semaglutide',
+        halfLifeDays: 7,
+        doses: [{ amount: 10, datetime: '2026-07-25T20:00:00.000Z' }],
+        now: new Date('2026-07-26T00:00:00.000Z'),
+        scheduleIntervalDays: 7,
+      });
+
+      expect(result.nextDoseAt).toBe('2026-08-01T20:00:00.000Z');
+    });
+  });
+
+  // Protocol timing: schedule.timesOfDay are user-LOCAL wall-clock times,
+  // converted through the profile timezone — never an echo of the last log.
+  describe('protocol dose times', () => {
+    it('split dosing lands on the later time the SAME day (daily, EDT)', () => {
+      // 08:05 ET shot logged; next is 20:00 ET today = 00:00Z tomorrow.
+      const result = computeMedicationLevel({
+        compoundId: 'compound-1',
+        compoundName: 'BPC-157',
+        halfLifeDays: 1,
+        doses: [{ amount: 0.25, datetime: '2026-06-24T12:05:00.000Z' }],
+        now: new Date('2026-06-24T12:30:00.000Z'),
+        schedule: { frequency: 'daily', timesOfDay: ['08:00', '20:00'] },
+        timeZone: 'America/New_York',
+      });
+
+      expect(result.nextDoseAt).toBe('2026-06-25T00:00:00.000Z');
+    });
+
+    it('weekly weekday schedules project the listed time, not the logged hour', () => {
+      // Saturdays at 09:00 ET; last shot logged late (11:47). Next Saturday
+      // still projects 09:00 ET (13:00Z in EDT).
+      const result = computeMedicationLevel({
+        compoundId: 'compound-1',
+        compoundName: 'semaglutide',
+        halfLifeDays: 7,
+        doses: [{ amount: 10, datetime: '2026-06-20T15:47:00.000Z' }],
+        now: new Date('2026-06-22T00:00:00.000Z'),
+        schedule: { frequency: 'weekly', daysOfWeek: [6], timesOfDay: ['09:00'] },
+        timeZone: 'America/New_York',
+      });
+
+      expect(result.nextDoseAt).toBe('2026-06-27T13:00:00.000Z');
+    });
+
+    it('converts through the zone in winter too (EST, not a fixed offset)', () => {
+      const result = computeMedicationLevel({
+        compoundId: 'compound-1',
+        compoundName: 'ipamorelin',
+        halfLifeDays: 1,
+        doses: [{ amount: 0.3, datetime: '2026-01-10T03:00:00.000Z' }],
+        now: new Date('2026-01-10T15:00:00.000Z'),
+        schedule: { frequency: 'daily', timesOfDay: ['22:00'] },
+        timeZone: 'America/New_York',
+      });
+
+      // 22:00 EST (UTC-5) = 03:00Z next day.
+      expect(result.nextDoseAt).toBe('2026-01-11T03:00:00.000Z');
+    });
+
+    it('cycle rest windows still pause timed protocols', () => {
+      // Rest Jul 27 – Aug 9 (user-local days); daily 08:00 ET resumes Aug 10.
+      const result = computeMedicationLevel({
+        compoundId: 'compound-1',
+        compoundName: 'BPC-157',
+        halfLifeDays: 1,
+        doses: [{ amount: 0.25, datetime: '2026-07-26T12:00:00.000Z' }],
+        now: new Date('2026-07-27T12:00:00.000Z'),
+        schedule: { frequency: 'daily', timesOfDay: ['08:00'] },
+        timeZone: 'America/New_York',
+        cyclePattern: { startDate: '2026-06-01', weeksOn: 8, weeksOff: 2, repeats: true },
+      });
+
+      expect(result.nextDoseAt).toBe('2026-08-10T12:00:00.000Z');
+    });
+
+    it('falls back to the legacy echo when the timezone is unusable', () => {
+      const result = computeMedicationLevel({
+        compoundId: 'compound-1',
+        compoundName: 'semaglutide',
+        halfLifeDays: 7,
+        doses: [{ amount: 10, datetime: '2026-06-20T15:47:00.000Z' }],
+        now: new Date('2026-06-22T00:00:00.000Z'),
+        schedule: { frequency: 'weekly', intervalDays: 7, timesOfDay: ['09:00'] },
+        scheduleIntervalDays: 7,
+        timeZone: 'Not/AZone',
+      });
+
+      // Legacy behavior: last dose + 7 days, hour echoed.
+      expect(result.nextDoseAt).toBe('2026-06-27T15:47:00.000Z');
+    });
+  });
 });

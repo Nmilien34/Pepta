@@ -27,10 +27,27 @@ import {
   registerPushToken,
   updateNotificationPreferences,
 } from "../services/pushToken.service";
+import { exportDoseLogsCsv } from "../services/export.service";
 
 const router = Router();
 
 router.use(requireAuth);
+
+// CSV export of the user's dose log (their own data — deliberately outside
+// the premium guard). ?tz=<IANA zone> localizes the date/time columns.
+router.get(
+  "/export/logs.csv",
+  asyncHandler(async (req, res) => {
+    const tz = typeof req.query.tz === "string" ? req.query.tz : undefined;
+    const csv = await exportDoseLogsCsv(req.user!.id, tz);
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="pepta-dose-log.csv"',
+    );
+    res.send(csv);
+  }),
+);
 
 router.get(
   "/",

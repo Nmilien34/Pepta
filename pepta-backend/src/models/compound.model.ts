@@ -33,6 +33,9 @@ export interface CycleDocument extends Document<Types.ObjectId> {
   startDate: string;
   endDate?: string;
   notes?: string;
+  weeksOn?: number;
+  weeksOff?: number;
+  repeats?: boolean;
   active: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -155,6 +158,23 @@ const scheduleSchema = new Schema<ScheduleDocument>(
     nextDoseAt: {
       type: Date,
     },
+    // Protocol timing: user-local "HH:MM" wall-clock times (up to 3 for split
+    // dosing) + the user's own timing context. Stored local, converted via
+    // the profile timezone at projection time.
+    timesOfDay: {
+      type: [String],
+      default: undefined,
+      validate: {
+        validator: (values: string[]) =>
+          values.length <= 3 &&
+          values.every((value) => /^([01]\d|2[0-3]):[0-5]\d$/.test(value)),
+        message: "timesOfDay must be up to 3 HH:MM strings",
+      },
+    },
+    timing: {
+      type: String,
+      enum: ["anytime", "fasted", "before_bed", "with_food"],
+    },
     active: {
       type: Boolean,
       required: true,
@@ -202,6 +222,19 @@ const cycleSchema = new Schema<CycleDocument>(
       type: String,
       trim: true,
       maxlength: 1000,
+    },
+    weeksOn: {
+      type: Number,
+      min: 1,
+      max: 52,
+    },
+    weeksOff: {
+      type: Number,
+      min: 1,
+      max: 52,
+    },
+    repeats: {
+      type: Boolean,
     },
     active: {
       type: Boolean,

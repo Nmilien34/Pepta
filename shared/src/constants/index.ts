@@ -115,6 +115,15 @@ export const SCHEDULE_FREQUENCIES = [
   "biweekly",
   "custom",
 ] as const;
+// Timing context a user attaches to their own protocol (peptide-community
+// practice: GH secretagogues before bed/fasted, split dosing, etc.). USER-SET
+// only — Pepta never recommends an "optimal" time; copy stays neutral.
+export const SCHEDULE_TIMINGS = [
+  "anytime",
+  "fasted",
+  "before_bed",
+  "with_food",
+] as const;
 export const INSIGHT_TYPES = [
   "medication_level",
   "dose_cycle",

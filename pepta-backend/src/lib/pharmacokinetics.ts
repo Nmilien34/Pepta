@@ -1,13 +1,28 @@
+import { cycleDayStatus, type CyclePattern } from "@pepta/shared";
+import {
+  addDaysDateOnly,
+  dateOnlyInTz,
+  dayDiff,
+  dayOfWeekOf,
+  isValidTimeZone,
+  zonedTimeToUtc,
+} from "./timezone";
+
 export const PHARMACOKINETICS_ENGINE_VERSION = "pk-v2";
 
 const MS_PER_HOUR = 60 * 60 * 1000;
 const HOURS_PER_DAY = 24;
 const CURVE_SAMPLE_HOURS = 6;
+// Widest search for the next on-cycle dose day: past the longest allowed rest
+// window (52 weeks) plus a schedule period.
+const MAX_NEXT_DOSE_LOOKAHEAD_DAYS = 400;
 
 export interface MedicationSchedule {
   frequency: "daily" | "weekly" | "biweekly" | "custom";
   intervalDays?: number;
   daysOfWeek?: number[];
+  /** User-local "HH:MM" dose times (protocol timing; up to 3 = split dosing). */
+  timesOfDay?: string[];
 }
 
 export interface MedicationDose {
@@ -23,6 +38,10 @@ export interface MedicationLevelInput {
   now?: Date;
   scheduleIntervalDays?: number;
   schedule?: MedicationSchedule;
+  /** On/off cycle: next-dose projection skips rest days so reminders pause. */
+  cyclePattern?: CyclePattern;
+  /** IANA zone the schedule's timesOfDay are expressed in (profile timezone). */
+  timeZone?: string;
   curveDaysBefore?: number;
   curveDaysAfter?: number;
 }
@@ -120,17 +139,103 @@ function buildCurve(
   return points;
 }
 
+// Rest-day check in UTC day-space (matching the daysOfWeek getUTCDay logic).
+// 'rest' days are skipped; a finished one-shot cycle ('done') means no next
+// dose at all — that is what pauses reminders during an off-cycle window.
+function cyclePhaseAt(pattern: CyclePattern | undefined, at: Date) {
+  if (!pattern) return "on" as const;
+  return cycleDayStatus(pattern, at.toISOString().slice(0, 10)).phase;
+}
+
+// Does the schedule call for a dose on this calendar day (user-local)?
+// daysOfWeek wins when present; otherwise cadence anchored at the last dose.
+function scheduleMatchesDay(
+  schedule: MedicationSchedule,
+  dateOnly: string,
+  anchorDateOnly: string,
+): boolean {
+  if (schedule.frequency === "daily") return true;
+  const days = schedule.daysOfWeek ?? [];
+  if (days.length > 0) return days.includes(dayOfWeekOf(dateOnly));
+  const interval =
+    schedule.frequency === "weekly"
+      ? 7
+      : schedule.frequency === "biweekly"
+        ? 14
+        : schedule.intervalDays;
+  if (!interval) return false;
+  // >= 0: the last-dose day itself is a scheduled day — a later listed time
+  // that same day (split dosing) must still project.
+  const since = dayDiff(anchorDateOnly, dateOnly);
+  return since >= 0 && since % interval === 0;
+}
+
+// Protocol-timing projection: the next dose is the earliest listed wall-clock
+// time, on the next scheduled day, converted from the user's zone — instead
+// of echoing whatever hour the last dose happened to be logged at. Split
+// dosing falls out naturally: after the 08:00 shot is logged, the projection
+// lands on 20:00 the same day. Cycle phases are judged on the USER-LOCAL day.
+function nextDoseFromTimes(input: {
+  latestAt: Date;
+  now: Date;
+  schedule: MedicationSchedule;
+  timesOfDay: string[];
+  timeZone: string;
+  cyclePattern?: CyclePattern;
+}): Date | null {
+  const times = [...input.timesOfDay].sort();
+  const anchor = dateOnlyInTz(input.latestAt, input.timeZone);
+  const today = dateOnlyInTz(input.now, input.timeZone);
+
+  for (let offset = 0; offset <= MAX_NEXT_DOSE_LOOKAHEAD_DAYS; offset += 1) {
+    const day = addDaysDateOnly(today, offset);
+    if (!scheduleMatchesDay(input.schedule, day, anchor)) continue;
+    if (input.cyclePattern) {
+      const phase = cycleDayStatus(input.cyclePattern, day).phase;
+      if (phase === "done") return null;
+      if (phase === "rest") continue;
+    }
+    for (const time of times) {
+      const candidate = zonedTimeToUtc(day, time, input.timeZone);
+      if (candidate.getTime() > input.now.getTime()) {
+        return candidate;
+      }
+    }
+  }
+  return null;
+}
+
 function nextDoseFromSchedule(input: {
   latest: MedicationDose | null;
   now: Date;
   schedule?: MedicationSchedule;
   fallbackIntervalDays?: number;
+  cyclePattern?: CyclePattern;
+  timeZone?: string;
 }): Date | null {
   if (input.latest === null) {
     return null;
   }
 
   const latestAt = new Date(input.latest.datetime);
+
+  const times = input.schedule?.timesOfDay ?? [];
+  if (
+    input.schedule &&
+    times.length > 0 &&
+    input.timeZone &&
+    isValidTimeZone(input.timeZone)
+  ) {
+    return nextDoseFromTimes({
+      latestAt,
+      now: input.now,
+      schedule: input.schedule,
+      timesOfDay: times,
+      timeZone: input.timeZone,
+      cyclePattern: input.cyclePattern,
+    });
+  }
+
   const scheduleDays = input.schedule?.daysOfWeek ?? [];
 
   if (
@@ -139,7 +244,8 @@ function nextDoseFromSchedule(input: {
       input.schedule.frequency === "custom") &&
     scheduleDays.length > 0
   ) {
-    for (let dayOffset = 0; dayOffset <= 31; dayOffset += 1) {
+    const lookahead = input.cyclePattern ? MAX_NEXT_DOSE_LOOKAHEAD_DAYS : 31;
+    for (let dayOffset = 0; dayOffset <= lookahead; dayOffset += 1) {
       const candidate = new Date(input.now);
       candidate.setUTCHours(0, 0, 0, 0);
       candidate.setUTCDate(candidate.getUTCDate() + dayOffset);
@@ -154,16 +260,33 @@ function nextDoseFromSchedule(input: {
         candidate.getTime() > input.now.getTime() &&
         scheduleDays.includes(candidate.getUTCDay())
       ) {
+        const phase = cyclePhaseAt(input.cyclePattern, candidate);
+        if (phase === "rest") continue;
+        if (phase === "done") return null;
         return candidate;
       }
     }
+    if (input.cyclePattern) return null;
   }
 
   const intervalDays =
     input.schedule?.intervalDays ?? input.fallbackIntervalDays;
-  return intervalDays
-    ? new Date(latestAt.getTime() + msForDays(intervalDays))
-    : null;
+  if (!intervalDays) {
+    return null;
+  }
+
+  let candidate = new Date(latestAt.getTime() + msForDays(intervalDays));
+  for (
+    let advanced = 0;
+    advanced <= MAX_NEXT_DOSE_LOOKAHEAD_DAYS;
+    advanced += 1
+  ) {
+    const phase = cyclePhaseAt(input.cyclePattern, candidate);
+    if (phase === "done") return null;
+    if (phase !== "rest") return candidate;
+    candidate = new Date(candidate.getTime() + msForDays(1));
+  }
+  return null;
 }
 
 function forwardTrough(input: {
@@ -213,6 +336,8 @@ export function computeMedicationLevel(
     now,
     schedule: input.schedule,
     fallbackIntervalDays: input.scheduleIntervalDays,
+    cyclePattern: input.cyclePattern,
+    timeZone: input.timeZone,
   });
   const hoursUntilNextDose =
     nextDose === null

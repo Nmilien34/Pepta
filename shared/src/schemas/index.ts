@@ -26,6 +26,7 @@ import {
   RETENTION_DRIVERS,
   RETENTION_VERDICTS,
   SCHEDULE_FREQUENCIES,
+  SCHEDULE_TIMINGS,
   SEX_VALUES,
   SIDE_EFFECT_TYPES,
   SUBSCRIPTION_STATUSES,
@@ -395,6 +396,10 @@ export const doseLogInputSchema = z
     datetime: isoDateTimeSchema,
     idempotencyKey: z.string().trim().min(1).optional(),
     notes: z.string().trim().max(500).optional(),
+    // Side effects felt around THIS shot (competitor-review ask). Contextual
+    // metadata on the dose record — the standalone side-effect log (with
+    // severity) remains the tracking source for insights.
+    sideEffects: z.array(sideEffectTypeSchema).max(12).optional(),
   })
   .strict();
 
@@ -546,6 +551,12 @@ export const cycleInputSchema = z
     startDate: dateOnlySchema,
     endDate: dateOnlySchema.optional(),
     notes: z.string().trim().max(1000).optional(),
+    // On/off pattern (design-lab schedule frames): rest windows are DERIVED
+    // from these, so the calendar band and paused reminders can never
+    // disagree. Optional — legacy cycles without a pattern stay valid.
+    weeksOn: z.number().int().min(1).max(52).optional(),
+    weeksOff: z.number().int().min(1).max(52).optional(),
+    repeats: z.boolean().optional(),
   })
   .strict();
 
@@ -557,6 +568,15 @@ export const cycleResponseSchema = cycleInputSchema.extend({
   updatedAt: isoDateTimeSchema,
 });
 
+// User-local wall-clock time, 24h "HH:MM". Stored as local time (not UTC) so
+// "10:00 PM before bed" survives timezone moves and DST; the backend converts
+// via the profile timezone when projecting nextDoseAt.
+export const timeOfDaySchema = z
+  .string()
+  .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Expected HH:MM (24h)");
+
+export const scheduleTimingSchema = z.enum(SCHEDULE_TIMINGS);
+
 export const scheduleInputSchema = z
   .object({
     compoundId: idSchema,
@@ -565,6 +585,10 @@ export const scheduleInputSchema = z
     daysOfWeek: z.array(z.number().int().min(0).max(6)).default([]),
     nextDoseAt: isoDateTimeSchema.optional(),
     active: z.boolean().default(true),
+    // Protocol timing (competitor-review ask): explicit dose times — up to 3
+    // for split dosing (e.g. BPC-157 AM/PM) — plus the user's own context.
+    timesOfDay: z.array(timeOfDaySchema).max(3).optional(),
+    timing: scheduleTimingSchema.optional(),
   })
   .strict();
 

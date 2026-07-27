@@ -9,6 +9,7 @@ import type {
   WaterLogInput,
   WeightLogInput,
 } from "@pepta/shared";
+import { SIDE_EFFECT_TYPES } from "@pepta/shared";
 import mongoose, { Schema } from "mongoose";
 import type { Document, Types } from "mongoose";
 import {
@@ -144,6 +145,12 @@ const doseLogSchema = new Schema<DoseLogDocument>(
         "buttock_left",
         "buttock_right",
       ],
+    },
+    // Side effects felt around this shot (optional, from the dose form).
+    sideEffects: {
+      type: [String],
+      enum: SIDE_EFFECT_TYPES,
+      default: undefined,
     },
   },
   {

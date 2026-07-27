@@ -1,11 +1,23 @@
-import { medicationLevelResponseSchema } from "@pepta/shared";
+import { hasPattern, medicationLevelResponseSchema } from "@pepta/shared";
 import { computeMedicationLevel } from "../lib/pharmacokinetics";
-import { CompoundModel, DoseLogModel, ScheduleModel } from "../models";
+import {
+  CompoundModel,
+  CycleModel,
+  DoseLogModel,
+  ScheduleModel,
+  UserProfileModel,
+} from "../models";
 
 export async function getMedicationLevels(userId: string, now = new Date()) {
-  const compounds = await CompoundModel.find({ userId, status: "active" }).sort(
-    { createdAt: 1 },
-  );
+  const [compounds, cycles, profile] = await Promise.all([
+    CompoundModel.find({ userId, status: "active" }).sort({ createdAt: 1 }),
+    // Newest active pattern-bearing cycle wins — same rule as the app's
+    // activeCycleOf, so the calendar band and this projection agree.
+    CycleModel.find({ userId, active: true }).sort({ startDate: -1 }),
+    // Protocol timesOfDay are user-local wall clock; the projection converts
+    // them through the profile timezone.
+    UserProfileModel.findOne({ userId }).select({ timezone: 1 }),
+  ]);
   const levels = await Promise.all(
     compounds.map(async (compound) => {
       const [doseLogs, schedule] = await Promise.all([
@@ -28,6 +40,14 @@ export async function getMedicationLevels(userId: string, now = new Date()) {
             ? 14
             : undefined);
 
+      const cycle = cycles.find(
+        (candidate) =>
+          hasPattern(candidate) &&
+          candidate.compoundIds.some(
+            (id) => id.toString() === compound._id.toString(),
+          ),
+      );
+
       return medicationLevelResponseSchema.parse(
         computeMedicationLevel({
           compoundId: compound._id.toString(),
@@ -44,8 +64,19 @@ export async function getMedicationLevels(userId: string, now = new Date()) {
                 frequency: schedule.frequency,
                 intervalDays,
                 daysOfWeek: schedule.daysOfWeek,
+                timesOfDay: schedule.timesOfDay,
               }
             : undefined,
+          timeZone: profile?.timezone ?? undefined,
+          cyclePattern:
+            cycle && hasPattern(cycle)
+              ? {
+                  startDate: cycle.startDate,
+                  weeksOn: cycle.weeksOn,
+                  weeksOff: cycle.weeksOff,
+                  repeats: cycle.repeats ?? true,
+                }
+              : undefined,
         }),
       );
     }),
