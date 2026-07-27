@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Pepta — First-run tour (design)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@500;600;700;800&display=swap" rel="stylesheet" />
+<link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3/dist/tabler-icons.min.css" rel="stylesheet" />
+<style>
+  /* ── tokens ported from src/theme/spacing.ts + colors ───────────────────
+     radii.card = 24        sizes.card.padding = 18
+     radii.inset = 20       radii.pill = 9999
+     FAB (TabBar.tsx) = 52x52, borderRadius 16, in a 58-wide slot
+     tab bar: paddingTop 10, paddingBottom max(inset,12), paddingHorizontal 16
+     PlanCard (HomeScreen.tsx) = Card, bg #EFEBFF, borderWidth 0            */
+  :root{
+    --bg:#FAFAFB; --surface:#FFFFFF; --alt:#F2F3F5; --border:#ECECEF;
+    --ink:#0E0E12; --sec:#6B6B76; --ter:#A1A1AC;
+    --primary:#7C5CFC; --pg1:#6751E8; --pg2:#8C63F4; --fiber:#22C55E;
+    --card-r:24px; --card-p:18px;
+    --f:'Hanken Grotesk',system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#E7E5EC;font-family:var(--f);color:var(--ink);padding:40px 32px 80px;-webkit-font-smoothing:antialiased}
+  h1{font-size:30px;font-weight:800;letter-spacing:-.8px}
+  h1 small{font-weight:600;color:#8C8A94;font-size:15px;letter-spacing:0}
+  .note{max-width:1180px;color:#57555F;font-size:14.5px;line-height:1.65;margin-top:14px}
+  .note b{color:#2A2831;font-weight:700}
+  .note code{background:#EFEDF3;padding:1px 5px;border-radius:5px;font-size:13px}
+  .kicker{font-size:12px;font-weight:800;letter-spacing:1.4px;text-transform:uppercase;color:#9B99A3;margin:44px 0 16px}
+  .changes{display:flex;flex-wrap:wrap;gap:10px;max-width:1180px;margin-top:20px}
+  .change{background:#fff;border:1px solid #E1DFE8;border-radius:13px;padding:11px 14px 11px 12px;display:flex;gap:10px;align-items:flex-start;max-width:262px;box-shadow:0 1px 2px rgba(20,18,30,.04)}
+  .change i{color:var(--primary);font-size:18px;margin-top:1px}
+  .change b{display:block;font-size:12.5px;font-weight:800;margin-bottom:2px}
+  .change span{font-size:11.5px;color:#6C6A75;line-height:1.45}
+
+  .frames{display:flex;gap:34px;flex-wrap:wrap;align-items:flex-start}
+  .col{display:flex;flex-direction:column;align-items:center;gap:12px}
+  .tag{font-size:12.5px;font-weight:800;padding:5px 13px;border-radius:9999px;background:#ECE6FF;color:#5B3FD6}
+  .caption{font-size:12px;color:#6C6A75;max-width:330px;text-align:center;line-height:1.5}
+
+  .phone{width:352px;border-radius:48px;background:#0C0C10;padding:11px;box-shadow:0 40px 80px -30px rgba(24,20,40,.5)}
+  .screen{border-radius:39px;overflow:hidden;background:var(--bg);height:722px;position:relative}
+  .statusbar{height:46px;display:flex;align-items:flex-end;justify-content:space-between;padding:0 24px 5px}
+  .statusbar .t{font-size:14px;font-weight:800}
+  .statusbar .r{display:flex;gap:6px;font-size:14px}
+  .body{padding:2px 16px}                     /* screen padding 16 */
+  .scr-title{font-size:24px;font-weight:800;letter-spacing:-.6px;padding:6px 2px 0}
+
+  /* Card primitive — radius 24, padding 18, soft shadow, no harsh border */
+  .card{background:var(--surface);border-radius:var(--card-r);padding:var(--card-p);
+        box-shadow:0 1px 2px rgba(20,18,30,.05),0 8px 22px -18px rgba(20,18,30,.22)}
+  .card + .card{margin-top:10px}
+
+  /* PlanCard — bg #EFEBFF, NO border */
+  .plan{background:#EFEBFF;border:0}
+  .plan .eyebrow{font-size:12px;font-weight:700;color:var(--primary)}
+  .plan .t{font-size:18px;font-weight:800;margin-top:4px;letter-spacing:-.2px}
+  .plan .d{font-size:12px;color:var(--sec);margin-top:4px;font-weight:600}
+
+  /* GettingStartedCard */
+  .gs .head{display:flex;align-items:center;gap:7px}
+  .gs .head i{color:var(--primary);font-size:16px}
+  .gs .head b{font-size:15px;font-weight:800}
+  .gs .count{margin-left:auto;font-size:12px;color:var(--sec);font-weight:700}
+  .bar{height:6px;border-radius:3px;background:var(--alt);margin:12px 0 8px;overflow:hidden}
+  .bar i{display:block;height:6px;width:20%;background:var(--primary);border-radius:3px}
+  .task{display:flex;align-items:center;gap:10px;padding:7px 0;font-size:13.5px;font-weight:600}
+  .task .dot{width:20px;height:20px;border-radius:10px;background:var(--alt);flex:none;position:relative}
+  .task .dot.on{background:#E8F8EE}
+  .task .dot.on:after{content:'';position:absolute;left:6px;top:4px;width:5px;height:9px;border:solid var(--fiber);border-width:0 2px 2px 0;transform:rotate(45deg)}
+  .task.muted{color:var(--ter)}
+
+  /* tab bar — real paddings; FAB 52x52 r16 inside a 58 slot */
+  .tabbar{position:absolute;left:0;right:0;bottom:0;background:var(--surface);
+          border-top:.5px solid var(--border);display:flex;align-items:center;
+          padding:10px 16px 14px}
+  .tab{flex:1;text-align:center;font-size:10.5px;font-weight:700;color:var(--ter)}
+  .tab i{display:block;font-size:23px;margin-bottom:2px}
+  .tab.on{color:var(--primary)}
+  .fabslot{width:58px;display:flex;align-items:center;justify-content:center}
+  .fab{width:52px;height:52px;border-radius:16px;background:linear-gradient(135deg,var(--pg1),var(--pg2));
+       display:flex;align-items:center;justify-content:center;color:#fff;font-size:24px;
+       box-shadow:0 7px 18px -4px rgba(103,81,232,.55)}
+  .pep{position:absolute;right:16px;bottom:104px;width:52px;height:52px;border-radius:26px;
+       background:linear-gradient(160deg,#9C82FF,#6E4EF0);box-shadow:0 10px 20px -6px rgba(110,78,240,.55)}
+
+  /* ── tour layer. Geometry is COMPUTED from the target element at runtime
+        (see the script) — never hand-placed. This mirrors what the RN
+        build must do with measureInWindow. ── */
+  .spot{position:absolute;z-index:6;box-shadow:0 0 0 9999px rgba(10,8,20,.60);
+        border:2px solid rgba(255,255,255,.92);pointer-events:none}
+  .tip{position:absolute;z-index:8;background:#fff;border-radius:18px;padding:14px 15px 13px;width:246px;
+       box-shadow:0 18px 40px -12px rgba(10,8,30,.5)}
+  .tip h5{font-size:15px;font-weight:800;letter-spacing:-.2px}
+  .tip p{font-size:12.5px;color:var(--sec);line-height:1.5;font-weight:600;margin-top:5px}
+  .tip .row{display:flex;align-items:center;justify-content:space-between;margin-top:12px}
+  .dots{display:flex;gap:5px}
+  .dots i{width:6px;height:6px;border-radius:3px;background:#DAD8E0;display:block}
+  .dots i.on{background:var(--primary);width:16px}
+  .next{background:var(--primary);color:#fff;font-size:12.5px;font-weight:800;padding:7px 15px;border-radius:9999px}
+  .arrow{position:absolute;z-index:8;width:0;height:0}
+  .skip{position:absolute;right:20px;top:54px;z-index:8;color:#fff;font-size:12.5px;font-weight:700;opacity:.85}
+</style>
+</head>
+<body>
+  <h1>First-run tour <small>· design for sign-off · 2026-07-27 (v2)</small></h1>
+
+  <p class="note">PeptidePal greets a new user with one tooltip pointing at the Library tab. Same pattern, aimed at what Pepta actually needs a new user to learn. <b>v2 rebuild:</b> the first pass invented its own Home screen and hand-typed pixel coordinates for each highlight, so nothing lined up. This version ports the shipped tokens (<code>radii.card 24</code>, <code>sizes.card.padding 18</code>, PlanCard <code>#EFEBFF</code> borderless, FAB <code>52×52 r16</code> in a 58pt slot, tab bar <code>10/16/14</code> padding) and — the actual fix — <b>computes every spotlight from its target's measured box at runtime</b> instead of me guessing. Misalignment is now structurally impossible rather than something I eyeball.</p>
+
+  <div class="changes">
+    <div class="change"><i class="ti ti-ruler-measure"></i><div><b>Spotlights are measured</b><span>Each highlight reads its target's real box. This is exactly what the RN build must do — <code>measureInWindow</code>, not constants — or it breaks on every other device size.</span></div></div>
+    <div class="change"><i class="ti ti-lock-check"></i><div><b>“Paid only” is already free</b><span>AccessGate renders MainTabs only when access is <code>active</code>. Non-payers hit the wall and never see tabs — so this needs a first-run flag, no entitlement check.</span></div></div>
+    <div class="change"><i class="ti ti-checklist"></i><div><b>Home already activates</b><span>GettingStartedCard ships today. The tour points AT it rather than repeating it.</span></div></div>
+    <div class="change"><i class="ti ti-map-pin"></i><div><b>Tour = where, card = what</b><span>The checklist teaches what to do; the tour teaches where things live — the FAB and the tabs it never mentions.</span></div></div>
+  </div>
+
+  <div class="kicker">The four steps</div>
+  <div class="frames">
+
+    <div class="col">
+      <span class="tag">1 · Start here</span>
+      <div class="phone"><div class="screen"
+        data-spot="gs" data-pad="8" data-radius="26" data-place="below"
+        data-title="Start here"
+        data-copy="Your first few logs, in order. Tap any line and it opens the right screen for you."
+        data-step="1">
+        <div class="statusbar"><span class="t">9:41</span><span class="r"><i class="ti ti-signal-4g"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3"></i></span></div>
+        <div class="body">
+          <div class="scr-title">Today</div>
+          <div class="card plan" style="margin-top:12px">
+            <div class="eyebrow">Your plan</div>
+            <div class="t">Lose 19 lb to 165 lb</div>
+            <div class="d">Steady pace · ~1.1 lb/week · goal by Sep 14</div>
+          </div>
+          <div class="card gs" data-target="gs">
+            <div class="head"><i class="ti ti-sparkles"></i><b>Getting started</b><span class="count">1 of 5</span></div>
+            <div class="bar"><i></i></div>
+            <div class="task"><span class="dot on"></span>Create your account</div>
+            <div class="task"><span class="dot"></span>Log your first Mounjaro shot</div>
+            <div class="task muted"><span class="dot"></span>Log your first meal</div>
+            <div class="task muted"><span class="dot"></span>Add a glass of water</div>
+          </div>
+        </div>
+        <div class="tabbar">
+          <div class="tab on"><i class="ti ti-home-2"></i>Home</div>
+          <div class="tab"><i class="ti ti-vaccine"></i>Track</div>
+          <div class="fabslot"><div class="fab" data-target="fab">+</div></div>
+          <div class="tab"><i class="ti ti-chart-line"></i>Progress</div>
+          <div class="tab"><i class="ti ti-user-circle"></i>Settings</div>
+        </div>
+        <span class="skip">Skip</span>
+      </div></div>
+      <p class="caption">Highlight is the card's own measured box + 8pt breathing room, radius matched to the card.</p>
+    </div>
+
+    <div class="col">
+      <span class="tag">2 · The log button</span>
+      <div class="phone"><div class="screen"
+        data-spot="fab" data-pad="7" data-radius="20" data-place="above"
+        data-title="Log anything, one tap"
+        data-copy="Shot, weight, meal, water, side effects — it all starts here. Most logs are a single tap."
+        data-step="2">
+        <div class="statusbar"><span class="t">9:41</span><span class="r"><i class="ti ti-signal-4g"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3"></i></span></div>
+        <div class="body">
+          <div class="scr-title">Today</div>
+          <div class="card plan" style="margin-top:12px">
+            <div class="eyebrow">Your plan</div>
+            <div class="t">Lose 19 lb to 165 lb</div>
+            <div class="d">Steady pace · ~1.1 lb/week · goal by Sep 14</div>
+          </div>
+          <div class="card gs" data-target="gs">
+            <div class="head"><i class="ti ti-sparkles"></i><b>Getting started</b><span class="count">1 of 5</span></div>
+            <div class="bar"><i></i></div>
+            <div class="task"><span class="dot on"></span>Create your account</div>
+            <div class="task"><span class="dot"></span>Log your first Mounjaro shot</div>
+          </div>
+        </div>
+        <div class="tabbar">
+          <div class="tab on"><i class="ti ti-home-2"></i>Home</div>
+          <div class="tab"><i class="ti ti-vaccine"></i>Track</div>
+          <div class="fabslot"><div class="fab" data-target="fab">+</div></div>
+          <div class="tab"><i class="ti ti-chart-line"></i>Progress</div>
+          <div class="tab"><i class="ti ti-user-circle"></i>Settings</div>
+        </div>
+        <span class="skip">Skip</span>
+      </div></div>
+      <p class="caption">Squircle highlight (r20) around the real 52×52 r16 FAB — not a circle, which is what v1 got wrong.</p>
+    </div>
+
+    <div class="col">
+      <span class="tag">3 · Track</span>
+      <div class="phone"><div class="screen"
+        data-spot="track" data-pad="6" data-radius="16" data-place="above"
+        data-title="Your medication, tracked"
+        data-copy="Dose history, injection sites, your estimated level, and the schedule with rest weeks."
+        data-step="3">
+        <div class="statusbar"><span class="t">9:41</span><span class="r"><i class="ti ti-signal-4g"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3"></i></span></div>
+        <div class="body">
+          <div class="scr-title">Today</div>
+          <div class="card plan" style="margin-top:12px">
+            <div class="eyebrow">Your plan</div>
+            <div class="t">Lose 19 lb to 165 lb</div>
+            <div class="d">Steady pace · ~1.1 lb/week · goal by Sep 14</div>
+          </div>
+          <div class="card gs">
+            <div class="head"><i class="ti ti-sparkles"></i><b>Getting started</b><span class="count">1 of 5</span></div>
+            <div class="bar"><i></i></div>
+            <div class="task"><span class="dot on"></span>Create your account</div>
+            <div class="task"><span class="dot"></span>Log your first Mounjaro shot</div>
+          </div>
+        </div>
+        <div class="tabbar">
+          <div class="tab on"><i class="ti ti-home-2"></i>Home</div>
+          <div class="tab" data-target="track"><i class="ti ti-vaccine"></i>Track</div>
+          <div class="fabslot"><div class="fab">+</div></div>
+          <div class="tab"><i class="ti ti-chart-line"></i>Progress</div>
+          <div class="tab"><i class="ti ti-user-circle"></i>Settings</div>
+        </div>
+        <span class="skip">Skip</span>
+      </div></div>
+      <p class="caption">Highlight tracks the tab's real hit area, so it stays right whatever the label width.</p>
+    </div>
+
+    <div class="col">
+      <span class="tag">4 · Pep</span>
+      <div class="phone"><div class="screen"
+        data-spot="pep" data-pad="7" data-radius="9999" data-place="above"
+        data-title="Pep is here if you need him"
+        data-copy="Tap Pep for a nudge, a win, or to ask about your own numbers. He never sends anything on his own."
+        data-step="4" data-last="1">
+        <div class="statusbar"><span class="t">9:41</span><span class="r"><i class="ti ti-signal-4g"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3"></i></span></div>
+        <div class="body">
+          <div class="scr-title">Today</div>
+          <div class="card plan" style="margin-top:12px">
+            <div class="eyebrow">Your plan</div>
+            <div class="t">Lose 19 lb to 165 lb</div>
+            <div class="d">Steady pace · ~1.1 lb/week · goal by Sep 14</div>
+          </div>
+          <div class="card gs">
+            <div class="head"><i class="ti ti-sparkles"></i><b>Getting started</b><span class="count">1 of 5</span></div>
+            <div class="bar"><i></i></div>
+            <div class="task"><span class="dot on"></span>Create your account</div>
+            <div class="task"><span class="dot"></span>Log your first Mounjaro shot</div>
+          </div>
+        </div>
+        <div class="pep" data-target="pep"></div>
+        <div class="tabbar">
+          <div class="tab on"><i class="ti ti-home-2"></i>Home</div>
+          <div class="tab"><i class="ti ti-vaccine"></i>Track</div>
+          <div class="fabslot"><div class="fab">+</div></div>
+          <div class="tab"><i class="ti ti-chart-line"></i>Progress</div>
+          <div class="tab"><i class="ti ti-user-circle"></i>Settings</div>
+        </div>
+        <span class="skip">Skip</span>
+      </div></div>
+      <p class="caption">Pep is a true circle, so this highlight is the one that legitimately uses a pill radius.</p>
+    </div>
+
+  </div>
+
+  <div class="kicker">Open questions for sign-off</div>
+  <p class="note">
+    <b>1. Four steps or three?</b> Shorter tours complete more often. Pep is the most cuttable — he greets the user with a bubble ~900ms after Home loads anyway, so step 4 may be telling them what they are about to find out.<br>
+    <b>2. Progress gets no step, deliberately.</b> On day one it is empty; pointing at a blank chart sells nothing. It earns a mention after the first weigh-in.<br>
+    <b>3. “Done” should close quietly</b> rather than auto-opening the first task — converting orientation into action is tempting, but it takes control back the moment the user gets it.<br>
+    <b>4. No replay affordance</b> is designed. If wanted, Settings → Support is the natural home.
+  </p>
+  <p class="note"><b>Build note carried into implementation:</b> the RN overlay must position each spotlight from <code>measureInWindow</code> on a ref to the real target (and re-measure on rotation / dynamic-type change), exactly as this page measures the DOM. Hardcoded offsets are what produced the v1 misalignment and would ship as misalignment on every screen size that is not the one it was tuned on.</p>
+
+<script>
+  // Position every spotlight + tooltip from the TARGET'S MEASURED BOX.
+  // Nothing here is hand-placed; that is the whole point of the rebuild.
+  function layout() {
+    document.querySelectorAll('.screen[data-spot]').forEach(function (screen) {
+      screen.querySelectorAll('.spot,.tip,.arrow').forEach(function (n) { n.remove(); });
+
+      var key = screen.getAttribute('data-spot');
+      var target = screen.querySelector('[data-target="' + key + '"]');
+      if (!target) return;
+
+      var s = screen.getBoundingClientRect();
+      var t = target.getBoundingClientRect();
+      var pad = parseFloat(screen.getAttribute('data-pad') || '8');
+      var radius = screen.getAttribute('data-radius') || '20';
+
+      var x = t.left - s.left - pad, y = t.top - s.top - pad;
+      var w = t.width + pad * 2, h = t.height + pad * 2;
+
+      var spot = document.createElement('div');
+      spot.className = 'spot';
+      spot.style.cssText = 'left:' + x + 'px;top:' + y + 'px;width:' + w + 'px;height:' + h +
+                           'px;border-radius:' + (radius === '9999' ? '9999px' : radius + 'px');
+      screen.appendChild(spot);
+
+      var tip = document.createElement('div');
+      tip.className = 'tip';
+      var last = screen.getAttribute('data-last') === '1';
+      var step = parseInt(screen.getAttribute('data-step'), 10);
+      var dots = '';
+      for (var i = 1; i <= 4; i++) dots += '<i class="' + (i === step ? 'on' : '') + '"></i>';
+      tip.innerHTML = '<h5>' + screen.getAttribute('data-title') + '</h5><p>' +
+        screen.getAttribute('data-copy') + '</p><div class="row"><div class="dots">' + dots +
+        '</div><span class="next">' + (last ? 'Done' : 'Next') + '</span></div>';
+      screen.appendChild(tip);
+
+      // Anchor beside the spotlight, clamped inside the screen with a 14pt margin.
+      var tr = tip.getBoundingClientRect();
+      var place = screen.getAttribute('data-place');
+      var gap = 12;
+      var ty = place === 'below' ? (y + h + gap) : (y - tr.height - gap);
+      var cx = x + w / 2;
+      var tx = Math.min(Math.max(cx - tr.width / 2, 14), s.width - tr.width - 14);
+      tip.style.left = tx + 'px';
+      tip.style.top = ty + 'px';
+
+      // Arrow points at the spotlight's centre line.
+      var arrow = document.createElement('div');
+      arrow.className = 'arrow';
+      var ax = Math.min(Math.max(cx - 9, tx + 14), tx + tr.width - 32);
+      arrow.style.left = ax + 'px';
+      if (place === 'below') {
+        arrow.style.top = (ty - 10) + 'px';
+        arrow.style.borderLeft = '9px solid transparent';
+        arrow.style.borderRight = '9px solid transparent';
+        arrow.style.borderBottom = '10px solid #fff';
+      } else {
+        arrow.style.top = (ty + tr.height) + 'px';
+        arrow.style.borderLeft = '9px solid transparent';
+        arrow.style.borderRight = '9px solid transparent';
+        arrow.style.borderTop = '10px solid #fff';
+      }
+      screen.appendChild(arrow);
+    });
+  }
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(layout);
+  window.addEventListener('load', layout);
+  window.addEventListener('resize', layout);
+  layout();
+</script>
+</body>
+</html>
