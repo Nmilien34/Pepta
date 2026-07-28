@@ -22,7 +22,8 @@ import {
 import { OnboardingMotionContext, convo } from '../../components';
 import { StepFade } from './StepFade';
 import { ONBOARDING_DRAFT_KEY, parseDraft, serializeDraft } from './onboardingDraft';
-import { echoFor, instrumentContext, companyContext } from './onboardingEcho';
+import { echoFor, instrumentContext, companyContext, leanMassContext } from './onboardingEcho';
+import { symptomForWeekBeat } from './symptomWeek';
 import { MeetPepScreen } from './MeetPepScreen';
 import { NameCompanionScreen } from './NameCompanionScreen';
 import { NeedsScreen, type NeedType } from './NeedsScreen';
@@ -38,6 +39,8 @@ import { LastShotScreen } from './LastShotScreen';
 import { ShotDayScreen } from './ShotDayScreen';
 import { ShotTimeScreen } from './ShotTimeScreen';
 import { InstrumentBeatScreen } from './InstrumentBeatScreen';
+import { LeanMassBeatScreen } from './LeanMassBeatScreen';
+import { SymptomWeekBeatScreen } from './SymptomWeekBeatScreen';
 import { GoalTypeScreen, type GoalType } from './GoalTypeScreen';
 import { SexGenderScreen, type GenderIdentity } from './SexGenderScreen';
 import { BirthdayScreen } from './BirthdayScreen';
@@ -133,6 +136,7 @@ function ctxFromAnswers(a: FlowAnswers): FlowContext {
     routeLocked: a.medication ? !a.medication.routeAmbiguous : false,
     deviceType: a.deviceType,
     frequency: a.frequency,
+    sideEffects: a.sideEffects,
   };
 }
 
@@ -522,6 +526,31 @@ export function OnboardingNavigator() {
           onAnswer={(shotHour) => commit({ shotHour })}
         />
       );
+    case 'leanMass':
+      return (
+        <LeanMassBeatScreen
+          progress={progress}
+          onBack={goBack}
+          context={leanMassContext(answers)}
+          companionName={answers.companionName}
+          onContinue={goNext}
+        />
+      );
+    case 'symptomWeek': {
+      const effect = symptomForWeekBeat(answers.sideEffects);
+      // Belt and braces: shouldSkipStep already gates this, but rendering a
+      // curve with no symptom to title it would be a crash, so fall through.
+      if (!effect) return null;
+      return (
+        <SymptomWeekBeatScreen
+          progress={progress}
+          onBack={goBack}
+          context={context}
+          effect={effect}
+          onContinue={goNext}
+        />
+      );
+    }
     case 'instrument':
       return (
         <InstrumentBeatScreen

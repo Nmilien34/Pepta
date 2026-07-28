@@ -44,6 +44,9 @@
 // absent from the payload) but it is not — `buildCraftingSteps` leads the
 // crafting checklist with the user's own picks, so the answer visibly comes
 // back. It moved late instead, next to that payoff.
+import type { SideEffectType } from '@pepta/shared';
+import { symptomForWeekBeat } from './symptomWeek';
+
 export const ONBOARDING_STEPS = [
   'welcome',
   'meetPep',
@@ -59,6 +62,10 @@ export const ONBOARDING_STEPS = [
   'deviceType',
   'concentration',
   'frequency',
+  // Conviction beat. Deliberately AFTER medication + dose + frequency: by here
+  // the user has told us what they take and how often, so "the weight you lose
+  // on this" is about THEIR regimen rather than an abstract statistic.
+  'leanMass',
   'lastShot',
   'shotDay',
   'shotTime',
@@ -77,6 +84,9 @@ export const ONBOARDING_STEPS = [
   'dailyRoutine',
   'training',
   'sideEffects',
+  // Conviction beat. Collect the worry, then draw it. Skipped for "none yet"
+  // and for picks that do not follow a post-dose arc — see symptomForWeekBeat.
+  'symptomWeek',
   // Kept, and moved to sit two steps before `crafting`: this answer is what the
   // crafting checklist leads with, ticking off the user's own words. Asked at
   // step 5 that payoff was twenty screens away and read as a throwaway; here
@@ -138,11 +148,14 @@ export interface FlowContext {
   routeLocked?: boolean;
   deviceType?: 'single_dose_pen' | 'auto_injector' | 'syringe_vial' | 'other';
   frequency?: 'weekly' | 'biweekly' | 'daily' | 'custom';
+  /** Their side-effect picks — gates the symptom-week beat. */
+  sideEffects?: readonly SideEffectType[];
 }
 
 // The dosing block only makes sense for someone actively on a GLP-1.
 const MEDICATION_BLOCK: readonly OnboardingStep[] = [
   'currentDose',
+  'leanMass',
   'deviceType',
   'concentration',
   'frequency',
@@ -162,6 +175,10 @@ export function shouldSkipStep(step: OnboardingStep, ctx: FlowContext): boolean 
   if (ctx.journeyStage && ctx.journeyStage !== 'active' && MEDICATION_BLOCK.includes(step)) {
     return true;
   }
+  // The symptom-week beat only makes sense when they reported something that
+  // actually follows a post-dose arc. "None yet", an empty pick, or only
+  // injection-site/hair-loss/other → no curve to draw about them.
+  if (step === 'symptomWeek' && !symptomForWeekBeat(ctx.sideEffects)) return true;
   // Not on a GLP-1 at all → also skip the medication picker (and its route question).
   if (ctx.journeyStage === 'none' && (step === 'medication' || step === 'route')) return true;
   // The route question only shows when the picked medication doesn't pin it.

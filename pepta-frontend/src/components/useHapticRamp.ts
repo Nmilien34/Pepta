@@ -10,7 +10,12 @@ import { Platform } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { buildHapticRamp, type RampStyle } from '../utils/hapticRamp';
 
-const IMPACT: Record<RampStyle, Haptics.ImpactFeedbackStyle> = {
+/**
+ * RampStyle → the expo-haptics impact it plays. Exported because `hapticRamp`
+ * itself is deliberately RN-free (it unit-tests in plain Node), so anything
+ * firing a single ramp-scale tap needs the mapping from here.
+ */
+export const IMPACT: Record<RampStyle, Haptics.ImpactFeedbackStyle> = {
   soft: Haptics.ImpactFeedbackStyle.Soft,
   light: Haptics.ImpactFeedbackStyle.Light,
   medium: Haptics.ImpactFeedbackStyle.Medium,

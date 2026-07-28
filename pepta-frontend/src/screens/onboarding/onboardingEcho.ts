@@ -11,6 +11,7 @@ import { formatHeight, kgToLb, lbToKg, type BodyMeasure } from '../../utils/unit
 import { formatShortDate } from '../../utils/dateParts';
 import { projectGoal } from '../../utils/goalProjection';
 import type { OnboardingStep } from './onboardingFlow';
+import { sideEffectNamesEcho, symptomForWeekBeat } from './symptomWeek';
 import type { JourneyStage } from './JourneyStageScreen';
 import type { MedicationOption } from '../../data/medicationCatalog';
 import type { DoseValue } from './DoseScreen';
@@ -81,21 +82,6 @@ function deviceEcho(device?: InjectionDeviceType): string {
       return 'Syringe and vial. The precise way.';
     default:
       return 'Noted.';
-  }
-}
-
-function frequencyEcho(freq?: DoseFrequency): string {
-  switch (freq) {
-    case 'weekly':
-      return 'Weekly. Classic.';
-    case 'biweekly':
-      return 'Every two weeks. Got it.';
-    case 'daily':
-      return 'Daily. Consistent.';
-    case 'custom':
-      return 'Custom rhythm. Noted.';
-    default:
-      return 'Got it.';
   }
 }
 
@@ -180,8 +166,13 @@ export function echoFor(step: OnboardingStep, a: EchoAnswers, now: Date = new Da
       return deviceEcho(a.deviceType);
     case 'frequency':
       return a.deviceType ? deviceEcho(a.deviceType) : doseEcho(a.dose, unit);
+    case 'leanMass':
+      return leanMassContext(a);
     case 'lastShot':
-      return frequencyEcho(a.frequency);
+      // Was frequencyEcho — the frequency answer is two screens back now that
+      // the lean-mass beat sits between them, and repeating it here would echo
+      // the same line the beat already opened with.
+      return 'Back to your schedule.';
     case 'shotDay':
       return a.lastShot ? `Last shot was a ${DAY_SINGULAR[weekdayOf(a.lastShot)]}.` : undefined;
     case 'shotTime':
@@ -214,7 +205,13 @@ export function echoFor(step: OnboardingStep, a: EchoAnswers, now: Date = new Da
       return trainingEcho(a.trainingStatus);
     case 'biggestWorry':
       return `${journeyEcho(a.journeyStage)} Now, honestly —`;
+    case 'symptomWeek':
+      return sideEffectNamesEcho(a.sideEffects);
     case 'needs':
+      // "I'll watch for those" belongs to whichever screen directly follows
+      // the side-effects turn. When the symptom-week beat runs it has already
+      // acknowledged the picks by name, so this must not say it twice.
+      if (symptomForWeekBeat(a.sideEffects)) return 'Last thing.';
       return (a.sideEffects?.length ?? 0) > 0 ? 'Noted — I’ll watch for those.' : 'Clean slate so far.';
     case 'notifications':
       return 'You’ve given me everything I need.';
@@ -224,6 +221,26 @@ export function echoFor(step: OnboardingStep, a: EchoAnswers, now: Date = new Da
 }
 
 // "Tirzepatide · 5 mg · Sundays." — the instrument beat's proof line.
+/**
+ * What the user has just told us, replayed above the lean-mass beat: their
+ * medication, dose and rhythm. The point of the beat is that the statistic is
+ * about THEIR regimen, so it opens by naming it.
+ */
+export function leanMassContext(a: EchoAnswers): string {
+  const parts: string[] = [];
+  if (a.medication) parts.push(a.medication.name);
+  if (typeof a.dose === 'number') parts.push(`${a.dose} ${a.medication?.doseUnit ?? 'mg'}`);
+  if (a.frequency) parts.push(FREQUENCY_WORD[a.frequency]);
+  return parts.length > 0 ? `${parts.join(' · ')}.` : 'Here is why this matters.';
+}
+
+const FREQUENCY_WORD: Record<DoseFrequency, string> = {
+  weekly: 'weekly',
+  biweekly: 'every two weeks',
+  daily: 'daily',
+  custom: 'on your own rhythm',
+};
+
 export function instrumentContext(a: EchoAnswers): string {
   const parts: string[] = [];
   if (a.medication) parts.push(a.medication.name);

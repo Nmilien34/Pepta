@@ -8,6 +8,12 @@
 // `reveal` under the old 36-step order reopened the app at the plan graph,
 // so the whole quiz appeared to have vanished. Bumped to v2 for the
 // 2026-07-27 restructure; an unrecognised key simply starts fresh.
+//
+// Deliberately NOT bumped for the `leanMass` insertion (2026-07-28). The rule
+// is about steps MOVING: a pure insertion leaves every existing step name
+// meaning what it always did, so a v2 draft saved at `lastShot` still resumes
+// at `lastShot` — it just skips a beat the user was already past. Bumping
+// would discard every in-progress draft to buy nothing.
 export const ONBOARDING_DRAFT_KEY = 'pepta.onboarding.v2';
 
 export interface StoredDraft {

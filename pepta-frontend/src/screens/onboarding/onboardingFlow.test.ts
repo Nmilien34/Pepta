@@ -87,13 +87,15 @@ describe('onboarding flow', () => {
     expect(nextStep('meetPep')).toBe('nameCompanion');
     expect(nextStep('nameCompanion')).toBe('journeyStage');
     expect(nextStep('deviceType')).toBe('concentration');
-    expect(nextStep('frequency')).toBe('lastShot');
+    expect(nextStep('frequency')).toBe('leanMass');
+    expect(nextStep('leanMass')).toBe('lastShot');
     expect(nextStep('lastShot')).toBe('shotDay');
     expect(nextStep('shotDay')).toBe('shotTime');
     expect(nextStep('shotTime')).toBe('instrument');
     expect(nextStep('goalPace')).toBe('company');
     expect(nextStep('company')).toBe('dailyRoutine');
-    expect(nextStep('sideEffects')).toBe('needs');
+    expect(nextStep('sideEffects')).toBe('symptomWeek');
+    expect(nextStep('symptomWeek')).toBe('needs');
   });
 
   it('names the problem early: the worry, then the answer, before any dosing', () => {
@@ -108,8 +110,11 @@ describe('onboarding flow', () => {
   });
 
   it('never runs more than 9 input turns without a payoff', () => {
+    // Hand-maintained: a new beat that is NOT listed here scores as an input
+    // turn and will fail this test. That is the intended failure — it forces
+    // the question "is this really a payoff?" rather than passing silently.
     const BEATS = new Set<string>([
-      'welcome', 'meetPep', 'fearAnswered', 'company', 'instrument',
+      'welcome', 'meetPep', 'fearAnswered', 'leanMass', 'company', 'instrument', 'symptomWeek',
       'crafting', 'reveal', 'auth', 'paywall', 'welcomeIn',
     ]);
     const runLength = (steps: readonly string[]) => {
@@ -122,12 +127,14 @@ describe('onboarding flow', () => {
       return worst;
     };
 
-    // Was 12 before the restructure.
-    expect(runLength(ONBOARDING_STEPS)).toBeLessThanOrEqual(9);
+    // 12 before the 2026-07-27 restructure, 9 after it, 7 once the lean-mass
+    // beat split the dosing block. Tighten this whenever it improves — a bound
+    // left loose stops catching the regression it was written for.
+    expect(runLength(ONBOARDING_STEPS)).toBeLessThanOrEqual(7);
 
-    // And the only run that long is the dosing block — the one stretch the
-    // skip rules actually shorten. Everything a non-dosing user must walk
-    // stays well under it, which is the part nobody can escape.
+    // The longest run is now the same for everyone: the skip rules shorten the
+    // dosing block to nothing, so what a non-dosing user walks is the stretch
+    // nobody can escape. Both must stay under the bound.
     const unskippable = ONBOARDING_STEPS.filter(
       (s) => !shouldSkipStep(s, { journeyStage: 'none' }),
     );
@@ -259,5 +266,17 @@ describe('route + deviceType gating', () => {
     expect(shouldSkipStep('deviceType', { journeyStage: 'active', route: 'oral' })).toBe(true);
     expect(shouldSkipStep('deviceType', { journeyStage: 'starting_soon', route: 'injection' })).toBe(true);
     expect(shouldSkipStep('deviceType', { journeyStage: 'none' })).toBe(true);
+  });
+
+  it('shows the symptom-week beat only when a drawable symptom was reported', () => {
+    // Gated on the actual picks, unlike every other skip rule here. "None yet"
+    // and picks with no post-dose arc get no curve — a nausea graph shown to
+    // someone reporting nothing reads as being told what is coming.
+    expect(shouldSkipStep('symptomWeek', {})).toBe(true);
+    expect(shouldSkipStep('symptomWeek', { sideEffects: [] })).toBe(true);
+    expect(shouldSkipStep('symptomWeek', { sideEffects: ['injection_site_reaction'] })).toBe(true);
+    expect(shouldSkipStep('symptomWeek', { sideEffects: ['hair_loss', 'other'] })).toBe(true);
+    expect(shouldSkipStep('symptomWeek', { sideEffects: ['nausea'] })).toBe(false);
+    expect(shouldSkipStep('symptomWeek', { sideEffects: ['other', 'fatigue'] })).toBe(false);
   });
 });
