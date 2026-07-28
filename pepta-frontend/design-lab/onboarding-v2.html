@@ -366,6 +366,47 @@ h2{font-size:18px;font-weight:800;margin:44px 0 6px}
   </div>
 
 
+  <div class="fw"><div class="fl">T2c · Name your companion <span style="color:var(--primary)">(NEW)</span></div>
+    <style>
+      /* Reuses the existing chip idiom; nothing new invented. */
+      .nmfield{border:1.5px solid var(--ink);border-radius:14px;padding:13px 15px;font-weight:800;font-size:17px;color:var(--ink);display:flex;align-items:center;justify-content:space-between}
+      .nmfield .caret{width:2px;height:19px;background:var(--primary);display:inline-block;margin-left:1px;animation:nmcar 1s step-end infinite}
+      @keyframes nmcar{50%{opacity:0}}
+      .nmchips{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px}
+      .nmchip{border:1px solid var(--hair);background:#fff;border-radius:999px;padding:8px 13px;font-weight:700;font-size:13px;color:var(--ts)}
+      .nmchip.on{border-color:var(--ink);color:var(--ink);border-width:1.5px}
+      .nmdice{font-size:12.5px;font-weight:700;color:var(--primary);margin-top:11px;display:inline-block}
+    </style>
+    <div class="dev"><div class="orbs"><i></i><i></i><i></i></div><div class="scr">
+      <div class="top"><span class="back">&#8249;</span><div class="prog"><i style="width:11%"></i></div></div>
+      <div class="echo">Nice to meet you too.</div>
+      <div class="q">What should I go by<span class="sq">?</span></div>
+      <div class="subq">Totally optional &mdash; I answer to Pep just fine.</div>
+
+      <div style="margin-top:20px">
+        <div class="nmfield"><span>Sushi<span class="caret"></span></span><span style="font-size:12px;font-weight:700;color:var(--tt)">5/16</span></div>
+        <div class="nmchips">
+          <span class="nmchip on">Sushi</span><span class="nmchip">Bob</span><span class="nmchip">Ollie</span>
+          <span class="nmchip">Ivy</span><span class="nmchip">Pip</span><span class="nmchip">Momo</span>
+          <span class="nmchip">Gus</span><span class="nmchip">Bean</span><span class="nmchip">Nugget</span>
+          <span class="nmchip">Waffle</span><span class="nmchip">Otto</span><span class="nmchip">Noodle</span>
+        </div>
+        <span class="nmdice">&#127922; Surprise me</span>
+      </div>
+
+      <div style="flex:1;display:flex;align-items:flex-end;justify-content:center;padding-bottom:14px;min-height:96px">
+        <div style="position:relative">
+          <svg width="86" height="102" viewBox="0 0 120 142" style="display:block"><use href="#pep"/></svg>
+          <div class="mpbub" style="opacity:1;transform:none;bottom:96px;left:78px;white-space:nowrap">Sushi it is &#128522;</div>
+        </div>
+      </div>
+      <div class="cta">Continue</div>
+    </div></div>
+    <div class="spec"><b>Place:</b> straight after Meet Pep, while the introduction is still on screen &mdash; asking later would feel bolted on. <b>Default is Pep</b> (it ties to Pepta); Continue works untouched, so this is a flourish, never a gate. Tapping a chip fills the field and Pep&rsquo;s bubble echoes the new name immediately &mdash; that instant reflection is the whole point. Free text is capped at 16 chars.
+    <b>Not a one-screen change:</b> the name replaces &ldquo;Pep&rdquo; in ~12 user-visible strings including push titles (&ldquo;Pep: shot time&rdquo;), so it needs a real field on the user model &mdash; device-local storage would break server-sent notifications.</div>
+  </div>
+
+
   <div class="fw"><div class="fl">T3b · Experience (NEW)</div>
     <div class="dev"><div class="orbs"><i></i><i></i><i></i></div><div class="scr">
       <div class="top"><span class="back">&#8249;</span><div class="prog"><i style="width:13%"></i></div></div>

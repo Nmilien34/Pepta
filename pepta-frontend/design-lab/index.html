@@ -83,7 +83,11 @@
   .cd.rest{background:rgba(52,199,89,.09)}
   .cd.rest.rs{border-radius:10px 0 0 10px}.cd.rest.re{border-radius:0 10px 10px 0}
   .cd .dd{width:4.5px;height:4.5px;border-radius:99px;margin-top:1px}
-  .dsheet{position:absolute;left:0;right:0;bottom:0;background:var(--surface);border-radius:22px 22px 0 0;padding:14px 16px 18px;box-shadow:0 -14px 40px rgba(16,16,24,.16);z-index:5}
+  /* Bottom padding is 34px, not 18: the shipped BottomSheet wraps its content in
+     SafeAreaView edges={['bottom']}, so the home-indicator inset sits beneath the
+     last row. At 18px the "Cycle · 8 wk on, 2 off" row read as jammed against the
+     screen edge — the mockup was under-representing the sheet, not a design call. */
+  .dsheet{position:absolute;left:0;right:0;bottom:0;background:var(--surface);border-radius:22px 22px 0 0;padding:14px 16px 34px;box-shadow:0 -14px 40px rgba(16,16,24,.16);z-index:5}
   .dgrab{width:34px;height:4px;border-radius:99px;background:#E4E4EA;margin:0 auto 12px}
   .dim{position:absolute;inset:0;background:rgba(14,14,18,.32);z-index:4}
   /* segments / steppers / bars */
@@ -166,7 +170,7 @@
 <body>
 <div class="lab-head">
   <h1>Pepta — design lab</h1>
-  <p>Premium GLP-1 tracker. App shell + the full 25-screen onboarding · Hanken Grotesk · calm purple · the “Pep” syringe mascot. Light mode (primary).</p>
+  <p>Premium GLP-1 tracker. Current designs only — superseded frames removed 2026-07-27. Hanken Grotesk · calm purple · the “Pep” syringe mascot. Light mode (primary).</p>
 </div>
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
@@ -178,7 +182,7 @@
 
 <div class="gallery">
 
-  <div class="divider"><h2>App</h2><div class="ln"></div><span class="ct">5 core screens</span></div>
+  <div class="divider"><h2>App</h2><div class="ln"></div><span class="ct">9 screens · current only</span></div>
 
   <!-- ================= HOME ================= -->
   <div class="fw"><div class="fl">Home</div>
@@ -266,51 +270,6 @@
   </div>
 
   <!-- ================= TRACK ================= -->
-  <div class="fw"><div class="fl">Track</div>
-    <div class="device"><div class="sb"><span class="tt">10:42</span><span class="ri"><i class="ti ti-antenna-bars-5"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3" style="font-size:18px"></i></span></div>
-      <div class="scr">
-        <div class="pad row bt" style="padding-top:4px"><span class="h1">Track</span><div class="row" style="gap:9px"><span class="today"><i class="ti ti-calendar" style="font-size:14px;color:var(--ts)"></i>Today</span><div class="av"><i class="ti ti-adjustments-horizontal" style="font-size:18px;color:var(--ts)"></i></div></div></div>
-        <div class="pad">
-          <div class="card mt16 row bt">
-            <div><span class="sec">Next dose</span><div class="big mt8">5d 9h</div><div class="lab mt8">Fri, Jun 27 · 8:00 PM</div></div>
-            <div class="ringwrap" style="width:74px;height:74px"><svg width="74" height="74" viewBox="0 0 100 100"><circle cx="50" cy="50" r="43" fill="none" stroke="#EFEFF2" stroke-width="9"/><circle cx="50" cy="50" r="43" fill="none" stroke="var(--primary)" stroke-width="9" stroke-linecap="round" stroke-dasharray="270" stroke-dashoffset="97" transform="rotate(-90 50 50)"/></svg><div class="ringtxt"><span class="sv" style="color:var(--primary);font-size:14px">64%</span></div></div>
-          </div>
-          <div class="card mt12">
-            <div class="row bt"><span class="sec">Compounds</span><span class="link"><i class="ti ti-plus" style="font-size:13px;vertical-align:-1px"></i> Add</span></div>
-            <div class="lrow mt8"><div class="lic" style="background:#EFEBFF;color:var(--primary)"><i class="ti ti-vaccine"></i></div><div style="flex:1"><div class="nm">Tirzepatide</div><div class="lab">5 mg · weekly · half-life 5d</div></div><span class="pill" style="background:#E8F8EE;color:#1E8E40">Active</span></div>
-            <div class="lrow"><div class="lic" style="background:#E1F5EE;color:#0F6E56"><i class="ti ti-flask"></i></div><div style="flex:1"><div class="nm">BPC-157</div><div class="lab">250 mcg · daily</div></div><span class="state">Paused</span></div>
-          </div>
-          <div class="card mt12">
-            <div class="row bt"><div class="ch"><i class="ti ti-current-location ic" style="color:var(--primary)"></i><span class="nm">Injection sites</span></div><span class="link">History</span></div>
-            <div class="row" style="justify-content:space-around;margin:14px 0 6px">
-              <div style="text-align:center"><svg width="84" height="156" viewBox="0 0 80 150"><use href="#body"/><circle class="dot-used" cx="33" cy="58" r="5.5"/><circle class="dot-next" cx="47" cy="58" r="5.5"/><circle class="dot-free" cx="18" cy="44" r="5"/><circle class="dot-free" cx="62" cy="44" r="5"/><circle class="dot-used" cx="34" cy="104" r="5"/><circle class="dot-free" cx="46" cy="104" r="5"/></svg><div class="den mt8" style="font-size:11px">Front</div></div>
-              <div style="text-align:center"><svg width="84" height="156" viewBox="0 0 80 150"><use href="#body"/><circle class="dot-free" cx="18" cy="44" r="5"/><circle class="dot-free" cx="62" cy="44" r="5"/><circle class="dot-used" cx="33" cy="86" r="5.5"/><circle class="dot-free" cx="47" cy="86" r="5.5"/><circle class="dot-free" cx="34" cy="112" r="5"/><circle class="dot-free" cx="46" cy="112" r="5"/></svg><div class="den mt8" style="font-size:11px">Back</div></div>
-            </div>
-            <div class="row" style="gap:14px;justify-content:center;padding-top:6px;border-top:.5px solid var(--hair)">
-              <span class="lab"><span style="display:inline-block;width:9px;height:9px;border-radius:9px;background:var(--primary);vertical-align:0"></span> Used</span>
-              <span class="lab"><span style="display:inline-block;width:9px;height:9px;border-radius:9px;border:2px solid var(--primary);vertical-align:0"></span> Next: left abdomen</span>
-            </div>
-          </div>
-          <div class="card mt12">
-            <div class="row bt"><div class="ch"><i class="ti ti-chart-line ic" style="color:var(--primary)"></i><span class="nm">Medication level</span></div></div>
-            <div class="segctl mt12"><span class="on">7d</span><span>30d</span><span>90d</span><span>1y</span></div>
-            <svg viewBox="0 0 300 100" class="mt12" style="width:100%;height:88px"><defs><linearGradient id="ml" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#8B6CFF" stop-opacity=".22"/><stop offset="1" stop-color="#8B6CFF" stop-opacity="0"/></linearGradient></defs><line x1="0" y1="80" x2="300" y2="80" stroke="#F0F0F3" stroke-width="1"/><line x1="0" y1="45" x2="300" y2="45" stroke="#F0F0F3" stroke-width="1"/><path d="M0 70 C40 64 60 30 98 26 C140 22 152 58 192 62 C232 66 256 38 300 30 L300 90 L0 90 Z" fill="url(#ml)"/><path d="M0 70 C40 64 60 30 98 26 C140 22 152 58 192 62 C232 66 256 38 300 30" fill="none" stroke="#7C5CFC" stroke-width="3" stroke-linecap="round"/><circle cx="192" cy="62" r="5" fill="#7C5CFC" stroke="#fff" stroke-width="2.5"/></svg>
-            <div class="row bt mt8"><span class="lab">Current 1.42 mg</span><span class="lab">Peak 2.1 · Trough 0.9</span></div>
-          </div>
-          <div class="card mt12" style="padding:14px 16px"><div class="row bt"><div class="ch"><i class="ti ti-history" style="color:var(--ts);font-size:18px"></i><span class="nm">Dose history</span></div><i class="ti ti-chevron-right" style="color:var(--tt)"></i></div></div>
-        </div>
-        <div class="tabbar">
-          <div class="tab"><i class="ti ti-home-2"></i><span>Home</span></div>
-          <div class="tab on"><i class="ti ti-vaccine"></i><span>Track</span></div>
-          <div class="fw2"><div class="fab"><i class="ti ti-plus"></i></div></div>
-          <div class="tab"><i class="ti ti-chart-line"></i><span>Progress</span></div>
-          <div class="tab"><i class="ti ti-user-circle"></i><span>Account</span></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ============ TRACK + SCHEDULE (NEW · minimal delta) ============ -->
   <div class="fw"><div class="fl">Track · + schedule <span style="color:var(--primary)">(NEW — 2 additions)</span></div>
     <div class="device"><div class="sb"><span class="tt">10:42</span><span class="ri"><i class="ti ti-antenna-bars-5"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3" style="font-size:18px"></i></span></div>
       <div class="scr">
@@ -397,7 +356,7 @@
             <div class="nm mt6">Shot day — 5 mg Tirzepatide, 8:00 PM.</div>
             <div class="lab mt4">Last dose of this cycle. Two weeks off start Jun 29 — reminders pause automatically.</div>
           </div>
-          <div class="row bt" style="padding:12px 4px 2px"><div class="ch"><i class="ti ti-repeat" style="color:var(--primary);font-size:16px"></i><span class="nm" style="font-size:14px">Cycle · 8 wk on, 2 off</span></div><span class="link">Edit</span></div>
+          <div class="row bt" style="padding:14px 4px 0"><div class="ch"><i class="ti ti-repeat" style="color:var(--primary);font-size:16px"></i><span class="nm" style="font-size:14px">Cycle · 8 wk on, 2 off</span></div><span class="link">Edit</span></div>
         </div>
       </div>
     </div>
@@ -637,58 +596,6 @@
   </div>
 
   <!-- ================= ACCOUNT ================= -->
-  <div class="fw"><div class="fl">Account</div>
-    <div class="device"><div class="sb"><span class="tt">10:42</span><span class="ri"><i class="ti ti-antenna-bars-5"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3" style="font-size:18px"></i></span></div>
-      <div class="scr">
-        <div class="pad" style="padding-top:4px"><span class="h1">Account</span></div>
-        <div class="pad">
-          <div class="card mt16 row" style="gap:13px">
-            <div class="av" style="width:54px;height:54px"><svg width="40" height="46"><use href="#pep"/></svg></div>
-            <div style="flex:1"><div class="nm" style="font-size:17px">Nick M.</div><div class="lab mt8">Day 24 · Tirzepatide</div></div>
-            <i class="ti ti-chevron-right" style="color:var(--tt)"></i>
-          </div>
-          <div class="card mt12 row bt" style="background:linear-gradient(135deg,#F3EFFF,#FBF4FF);border:.5px solid #E7DEFB">
-            <div class="row" style="gap:11px"><div class="logo"><i class="ti ti-sparkles"></i></div><div><div class="nm">Pepta Plus</div><div class="lab">Active · renews Jul 21</div></div></div>
-            <span class="link">Manage</span>
-          </div>
-          <div class="sec mt20" style="padding-left:6px">Preferences</div>
-          <div class="card mt8" style="padding:2px 14px">
-            <div class="lrow"><div class="lic" style="background:#F1EFE8;color:#5F5E5A"><i class="ti ti-ruler-2"></i></div><span class="nm" style="flex:1">Units</span><span class="lab">Imperial</span><i class="ti ti-chevron-right" style="color:var(--tt);margin-left:8px"></i></div>
-            <div class="lrow"><div class="lic" style="background:#EFEBFF;color:var(--primary)"><i class="ti ti-vaccine"></i></div><span class="nm" style="flex:1">Dose units</span><span class="lab">mg</span><i class="ti ti-chevron-right" style="color:var(--tt);margin-left:8px"></i></div>
-            <div class="lrow"><div class="lic" style="background:#FFF1E7;color:#C75B16"><i class="ti ti-bell"></i></div><span class="nm" style="flex:1">Notifications</span><i class="ti ti-chevron-right" style="color:var(--tt)"></i></div>
-            <div class="lrow"><div class="lic" style="background:#FCEBEB;color:#D14343"><i class="ti ti-heart"></i></div><span class="nm" style="flex:1">Apple Health</span><span class="pill" style="background:#E8F8EE;color:#1E8E40">Connected</span></div>
-            <div class="lrow"><div class="lic" style="background:#E7F4FF;color:#1E7FCC"><i class="ti ti-language"></i></div><span class="nm" style="flex:1">Language</span><span class="lab">English</span><i class="ti ti-chevron-right" style="color:var(--tt);margin-left:8px"></i></div>
-          </div>
-          <div class="sec mt20" style="padding-left:6px">Data &amp; reports</div>
-          <div class="card mt8" style="padding:2px 14px">
-            <div class="lrow"><div class="lic" style="background:#E8F8EE;color:#1E8E40"><i class="ti ti-file-export"></i></div><span class="nm" style="flex:1">Export report</span><i class="ti ti-chevron-right" style="color:var(--tt)"></i></div>
-            <div class="lrow"><div class="lic" style="background:#EFEBFF;color:var(--primary)"><i class="ti ti-layout-grid-add"></i></div><span class="nm" style="flex:1">Add widgets</span><i class="ti ti-chevron-right" style="color:var(--tt)"></i></div>
-          </div>
-          <div class="sec mt20" style="padding-left:6px">Support</div>
-          <div class="card mt8" style="padding:2px 14px">
-            <div class="lrow"><div class="lic" style="background:#FBEAF6;color:#A8327D"><i class="ti ti-bulb"></i></div><span class="nm" style="flex:1">Feature requests</span><i class="ti ti-chevron-right" style="color:var(--tt)"></i></div>
-            <div class="lrow"><div class="lic" style="background:#FFF6E5;color:#B5790B"><i class="ti ti-flag-2"></i></div><span class="nm" style="flex:1">Report a problem</span><i class="ti ti-chevron-right" style="color:var(--tt)"></i></div>
-            <div class="lrow"><div class="lic" style="background:#F1EFE8;color:#5F5E5A"><i class="ti ti-help-circle"></i></div><span class="nm" style="flex:1">Help</span><i class="ti ti-chevron-right" style="color:var(--tt)"></i></div>
-          </div>
-          <div class="sec mt20" style="padding-left:6px">About</div>
-          <div class="card mt8" style="padding:2px 14px">
-            <div class="lrow"><div class="lic" style="background:#F1EFE8;color:#5F5E5A"><i class="ti ti-file-text"></i></div><span class="nm" style="flex:1">Terms</span><i class="ti ti-chevron-right" style="color:var(--tt)"></i></div>
-            <div class="lrow"><div class="lic" style="background:#F1EFE8;color:#5F5E5A"><i class="ti ti-lock"></i></div><span class="nm" style="flex:1">Privacy</span><i class="ti ti-chevron-right" style="color:var(--tt)"></i></div>
-          </div>
-          <div class="card mt12" style="padding:14px 16px;text-align:center"><span class="nm" style="color:var(--danger)">Sign out</span></div>
-        </div>
-        <div class="tabbar">
-          <div class="tab"><i class="ti ti-home-2"></i><span>Home</span></div>
-          <div class="tab"><i class="ti ti-vaccine"></i><span>Track</span></div>
-          <div class="fw2"><div class="fab"><i class="ti ti-plus"></i></div></div>
-          <div class="tab"><i class="ti ti-chart-line"></i><span>Progress</span></div>
-          <div class="tab on"><i class="ti ti-user-circle"></i><span>Account</span></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ================= QUICK LOG ================= -->
   <div class="fw"><div class="fl">Quick Log · FAB sheet</div>
     <div class="device"><div class="sb"><span class="tt">10:42</span><span class="ri"><i class="ti ti-antenna-bars-5"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3" style="font-size:18px"></i></span></div>
       <div style="background:rgba(14,14,18,.42);min-height:700px;display:flex;align-items:flex-end">
@@ -709,465 +616,15 @@
     </div>
   </div>
 
-  <div class="divider"><h2>Onboarding</h2><div class="ln"></div><span class="ct">25 screens · tracker-framed</span></div>
-
-  <!-- 1 WELCOME -->
-  <div class="fw"><div class="fl">1 · Welcome</div>
-    <div class="device"><div class="sb"><span class="tt">9:41</span><span class="ri"><i class="ti ti-antenna-bars-5"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3" style="font-size:17px"></i></span></div>
-      <div class="ob" style="align-items:center;text-align:center;background:radial-gradient(125% 55% at 50% 0%,#F1ECFF 0%,var(--bg) 52%)">
-        <div class="spc" style="display:flex;flex-direction:column;justify-content:center;align-items:center;gap:22px">
-          <svg width="150" height="186"><use href="#pepwave"/></svg>
-          <div><div class="obh lg">Your trusted<br/>GLP-1 partner.</div><div class="sub mt12" style="max-width:270px">Lose the fat, keep the muscle — Pepta tracks the whole journey.</div></div>
-        </div>
-        <div class="obbtn" style="width:100%">Get started</div>
-        <div class="lab mt14">Already have an account? <span style="color:var(--primary);font-weight:700">Sign in</span></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 1b SIGN IN / SIGN UP -->
-  <div class="fw"><div class="fl">1b · Sign in / Sign up</div>
-    <div class="device"><div class="sb"><span class="tt">9:41</span><span class="ri"><i class="ti ti-antenna-bars-5"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3" style="font-size:17px"></i></span></div>
-      <div class="ob" style="align-items:center;text-align:center;background:radial-gradient(125% 55% at 50% 0%,#F1ECFF 0%,var(--bg) 52%)">
-        <div class="spc" style="display:flex;flex-direction:column;justify-content:center;align-items:center;gap:20px">
-          <svg width="132" height="164"><use href="#pepwave"/></svg>
-          <div><div class="obh lg">Welcome to Pepta</div><div class="sub mt12" style="max-width:258px">Create your account to start tracking — lose the fat, keep the muscle.</div></div>
-        </div>
-        <div style="width:100%;display:flex;flex-direction:column;gap:11px">
-          <div class="authbtn apple"><i class="ti ti-brand-apple"></i> Continue with Apple</div>
-          <div class="authbtn google"><i class="ti ti-brand-google" style="color:#4285F4"></i> Continue with Google</div>
-        </div>
-        <div class="lab mt16" style="font-size:11px;max-width:250px">By continuing you agree to Pepta’s <span style="color:var(--primary);font-weight:700">Terms</span> &amp; <span style="color:var(--primary);font-weight:700">Privacy Policy</span>.</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 2 LEGAL -->
-  <div class="fw"><div class="fl">2 · Privacy &amp; legal</div>
-    <div class="device"><div class="sb"><span class="tt">9:41</span><span class="ri"><i class="ti ti-antenna-bars-5"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3" style="font-size:17px"></i></span></div>
-      <div class="ob">
-        <div class="obtop"><span class="back">‹</span><div class="obbar"><div class="obfill" style="width:8%"></div></div></div>
-        <div class="mascot mt6"><svg width="78" height="92"><use href="#pep"/></svg></div>
-        <div class="obh mt16" style="text-align:center">Your privacy<br/>comes first.</div>
-        <div class="sub mt12" style="text-align:center">Your health data is encrypted and never sold. You’re always in control.</div>
-        <div class="mt20" style="display:flex;flex-direction:column;gap:10px">
-          <div class="olrow"><div class="olic" style="color:#5F5E5A"><i class="ti ti-file-text"></i></div><span class="nm" style="flex:1">Terms of Service</span><i class="ti ti-chevron-right" style="color:var(--tt)"></i></div>
-          <div class="olrow"><div class="olic" style="color:var(--primary)"><i class="ti ti-lock"></i></div><span class="nm" style="flex:1">Privacy Policy</span><i class="ti ti-chevron-right" style="color:var(--tt)"></i></div>
-        </div>
-        <div class="spc"></div><div class="obbtn">Accept &amp; continue</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 3 JOURNEY STAGE -->
-  <div class="fw"><div class="fl">3 · Journey stage</div>
-    <div class="device"><div class="sb"><span class="tt">9:41</span><span class="ri"><i class="ti ti-antenna-bars-5"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3" style="font-size:17px"></i></span></div>
-      <div class="ob">
-        <div class="obtop"><span class="back">‹</span><div class="obbar"><div class="obfill" style="width:12%"></div></div></div>
-        <div class="obh">Where are you in your journey?</div><div class="lab mt8">This tailors your setup.</div>
-        <div class="mt20" style="display:flex;flex-direction:column;gap:11px">
-          <div class="opt sel"><i class="ti ti-vaccine oi" style="color:var(--primary)"></i><div class="ol"><div class="nm">Already on a GLP-1</div><div class="lab">Tracking shots &amp; progress</div></div><div class="chk on"><i class="ti ti-check"></i></div></div>
-          <div class="opt"><i class="ti ti-calendar-plus oi" style="color:#0F6E56"></i><div class="ol"><div class="nm">Starting soon</div><div class="lab">Prescription on the way</div></div><div class="chk"></div></div>
-          <div class="opt"><i class="ti ti-compass oi" style="color:#854F0B"></i><div class="ol"><div class="nm">Just exploring</div><div class="lab">Not on one yet</div></div><div class="chk"></div></div>
-        </div>
-        <div class="spc"></div><div class="obbtn">Continue</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 4 MEDICATION PICKER -->
-  <div class="fw"><div class="fl">4 · Medication picker</div>
-    <div class="device"><div class="sb"><span class="tt">9:41</span><span class="ri"><i class="ti ti-antenna-bars-5"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3" style="font-size:17px"></i></span></div>
-      <div class="ob">
-        <div class="obtop"><span class="back">‹</span><div class="obbar"><div class="obfill" style="width:16%"></div></div></div>
-        <div class="obh">What are you taking?</div>
-        <div class="field mt14"><span class="lab"><i class="ti ti-search" style="margin-right:6px"></i>Search medications</span></div>
-        <div class="mt12" style="display:flex;flex-direction:column;gap:9px">
-          <div class="opt sel" style="padding:12px"><span class="oi" style="font-weight:800;color:#854F0B">M</span><div class="ol"><div class="nm">Mounjaro</div><div class="lab">Tirzepatide · injection</div></div><div class="chk on"><i class="ti ti-check"></i></div></div>
-          <div class="opt" style="padding:12px"><span class="oi" style="font-weight:800;color:#0C447C">O</span><div class="ol"><div class="nm">Ozempic</div><div class="lab">Semaglutide · injection</div></div><div class="chk"></div></div>
-          <div class="opt" style="padding:12px"><span class="oi" style="font-weight:800;color:#085041">W</span><div class="ol"><div class="nm">Wegovy</div><div class="lab">Semaglutide · injection</div></div><div class="chk"></div></div>
-          <div class="opt" style="padding:12px"><i class="ti ti-pill oi" style="color:#A8327D"></i><div class="ol"><div class="nm">Rybelsus</div><div class="lab">Oral · daily pill</div></div><div class="chk"></div></div>
-          <div class="opt" style="padding:12px"><i class="ti ti-flask oi" style="color:#0F6E56"></i><div class="ol"><div class="nm">Compounded</div><div class="lab">Custom sema / tirz</div></div><div class="chk"></div></div>
-        </div>
-        <div class="spc"></div><div class="obbtn">Continue</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 5 CURRENT DOSE -->
-  <div class="fw"><div class="fl">5 · Current dose</div>
-    <div class="device"><div class="sb"><span class="tt">9:41</span><span class="ri"><i class="ti ti-antenna-bars-5"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3" style="font-size:17px"></i></span></div>
-      <div class="ob">
-        <div class="obtop"><span class="back">‹</span><div class="obbar"><div class="obfill" style="width:20%"></div></div></div>
-        <div class="obh">Your current dose</div><div class="lab mt8">Mounjaro · pick what you’re on now.</div>
-        <div class="mt20" style="display:flex;flex-wrap:wrap;gap:10px">
-          <div class="chip">2.5 mg</div><div class="chip sel">5 mg <i class="ti ti-check"></i></div><div class="chip">7.5 mg</div><div class="chip">10 mg</div><div class="chip">12.5 mg</div><div class="chip">15 mg</div><div class="chip">Custom</div>
-        </div>
-        <div class="mascot spc" style="align-items:flex-end"><svg width="92" height="108"><use href="#pep"/></svg></div>
-        <div class="obbtn">Continue</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 6 FREQUENCY + LAST SHOT -->
-  <div class="fw"><div class="fl">6 · Frequency + last shot</div>
-    <div class="device"><div class="sb"><span class="tt">9:41</span><span class="ri"><i class="ti ti-antenna-bars-5"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3" style="font-size:17px"></i></span></div>
-      <div class="ob">
-        <div class="obtop"><span class="back">‹</span><div class="obbar"><div class="obfill" style="width:24%"></div></div></div>
-        <div class="obh">How often?</div>
-        <div class="mt16" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-          <div class="opt sel" style="flex-direction:column;align-items:flex-start;gap:6px;padding:14px"><i class="ti ti-calendar-week" style="font-size:21px;color:var(--primary)"></i><div class="nm">Weekly</div></div>
-          <div class="opt" style="flex-direction:column;align-items:flex-start;gap:6px;padding:14px"><i class="ti ti-calendar" style="font-size:21px;color:var(--ts)"></i><div class="nm">Every 2 weeks</div></div>
-          <div class="opt" style="flex-direction:column;align-items:flex-start;gap:6px;padding:14px"><i class="ti ti-sun" style="font-size:21px;color:var(--ts)"></i><div class="nm">Daily</div></div>
-          <div class="opt" style="flex-direction:column;align-items:flex-start;gap:6px;padding:14px"><i class="ti ti-adjustments" style="font-size:21px;color:var(--ts)"></i><div class="nm">Custom</div></div>
-        </div>
-        <div class="sec mt20">Last shot taken</div>
-        <div class="field mt8"><span class="nm"><i class="ti ti-calendar" style="margin-right:7px;vertical-align:-2px"></i>Fri, Jun 20</span><i class="ti ti-chevron-right" style="color:var(--tt)"></i></div>
-        <div class="spc"></div><div class="obbtn">Continue</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 7 SHOT DAY -->
-  <div class="fw"><div class="fl">7 · Shot day</div>
-    <div class="device"><div class="sb"><span class="tt">9:41</span><span class="ri"><i class="ti ti-antenna-bars-5"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3" style="font-size:17px"></i></span></div>
-      <div class="ob">
-        <div class="obtop"><span class="back">‹</span><div class="obbar"><div class="obfill" style="width:28%"></div></div></div>
-        <div class="obh">Which day do cravings hit hardest?</div><div class="lab mt8">We’ll time your dose insights around it.</div>
-        <div class="mt20 row" style="gap:7px;justify-content:space-between">
-          <div class="chip" style="width:36px;padding:10px 0;justify-content:center">S</div><div class="chip" style="width:36px;padding:10px 0;justify-content:center">M</div><div class="chip" style="width:36px;padding:10px 0;justify-content:center">T</div><div class="chip" style="width:36px;padding:10px 0;justify-content:center">W</div><div class="chip" style="width:36px;padding:10px 0;justify-content:center">T</div><div class="chip sel" style="width:36px;padding:10px 0;justify-content:center">F</div><div class="chip" style="width:36px;padding:10px 0;justify-content:center">S</div>
-        </div>
-        <div class="card mt20 row" style="gap:11px"><svg width="40" height="47"><use href="#pep"/></svg><span class="lab" style="color:var(--tp)">Appetite usually dips for a day or two after your shot — we’ll help you front-load protein then.</span></div>
-        <div class="spc"></div><div class="obbtn">Continue</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 8 APPLE HEALTH -->
-  <div class="fw"><div class="fl">8 · Apple Health</div>
-    <div class="device"><div class="sb"><span class="tt">9:41</span><span class="ri"><i class="ti ti-antenna-bars-5"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3" style="font-size:17px"></i></span></div>
-      <div class="ob" style="align-items:center;text-align:center">
-        <div class="obtop" style="width:100%"><span class="back">‹</span><div class="obbar"><div class="obfill" style="width:32%"></div></div></div>
-        <div class="spc" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px">
-          <div style="width:96px;height:96px;border-radius:999px;background:#FCEBEB;display:flex;align-items:center;justify-content:center"><i class="ti ti-heart" style="font-size:42px;color:#A32D2D"></i></div>
-          <div><div class="obh">Sync Apple Health</div><div class="sub mt12" style="max-width:260px">Pull in weight &amp; steps automatically — less to log by hand.</div></div>
-        </div>
-        <div class="obbtn" style="width:100%">Connect Apple Health</div>
-        <div class="lab mt14">Maybe later</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 9 GOAL TYPE -->
-  <div class="fw"><div class="fl">9 · Goal type</div>
-    <div class="device"><div class="sb"><span class="tt">9:41</span><span class="ri"><i class="ti ti-antenna-bars-5"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3" style="font-size:17px"></i></span></div>
-      <div class="ob">
-        <div class="obtop"><span class="back">‹</span><div class="obbar"><div class="obfill" style="width:36%"></div></div></div>
-        <div class="obh">What’s your goal?</div><div class="lab mt8">Sets your calorie &amp; protein targets.</div>
-        <div class="mt20" style="display:flex;flex-direction:column;gap:11px">
-          <div class="opt sel"><i class="ti ti-flame oi" style="color:#993C1D"></i><div class="ol"><div class="nm">Lose fat</div><div class="lab">Drop fat, protect muscle</div></div><div class="chk on"><i class="ti ti-check"></i></div></div>
-          <div class="opt"><i class="ti ti-equal oi" style="color:#5F5E5A"></i><div class="ol"><div class="nm">Maintain</div><div class="lab">Hold steady</div></div><div class="chk"></div></div>
-          <div class="opt"><i class="ti ti-barbell oi" style="color:#0F6E56"></i><div class="ol"><div class="nm">Build &amp; recomp</div><div class="lab">Add muscle while leaning out</div></div><div class="chk"></div></div>
-        </div>
-        <div class="spc"></div><div class="obbtn">Continue</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 10 SEX / GENDER -->
-  <div class="fw"><div class="fl">10 · Sex &amp; gender</div>
-    <div class="device"><div class="sb"><span class="tt">9:41</span><span class="ri"><i class="ti ti-antenna-bars-5"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3" style="font-size:17px"></i></span></div>
-      <div class="ob">
-        <div class="obtop"><span class="back">‹</span><div class="obbar"><div class="obfill" style="width:40%"></div></div></div>
-        <div class="obh">How do you identify?</div>
-        <div class="mt16" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-          <div class="opt sel" style="flex-direction:column;align-items:center;gap:8px;padding:18px 12px"><i class="ti ti-gender-female" style="font-size:24px;color:var(--weight)"></i><div class="nm">Woman</div></div>
-          <div class="opt" style="flex-direction:column;align-items:center;gap:8px;padding:18px 12px"><i class="ti ti-gender-male" style="font-size:24px;color:var(--water)"></i><div class="nm">Man</div></div>
-          <div class="opt" style="flex-direction:column;align-items:center;gap:8px;padding:18px 12px"><i class="ti ti-gender-bigender" style="font-size:24px;color:var(--primary)"></i><div class="nm">Non-binary</div></div>
-          <div class="opt" style="flex-direction:column;align-items:center;gap:8px;padding:18px 12px"><i class="ti ti-dots" style="font-size:24px;color:var(--ts)"></i><div class="nm" style="font-size:13px">Prefer not to say</div></div>
-        </div>
-        <div class="card mt16 row" style="gap:10px;box-shadow:none;background:var(--alt);border:none"><i class="ti ti-info-circle" style="color:var(--ts)"></i><span class="lab">Sex is only used to estimate your calorie needs.</span></div>
-        <div class="spc"></div><div class="obbtn">Continue</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 11 BIRTHDAY -->
-  <div class="fw"><div class="fl">11 · Birthday</div>
-    <div class="device"><div class="sb"><span class="tt">9:41</span><span class="ri"><i class="ti ti-antenna-bars-5"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3" style="font-size:17px"></i></span></div>
-      <div class="ob">
-        <div class="obtop"><span class="back">‹</span><div class="obbar"><div class="obfill" style="width:44%"></div></div></div>
-        <div class="obh">When’s your birthday?</div><div class="lab mt8">Used to personalize your targets.</div>
-        <div class="spc" style="display:flex;align-items:center;justify-content:center">
-          <div class="row" style="gap:6px;position:relative;width:100%"><div class="band"></div>
-            <div class="wheel" style="flex:1.4"><div class="wrow d2">Apr</div><div class="wrow d1">May</div><div class="wrow sel">Jun</div><div class="wrow d1">Jul</div><div class="wrow d2">Aug</div></div>
-            <div class="wheel" style="flex:1"><div class="wrow d2">11</div><div class="wrow d1">12</div><div class="wrow sel">13</div><div class="wrow d1">14</div><div class="wrow d2">15</div></div>
-            <div class="wheel" style="flex:1.2"><div class="wrow d2">1990</div><div class="wrow d1">1991</div><div class="wrow sel">1992</div><div class="wrow d1">1993</div><div class="wrow d2">1994</div></div>
-          </div>
-        </div>
-        <div class="obbtn">Continue</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 12 HEIGHT & WEIGHT -->
-  <div class="fw"><div class="fl">12 · Height &amp; weight</div>
-    <div class="device"><div class="sb"><span class="tt">9:41</span><span class="ri"><i class="ti ti-antenna-bars-5"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3" style="font-size:17px"></i></span></div>
-      <div class="ob">
-        <div class="obtop"><span class="back">‹</span><div class="obbar"><div class="obfill" style="width:48%"></div></div></div>
-        <div class="obh">Your height &amp; weight</div>
-        <div class="row mt14" style="justify-content:center"><div class="toggle"><span class="on">Imperial</span><span>Metric</span></div></div>
-        <div class="spc" style="display:flex;align-items:center;justify-content:center">
-          <div class="row" style="gap:10px;position:relative;width:100%"><div class="band"></div>
-            <div class="wheel" style="flex:1"><div class="sec" style="margin-bottom:4px">Height</div><div class="wrow d1">5'5"</div><div class="wrow sel">5'6"</div><div class="wrow d1">5'7"</div></div>
-            <div class="wheel" style="flex:1"><div class="sec" style="margin-bottom:4px">Weight</div><div class="wrow d1">183</div><div class="wrow sel">184 lb</div><div class="wrow d1">185</div></div>
-          </div>
-        </div>
-        <div class="obbtn">Continue</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 13 START WEIGHT + DATE -->
-  <div class="fw"><div class="fl">13 · Start weight &amp; date</div>
-    <div class="device"><div class="sb"><span class="tt">9:41</span><span class="ri"><i class="ti ti-antenna-bars-5"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3" style="font-size:17px"></i></span></div>
-      <div class="ob">
-        <div class="obtop"><span class="back">‹</span><div class="obbar"><div class="obfill" style="width:52%"></div></div></div>
-        <div class="obh">Where did you start?</div><div class="lab mt8">Your weight when you began your GLP-1.</div>
-        <div class="sec mt20">Starting weight</div>
-        <div class="field mt8"><span class="big">196<span class="unit"> lb</span></span><i class="ti ti-chevron-right" style="color:var(--tt)"></i></div>
-        <div class="sec mt16">Start date</div>
-        <div class="field mt8"><span class="nm"><i class="ti ti-calendar" style="margin-right:7px;vertical-align:-2px"></i>April 4, 2026</span><i class="ti ti-chevron-right" style="color:var(--tt)"></i></div>
-        <div class="card mt16 row" style="gap:11px;box-shadow:none;background:var(--alt);border:none"><svg width="38" height="45"><use href="#pep"/></svg><span class="lab" style="color:var(--tp)">12 lbs down already — we’ll chart every step from here.</span></div>
-        <div class="spc"></div><div class="obbtn">Continue</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 14 GOAL WEIGHT -->
-  <div class="fw"><div class="fl">14 · Goal weight</div>
-    <div class="device"><div class="sb"><span class="tt">9:41</span><span class="ri"><i class="ti ti-antenna-bars-5"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3" style="font-size:17px"></i></span></div>
-      <div class="ob">
-        <div class="obtop"><span class="back">‹</span><div class="obbar"><div class="obfill" style="width:56%"></div></div></div>
-        <div class="obh">Set your dream weight</div>
-        <div class="spc" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px">
-          <div class="row" style="align-items:baseline;gap:8px"><span style="font-weight:800;font-size:62px;letter-spacing:-2px;color:var(--weight)">165</span><span class="unit">lb</span></div>
-          <div style="display:flex;gap:4px;align-items:flex-end;height:28px;opacity:.5"><span style="width:2px;height:28px;background:var(--tp)"></span><span style="width:2px;height:13px;background:var(--tt)"></span><span style="width:2px;height:13px;background:var(--tt)"></span><span style="width:2px;height:13px;background:var(--tt)"></span><span style="width:2px;height:20px;background:var(--tt)"></span><span style="width:2px;height:13px;background:var(--tt)"></span><span style="width:2px;height:13px;background:var(--tt)"></span><span style="width:2px;height:13px;background:var(--tt)"></span><span style="width:2px;height:28px;background:var(--tp)"></span></div>
-          <div class="toggle"><span class="on">lb</span><span>kg</span></div>
-        </div>
-        <div class="obbtn">Continue</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 15 GOAL PACE -->
-  <div class="fw"><div class="fl">15 · Goal pace</div>
-    <div class="device"><div class="sb"><span class="tt">9:41</span><span class="ri"><i class="ti ti-antenna-bars-5"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3" style="font-size:17px"></i></span></div>
-      <div class="ob">
-        <div class="obtop"><span class="back">‹</span><div class="obbar"><div class="obfill" style="width:60%"></div></div></div>
-        <div class="obh">How fast feels right?</div>
-        <div class="spc" style="display:flex;flex-direction:column;justify-content:center;gap:22px">
-          <div style="text-align:center"><span class="estchip"><i class="ti ti-flag"></i>Estimated goal · Sep 14</span></div>
-          <div class="row" style="justify-content:space-between;font-size:24px;color:var(--ts)"><i class="ti ti-walk"></i><i class="ti ti-car"></i><i class="ti ti-rocket"></i></div>
-          <div><div class="ptrack"><div class="pfill" style="width:52%"></div><div class="pthumb" style="left:calc(52% - 12px)"></div></div></div>
-          <div class="card" style="box-shadow:none;background:var(--alt);border:none;text-align:center"><span class="lab" style="color:var(--tp)">~1.1 lb / week — gentle and sustainable, and easier on your muscle.</span></div>
-        </div>
-        <div class="obbtn">Continue</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 16 DAILY ROUTINE -->
-  <div class="fw"><div class="fl">16 · Daily routine</div>
-    <div class="device"><div class="sb"><span class="tt">9:41</span><span class="ri"><i class="ti ti-antenna-bars-5"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3" style="font-size:17px"></i></span></div>
-      <div class="ob">
-        <div class="obtop"><span class="back">‹</span><div class="obbar"><div class="obfill" style="width:64%"></div></div></div>
-        <div class="obh">Your daily routine</div><div class="lab mt8">Roughly how active are you?</div>
-        <div class="mt20" style="display:flex;flex-direction:column;gap:11px">
-          <div class="opt"><i class="ti ti-armchair oi" style="color:#5F5E5A"></i><div class="ol"><div class="nm">Mostly sitting</div><div class="lab">Desk job, little movement</div></div><div class="chk"></div></div>
-          <div class="opt sel"><i class="ti ti-walk oi" style="color:#0F6E56"></i><div class="ol"><div class="nm">Lightly active</div><div class="lab">On my feet some of the day</div></div><div class="chk on"><i class="ti ti-check"></i></div></div>
-          <div class="opt"><i class="ti ti-run oi" style="color:#854F0B"></i><div class="ol"><div class="nm">Active</div><div class="lab">Moving most of the day</div></div><div class="chk"></div></div>
-          <div class="opt"><i class="ti ti-flame oi" style="color:#993C1D"></i><div class="ol"><div class="nm">Very active</div><div class="lab">Physical job or daily training</div></div><div class="chk"></div></div>
-        </div>
-        <div class="spc"></div><div class="obbtn">Continue</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 17 TRAINING -->
-  <div class="fw"><div class="fl">17 · Training</div>
-    <div class="device"><div class="sb"><span class="tt">9:41</span><span class="ri"><i class="ti ti-antenna-bars-5"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3" style="font-size:17px"></i></span></div>
-      <div class="ob">
-        <div class="obtop"><span class="back">‹</span><div class="obbar"><div class="obfill" style="width:68%"></div></div></div>
-        <div class="obh">Do you lift?</div><div class="lab mt8">Resistance work is the best way to keep muscle.</div>
-        <div class="mt20" style="display:flex;flex-direction:column;gap:11px">
-          <div class="opt"><i class="ti ti-armchair oi" style="color:#5F5E5A"></i><div class="ol"><div class="nm">Not yet</div></div><div class="chk"></div></div>
-          <div class="opt"><i class="ti ti-seeding oi" style="color:#854F0B"></i><div class="ol"><div class="nm">Just starting</div></div><div class="chk"></div></div>
-          <div class="opt sel"><i class="ti ti-refresh oi" style="color:#0F6E56"></i><div class="ol"><div class="nm">Getting back into it</div></div><div class="chk on"><i class="ti ti-check"></i></div></div>
-          <div class="opt"><i class="ti ti-barbell oi" style="color:#0C447C"></i><div class="ol"><div class="nm">Consistent</div></div><div class="chk"></div></div>
-        </div>
-        <div class="spc"></div><div class="obbtn">Continue</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 18 BIGGEST WORRY -->
-  <div class="fw"><div class="fl">18 · Biggest worry</div>
-    <div class="device"><div class="sb"><span class="tt">9:41</span><span class="ri"><i class="ti ti-antenna-bars-5"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3" style="font-size:17px"></i></span></div>
-      <div class="ob">
-        <div class="obtop"><span class="back">‹</span><div class="obbar"><div class="obfill" style="width:72%"></div></div></div>
-        <div class="obh">What worries you most?</div><div class="lab mt8">We’ll keep a close eye on it for you.</div>
-        <div class="mt16" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-          <div class="opt sel" style="flex-direction:column;align-items:flex-start;gap:8px;padding:14px"><i class="ti ti-stretching" style="font-size:21px;color:var(--primary)"></i><div class="nm" style="font-size:14px">Losing muscle</div></div>
-          <div class="opt" style="flex-direction:column;align-items:flex-start;gap:8px;padding:14px"><i class="ti ti-mood-sad" style="font-size:21px;color:var(--ts)"></i><div class="nm" style="font-size:14px">“Ozempic face”</div></div>
-          <div class="opt" style="flex-direction:column;align-items:flex-start;gap:8px;padding:14px"><i class="ti ti-urgent" style="font-size:21px;color:var(--ts)"></i><div class="nm" style="font-size:14px">Side effects</div></div>
-          <div class="opt" style="flex-direction:column;align-items:flex-start;gap:8px;padding:14px"><i class="ti ti-trending-down-2" style="font-size:21px;color:var(--ts)"></i><div class="nm" style="font-size:14px">Stalling out</div></div>
-          <div class="opt" style="flex-direction:column;align-items:flex-start;gap:8px;padding:14px"><i class="ti ti-rotate" style="font-size:21px;color:var(--ts)"></i><div class="nm" style="font-size:14px">Regaining it</div></div>
-          <div class="opt" style="flex-direction:column;align-items:flex-start;gap:8px;padding:14px"><i class="ti ti-battery-2" style="font-size:21px;color:var(--ts)"></i><div class="nm" style="font-size:14px">Low energy</div></div>
-        </div>
-        <div class="spc"></div><div class="obbtn">Continue</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 19 SIDE EFFECTS -->
-  <div class="fw"><div class="fl">19 · Side effects</div>
-    <div class="device"><div class="sb"><span class="tt">9:41</span><span class="ri"><i class="ti ti-antenna-bars-5"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3" style="font-size:17px"></i></span></div>
-      <div class="ob">
-        <div class="obtop"><span class="back">‹</span><div class="obbar"><div class="obfill" style="width:76%"></div></div></div>
-        <div class="obh">Any side effects so far?</div><div class="lab mt8">So we can help you manage them.</div>
-        <div class="mt16" style="display:flex;flex-wrap:wrap;gap:9px">
-          <div class="chip sel">None <i class="ti ti-check"></i></div><div class="chip">Nausea</div><div class="chip">Constipation</div><div class="chip">Fatigue</div><div class="chip">Headache</div><div class="chip">Reflux</div><div class="chip">Appetite loss</div><div class="chip">Hair loss</div><div class="chip">Bloating</div><div class="chip">Sulfur burps</div>
-        </div>
-        <div class="mascot spc" style="align-items:flex-end"><svg width="84" height="99"><use href="#pep"/></svg></div>
-        <div class="obbtn">Continue</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 20 MOTIVATIONAL -->
-  <div class="fw"><div class="fl">20 · Momentum</div>
-    <div class="device"><div class="sb"><span class="tt">9:41</span><span class="ri"><i class="ti ti-antenna-bars-5"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3" style="font-size:17px"></i></span></div>
-      <div class="ob" style="align-items:center;text-align:center;background:radial-gradient(125% 50% at 50% 0%,#EAF7EF 0%,var(--bg) 50%)">
-        <div class="obtop" style="width:100%"><span class="back">‹</span><div class="obbar"><div class="obfill" style="width:80%"></div></div></div>
-        <div class="spc" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px">
-          <svg width="120" height="150"><use href="#pepwave"/></svg>
-          <div><div class="obh lg" style="color:var(--fiber)">19 lbs to go.</div><div class="sub mt12" style="max-width:250px">You’ve already lost 12. Let’s keep the momentum together.</div></div>
-          <div class="pill" style="background:#E8F8EE;color:#1E8E40"><i class="ti ti-check"></i> Works with any GLP-1</div>
-        </div>
-        <div class="obbtn" style="width:100%">Keep going</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 21 NOTIFICATIONS -->
-  <div class="fw"><div class="fl">21 · Notifications</div>
-    <div class="device"><div class="sb"><span class="tt">9:41</span><span class="ri"><i class="ti ti-antenna-bars-5"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3" style="font-size:17px"></i></span></div>
-      <div class="ob" style="align-items:center;text-align:center;background:radial-gradient(125% 50% at 50% 0%,#F1ECFF 0%,var(--bg) 52%)">
-        <div class="obtop" style="width:100%"><span class="back">‹</span><div class="obbar"><div class="obfill" style="width:84%"></div></div></div>
-        <div class="spc" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px">
-          <div style="width:96px;height:96px;border-radius:26px;background:linear-gradient(135deg,var(--g1),var(--g2));display:flex;align-items:center;justify-content:center;box-shadow:0 10px 24px rgba(124,92,252,.34)"><i class="ti ti-bell" style="font-size:44px;color:#fff"></i></div>
-          <div><div class="obh">Never miss a shot</div><div class="sub mt12" style="max-width:255px">Gentle reminders for your dose, water and protein — only when they help.</div></div>
-        </div>
-        <div class="obbtn" style="width:100%">Allow notifications</div>
-        <div class="lab mt14">Not now</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 22 RATING -->
-  <div class="fw"><div class="fl">22 · Rating</div>
-    <div class="device"><div class="sb"><span class="tt">9:41</span><span class="ri"><i class="ti ti-antenna-bars-5"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3" style="font-size:17px"></i></span></div>
-      <div class="ob">
-        <div class="obtop"><span class="back">‹</span><div class="obbar"><div class="obfill" style="width:88%"></div></div></div>
-        <div class="obh" style="text-align:center">Loved by people<br/>on the journey</div>
-        <div class="row mt12" style="justify-content:center;gap:3px;color:#F5A623;font-size:20px"><i class="ti ti-star-filled"></i><i class="ti ti-star-filled"></i><i class="ti ti-star-filled"></i><i class="ti ti-star-filled"></i><i class="ti ti-star-filled"></i></div>
-        <div class="lab" style="text-align:center;margin-top:6px">4.9 · 12,000+ ratings</div>
-        <div class="mt16" style="display:flex;flex-direction:column;gap:10px">
-          <div class="card"><div class="row" style="gap:3px;color:#F5A623;font-size:13px"><i class="ti ti-star-filled"></i><i class="ti ti-star-filled"></i><i class="ti ti-star-filled"></i><i class="ti ti-star-filled"></i><i class="ti ti-star-filled"></i></div><div class="lab mt8" style="color:var(--tp)">“Finally something that tracks my levels and keeps my protein on point.”</div><div class="lab mt6">— Dana, down 28 lbs</div></div>
-          <div class="card"><div class="row" style="gap:3px;color:#F5A623;font-size:13px"><i class="ti ti-star-filled"></i><i class="ti ti-star-filled"></i><i class="ti ti-star-filled"></i><i class="ti ti-star-filled"></i><i class="ti ti-star-filled"></i></div><div class="lab mt8" style="color:var(--tp)">“The injection map alone is worth it. So calm to use.”</div><div class="lab mt6">— Marcus, week 14</div></div>
-        </div>
-        <div class="spc"></div><div class="obbtn">Continue</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 23 CRAFTING LOADER -->
-  <div class="fw"><div class="fl">23 · Crafting your plan</div>
-    <div class="device"><div class="sb"><span class="tt">9:41</span><span class="ri"><i class="ti ti-antenna-bars-5"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3" style="font-size:17px"></i></span></div>
-      <div class="ob" style="align-items:center;text-align:center">
-        <div style="position:relative;width:150px;height:150px;margin-top:24px;display:flex;align-items:center;justify-content:center">
-          <svg width="150" height="150" viewBox="0 0 100 100"><circle cx="50" cy="50" r="44" fill="none" stroke="#EFEFF2" stroke-width="8"/><circle cx="50" cy="50" r="44" fill="none" stroke="url(#pg)" stroke-width="8" stroke-linecap="round" stroke-dasharray="276.5" stroke-dashoffset="77" transform="rotate(-90 50 50)"/><defs><linearGradient id="pg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8B6CFF"/><stop offset="1" stop-color="#C77DFF"/></linearGradient></defs></svg>
-          <div style="position:absolute;display:flex;flex-direction:column;align-items:center"><svg width="46" height="54"><use href="#pep"/></svg></div>
-        </div>
-        <div class="obh mt20">Crafting your plan…</div>
-        <div class="mt16" style="width:100%;text-align:left">
-          <div class="lchk"><div class="b" style="background:#E8F8EE;color:var(--fiber)"><i class="ti ti-check"></i></div><span class="nm" style="font-weight:600;font-size:14px">Optimizing protein to protect muscle</span></div>
-          <div class="lchk"><div class="b" style="background:#E8F8EE;color:var(--fiber)"><i class="ti ti-check"></i></div><span class="nm" style="font-weight:600;font-size:14px">Tailoring fiber to ease digestion</span></div>
-          <div class="lchk"><div class="b" style="background:#E7F4FF;color:var(--water)"><i class="ti ti-loader-2"></i></div><span class="nm" style="font-weight:600;font-size:14px;color:var(--ts)">Adjusting hydration for nausea</span></div>
-          <div class="lchk"><div class="b" style="background:var(--alt);color:var(--tt)"></div><span class="lab" style="font-size:14px">Setting your step goal for energy</span></div>
-        </div>
-        <div class="spc"></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 24 PLAN REVEAL -->
-  <div class="fw"><div class="fl">24 · Plan reveal</div>
-    <div class="device"><div class="sb"><span class="tt">9:41</span><span class="ri"><i class="ti ti-antenna-bars-5"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3" style="font-size:17px"></i></span></div>
-      <div class="ob" style="background:radial-gradient(125% 38% at 50% 0%,#F1ECFF 0%,var(--bg) 42%);position:relative;overflow:hidden">
-        <div class="confetti" style="position:absolute;inset:0;pointer-events:none">
-          <i style="left:34px;top:30px;width:7px;height:7px;background:var(--protein)"></i><i style="left:70px;top:18px;width:6px;height:10px;background:var(--fiber)"></i><i style="left:120px;top:36px;width:7px;height:7px;background:var(--water);border-radius:999px"></i><i style="left:200px;top:20px;width:6px;height:10px;background:var(--weight)"></i><i style="left:250px;top:40px;width:7px;height:7px;background:var(--primary)"></i><i style="left:280px;top:24px;width:6px;height:6px;background:var(--protein);border-radius:999px"></i><i style="left:160px;top:14px;width:6px;height:9px;background:var(--g2)"></i>
-        </div>
-        <div style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;margin-top:8px;z-index:1">
-          <svg width="108" height="135"><use href="#pepwave"/></svg>
-          <div class="obh lg">Your plan is ready!</div>
-          <div class="lab">Personalized to support your energy &amp; ease nausea.</div>
-        </div>
-        <div class="card mt16" style="z-index:1">
-          <div class="row bt"><span class="sec">Projected timeline</span><span class="pill" style="background:#FBEAF6;color:#A8327D"><i class="ti ti-flag" style="font-size:12px"></i>Sep 14</span></div>
-          <svg viewBox="0 0 300 70" class="mt10" style="width:100%;height:58px"><defs><linearGradient id="rv" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#E25CC4" stop-opacity=".18"/><stop offset="1" stop-color="#E25CC4" stop-opacity="0"/></linearGradient></defs><path d="M0 14 C80 18 150 40 300 60 L300 70 L0 70 Z" fill="url(#rv)"/><path d="M0 14 C80 18 150 40 300 60" fill="none" stroke="#E25CC4" stroke-width="3" stroke-linecap="round"/><circle cx="0" cy="14" r="4.5" fill="#E25CC4"/><circle cx="300" cy="60" r="4.5" fill="#E25CC4"/></svg>
-          <div class="row bt"><span class="lab">196 → <b style="color:var(--tp)">165 lb</b></span><span class="lab">Today → Sep 14</span></div>
-        </div>
-        <div class="mt12" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px;z-index:1">
-          <div class="stat"><div class="lab" style="font-size:11px">Protein</div><div class="statv" style="color:var(--protein)">120g</div></div>
-          <div class="stat"><div class="lab" style="font-size:11px">Calories</div><div class="statv">1,640</div></div>
-          <div class="stat"><div class="lab" style="font-size:11px">Water</div><div class="statv" style="color:var(--water)">80oz</div></div>
-          <div class="stat"><div class="lab" style="font-size:11px">Fiber</div><div class="statv" style="color:var(--fiber)">30g</div></div>
-          <div class="stat"><div class="lab" style="font-size:11px">Steps</div><div class="statv">8,000</div></div>
-          <div class="stat" style="display:flex;align-items:center;justify-content:center"><i class="ti ti-sparkles" style="color:var(--primary);font-size:20px"></i></div>
-        </div>
-        <div class="spc"></div><div class="obbtn" style="z-index:1">Get started</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 25 PAYWALL -->
-  <div class="fw"><div class="fl">25 · Paywall</div>
-    <div class="device"><div class="sb"><span class="tt">9:41</span><span class="ri"><i class="ti ti-antenna-bars-5"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3" style="font-size:17px"></i></span></div>
-      <div class="ob">
-        <div class="obtop"><span class="back"><i class="ti ti-x"></i></span><div class="spc"></div><span class="lab">Restore</span></div>
-        <div style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:5px"><svg width="60" height="74"><use href="#pep"/></svg><div class="obh">Unlock the full tracker</div><div class="lab">Levels, muscle, meals, insights — everything Pepta does.</div></div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px 10px;margin-top:16px">
-          <div class="row" style="gap:7px"><i class="ti ti-circle-check" style="color:var(--fiber);font-size:16px"></i><span class="lab" style="color:var(--tp)">Medication level &amp; curve</span></div>
-          <div class="row" style="gap:7px"><i class="ti ti-circle-check" style="color:var(--fiber);font-size:16px"></i><span class="lab" style="color:var(--tp)">Injection-site map</span></div>
-          <div class="row" style="gap:7px"><i class="ti ti-circle-check" style="color:var(--fiber);font-size:16px"></i><span class="lab" style="color:var(--tp)">Muscle-protection tracking</span></div>
-          <div class="row" style="gap:7px"><i class="ti ti-circle-check" style="color:var(--fiber);font-size:16px"></i><span class="lab" style="color:var(--tp)">Unlimited AI insights</span></div>
-          <div class="row" style="gap:7px"><i class="ti ti-circle-check" style="color:var(--fiber);font-size:16px"></i><span class="lab" style="color:var(--tp)">Meal scan &amp; voice</span></div>
-          <div class="row" style="gap:7px"><i class="ti ti-circle-check" style="color:var(--fiber);font-size:16px"></i><span class="lab" style="color:var(--tp)">Apple Health &amp; export</span></div>
-        </div>
-        <div style="position:relative;border:2px solid var(--primary);background:#F7F4FF;border-radius:16px;padding:13px;margin-top:20px">
-          <div style="position:absolute;top:-9px;right:14px;background:var(--primary);color:#fff;font-weight:800;font-size:10px;letter-spacing:.4px;padding:3px 9px;border-radius:999px">SAVE 63%</div>
-          <div class="row bt"><div class="row" style="gap:10px"><i class="ti ti-circle-check" style="color:var(--primary);font-size:20px"></i><div><div class="nm">Yearly</div><div class="lab">$40.00/yr · just $0.11 a day</div></div></div><div style="text-align:right"><span class="big" style="font-size:20px">$3.33</span><span class="lab"> /mo</span></div></div>
-        </div>
-        <div style="border:2px solid var(--border);border-radius:16px;padding:13px;margin-top:10px">
-          <div class="row bt"><div class="row" style="gap:10px"><i class="ti ti-circle" style="color:var(--tt);font-size:20px"></i><div><div class="nm">Monthly</div><div class="lab">billed monthly</div></div></div><div style="text-align:right"><span class="big" style="font-size:20px">$9.99</span><span class="lab"> /mo</span></div></div>
-        </div>
-        <div class="spc"></div><div class="obbtn">Start 7-day free trial</div>
-        <div class="lab" style="text-align:center;font-size:10px;color:var(--tt);margin-top:8px">7 days free, then $40/yr ($3.33/mo). Cancel anytime · Terms &amp; Privacy</div>
-      </div>
-    </div>
-  </div>
+  <div class="divider"><h2>Onboarding</h2><div class="ln"></div><span class="ct">conversational · v2.2</span></div>
+  <p style="max-width:1180px;color:#57555F;font-size:14px;line-height:1.6;margin:0 0 18px">
+    Embedded live from <code>onboarding-v2.html</code> rather than copied, so this hub can never
+    drift from it again — the scaffold flow that used to sit here had been dead since 2026-07-15.
+    <strong>Note:</strong> these frames show the conversational idiom, not the 2026-07-27 step
+    reorder (problem beat moved to step 5; experience / alsoTracking / momentum dropped).
+  </p>
+  <iframe src="onboarding-v2.html" scrolling="no" loading="eager"
+          style="width:100%;max-width:1600px;height:8366px;border:0;display:block;margin-bottom:26px"></iframe>
 
   <div class="divider"><h2>Log flows</h2><div class="ln"></div><span class="ct">quick-log destinations</span></div>
 
@@ -1375,5 +832,173 @@
   </div>
 
 </div>
+
+  <div class="divider"><h2>Settings</h2><div class="ln"></div><span class="ct">quick-access tiles · shipped 2026-07-27</span></div>
+  <p style="max-width:1180px;color:#57555F;font-size:14px;line-height:1.6;margin:0 0 18px">
+    Embedded from <code>settings.html</code>. Variant A (tiles above the billing card) is the one
+    that shipped in <code>AccountScreen.tsx</code>.
+  </p>
+  <iframe src="settings.html" scrolling="no" loading="eager"
+          style="width:100%;max-width:1600px;height:3839px;border:0;display:block;margin-bottom:26px"></iframe>
+
+  <div class="divider"><h2>First-run tour</h2><div class="ln"></div><span class="ct">coach-marks · pending sign-off</span></div>
+  <p style="max-width:1180px;color:#57555F;font-size:14px;line-height:1.6;margin:0 0 18px">
+    Embedded from <code>first-run-tour.html</code>. Designed, <strong>not built</strong> — open
+    question is four steps or three.
+  </p>
+  <iframe src="first-run-tour.html" scrolling="no" loading="eager"
+          style="width:100%;max-width:1600px;height:1625px;border:0;display:block;margin-bottom:26px"></iframe>
+
+
+  <div class="divider"><h2>Pep · companion system</h2><div class="ln"></div><span class="ct">proposed · not built</span></div>
+  <p style="max-width:1180px;color:#57555F;font-size:14px;line-height:1.6;margin:0 0 20px">
+    Extensions to the mascot that already ships (poses, the floating companion on Home, the chat,
+    the push-priority engine). <strong>No new character art</strong> — every pose below is the existing
+    <code>#pep</code> symbol with a small overlay, so the RN <code>Mascot</code> component only needs
+    new <code>pose</code> values. <strong>Deliberately excluded:</strong> streak-loss guilt and
+    "Pep is sad you missed your shot". Shame about a missed dose can push someone to double up —
+    that is a safety issue, not a growth lever. The streak stays on <em>logging</em>.
+  </p>
+
+  <style>
+    .pepgrid{display:flex;gap:26px;flex-wrap:wrap;margin-bottom:10px}
+    .pepstate{background:#fff;border:1px solid var(--hair);border-radius:20px;padding:20px 18px 16px;width:212px;text-align:center;box-shadow:0 1px 2px rgba(20,18,30,.05)}
+    .pepstate .who{font-size:12.5px;font-weight:800;color:var(--primary);letter-spacing:.4px;text-transform:uppercase}
+    .pepstate .say{font-size:13px;font-weight:700;color:var(--tp);margin-top:8px;line-height:1.4}
+    .pepstate .why{font-size:11.5px;color:var(--ts);margin-top:6px;line-height:1.45}
+    .pepart{height:96px;display:flex;align-items:flex-end;justify-content:center;margin-bottom:10px}
+  </style>
+
+  <div class="fw" style="width:100%">
+    <div class="fl">Pep&rsquo;s state mirrors your level curve <span style="color:var(--primary)">(NEW)</span></div>
+    <div class="pepgrid">
+      <div class="pepstate">
+        <div class="pepart"><svg width="76" height="90" viewBox="0 0 120 142"><use href="#pep"/></svg></div>
+        <div class="who">Peak &middot; day 1&ndash;2</div>
+        <div class="say">&ldquo;You&rsquo;re at 2.1 mg. This is the strong part.&rdquo;</div>
+        <div class="why">Bright, upright, quick bob.</div>
+      </div>
+      <div class="pepstate">
+        <div class="pepart">
+          <svg width="76" height="90" viewBox="0 0 120 142" style="opacity:.85">
+            <use href="#pep"/>
+            <!-- droop: half-lidded eyes drawn over the base symbol -->
+            <path d="M43 64 q7 4 14 0M67 64 q7 4 14 0" stroke="#1A1430" stroke-width="3" fill="none" stroke-linecap="round"/>
+            <rect x="42" y="56" width="16" height="10" fill="url(#qb)"/><rect x="66" y="56" width="16" height="10" fill="url(#qb)"/>
+          </svg>
+        </div>
+        <div class="who">Trough &middot; day 6&ndash;7</div>
+        <div class="say">&ldquo;Down to 0.9 mg. Shot day&rsquo;s close.&rdquo;</div>
+        <div class="why">Lower lids, slower bob. Teaches the curve without a chart.</div>
+      </div>
+      <div class="pepstate">
+        <div class="pepart">
+          <svg width="76" height="90" viewBox="0 0 120 142" style="opacity:.8">
+            <use href="#pep"/>
+            <rect x="40" y="54" width="20" height="14" fill="url(#qb)"/><rect x="64" y="54" width="20" height="14" fill="url(#qb)"/>
+            <path d="M44 64 q6 5 12 0M68 64 q6 5 12 0" stroke="#1A1430" stroke-width="3" fill="none" stroke-linecap="round"/>
+            <text x="92" y="34" font-size="15" font-weight="800" fill="#7C5CFC">z</text>
+            <text x="103" y="22" font-size="11" font-weight="800" fill="#9C82FF">z</text>
+          </svg>
+        </div>
+        <div class="who">Rest week</div>
+        <div class="say">&ldquo;Resting with you. Back on Jul 13.&rdquo;</div>
+        <div class="why">Asleep. Makes the off-cycle feel intentional, not like the app went quiet.</div>
+      </div>
+      <div class="pepstate">
+        <div class="pepart">
+          <svg width="76" height="90" viewBox="0 0 120 142">
+            <use href="#pep"/>
+            <g stroke="#F5B301" stroke-width="3" stroke-linecap="round">
+              <line x1="14" y1="30" x2="6" y2="24"/><line x1="18" y1="18" x2="14" y2="8"/><line x1="30" y1="12" x2="28" y2="2"/>
+            </g>
+          </svg>
+        </div>
+        <div class="who">Milestone</div>
+        <div class="say">&ldquo;First shot logged. That&rsquo;s the hard one.&rdquo;</div>
+        <div class="why">First shot &middot; first month &middot; first 10 lb. A reaction, not points.</div>
+      </div>
+    </div>
+    <div class="lab" style="max-width:820px">Drives off <code>medicationLevels[0].curve</code> and <code>cycleWindows</code> &mdash; both already computed. Nobody else can copy this: it needs the level model. <b>Never</b> a sad or disappointed state for a missed dose.</div>
+  </div>
+
+  <div class="fw"><div class="fl">Pep teaches &middot; library voice <span style="color:var(--primary)">(NEW)</span></div>
+    <div class="device"><div class="sb"><span class="tt">9:41</span><span class="ri"><i class="ti ti-antenna-bars-5"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3" style="font-size:18px"></i></span></div>
+      <div class="scr" style="min-height:726px">
+        <div class="pad row bt" style="padding-top:4px"><span class="h1">Today</span><div class="row" style="gap:9px"><span class="today"><i class="ti ti-calendar" style="font-size:14px;color:var(--ts)"></i>Today</span></div></div>
+        <div class="pad">
+          <div class="card mt16" style="background:#F3EFFF;border:1px solid #E4DAFF">
+            <div class="row" style="gap:11px;align-items:flex-start">
+              <svg width="42" height="50" viewBox="0 0 120 142" style="flex:none"><use href="#pep"/></svg>
+              <div style="flex:1">
+                <span class="sec" style="color:var(--primary)">30 seconds?</span>
+                <div class="nm mt6" style="font-size:15px;line-height:1.35">Why your dose steps up every 4 weeks</div>
+                <div class="lab mt6" style="line-height:1.45">Tirzepatide titrates to let GI effects settle before the next increase. It&rsquo;s not about speed.</div>
+                <div class="lab mt6" style="font-size:10.5px;color:var(--tt)">SURMOUNT-1 &middot; NEJM 2022</div>
+                <div class="row" style="gap:8px;margin-top:11px">
+                  <span class="pill" style="background:var(--tp);color:#fff;font-size:11.5px;padding:7px 14px">Read it</span>
+                  <span class="pill" style="background:transparent;color:var(--ts);font-size:11.5px;padding:7px 10px">Not now</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="card mt12"><div class="row bt"><div class="ch"><i class="ti ti-vaccine ic" style="color:var(--primary)"></i><span class="nm">Medication Level</span></div><span class="pill" style="background:#E8F8EE;color:#1E8E40">Steady</span></div><div class="big mt8" style="color:var(--primary)">1.42<span style="font-size:14px;color:var(--ts)"> mg</span></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="lab mt8" style="max-width:300px">The real Duolingo parallel &mdash; tiny daily learning, not streaks. Sourced from the 28 evidence-tiered library entries already shipped, filtered to the compound the user actually takes. Always dismissible; never blocks the screen. Citation is always attached, which is what separates this from Reddit.</div>
+  </div>
+
+  <div class="fw"><div class="fl">Pep knows your rotation <span style="color:var(--primary)">(NEW)</span></div>
+    <div class="device"><div class="sb"><span class="tt">9:41</span><span class="ri"><i class="ti ti-antenna-bars-5"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3" style="font-size:18px"></i></span></div>
+      <div class="scr" style="min-height:726px">
+        <div class="pad row bt" style="padding-top:4px"><span class="h1">Log a shot</span></div>
+        <div class="pad">
+          <div class="card mt16">
+            <span class="sec">Injection site</span>
+            <div class="row" style="justify-content:space-around;margin:14px 0 4px">
+              <svg width="86" height="160" viewBox="0 0 80 150"><use href="#body"/><circle cx="33" cy="58" r="5" fill="#7C5CFC"/><circle cx="47" cy="58" r="5.5" fill="#fff" stroke="#7C5CFC" stroke-width="2.5"/><circle cx="34" cy="104" r="4.5" fill="#7C5CFC"/></svg>
+              <svg width="86" height="160" viewBox="0 0 80 150"><use href="#body"/><circle cx="33" cy="86" r="5" fill="#7C5CFC"/></svg>
+            </div>
+          </div>
+          <div class="row" style="gap:10px;align-items:flex-end;margin-top:14px">
+            <svg width="46" height="55" viewBox="0 0 120 142" style="flex:none"><use href="#pep"/></svg>
+            <div style="background:#fff;border:1px solid var(--hair);border-radius:16px 16px 16px 5px;padding:11px 14px;box-shadow:0 8px 20px -14px rgba(20,16,40,.3)">
+              <div class="nm" style="font-size:13.5px">Left abdomen next &mdash; right side&rsquo;s had the last two.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="lab mt8" style="max-width:300px">Small, but real safety value rather than decoration &mdash; <code>suggestNextSite</code> already computes this from dose history. Pep is simply the natural voice for it.</div>
+  </div>
+
+  <div class="fw" style="width:100%">
+    <div class="fl">Cosmetics &middot; unlocked by milestones <span style="color:var(--primary)">(NEW)</span></div>
+    <div class="pepgrid">
+      <div class="pepstate">
+        <div class="pepart"><svg width="70" height="84" viewBox="0 0 120 142"><use href="#pep"/><rect x="30" y="6" width="60" height="13" rx="6" fill="#1E8E40"/><rect x="52" y="-2" width="16" height="12" rx="4" fill="#1E8E40"/></svg></div>
+        <div class="who">30 days logged</div>
+        <div class="why">A hat. That is the whole reward.</div>
+      </div>
+      <div class="pepstate">
+        <div class="pepart"><svg width="70" height="84" viewBox="0 0 120 142"><use href="#pep"/><path d="M36 60 h18 M66 60 h18" stroke="#1A1430" stroke-width="3.5" stroke-linecap="round"/><circle cx="45" cy="64" r="11" fill="none" stroke="#1A1430" stroke-width="3"/><circle cx="75" cy="64" r="11" fill="none" stroke="#1A1430" stroke-width="3"/></svg></div>
+        <div class="who">First doctor export</div>
+        <div class="why">Reading glasses.</div>
+      </div>
+      <div class="pepstate">
+        <div class="pepart"><svg width="70" height="84" viewBox="0 0 120 142"><use href="#pep"/><path d="M20 96 q-14 8 -6 20 q10 10 20 -2" fill="#FF9CB6" opacity=".9"/></svg></div>
+        <div class="who">First 10 lb</div>
+        <div class="why">A scarf.</div>
+      </div>
+      <div class="pepstate" style="border-style:dashed;background:#FAFAFB">
+        <div class="pepart" style="align-items:center;color:var(--tt);font-size:30px">&#43;</div>
+        <div class="who" style="color:var(--tt)">Room to grow</div>
+        <div class="why">Cosmetic only. Never gates a feature, never purchasable with money.</div>
+      </div>
+    </div>
+    <div class="lab" style="max-width:820px">The safe half of Duolingo&rsquo;s shop: collection without coercion. Ties to milestones the app already tracks (<code>streakDays</code>, dose count, export events), so no new counters.</div>
+  </div>
+
 </body>
 </html>
