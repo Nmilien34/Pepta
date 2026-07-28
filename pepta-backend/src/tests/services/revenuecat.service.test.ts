@@ -22,6 +22,16 @@ vi.mock('../../models', () => ({
   },
 }));
 
+// The reconciler is unit-tested in its own file. Left unmocked here it makes
+// LIVE RevenueCat API calls whenever .env carries the secret key: getSubscriber
+// on a random test id returns an empty subscriber, the projection comes back
+// inactive, and it overwrites the exact status these tests assert on — which is
+// how the "stale expiration" test failed for weeks while the production guard
+// it covers was actually correct. Unit tests must never depend on the network.
+vi.mock('../../services/entitlement-reconciler.service', () => ({
+  reconcileUserEntitlement: vi.fn(async () => null),
+}));
+
 vi.mock('../../lib/logger', () => ({
   logger: {
     warn: mocks.warn,
