@@ -375,7 +375,6 @@ export function ScheduleSheet({ visible, onClose, onEditCycle, onDismissed }: Sc
 }
 
 function LegendDot({ color, label }: { color: string; label: string }) {
-  const theme = useTheme();
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
       <View style={{ width: 7, height: 7, borderRadius: 9, backgroundColor: color }} />

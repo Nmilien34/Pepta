@@ -1,0 +1,412 @@
+{
+ "data": {
+  "profile": {
+   "sex": "male",
+   "ageYears": 38,
+   "genderIdentity": "man",
+   "medicationStatus": "active",
+   "height": 70,
+   "heightUnit": "in",
+   "currentWeight": 196,
+   "weightUnit": "lb",
+   "goalWeight": 175,
+   "goalWeightUnit": "lb",
+   "goalPace": "steady",
+   "activityLevel": "light",
+   "trainingStatus": "returning",
+   "goalType": "lose_fat",
+   "biggestWorry": "losing_muscle",
+   "doseUnitPreference": "mg",
+   "onboardingComplete": true,
+   "journeyStartDate": "2026-04-17",
+   "timezone": "America/New_York",
+   "sideEffectBaseline": [
+    "nausea"
+   ],
+   "id": "6a3dcea9681e813be2e17fe4",
+   "userId": "6a3dcea8681e813be2e17fe3",
+   "dailyCalorieTarget": 2040,
+   "dailyProteinTargetGrams": 159,
+   "proteinGramsPerKg": 2,
+   "targetWeeklyLossPercent": 0.75,
+   "estimatedGoalDate": "2026-07-31",
+   "dailyFiberTargetGrams": 30,
+   "dailyWaterTargetOz": 114,
+   "dailyStepTarget": 7000,
+   "nutritionEngineVersion": "nutrition-v2",
+   "createdAt": "2026-06-26T00:58:16.553Z",
+   "updatedAt": "2026-06-26T00:58:16.553Z"
+  },
+  "activeCompounds": [
+   {
+    "name": "Tirzepatide",
+    "drugClass": "dual_glp_1_gip",
+    "route": "injection",
+    "halfLifeDays": 5,
+    "doseUnit": "mg",
+    "plannedDose": 5,
+    "startDate": "2026-04-17",
+    "status": "active",
+    "id": "6a3dcea9681e813be2e17fe5",
+    "userId": "6a3dcea8681e813be2e17fe3",
+    "deletedAt": null,
+    "createdAt": "2026-06-26T00:58:17.389Z",
+    "updatedAt": "2026-06-26T00:58:17.389Z"
+   }
+  ],
+  "medicationLevels": [
+   {
+    "compoundId": "6a3dcea9681e813be2e17fe5",
+    "compoundName": "Tirzepatide",
+    "halfLifeDays": 5,
+    "currentEstimate": 0.0244,
+    "peakEstimate": 0.0726,
+    "troughEstimate": 0.014,
+    "curve": [
+     {
+      "datetime": "2026-07-21T00:00:00.000Z",
+      "level": 0.0726
+     },
+     {
+      "datetime": "2026-07-21T06:00:00.000Z",
+      "level": 0.0702
+     },
+     {
+      "datetime": "2026-07-21T12:00:00.000Z",
+      "level": 0.0678
+     },
+     {
+      "datetime": "2026-07-21T18:00:00.000Z",
+      "level": 0.0655
+     },
+     {
+      "datetime": "2026-07-22T00:00:00.000Z",
+      "level": 0.0632
+     },
+     {
+      "datetime": "2026-07-22T06:00:00.000Z",
+      "level": 0.0611
+     },
+     {
+      "datetime": "2026-07-22T12:00:00.000Z",
+      "level": 0.059
+     },
+     {
+      "datetime": "2026-07-22T18:00:00.000Z",
+      "level": 0.057
+     },
+     {
+      "datetime": "2026-07-23T00:00:00.000Z",
+      "level": 0.0551
+     },
+     {
+      "datetime": "2026-07-23T06:00:00.000Z",
+      "level": 0.0532
+     },
+     {
+      "datetime": "2026-07-23T12:00:00.000Z",
+      "level": 0.0514
+     },
+     {
+      "datetime": "2026-07-23T18:00:00.000Z",
+      "level": 0.0496
+     },
+     {
+      "datetime": "2026-07-24T00:00:00.000Z",
+      "level": 0.0479
+     },
+     {
+      "datetime": "2026-07-24T06:00:00.000Z",
+      "level": 0.0463
+     },
+     {
+      "datetime": "2026-07-24T12:00:00.000Z",
+      "level": 0.0447
+     },
+     {
+      "datetime": "2026-07-24T18:00:00.000Z",
+      "level": 0.0432
+     },
+     {
+      "datetime": "2026-07-25T00:00:00.000Z",
+      "level": 0.0417
+     },
+     {
+      "datetime": "2026-07-25T06:00:00.000Z",
+      "level": 0.0403
+     },
+     {
+      "datetime": "2026-07-25T12:00:00.000Z",
+      "level": 0.0389
+     },
+     {
+      "datetime": "2026-07-25T18:00:00.000Z",
+      "level": 0.0376
+     },
+     {
+      "datetime": "2026-07-26T00:00:00.000Z",
+      "level": 0.0363
+     },
+     {
+      "datetime": "2026-07-26T06:00:00.000Z",
+      "level": 0.0351
+     },
+     {
+      "datetime": "2026-07-26T12:00:00.000Z",
+      "level": 0.0339
+     },
+     {
+      "datetime": "2026-07-26T18:00:00.000Z",
+      "level": 0.0327
+     },
+     {
+      "datetime": "2026-07-27T00:00:00.000Z",
+      "level": 0.0316
+     },
+     {
+      "datetime": "2026-07-27T06:00:00.000Z",
+      "level": 0.0305
+     },
+     {
+      "datetime": "2026-07-27T12:00:00.000Z",
+      "level": 0.0295
+     },
+     {
+      "datetime": "2026-07-27T18:00:00.000Z",
+      "level": 0.0285
+     },
+     {
+      "datetime": "2026-07-28T00:00:00.000Z",
+      "level": 0.0275
+     },
+     {
+      "datetime": "2026-07-28T06:00:00.000Z",
+      "level": 0.0266
+     },
+     {
+      "datetime": "2026-07-28T12:00:00.000Z",
+      "level": 0.0257
+     },
+     {
+      "datetime": "2026-07-28T18:00:00.000Z",
+      "level": 0.0248
+     },
+     {
+      "datetime": "2026-07-29T00:00:00.000Z",
+      "level": 0.024
+     },
+     {
+      "datetime": "2026-07-29T06:00:00.000Z",
+      "level": 0.0231
+     },
+     {
+      "datetime": "2026-07-29T12:00:00.000Z",
+      "level": 0.0224
+     },
+     {
+      "datetime": "2026-07-29T18:00:00.000Z",
+      "level": 0.0216
+     },
+     {
+      "datetime": "2026-07-30T00:00:00.000Z",
+      "level": 0.0209
+     },
+     {
+      "datetime": "2026-07-30T06:00:00.000Z",
+      "level": 0.0202
+     },
+     {
+      "datetime": "2026-07-30T12:00:00.000Z",
+      "level": 0.0195
+     },
+     {
+      "datetime": "2026-07-30T18:00:00.000Z",
+      "level": 0.0188
+     },
+     {
+      "datetime": "2026-07-31T00:00:00.000Z",
+      "level": 0.0182
+     },
+     {
+      "datetime": "2026-07-31T06:00:00.000Z",
+      "level": 0.0175
+     },
+     {
+      "datetime": "2026-07-31T12:00:00.000Z",
+      "level": 0.0169
+     },
+     {
+      "datetime": "2026-07-31T18:00:00.000Z",
+      "level": 0.0164
+     },
+     {
+      "datetime": "2026-08-01T00:00:00.000Z",
+      "level": 0.0158
+     },
+     {
+      "datetime": "2026-08-01T06:00:00.000Z",
+      "level": 0.0153
+     },
+     {
+      "datetime": "2026-08-01T12:00:00.000Z",
+      "level": 0.0148
+     },
+     {
+      "datetime": "2026-08-01T18:00:00.000Z",
+      "level": 0.0142
+     },
+     {
+      "datetime": "2026-08-02T00:00:00.000Z",
+      "level": 0.0138
+     },
+     {
+      "datetime": "2026-08-02T06:00:00.000Z",
+      "level": 0.0133
+     },
+     {
+      "datetime": "2026-08-02T12:00:00.000Z",
+      "level": 0.0128
+     },
+     {
+      "datetime": "2026-08-02T18:00:00.000Z",
+      "level": 0.0124
+     },
+     {
+      "datetime": "2026-08-03T00:00:00.000Z",
+      "level": 0.012
+     },
+     {
+      "datetime": "2026-08-03T06:00:00.000Z",
+      "level": 0.0116
+     },
+     {
+      "datetime": "2026-08-03T12:00:00.000Z",
+      "level": 0.0112
+     },
+     {
+      "datetime": "2026-08-03T18:00:00.000Z",
+      "level": 0.0108
+     },
+     {
+      "datetime": "2026-08-04T00:00:00.000Z",
+      "level": 0.0104
+     }
+    ],
+    "nextDoseAt": "2026-08-02T00:58:13.343Z",
+    "hoursUntilNextDose": 100,
+    "estimateBasis": "relative-dose-equivalent",
+    "engineVersion": "pk-v2"
+   }
+  ],
+  "selectedRange": "today",
+  "rangeTotals": {
+   "key": "today",
+   "label": "Today",
+   "proteinGrams": 0,
+   "fiberGrams": 0,
+   "calories": 0,
+   "waterOz": 0,
+   "dayCount": 1,
+   "hasData": false
+  },
+  "rangeAvailability": {
+   "today": true,
+   "week": false,
+   "month": false,
+   "year": true
+  },
+  "todayProteinGrams": 0,
+  "todayFiberGrams": 0,
+  "todayCalories": 0,
+  "todayWaterOz": 0,
+  "streakDays": 0,
+  "setupProgress": {
+   "loggedItems": 3,
+   "required": 3,
+   "unlocked": true
+  },
+  "nextDose": {
+   "compoundId": "6a3dcea9681e813be2e17fe5",
+   "compoundName": "Tirzepatide",
+   "nextDoseAt": "2026-08-02T00:58:13.343Z",
+   "hoursUntilNextDose": 100
+  },
+  "latestWeight": {
+   "value": 196,
+   "unit": "lb",
+   "datetime": "2026-06-26T00:58:13.343Z",
+   "id": "6a3dceaa778d3c45f699fee8",
+   "userId": "6a3dcea8681e813be2e17fe3",
+   "deletedAt": null,
+   "createdAt": "2026-06-26T00:58:18.258Z",
+   "updatedAt": "2026-06-26T00:58:18.258Z"
+  },
+  "insights": [
+   {
+    "id": "6a551bd29f6759300b81089a",
+    "type": "medication_level",
+    "headline": "Tirzepatide is near the lower part of the curve",
+    "body": "Your relative medication estimate is lower in the current dose cycle.",
+    "severity": "warning",
+    "deterministicSignal": {
+     "type": "medication_level",
+     "active": true,
+     "severity": "warning",
+     "ratioToPeak": 0.336,
+     "message": "Medication estimate is in the lower part of the dose curve.",
+     "compoundId": "6a3dcea9681e813be2e17fe5"
+    },
+    "generatedAt": "2026-07-28T20:53:10.152Z",
+    "copyVersion": "insight-copy-v1"
+   },
+   {
+    "id": "6a551bd49f6759300b81089b",
+    "type": "dose_cycle",
+    "headline": "Tirzepatide is late-cycle",
+    "body": "You may be near the lower-support part of this dose cycle. Keep meals steady and watch protein consistency.",
+    "severity": "info",
+    "deterministicSignal": {
+     "type": "dose_cycle",
+     "active": true,
+     "severity": "info",
+     "daysSinceLastDose": 41,
+     "scheduleIntervalDays": 7,
+     "message": "User is near the lower-appetite-support window of the cycle.",
+     "compoundId": "6a3dcea9681e813be2e17fe5"
+    },
+    "generatedAt": "2026-07-28T20:53:10.152Z",
+    "copyVersion": "insight-copy-v1"
+   }
+  ],
+  "weeklyRetention": {
+   "weekOf": "2026-07-27",
+   "score": 20,
+   "verdict": "at_risk",
+   "verdictProse": "This week has a higher muscle-retention risk. Prioritize protein and resistance work.",
+   "drivers": [
+    {
+     "type": "protein",
+     "label": "Protein adequacy",
+     "score": 0,
+     "contribution": 0
+    },
+    {
+     "type": "training",
+     "label": "Resistance training",
+     "score": 0,
+     "contribution": 0
+    },
+    {
+     "type": "pace",
+     "label": "Weight-loss pace",
+     "score": 100,
+     "contribution": 20
+    }
+   ],
+   "penaltyApplied": false,
+   "engineVersion": "retention-v2",
+   "copyVersion": null
+  },
+  "sectionErrors": {}
+ }
+}

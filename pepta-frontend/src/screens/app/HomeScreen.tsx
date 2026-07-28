@@ -51,6 +51,27 @@ export function HomeScreen() {
     if (!track) void refreshTrack();
   }, [home, track, refreshHome, refreshTrack]);
 
+  // EVERY hook lives above the early returns. The crash this guards against:
+  // while `home` was null this component returned early, so the render where
+  // data arrived called MORE hooks than the render before it — a rules-of-hooks
+  // violation that React turns into a throw, which the root boundary showed as
+  // "Something went wrong" the moment anyone entered the app. It shipped that
+  // way in builds 20–22 because the react-hooks lint plugin was silently
+  // broken. Do not move hooks back below the guards.
+  const companionName = useCompanionName();
+  const { seen, markSeen } = useSeenTeachCards();
+  // One lesson a day at most, about the user's own compounds, and only when
+  // the day-one checklist is done — a new user has enough to read already.
+  const teach = useMemo(() => {
+    if (!home) return null;
+    if (buildGettingStarted(home).show) return null;
+    return buildPepTeachCard({
+      compoundNames: home.activeCompounds.map((c) => c.name),
+      seenEntryIds: seen,
+      dayIndex: Math.floor(Date.now() / 86_400_000),
+    });
+  }, [home, seen]);
+
   if (!home && homeError) {
     return (
       <CenteredState>
@@ -80,21 +101,6 @@ export function HomeScreen() {
   const view = buildHomeView(home);
   const plan = buildPlanSummary(home);
   const gettingStarted = buildGettingStarted(home);
-  const companionName = useCompanionName();
-  const { seen, markSeen } = useSeenTeachCards();
-  // One lesson a day at most, about the user's own compounds, and only when
-  // the day-one checklist is done — a new user has enough to read already.
-  const teach = useMemo(
-    () =>
-      gettingStarted.show
-        ? null
-        : buildPepTeachCard({
-            compoundNames: (home?.activeCompounds ?? []).map((c) => c.name),
-            seenEntryIds: seen,
-            dayIndex: Math.floor(Date.now() / 86_400_000),
-          }),
-    [gettingStarted.show, home?.activeCompounds, seen],
-  );
   const selectedRange = home.selectedRange ?? homeRange;
   const rangeAvailability = home.rangeAvailability ?? { today: true, week: false, month: false, year: false };
   const activity = buildActivity(track, home.profile, new Date(), selectedRange);
