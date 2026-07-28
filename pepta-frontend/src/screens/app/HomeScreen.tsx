@@ -6,7 +6,7 @@
 // calories / protein / fiber / water vs. their profile targets, logging streak,
 // setup progress, latest weight, and the first insight.
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { Icon } from "../../components/Icon";
 import * as Haptics from 'expo-haptics';
@@ -34,7 +34,7 @@ const HOME_RANGES: { key: HomeRangeKey; label: string; short: string }[] = [
 
 export function HomeScreen() {
   const theme = useTheme();
-  const navigation = useNavigation<NavigationProp<Record<string, undefined>>>();
+  const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
   const { home, track, homeLoading, homeError, homeRefreshing, homeRange, refreshHome, refreshTrack, bumpProtein, bumpWater, bumpFiber } = usePeptaData();
   const { openQuickLog, openMeal } = useLogSheets();
   const [rangeOpen, setRangeOpen] = useState(false);

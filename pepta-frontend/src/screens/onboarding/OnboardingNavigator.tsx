@@ -66,6 +66,7 @@ import { projectGoal } from '../../utils/goalProjection';
 import { previewTargets } from '../../utils/planPreview';
 import { buildOnboardingPayload } from './onboardingPayload';
 import { api } from '../../services/api';
+import { writeCompanionName } from '../../services/companionNameStore';
 import { useAuth } from '../../context/AuthContext';
 import { useAccess } from '../../context/AccessContext';
 import { useOnboarding } from '../../context/OnboardingContext';
@@ -355,16 +356,18 @@ export function OnboardingNavigator() {
     updateDraft(payload);
     await api.completeOnboarding(payload);
 
-    // The companion name is written SEPARATELY and best-effort, never inside
-    // the completion payload. The profile schema is .strict(), so a backend
-    // that predates the field would reject the entire payload and strand the
-    // user at the last step of the funnel with no way through. Sending it on
-    // its own means an older backend simply 400s this one call: the name
-    // falls back to "Pep" until the backend catches up, and onboarding still
-    // completes. Client and server can ship in either order.
+    // The companion name is written SEPARATELY from the completion payload,
+    // and stored locally first. The profile schema is .strict(), so a backend
+    // predating the field would reject the whole payload and strand the user
+    // at the last step of the funnel. Sending it alone means an older backend
+    // 400s only this call — and because the name is saved locally, the user
+    // still sees their pick and useCompanionName retries the write until it
+    // lands. Nothing is lost whichever order client and backend ship in.
     if (answers.companionName) {
+      await writeCompanionName(answers.companionName, false);
       await api
         .updateProfileSettings({ companionName: answers.companionName })
+        .then(() => writeCompanionName(answers.companionName!, true))
         .catch(() => undefined);
     }
     // Draft is done — clear it (and the in-memory cache) so a future run starts fresh.

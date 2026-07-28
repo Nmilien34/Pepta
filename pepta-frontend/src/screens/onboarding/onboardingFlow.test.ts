@@ -230,11 +230,9 @@ describe('shouldSkipStep', () => {
     expect(shouldSkipStep('instrument', { journeyStage: 'active' })).toBe(false);
   });
 
-  it('keeps the new profile turns for everyone', () => {
+  it('keeps the remaining profile turns for everyone', () => {
     for (const stage of ['active', 'starting_soon', 'none'] as const) {
-      expect(shouldSkipStep('experience', { journeyStage: stage })).toBe(false);
       expect(shouldSkipStep('needs', { journeyStage: stage })).toBe(false);
-      expect(shouldSkipStep('alsoTracking', { journeyStage: stage })).toBe(false);
       expect(shouldSkipStep('company', { journeyStage: stage })).toBe(false);
       expect(shouldSkipStep('fearAnswered', { journeyStage: stage })).toBe(false);
     }
