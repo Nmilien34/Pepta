@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { MedicationLevelResponse } from '@pepta/shared';
-import { buildPepMood, levelFraction } from './pepMood';
+import { buildPepMood, moodNoteFor, levelFraction } from './pepMood';
 
 function level(current: number, peak = 2.1, trough = 0.9): MedicationLevelResponse {
   return {
@@ -101,5 +101,31 @@ describe('buildPepMood', () => {
     for (const line of lines) {
       expect(line.toLowerCase()).not.toMatch(/missed|late|forgot|behind|should have/);
     }
+  });
+});
+
+describe('moodNoteFor', () => {
+  const level = (currentEstimate: number) =>
+    ({ currentEstimate, peakEstimate: 10, troughEstimate: 1 }) as never;
+
+  it('turns the spoken moods into notes with stable ids', () => {
+    const drowsy = moodNoteFor(buildPepMood({ level: level(1.5) }));
+    expect(drowsy).toMatchObject({ id: 'mood-drowsy', tone: 'nudge' });
+    expect(drowsy!.text).toContain('Shot day is close');
+
+    const peak = moodNoteFor(buildPepMood({ level: level(9.5) }));
+    expect(peak).toMatchObject({ id: 'mood-peak', tone: 'win' });
+
+    const resting = moodNoteFor(buildPepMood({ resting: true }));
+    expect(resting).toMatchObject({ id: 'mood-resting', tone: 'win' });
+    expect(resting!.text).toContain('Nothing to log today');
+  });
+
+  it('stays silent when the mood has nothing to say', () => {
+    // steady carries no line, and celebrating speaks through its milestone
+    // note — a mood note there would double-speak the same moment.
+    expect(moodNoteFor(buildPepMood({ level: level(5) }))).toBeNull();
+    expect(moodNoteFor(buildPepMood({}))).toBeNull();
+    expect(moodNoteFor(buildPepMood({ milestone: true }))).toBeNull();
   });
 });

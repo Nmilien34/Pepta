@@ -11,7 +11,9 @@ import { useTheme } from '../theme';
 import { AppText } from './AppText';
 import { LivingMascot } from './LivingMascot';
 import { useSpeechHaptic } from './useSpeechHaptic';
-import { buildPepMood } from '../screens/app/pepMood';
+import { buildPepMood, moodNoteFor } from '../screens/app/pepMood';
+import { dueMilestone, milestoneFactsFrom, type PepMilestone } from '../screens/app/pepMilestones';
+import { markMilestoneSeen, readSeenMilestones } from '../services/pepMilestoneStore';
 import { resolveCompanionName } from '../utils/companion';
 import { activeCycleOf, patternOf, todayCycleStatus } from '../screens/app/scheduleView';
 import { usePeptaData } from '../context/PeptaDataContext';
@@ -65,19 +67,76 @@ export function PepCompanion() {
     return undefined;
   }, [home]);
 
-  // Merge AI notes ahead of the local ones, deduped by id.
+  // Same cycle derivation Track uses, from the same shared context — so Pep
+  // and the Track card can never disagree about whether today is a rest day.
+  const restingToday = useMemo(() => {
+    const pattern = patternOf(activeCycleOf(cycles));
+    return todayCycleStatus(pattern, new Date())?.phase === 'rest';
+  }, [cycles]);
+
+  // Milestones fire once per account+device. `active` pins the one being
+  // celebrated for the whole session; the store is marked immediately, so a
+  // crash mid-celebration costs the animation, never a duplicate later.
+  const [seenMilestones, setSeenMilestones] = useState<Set<string> | null>(null);
+  const [activeMilestone, setActiveMilestone] = useState<PepMilestone | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    void readSeenMilestones().then((seen) => {
+      if (alive) setSeenMilestones(seen);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    // Waits for the seen-set to load: celebrating before knowing what has
+    // been seen would replay old milestones on every launch.
+    if (!home || !seenMilestones || activeMilestone) return;
+    const due = dueMilestone(milestoneFactsFrom(home), seenMilestones);
+    if (due) {
+      setActiveMilestone(due);
+      void markMilestoneSeen(due.key);
+    }
+  }, [home, seenMilestones, activeMilestone]);
+
+  // Pep's face tracks the medication curve, not the user's compliance — and a
+  // due milestone outranks the curve for the session it fires in.
+  const mood = useMemo(
+    () =>
+      buildPepMood({
+        level: home?.medicationLevels?.[0] ?? null,
+        resting: restingToday,
+        milestone: activeMilestone != null,
+      }),
+    [home?.medicationLevels, restingToday, activeMilestone],
+  );
+
+  // Deck order is deliberate: the milestone leads (the auto-greet should open
+  // on the celebration), actionable nudges follow, and the mood's own line
+  // rides last so it never displaces something the user can act on.
   const notes = useMemo(() => {
     const local = home ? buildCompanionNotes(home) : [];
+    const milestoneNote: CompanionNote | null = activeMilestone
+      ? {
+          id: `milestone-${activeMilestone.key}`,
+          text: activeMilestone.line,
+          emoji: activeMilestone.emoji,
+          tone: 'win',
+        }
+      : null;
+    const moodNote = moodNoteFor(mood);
     const merged: CompanionNote[] = [];
     const seen = new Set<string>();
-    for (const n of [...aiNotes, ...local]) {
-      if (!seen.has(n.id)) {
+    for (const n of [milestoneNote, ...aiNotes, ...local, moodNote]) {
+      if (n && !seen.has(n.id)) {
         seen.add(n.id);
         merged.push(n);
       }
     }
     return merged;
-  }, [home, aiNotes]);
+  }, [home, aiNotes, activeMilestone, mood]);
 
   // Greet once, shortly after home data lands.
   useEffect(() => {
@@ -97,19 +156,6 @@ export function PepCompanion() {
   useEffect(() => {
     Animated.spring(bubble, { toValue: open ? 1 : 0, useNativeDriver: true, bounciness: 8, speed: 14 }).start();
   }, [open, bubble]);
-
-  // Same cycle derivation Track uses, from the same shared context — so Pep
-  // and the Track card can never disagree about whether today is a rest day.
-  const restingToday = useMemo(() => {
-    const pattern = patternOf(activeCycleOf(cycles));
-    return todayCycleStatus(pattern, new Date())?.phase === 'rest';
-  }, [cycles]);
-
-  // Pep's face tracks the medication curve, not the user's compliance.
-  const mood = useMemo(
-    () => buildPepMood({ level: home?.medicationLevels?.[0] ?? null, resting: restingToday }),
-    [home?.medicationLevels, restingToday],
-  );
 
   // The companion's own haptic voice — fires when the spoken LINE changes.
   const spokenLine = open ? (notes[Math.min(index, notes.length - 1)]?.text ?? null) : null;

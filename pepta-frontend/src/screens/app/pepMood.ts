@@ -94,3 +94,39 @@ function formatEstimate(level?: MedicationLevelResponse | null): string {
   const value = Math.round(level.currentEstimate * 100) / 100;
   return `${value} mg`;
 }
+
+/**
+ * The mood's line as a companion note, or null when the mood has nothing to
+ * say (steady carries no line; celebrating speaks through its milestone note).
+ *
+ * This is what puts the moods' words on screen: buildPepMood has returned
+ * these lines since the companion shipped, but PepCompanion only consumed the
+ * pose and tempo — the most characterful copy in the system was dead. The
+ * note rides LAST in the deck, so it never displaces an actionable nudge.
+ */
+export interface PepMoodNote {
+  id: string;
+  text: string;
+  emoji?: string;
+  tone: 'nudge' | 'win';
+}
+
+const MOOD_NOTE_EMOJI: Partial<Record<PepMood, string>> = {
+  peak: '⚡',
+  drowsy: '🌙',
+  resting: '😴',
+};
+
+export function moodNoteFor(view: PepMoodView): PepMoodNote | null {
+  if (!view.line) return null;
+  return {
+    // Stable per mood, so the dedupe in PepCompanion keeps exactly one and
+    // the speech haptic fires once per line change, not per re-render.
+    id: `mood-${view.mood}`,
+    text: view.line,
+    emoji: MOOD_NOTE_EMOJI[view.mood],
+    // Drowsy points at the coming shot day — a nudge. Peak and resting are
+    // good news about the user's own pharmacology — wins.
+    tone: view.mood === 'drowsy' ? 'nudge' : 'win',
+  };
+}
