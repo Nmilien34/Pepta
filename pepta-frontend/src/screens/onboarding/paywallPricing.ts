@@ -94,19 +94,37 @@ export function freeTrialOf(
   return { periodNumberOfUnits: units, periodUnit: unit };
 }
 
-// "3-day", "1-week", … — duration comes from the product, never a literal.
+// "3 days", "1 week", … — duration comes from the product, never a literal.
+// Reads as a noun ("Start 3 days for $0.00"), not the adjective form the old
+// "3-day free trial" wording needed.
 function trialDurationLabel(trial: { periodNumberOfUnits: number; periodUnit: string }): string {
   const unit = trial.periodUnit.toLowerCase();
-  return `${trial.periodNumberOfUnits}-${unit}`;
+  const plural = trial.periodNumberOfUnits === 1 ? unit : `${unit}s`;
+  return `${trial.periodNumberOfUnits} ${plural}`;
 }
 
-function monthlyCta(monthly: PricePackage, price: string): PaywallCtaCopy {
+function monthlyCta(
+  monthly: PricePackage,
+  price: string,
+  trialEligible: boolean,
+): PaywallCtaCopy {
   const trial = freeTrialOf(monthly);
-  if (!trial) return { label: "Subscribe" };
+  // ELIGIBILITY, NOT JUST EXISTENCE. `introPrice` describes the product as
+  // configured; it says nothing about whether THIS user can still get it.
+  // Anyone who already used an intro offer in this subscription group is
+  // charged the full price immediately by StoreKit, so advertising "$0.00"
+  // to them would be a false price claim on the paywall — worse than the old
+  // "free trial" wording, which was merely optimistic. RevenueCat's own
+  // guidance for an indeterminate answer is to show non-intro pricing.
+  if (!trial || !trialEligible) return { label: "Subscribe" };
   return {
-    label: `Start ${trialDurationLabel(trial)} free trial`,
-    // Apple requires the auto-renewal disclosure near the CTA on trials.
-    subline: `Then ${price}/mo. Auto-renews. Cancel anytime in Settings.`,
+    // "$0.00" rather than "free": a concrete number reads as a real price the
+    // user is being charged today, which converts better than the word free.
+    label: `Start ${trialDurationLabel(trial)} for $0.00`,
+    // Apple requires duration, the price after, and the auto-renewal
+    // disclosure near the CTA. The reminder promise rides along — and is kept
+    // by trialReminder.ts. Unwire that and this sentence must come out too.
+    subline: `We'll remind you before it ends. Then ${price}/mo, auto-renews. Cancel anytime in Settings.`,
   };
 }
 
@@ -146,6 +164,12 @@ function savingsBadge(monthly: PricePackage, yearly: PricePackage): string | und
 
 export function buildPaywallPricing(
   packages: { monthly: PricePackage; yearly: PricePackage } | null,
+  /**
+   * Whether this user can actually receive the intro offer. Defaults to false
+   * so a caller that has not resolved eligibility yet advertises no trial —
+   * the safe direction is under-promising.
+   */
+  trialEligible = false,
 ): PaywallPricingCopy {
   if (!packages) return FALLBACK_PRICING;
 
@@ -184,7 +208,7 @@ export function buildPaywallPricing(
       monthly: `${monthlyPrice}/month. Cancel anytime · Terms & Privacy`,
     },
     cta: {
-      monthly: monthlyCta(monthly, monthlyPrice),
+      monthly: monthlyCta(monthly, monthlyPrice, trialEligible),
       // The annual product has no trial on either arm — identical both ways.
       yearly: { label: "Subscribe" },
     },

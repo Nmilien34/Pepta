@@ -141,7 +141,15 @@ describe("RevenueCat client", () => {
 
     const packages = await client.getPaywallPackages("user_1");
 
-    expect(packages).toEqual({ monthly, yearly, offeringId: "default" });
+    // Eligibility resolves false here: the fake SDK exposes no
+    // checkTrialOrIntroductoryPriceEligibility, and an unanswerable check must
+    // never let the paywall promise a trial.
+    expect(packages).toEqual({
+      monthly,
+      yearly,
+      offeringId: "default",
+      monthlyTrialEligible: false,
+    });
     expect(sdk.getOfferings).toHaveBeenCalledTimes(1);
   });
 

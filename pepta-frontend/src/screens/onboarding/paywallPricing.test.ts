@@ -82,11 +82,15 @@ describe("buildPaywallPricing", () => {
         },
       },
       yearly: packageWithPrice("$40.00", 40),
-    });
+    }, true);
 
-    expect(pricing.cta.monthly.label).toBe("Start 3-day free trial");
+    // "$0.00" rather than "free" — a concrete number reads as a real price.
+    expect(pricing.cta.monthly.label).toBe("Start 3 days for $0.00");
+    // Duration, price after, auto-renewal: all three are required near the
+    // CTA. The reminder promise is kept by trialReminder.ts — if that is ever
+    // unwired, this sentence has to come out with it.
     expect(pricing.cta.monthly.subline).toBe(
-      "Then $9.99/mo. Auto-renews. Cancel anytime in Settings.",
+      "We'll remind you before it ends. Then $9.99/mo, auto-renews. Cancel anytime in Settings.",
     );
     // The annual plan is identical on both arms.
     expect(pricing.cta.yearly).toEqual({ label: "Subscribe" });
@@ -102,12 +106,10 @@ describe("buildPaywallPricing", () => {
         },
       },
       yearly: packageWithPrice("$40.00", 40),
-    });
+    }, true);
 
-    expect(pricing.cta.monthly.label).toBe("Start 1-week free trial");
-    expect(pricing.cta.monthly.subline).toBe(
-      "Then $4.99/mo. Auto-renews. Cancel anytime in Settings.",
-    );
+    expect(pricing.cta.monthly.label).toBe("Start 1 week for $0.00");
+    expect(pricing.cta.monthly.subline).toContain("Then $4.99/mo, auto-renews.");
   });
 
   it("shows no trial copy on the control arm or for paid intro offers", () => {
@@ -132,5 +134,28 @@ describe("buildPaywallPricing", () => {
 
   it("never advertises a trial before packages load", () => {
     expect(buildPaywallPricing(null).cta.monthly).toEqual({ label: "Subscribe" });
+  });
+
+  it("makes no $0.00 claim to a user who is not eligible for the intro offer", () => {
+    // THE POINT OF THE ELIGIBILITY FLAG. The product carries a trial, but this
+    // user already used one in this subscription group, so StoreKit will
+    // charge full price immediately. Advertising "$0.00" would be a false
+    // price claim on the paywall. Default is ineligible, so an unresolved
+    // check fails the same safe way.
+    const withTrial = {
+      monthly: {
+        product: {
+          price: 9.99,
+          priceString: "$9.99",
+          introPrice: { price: 0, periodNumberOfUnits: 3, periodUnit: "DAY" },
+        },
+      },
+      yearly: packageWithPrice("$40.00", 40),
+    };
+
+    for (const pricing of [buildPaywallPricing(withTrial, false), buildPaywallPricing(withTrial)]) {
+      expect(pricing.cta.monthly).toEqual({ label: "Subscribe" });
+      expect(JSON.stringify(pricing)).not.toContain("$0.00");
+    }
   });
 });

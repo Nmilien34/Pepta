@@ -18,6 +18,12 @@ export interface PaywallPackages {
   yearly: PurchasesPackage;
   /** Identifier of the offering these packages came from (experiment arm). */
   offeringId: string;
+  /**
+   * Whether THIS user can still receive the monthly product's intro offer.
+   * False on Android, on error, and on RevenueCat's UNKNOWN — the paywall
+   * must not advertise "$0.00" it cannot deliver. See monthlyCta().
+   */
+  monthlyTrialEligible: boolean;
 }
 
 export interface RevenueCatResult {
@@ -34,6 +40,9 @@ interface RevenueCatSdk {
     customerInfo: CustomerInfo;
     productIdentifier: string;
   }>;
+  checkTrialOrIntroductoryPriceEligibility?(
+    productIdentifiers: string[],
+  ): Promise<Record<string, { status: number }>>;
   restorePurchases(): Promise<CustomerInfo>;
   collectDeviceIdentifiers?(): Promise<void>;
   setAppsflyerID?(appsflyerID: string | null): Promise<void>;
@@ -74,6 +83,33 @@ function packageByIdentifier(
 ): PurchasesPackage | undefined {
   const offering = experimentOffering(offerings);
   return offering?.availablePackages.find((pkg) => pkg.identifier === identifier);
+}
+
+// react-native-purchases INTRO_ELIGIBILITY_STATUS. Inlined as a literal rather
+// than imported so this module keeps its structural-only dependency on the SDK
+// (which is what lets the whole client be unit-tested against a fake).
+const INTRO_ELIGIBILITY_ELIGIBLE = 2;
+
+/**
+ * iOS-only. Android and any failure resolve to false: the caller uses this to
+ * decide whether to promise a $0.00 trial, and the only safe default for a
+ * price claim is "do not make it".
+ */
+async function resolveTrialEligibility(
+  sdk: RevenueCatSdk,
+  productIdentifier: string | undefined,
+  platformOS: string,
+): Promise<boolean> {
+  if (platformOS !== "ios" || !productIdentifier) return false;
+  if (typeof sdk.checkTrialOrIntroductoryPriceEligibility !== "function") return false;
+  try {
+    const result = await sdk.checkTrialOrIntroductoryPriceEligibility([productIdentifier]);
+    return result?.[productIdentifier]?.status === INTRO_ELIGIBILITY_ELIGIBLE;
+  } catch {
+    // An unreachable eligibility check is not a reason to block the paywall —
+    // it is a reason to sell it without the trial claim.
+    return false;
+  }
 }
 
 function isActivePro(customerInfo: CustomerInfo): boolean {
@@ -211,16 +247,23 @@ export function createRevenueCatClient(options: RevenueCatClientOptions) {
       throw new Error("RevenueCat current offering is not available");
     }
 
+    const monthly = assertPackage(
+      offering.monthly ?? packageByIdentifier(offerings, "$rc_monthly"),
+      "monthly",
+    );
+
     return {
-      monthly: assertPackage(
-        offering.monthly ?? packageByIdentifier(offerings, "$rc_monthly"),
-        "monthly",
-      ),
+      monthly,
       yearly: assertPackage(
         offering.annual ?? packageByIdentifier(offerings, "$rc_annual"),
         "yearly",
       ),
       offeringId: offering.identifier,
+      monthlyTrialEligible: await resolveTrialEligibility(
+        sdk,
+        monthly.product.identifier,
+        platformOS,
+      ),
     };
   }
 

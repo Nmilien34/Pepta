@@ -15,10 +15,12 @@ import {
   isRevenueCatPurchaseCancelled,
   type PaywallPackages,
   revenueCat,
+  REVENUECAT_ENTITLEMENT_ID,
   type RevenueCatPlan,
 } from "../../services/revenueCat";
 import { logPaywallShown, logPurchaseStarted } from "../../services/funnelEvents";
 import { buildPaywallPricing } from "./paywallPricing";
+import { scheduleTrialEndReminder } from "../../services/trialReminder.service";
 
 export interface PaywallScreenProps {
   onComplete(): void | Promise<void>;
@@ -55,7 +57,10 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
   const [message, setMessage] = useState<string | null>(null);
   const [paywallPackages, setPaywallPackages] =
     useState<PaywallPackages | null>(null);
-  const pricing = buildPaywallPricing(paywallPackages);
+  const pricing = buildPaywallPricing(
+    paywallPackages,
+    paywallPackages?.monthlyTrialEligible ?? false,
+  );
   const plansReady = paywallPackages !== null;
   // paywall_shown fires once per presentation, when the offering load settles
   // (so `variant` is the real experiment arm, or 'unknown' on failure).
@@ -149,6 +154,11 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
     setCompleting(true);
     try {
       const result = await revenueCat.purchasePlan(auth.user.id, plan);
+      // Keep the paywall's promise. No-ops when this was not a trial, and
+      // never throws — see scheduleTrialEndReminder.
+      await scheduleTrialEndReminder(result.customerInfo, REVENUECAT_ENTITLEMENT_ID, {
+        priceString: pricing.monthly.price,
+      });
       if (!result.entitlementActive) {
         setFailed(true);
         setMessage(

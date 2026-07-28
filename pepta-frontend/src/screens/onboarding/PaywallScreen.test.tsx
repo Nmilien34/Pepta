@@ -21,6 +21,7 @@ const paywallPackages = {
   monthly: { product: { price: 9.99, priceString: "$9.99", currencyCode: "USD" } },
   yearly: { product: { price: 40, priceString: "$40.00", currencyCode: "USD" } },
   offeringId: "default",
+  monthlyTrialEligible: false,
 };
 
 // Treatment arm: monthly carries a 3-day free intro offer (derived, never
@@ -36,6 +37,7 @@ const trialPaywallPackages = {
   },
   yearly: { product: { price: 40, priceString: "$40.00", currencyCode: "USD" } },
   offeringId: "trial-offer",
+  monthlyTrialEligible: true,
 };
 
 vi.mock("react-native", () => ({
@@ -143,6 +145,7 @@ vi.mock("../../services/api", () => ({
 }));
 
 vi.mock("../../services/revenueCat", () => ({
+  REVENUECAT_ENTITLEMENT_ID: "pro",
   isRevenueCatPurchaseCancelled: mocks.isPurchaseCancelled,
   revenueCat: {
     getPaywallPackages: mocks.getPaywallPackages,
@@ -395,9 +398,9 @@ describe("PaywallScreen legal links", () => {
     });
 
     // Duration and renewal price are derived from the product, not literals.
-    expect(button(tree!.root, "Start 3-day free trial")).toBeTruthy();
+    expect(button(tree!.root, "Start 3 days for $0.00")).toBeTruthy();
     const text = allText(tree!.root);
-    expect(text).toContain("Then $9.99/mo. Auto-renews. Cancel anytime in Settings.");
+    expect(text).toContain("We'll remind you before it ends. Then $9.99/mo, auto-renews. Cancel anytime in Settings.");
   });
 
   it("fires paywall_shown once per presentation with the offering variant", async () => {
