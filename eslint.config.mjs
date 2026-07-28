@@ -35,7 +35,10 @@ export default tseslint.config(
   // stays a warning (the codebase manages deps deliberately in places), but
   // rules-of-hooks is an error: a violation is a runtime crash, not a style.
   {
-    files: ['**/*.tsx', '**/use*.ts'],
+    // Every ts/tsx file, not just .tsx and use-prefixed: a hook defined in a
+    // plain .ts helper is still a hook, and rules-of-hooks is inert on files
+    // with no hook calls, so the wide net costs nothing.
+    files: ['**/*.ts', '**/*.tsx'],
     plugins: { 'react-hooks': reactHooks },
     rules: {
       'react-hooks/rules-of-hooks': 'error',

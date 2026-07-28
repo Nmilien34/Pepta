@@ -17,7 +17,7 @@ say()  { printf '%s\n' "$*"; }
 ok()   { say "  ✓ $*"; }
 bad()  { say "  ✗ $*"; fail=1; }
 
-say "1/5 JS ↔ native module parity (autolinking vs Podfile.lock)"
+say "1/6 JS ↔ native module parity (autolinking vs Podfile.lock)"
 missing=$(npx expo-modules-autolinking resolve -p apple --json 2>/dev/null | python3 -c '
 import json, re, sys
 resolved = json.load(sys.stdin)
@@ -38,14 +38,14 @@ else
   ok "every autolinked Expo module has its pod in Podfile.lock"
 fi
 
-say "2/5 Pods in sync with lockfile"
+say "2/6 Pods in sync with lockfile"
 if [ -f ios/Pods/Manifest.lock ] && diff -q ios/Podfile.lock ios/Pods/Manifest.lock >/dev/null 2>&1; then
   ok "ios/Pods matches Podfile.lock"
 else
   bad "ios/Pods out of sync with Podfile.lock (run: cd ios && pod install)"
 fi
 
-say "3/5 Production env baked into the bundle"
+say "3/6 Production env baked into the bundle"
 if [ ! -f .env ]; then
   bad ".env missing — EXPO_PUBLIC_* vars won't be inlined"
 else
@@ -60,10 +60,17 @@ else
     || bad "EXPO_PUBLIC_REVENUECAT_IOS_API_KEY missing or malformed"
 fi
 
-say "4/5 Typecheck"
+say "4/6 Typecheck"
 if npx tsc --noEmit >/dev/null 2>&1; then ok "tsc clean"; else bad "tsc failed (run: npm run typecheck)"; fi
 
-say "5/5 Tests"
+say "5/6 Lint (rules-of-hooks is the load-bearing part)"
+# A conditional hook is a guaranteed runtime crash, not a style problem —
+# builds 20-22 shipped one in HomeScreen that blanked the app on entry the
+# moment /home data arrived. eslint-plugin-react-hooks now guards the whole
+# tree, but a rule that never runs before an archive protects nobody.
+if npx eslint src >/dev/null 2>&1; then ok "eslint clean"; else bad "eslint failed (run: npx eslint src)"; fi
+
+say "6/6 Tests"
 if npm run -s test >/dev/null 2>&1; then ok "tests pass"; else bad "tests failed (run: npm test)"; fi
 
 echo
