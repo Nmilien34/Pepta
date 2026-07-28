@@ -147,6 +147,11 @@ vi.mock("./AddCompoundSheet", () => ({
   AddCompoundSheet: () => null,
 }));
 
+vi.mock("./LivingMascot", () => ({
+  // Real one pulls in react-native-svg, which this suite does not transform.
+  LivingMascot: "LivingMascot",
+}));
+
 vi.mock("./BodyMap", () => ({
   BodyMap: () => null,
 }));

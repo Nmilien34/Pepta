@@ -17,6 +17,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { Icon } from "./Icon";
+import { LivingMascot } from "./LivingMascot";
 import * as Haptics from "expo-haptics";
 import {
   SafeAreaView,
@@ -35,6 +36,7 @@ import { usePeptaData } from "../context/PeptaDataContext";
 import { api } from "../services/api";
 import {
   sideEffectTypeLabel,
+  rotationReason,
   siteLabel,
   usedSites,
   type InjectionSite,
@@ -1076,21 +1078,39 @@ function DoseForm({
             setDose({ ...dose, site });
           }}
         />
-        <AppText
-          variant="caption"
-          color="textSecondary"
-          align="center"
-          style={{ marginTop: 6 }}
+        {/* The rotation was already computed by suggestNextSite; handing it to
+            the companion turns a caption into someone telling you why. Real
+            safety value (rotation reduces lipohypertrophy), so it is voiced
+            rather than decorated. */}
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 8,
+            alignSelf: "center",
+            marginTop: 8,
+            maxWidth: 300,
+          }}
         >
-          <AppText
-            variant="caption"
-            color="textPrimary"
-            style={{ fontWeight: "700" }}
+          <LivingMascot pose="idle" size={34} bobSeconds={4.2} />
+          <View
+            style={{
+              flex: 1,
+              backgroundColor: theme.colors.surfaceAlt,
+              borderRadius: 14,
+              borderBottomLeftRadius: 4,
+              paddingVertical: 8,
+              paddingHorizontal: 11,
+            }}
           >
-            {siteLabel(dose.site)}
-          </AppText>{" "}
-          · auto-rotated
-        </AppText>
+            <AppText variant="caption" color="textPrimary" style={{ fontWeight: "700" }}>
+              {siteLabel(dose.site)} next
+            </AppText>
+            <AppText variant="caption" color="textSecondary" style={{ marginTop: 1 }}>
+              {rotationReason(used)}
+            </AppText>
+          </View>
+        </View>
       </View>
 
       {/* time */}

@@ -96,7 +96,6 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
     return () => {
       mounted = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auth.user?.id]);
 
   const refreshEntitlement = async (optimisticActive: boolean) => {

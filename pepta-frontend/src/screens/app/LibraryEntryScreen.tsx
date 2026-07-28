@@ -30,6 +30,7 @@ import {
 import { askPepPrompt, trackedEntryIds } from './libraryView';
 import { EvidencePill } from './LibraryScreen';
 import { usePepChat } from '../../context/PepChatContext';
+import { useCompanionName } from '../../components/useCompanionName';
 
 type LibraryEntryRoute = RouteProp<{ LibraryEntry: { entryId: string } }, 'LibraryEntry'>;
 
@@ -39,6 +40,7 @@ export function LibraryEntryScreen() {
   const route = useRoute<LibraryEntryRoute>();
   const { home } = usePeptaData();
   const { askPep } = usePepChat();
+  const companionName = useCompanionName();
   const [addOpen, setAddOpen] = useState(false);
 
   const entry = entryById(route.params?.entryId ?? '');
@@ -187,7 +189,7 @@ export function LibraryEntryScreen() {
                 askPep(askPepPrompt(entry));
               }}
               accessibilityRole="button"
-              accessibilityLabel={`Ask Pep about ${entry.name}`}
+              accessibilityLabel={`Ask ${companionName} about ${entry.name}`}
               style={({ pressed }) => ({
                 flexDirection: 'row',
                 alignItems: 'center',
@@ -203,7 +205,7 @@ export function LibraryEntryScreen() {
             >
               <Icon name="sparkles" size={17} color={theme.colors.primary} />
               <AppText variant="bodyStrong" color="primary" style={{ fontWeight: '700' }}>
-                Ask Pep about {entry.name}
+                Ask {companionName} about {entry.name}
               </AppText>
             </Pressable>
             <Button

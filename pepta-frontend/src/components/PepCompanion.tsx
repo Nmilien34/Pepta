@@ -9,8 +9,11 @@ import * as Haptics from 'expo-haptics';
 import { Icon } from './Icon';
 import { useTheme } from '../theme';
 import { AppText } from './AppText';
-import { Mascot } from './Mascot';
-import { Float } from './Float';
+import { LivingMascot } from './LivingMascot';
+import { useSpeechHaptic } from './useSpeechHaptic';
+import { buildPepMood } from '../screens/app/pepMood';
+import { resolveCompanionName } from '../utils/companion';
+import { activeCycleOf, patternOf, todayCycleStatus } from '../screens/app/scheduleView';
 import { usePeptaData } from '../context/PeptaDataContext';
 import { useLogSheets } from '../context/LogSheetsContext';
 import { usePepChat } from '../context/PepChatContext';
@@ -20,7 +23,8 @@ import { buildCompanionNotes, type CompanionNote } from '../screens/app/companio
 
 export function PepCompanion() {
   const theme = useTheme();
-  const { home } = usePeptaData();
+  const { home, cycles } = usePeptaData();
+  const companionName = resolveCompanionName(home?.profile?.companionName);
   const { openQuickLog, openMeal } = useLogSheets();
   const { askPep } = usePepChat();
 
@@ -93,6 +97,23 @@ export function PepCompanion() {
   useEffect(() => {
     Animated.spring(bubble, { toValue: open ? 1 : 0, useNativeDriver: true, bounciness: 8, speed: 14 }).start();
   }, [open, bubble]);
+
+  // Same cycle derivation Track uses, from the same shared context — so Pep
+  // and the Track card can never disagree about whether today is a rest day.
+  const restingToday = useMemo(() => {
+    const pattern = patternOf(activeCycleOf(cycles));
+    return todayCycleStatus(pattern, new Date())?.phase === 'rest';
+  }, [cycles]);
+
+  // Pep's face tracks the medication curve, not the user's compliance.
+  const mood = useMemo(
+    () => buildPepMood({ level: home?.medicationLevels?.[0] ?? null, resting: restingToday }),
+    [home?.medicationLevels, restingToday],
+  );
+
+  // The companion's own haptic voice — fires when the spoken LINE changes.
+  const spokenLine = open ? (notes[Math.min(index, notes.length - 1)]?.text ?? null) : null;
+  useSpeechHaptic(spokenLine, open);
 
   if (!home || notes.length === 0) return null;
   const note = notes[Math.min(index, notes.length - 1)]!;
@@ -170,11 +191,9 @@ export function PepCompanion() {
         </Animated.View>
       ) : null}
 
-      <Pressable onPress={tapPep} accessibilityRole="button" accessibilityLabel="Pep — tips and next steps">
+      <Pressable onPress={tapPep} accessibilityRole="button" accessibilityLabel={`${companionName} — tips and next steps`}>
         <View style={[{ width: 58, height: 58, borderRadius: 29, backgroundColor: theme.colors.surface, borderWidth: 0.5, borderColor: theme.colors.border, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', paddingTop: 3 }, theme.shadows.card]}>
-          <Float amplitude={3} duration={3200}>
-            <Mascot pose="idle" size={42} />
-          </Float>
+          <LivingMascot pose={mood.pose} size={42} bobSeconds={mood.bobSeconds} />
         </View>
         {!open ? (
           <View style={{ position: 'absolute', top: 1, right: 1, width: 13, height: 13, borderRadius: 7, backgroundColor: theme.colors.primary, borderWidth: 2, borderColor: theme.colors.surface }} />

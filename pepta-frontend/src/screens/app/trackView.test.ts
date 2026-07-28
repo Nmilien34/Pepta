@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { DoseLogResponse } from '@pepta/shared';
 import {
   compoundIconName,
+  rotationReason,
   compoundStatusLabel,
   formatDoseAmount,
   formatDoseRelative,
@@ -129,5 +130,23 @@ describe('side effects', () => {
     expect(compoundStatusLabel('active')).toBe('Active');
     expect(compoundStatusLabel('paused')).toBe('Paused');
     expect(compoundStatusLabel('completed')).toBe('Completed');
+  });
+});
+
+describe('rotationReason', () => {
+  it('welcomes a first shot instead of inventing history', () => {
+    expect(rotationReason(new Set())).toContain('first');
+  });
+
+  it('is truthful about what suggestNextSite guarantees', () => {
+    // It prefers a never-used site, else the one used longest ago — so the
+    // copy may claim "rested longest", never "safest" or a medical outcome.
+    const two = rotationReason(new Set(['abdomen_left', 'thigh_left'] as const));
+    expect(two).toContain('2');
+    expect(two.toLowerCase()).not.toMatch(/safe|prevent|avoid|damage/);
+  });
+
+  it('does not say "your last 1"', () => {
+    expect(rotationReason(new Set(['abdomen_left'] as const))).not.toContain('last 1');
   });
 });

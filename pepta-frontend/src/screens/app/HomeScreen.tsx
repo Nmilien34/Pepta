@@ -15,11 +15,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import type { HomeRangeKey } from '@pepta/shared';
 import { useTheme } from '../../theme';
 import { AppText, Button, Card, CountUp, Mascot, ProgressBar, ProgressRing, Reveal, SectionErrorBanner, WaterCup } from '../../components';
+import { useCompanionName } from '../../components/useCompanionName';
+import { LivingMascot } from '../../components/LivingMascot';
+import { useSeenTeachCards } from './useSeenTeachCards';
 import { usePeptaData } from '../../context/PeptaDataContext';
 import { useLogSheets } from '../../context/LogSheetsContext';
 import { buildHomeView, type GoalView, type HomeWeightPulseView, type RingStat } from './homeView';
 import { buildActivity, buildTodaysLog, type ActivitySummary, type LogChip, type LogKind } from './homeExtras';
 import { buildGettingStarted, buildPlanSummary, type GettingStarted, type LogAction, type PlanSummary } from './planView';
+import { buildPepTeachCard, type PepTeachCard } from './pepTeach';
 
 const HOME_RANGES: { key: HomeRangeKey; label: string; short: string }[] = [
   { key: 'today', label: 'Today', short: 'Day' },
@@ -76,6 +80,21 @@ export function HomeScreen() {
   const view = buildHomeView(home);
   const plan = buildPlanSummary(home);
   const gettingStarted = buildGettingStarted(home);
+  const companionName = useCompanionName();
+  const { seen, markSeen } = useSeenTeachCards();
+  // One lesson a day at most, about the user's own compounds, and only when
+  // the day-one checklist is done — a new user has enough to read already.
+  const teach = useMemo(
+    () =>
+      gettingStarted.show
+        ? null
+        : buildPepTeachCard({
+            compoundNames: (home?.activeCompounds ?? []).map((c) => c.name),
+            seenEntryIds: seen,
+            dayIndex: Math.floor(Date.now() / 86_400_000),
+          }),
+    [gettingStarted.show, home?.activeCompounds, seen],
+  );
   const selectedRange = home.selectedRange ?? homeRange;
   const rangeAvailability = home.rangeAvailability ?? { today: true, week: false, month: false, year: false };
   const activity = buildActivity(track, home.profile, new Date(), selectedRange);
@@ -228,6 +247,23 @@ export function HomeScreen() {
           {gettingStarted.show ? (
             <Reveal delay={plan ? 90 : 60} style={{ marginTop: 12 }}>
               <GettingStartedCard data={gettingStarted} onTask={onTask} />
+            </Reveal>
+          ) : null}
+
+          {/* Pep's daily lesson. Sits BELOW the day-one checklist and only
+              appears once that checklist is gone, so a brand-new user is never
+              handed reading material and a to-do list at the same time. */}
+          {teach ? (
+            <Reveal delay={90} style={{ marginTop: 12 }}>
+              <TeachCard
+                card={teach}
+                companionName={companionName}
+                onRead={() => {
+                  markSeen(teach.entryId);
+                  navigation.navigate('LibraryEntry', { entryId: teach.entryId });
+                }}
+                onDismiss={() => markSeen(teach.entryId)}
+              />
             </Reveal>
           ) : null}
 
@@ -384,6 +420,78 @@ export function HomeScreen() {
         </ScrollView>
       </SafeAreaView>
     </View>
+  );
+}
+
+// Pep's 30-second lesson. Tinted like PlanCard so it reads as part of the app
+// rather than an ad, and the citation is never optional — a card without a
+// source is indistinguishable from a Reddit comment.
+function TeachCard({
+  card,
+  companionName,
+  onRead,
+  onDismiss,
+}: {
+  card: PepTeachCard;
+  companionName: string;
+  onRead(): void;
+  onDismiss(): void;
+}) {
+  const theme = useTheme();
+  return (
+    <Card style={{ backgroundColor: '#F3EFFF', borderWidth: 0 }}>
+      <View style={{ flexDirection: 'row', gap: 11, alignItems: 'flex-start' }}>
+        <LivingMascot pose="idle" size={44} bobSeconds={3.8} />
+        <View style={{ flex: 1 }}>
+          <AppText variant="caption" color="primary" style={{ fontWeight: '700' }}>
+            {companionName} · 30 seconds?
+          </AppText>
+          <AppText variant="cardTitle" style={{ fontSize: 15, marginTop: 4, lineHeight: 20 }}>
+            {card.title}
+          </AppText>
+          <AppText variant="caption" color="textSecondary" style={{ marginTop: 6, lineHeight: 18 }}>
+            {card.body}
+          </AppText>
+          <AppText variant="caption" color="textTertiary" style={{ marginTop: 6, fontSize: 11 }}>
+            {card.cite}
+          </AppText>
+          <View style={{ flexDirection: 'row', gap: 8, marginTop: 11 }}>
+            <Pressable
+              onPress={() => {
+                Haptics.selectionAsync().catch(() => undefined);
+                onRead();
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={`Read about ${card.entryName}`}
+              style={({ pressed }) => ({
+                backgroundColor: theme.colors.textPrimary,
+                borderRadius: theme.radii.pill,
+                paddingVertical: 7,
+                paddingHorizontal: 14,
+                opacity: pressed ? 0.7 : 1,
+              })}
+            >
+              <AppText variant="caption" style={{ color: theme.colors.surface, fontWeight: '800' }}>
+                Read it
+              </AppText>
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                Haptics.selectionAsync().catch(() => undefined);
+                onDismiss();
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Not now"
+              style={({ pressed }) => ({ paddingVertical: 7, paddingHorizontal: 10, opacity: pressed ? 0.6 : 1 })}
+            >
+              <AppText variant="caption" color="textSecondary" style={{ fontWeight: '700' }}>
+                Not now
+              </AppText>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </Card>
   );
 }
 

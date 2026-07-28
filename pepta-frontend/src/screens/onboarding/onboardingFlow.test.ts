@@ -5,6 +5,7 @@ import {
   prevStep,
   progressForStep,
   shouldSkipStep,
+  stepIndex,
   type OnboardingStep,
 } from './onboardingFlow';
 
@@ -83,19 +84,76 @@ describe('onboarding flow', () => {
   });
 
   it('advances forward in order through the new turns', () => {
-    expect(nextStep('meetPep')).toBe('journeyStage');
-    expect(nextStep('journeyStage')).toBe('experience');
-    expect(nextStep('experience')).toBe('needs');
-    expect(nextStep('needs')).toBe('medication');
+    expect(nextStep('meetPep')).toBe('nameCompanion');
+    expect(nextStep('nameCompanion')).toBe('journeyStage');
     expect(nextStep('deviceType')).toBe('concentration');
     expect(nextStep('frequency')).toBe('lastShot');
     expect(nextStep('lastShot')).toBe('shotDay');
     expect(nextStep('shotDay')).toBe('shotTime');
     expect(nextStep('shotTime')).toBe('instrument');
-    expect(nextStep('goalType')).toBe('alsoTracking');
     expect(nextStep('goalPace')).toBe('company');
-    expect(nextStep('sideEffects')).toBe('biggestWorry');
+    expect(nextStep('company')).toBe('dailyRoutine');
+    expect(nextStep('sideEffects')).toBe('needs');
+  });
+
+  it('names the problem early: the worry, then the answer, before any dosing', () => {
+    // The point of the 2026-07-27 restructure. fearAnswered is the only turn
+    // that states a PROBLEM; it sat at step 29 of 36, so anyone who left before
+    // it never heard one reason to want this.
+    expect(nextStep('journeyStage')).toBe('biggestWorry');
     expect(nextStep('biggestWorry')).toBe('fearAnswered');
+    expect(nextStep('fearAnswered')).toBe('medication');
+    expect(stepIndex('fearAnswered')).toBeLessThan(stepIndex('currentDose'));
+    expect(stepIndex('fearAnswered')).toBeLessThanOrEqual(5);
+  });
+
+  it('never runs more than 9 input turns without a payoff', () => {
+    const BEATS = new Set<string>([
+      'welcome', 'meetPep', 'fearAnswered', 'company', 'instrument',
+      'crafting', 'reveal', 'auth', 'paywall', 'welcomeIn',
+    ]);
+    const runLength = (steps: readonly string[]) => {
+      let run = 0;
+      let worst = 0;
+      for (const step of steps) {
+        run = BEATS.has(step) ? 0 : run + 1;
+        worst = Math.max(worst, run);
+      }
+      return worst;
+    };
+
+    // Was 12 before the restructure.
+    expect(runLength(ONBOARDING_STEPS)).toBeLessThanOrEqual(9);
+
+    // And the only run that long is the dosing block — the one stretch the
+    // skip rules actually shorten. Everything a non-dosing user must walk
+    // stays well under it, which is the part nobody can escape.
+    const unskippable = ONBOARDING_STEPS.filter(
+      (s) => !shouldSkipStep(s, { journeyStage: 'none' }),
+    );
+    expect(runLength(unskippable)).toBeLessThanOrEqual(7);
+  });
+
+  it('offers the naming turn to everyone and never gates on it', () => {
+    // Optional flourish: it has no skip rule, so it shows for every path, and
+    // the screen itself returns undefined when the user keeps the default.
+    expect(ONBOARDING_STEPS).toContain('nameCompanion');
+    expect(shouldSkipStep('nameCompanion', {})).toBe(false);
+    expect(shouldSkipStep('nameCompanion', { journeyStage: 'none' })).toBe(false);
+    expect(shouldSkipStep('nameCompanion', { accessActive: true })).toBe(false);
+    // It sits beside the introduction, not bolted on later.
+    expect(stepIndex('nameCompanion') - stepIndex('meetPep')).toBe(1);
+  });
+
+  it('drops the echo-only turns but keeps the one that pays off', () => {
+    // experience / alsoTracking / momentum each produced a single echo line.
+    for (const gone of ['experience', 'alsoTracking', 'momentum']) {
+      expect(ONBOARDING_STEPS).not.toContain(gone);
+    }
+    // `needs` stays — buildCraftingSteps leads the checklist with these picks —
+    // and now sits beside that payoff instead of twenty screens away.
+    expect(ONBOARDING_STEPS).toContain('needs');
+    expect(stepIndex('crafting') - stepIndex('needs')).toBeLessThanOrEqual(3);
   });
 
   it('returns null past the last step', () => {
@@ -103,7 +161,8 @@ describe('onboarding flow', () => {
   });
 
   it('walks back, with no step before the first', () => {
-    expect(prevStep('journeyStage')).toBe('meetPep');
+    expect(prevStep('journeyStage')).toBe('nameCompanion');
+    expect(prevStep('nameCompanion')).toBe('meetPep');
     expect(prevStep('meetPep')).toBe('welcome');
     expect(prevStep('welcome')).toBeNull();
   });
@@ -117,7 +176,8 @@ describe('onboarding flow', () => {
     const n = ONBOARDING_STEPS.length;
     expect(progressForStep('welcome')).toBeCloseTo(1 / n, 5);
     expect(progressForStep('meetPep')).toBeCloseTo(2 / n, 5);
-    expect(progressForStep('journeyStage')).toBeCloseTo(3 / n, 5);
+    expect(progressForStep('nameCompanion')).toBeCloseTo(3 / n, 5);
+    expect(progressForStep('journeyStage')).toBeCloseTo(4 / n, 5);
     expect(progressForStep('welcomeIn')).toBe(1);
   });
 });

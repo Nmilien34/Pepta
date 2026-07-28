@@ -240,6 +240,10 @@ export const authResponseSchema = z
 
 const baseUserProfileInputSchema = z
   .object({
+    // The user's chosen name for the Pep companion. Lives on the profile, not
+    // on the device: it replaces "Pep" in push-notification titles, which are
+    // composed server-side. Defaults to "Pep" when unset.
+    companionName: z.string().trim().min(1).max(16).optional(),
     sex: sexSchema.optional(),
     dateOfBirth: dateOnlySchema.optional(),
     ageYears: z.number().int().min(18).max(100).optional(),
@@ -292,6 +296,10 @@ export const userProfileResponseSchema = baseUserProfileInputSchema.extend({
 
 export const userProfileSettingsPatchSchema = z
   .object({
+    // The user's chosen name for the Pep companion. Lives on the profile, not
+    // on the device: it replaces "Pep" in push-notification titles, which are
+    // composed server-side. Defaults to "Pep" when unset.
+    companionName: z.string().trim().min(1).max(16).optional(),
     sex: sexSchema.optional(),
     dateOfBirth: dateOnlySchema.optional(),
     ageYears: z.number().int().min(18).max(100).optional(),

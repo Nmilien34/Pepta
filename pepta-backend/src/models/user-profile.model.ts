@@ -122,6 +122,14 @@ const userProfileSchema = new Schema<UserProfileDocument>(
       required: true,
       default: "mg",
     },
+    // What the user calls their companion. Optional — absent means "Pep".
+    // Stored server-side because push-notification titles use it.
+    companionName: {
+      type: String,
+      required: false,
+      trim: true,
+      maxlength: 16,
+    },
     onboardingComplete: {
       type: Boolean,
       required: true,

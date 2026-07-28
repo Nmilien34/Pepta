@@ -21,34 +21,40 @@ interface FearCopy {
   cite?: string;
 }
 
+// This beat moved from step 29 to step 5 (2026-07-27), so the copy had to
+// change with it. Every line used to end "…is built next" — true when the plan
+// was three screens away, a broken promise now that it is twenty. Each line
+// still does the same two jobs, in this order: name the problem with a real
+// number, then say plainly that this is the thing Pepta is FOR. Present tense,
+// no timing claim.
 const FEAR_COPY: Record<BiggestWorry, FearCopy> = {
   losing_muscle: {
     spoken: 'Losing muscle',
     statNum: '25–39%',
-    line: 'of weight lost on GLP-1s can be lean mass when it goes unmanaged. It’s preventable — your muscle guard is built next.',
+    line: 'of the weight lost on a GLP-1 can be lean mass when nobody is watching for it. That is the number Pepta exists to keep down — protein, pace and a muscle check every week.',
     cite: 'STEP-1 & SURMOUNT-1 body-composition analyses',
   },
   ozempic_face: {
     spoken: '“Ozempic face”',
     statNum: '25–39%',
-    line: 'of rapid weight loss can be lean mass — volume loss shows first in the face. Pace + protein are the guards, and yours are built next.',
+    line: 'of rapid loss can be lean mass, and it shows in the face first. Pace and protein are the two guards — Pepta watches both, every week.',
     cite: 'STEP-1 & SURMOUNT-1 body-composition analyses',
   },
   side_effects: {
     spoken: 'Side effects',
-    line: 'Most GI effects cluster around dose changes and ease with time. Your log ties symptoms to doses, so you and your doctor see the pattern — that watch starts now.',
+    line: 'Most GI effects cluster around dose changes and ease with time. Pepta ties every symptom to the shot that came before it, so you and your doctor can see the pattern instead of guessing at it.',
   },
   stalling: {
     spoken: 'Stalling out',
-    line: 'Plateaus are part of every real weight curve. The trend view separates a true stall from noise weeks earlier than the scale — it’s built next.',
+    line: 'Plateaus are part of every real weight curve — the hard part is telling a true stall from a noisy week. Pepta’s trend line separates them weeks before the scale does.',
   },
   rebound: {
     spoken: 'Regaining it',
-    line: 'Drift shows in the data before it shows in the mirror. Your trend line and weekly logging catch it early — that’s exactly what gets built next.',
+    line: 'Drift shows up in the data long before it shows up in the mirror. Pepta watches the trend, not the daily number, so you catch it while it is still small.',
   },
   energy: {
     spoken: 'Low energy',
-    line: 'Protein, hydration and shot-day timing are the energy levers — all three are tracked here, and your targets are built next.',
+    line: 'Protein, hydration and shot-day timing are the three levers that move energy on a GLP-1. Pepta tracks all three against targets set for your dose.',
   },
 };
 

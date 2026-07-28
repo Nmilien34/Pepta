@@ -11,6 +11,7 @@ import * as Haptics from "expo-haptics";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AppText, Button, Card } from "../../components";
 import { Icon } from "../../components/Icon";
+import { useCompanionName } from "../../components/useCompanionName";
 import { useAuth } from "../../context/AuthContext";
 import { usePeptaData } from "../../context/PeptaDataContext";
 import { api } from "../../services/api";
@@ -47,6 +48,7 @@ export function ReminderSettingsScreen({ visible, onClose }: ReminderSettingsScr
   const theme = useTheme();
   const { user, updateCachedUser } = useAuth();
   const { home, track, refreshHome, refreshTrack } = usePeptaData();
+  const companionName = useCompanionName();
   const groups = useMemo(() => deriveReminderGroups({ home, track }), [home, track]);
   const [state, setState] = useState<Record<string, boolean>>(() => defaultReminderState(groups));
   const [permissionStatus, setPermissionStatus] = useState<ReminderPermissionStatus>("undetermined");
@@ -146,7 +148,7 @@ export function ReminderSettingsScreen({ visible, onClose }: ReminderSettingsScr
       })
       .catch(() => {
         setAiPushCopyConsent(previous);
-        setError("Couldn't update Pep's AI notification setting right now.");
+        setError(`Couldn't update ${companionName}'s AI notification setting right now.`);
       })
       .finally(() => setAiConsentSaving(false));
   };
@@ -238,10 +240,10 @@ export function ReminderSettingsScreen({ visible, onClose }: ReminderSettingsScr
                 </View>
                 <View style={{ flex: 1 }}>
                   <AppText variant="bodyStrong" style={{ fontWeight: "800" }}>
-                    Personalized Pep push notes
+                    Personalized {companionName} push notes
                   </AppText>
                   <AppText variant="caption" color="textSecondary" style={{ marginTop: 4, lineHeight: 17 }}>
-                    Let Pep use recent logs, dose timing, goals, and OpenAI to write smarter push wording.
+                    Let {companionName} use recent logs, dose timing, goals, and OpenAI to write smarter push wording.
                   </AppText>
                 </View>
                 <Switch
@@ -250,7 +252,7 @@ export function ReminderSettingsScreen({ visible, onClose }: ReminderSettingsScr
                   disabled={aiConsentSaving || !user}
                   trackColor={{ false: theme.colors.surfaceAlt, true: "#BDECCD" }}
                   thumbColor={aiPushCopyConsent ? "#1E8E40" : "#FFFFFF"}
-                  accessibilityLabel="Personalized Pep push notes"
+                  accessibilityLabel={`Personalized ${companionName} push notes`}
                 />
               </View>
             </Card>

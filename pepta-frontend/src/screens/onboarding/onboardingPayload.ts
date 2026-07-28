@@ -1,7 +1,9 @@
 // Pure mapper: navigator flow answers → the typed OnboardingCompleteInput the
-// backend expects. No RN imports → unit-testable. Where the flow collects fields
-// the schema doesn't have (experience, needs, alsoTracking, momentum), they stay
-// navigator-local (flagged TODO for the schema). The v2.2 turns now feed real
+// backend expects. No RN imports → unit-testable. One collected field has no
+// schema home — `needs` — and stays navigator-local on purpose: it drives the
+// crafting checklist rather than any stored profile. (experience / alsoTracking
+// / momentum were dropped from the flow on 2026-07-27 — echo-only, and they
+// never reached this mapper.) The v2.2 turns now feed real
 // schema surfaces the old flow left empty: compound.concentration (vial users),
 // schedule{frequency, daysOfWeek, nextDoseAt} and lastDose (arms the level model
 // server-side from the last-shot + shot-time answers).
@@ -24,20 +26,11 @@ import type { GenderIdentity } from './SexGenderScreen';
 import type { WeightUnit } from './GoalWeightScreen';
 import type { SideEffectType } from './SideEffectsScreen';
 import type { MedicationRoute } from './RouteScreen';
-import type { ExperienceLevel } from './ExperienceScreen';
-import type { NeedType } from './NeedsScreen';
 import type { ConcentrationValue } from './ConcentrationScreen';
-import type { AlsoTracking } from './AlsoTrackingScreen';
-import type { MomentumAnswer } from './MomentumScreen';
 
 export interface OnboardingAnswers {
   journeyStage?: JourneyStage;
-  // TODO(schema): experience/needs/alsoTracking/momentum are conversation
-  // signals with no backend field yet — persisted in the draft only.
-  experience?: ExperienceLevel;
-  needs?: NeedType[];
-  alsoTracking?: AlsoTracking;
-  momentum?: MomentumAnswer;
+  companionName?: string;
   medication?: MedicationOption;
   route?: MedicationRoute;
   deviceType?: InjectionDeviceType;

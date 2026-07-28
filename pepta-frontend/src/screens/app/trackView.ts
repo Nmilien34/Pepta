@@ -52,6 +52,16 @@ export function usedSites(doseLogs: DoseLogResponse[], recent = 6): Set<Injectio
   return used;
 }
 
+// Why the suggested site is the suggested one, in the companion's voice.
+// Truthful to what suggestNextSite actually does: it prefers a site that has
+// never been used, otherwise the one used longest ago. The copy must not
+// promise more precision than that.
+export function rotationReason(used: Set<InjectionSite>): string {
+  if (used.size === 0) return 'Your first one — anywhere comfortable.';
+  if (used.size === 1) return 'Last shot went somewhere else.';
+  return `Your last ${used.size} went elsewhere — this one has rested longest.`;
+}
+
 // Auto-rotation: prefer a never-used site, otherwise the one used longest ago.
 export function suggestNextSite(doseLogs: DoseLogResponse[]): InjectionSite {
   const lastUsedAt = new Map<InjectionSite, number>();

@@ -27,11 +27,23 @@ const mocks = vi.hoisted(() => ({
 vi.mock("react-native", () => ({
   ActivityIndicator: "ActivityIndicator",
   Animated: {
+    // LivingMascot drives the bob/blink/pop with these, so the stub needs the
+    // full surface — an under-specified mock fails as a TypeError, not a
+    // meaningful assertion.
     Value: vi.fn(() => ({
       interpolate: vi.fn(() => "interpolated"),
+      setValue: vi.fn(),
     })),
     View: "Animated.View",
     spring: vi.fn(() => ({ start: vi.fn() })),
+    timing: vi.fn(() => ({ start: vi.fn() })),
+    sequence: vi.fn(() => ({ start: vi.fn() })),
+    loop: vi.fn(() => ({ start: vi.fn(), stop: vi.fn() })),
+  },
+  Easing: {
+    inOut: vi.fn((v: unknown) => v),
+    out: vi.fn((v: unknown) => v),
+    quad: "quad",
   },
   KeyboardAvoidingView: ({ children, ...props }: { children?: React.ReactNode }) =>
     React.createElement("KeyboardAvoidingView", props, children),
@@ -71,6 +83,11 @@ vi.mock("react-native-safe-area-context", () => ({
 
 vi.mock("expo-haptics", () => ({
   selectionAsync: vi.fn(() => Promise.resolve()),
+  // useSpeechHaptic gives the companion its own voice: Soft + Soft.
+  impactAsync: vi.fn(() => Promise.resolve()),
+  notificationAsync: vi.fn(() => Promise.resolve()),
+  ImpactFeedbackStyle: { Soft: "soft", Light: "light", Medium: "medium", Rigid: "rigid", Heavy: "heavy" },
+  NotificationFeedbackType: { Success: "success", Error: "error", Warning: "warning" },
 }));
 
 vi.mock("../theme", () => ({

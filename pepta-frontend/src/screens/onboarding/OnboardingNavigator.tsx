@@ -24,11 +24,11 @@ import { StepFade } from './StepFade';
 import { ONBOARDING_DRAFT_KEY, parseDraft, serializeDraft } from './onboardingDraft';
 import { echoFor, instrumentContext, companyContext } from './onboardingEcho';
 import { MeetPepScreen } from './MeetPepScreen';
+import { NameCompanionScreen } from './NameCompanionScreen';
+import { NeedsScreen, type NeedType } from './NeedsScreen';
 import { WelcomeScreen } from '../auth/WelcomeScreen';
 import { SignInScreen } from '../auth/SignInScreen';
 import { JourneyStageScreen, type JourneyStage } from './JourneyStageScreen';
-import { ExperienceScreen, type ExperienceLevel } from './ExperienceScreen';
-import { NeedsScreen, type NeedType } from './NeedsScreen';
 import { MedicationPickerScreen } from './MedicationPickerScreen';
 import { DeviceTypeScreen } from './DeviceTypeScreen';
 import { DoseScreen, type DoseValue } from './DoseScreen';
@@ -39,7 +39,6 @@ import { ShotDayScreen } from './ShotDayScreen';
 import { ShotTimeScreen } from './ShotTimeScreen';
 import { InstrumentBeatScreen } from './InstrumentBeatScreen';
 import { GoalTypeScreen, type GoalType } from './GoalTypeScreen';
-import { AlsoTrackingScreen, type AlsoTracking } from './AlsoTrackingScreen';
 import { SexGenderScreen, type GenderIdentity } from './SexGenderScreen';
 import { BirthdayScreen } from './BirthdayScreen';
 import { HeightWeightScreen } from './HeightWeightScreen';
@@ -52,7 +51,6 @@ import { TrainingScreen } from './TrainingScreen';
 import { SideEffectsScreen, type SideEffectType } from './SideEffectsScreen';
 import { BiggestWorryScreen } from './BiggestWorryScreen';
 import { FearAnsweredScreen } from './FearAnsweredScreen';
-import { MomentumScreen, type MomentumAnswer } from './MomentumScreen';
 import { NotificationsScreen } from './NotificationsScreen';
 import { CraftingScreen } from './CraftingScreen';
 import { RevealScreen } from './RevealScreen';
@@ -84,7 +82,7 @@ function defaultBirthday(): DateParts {
 
 interface FlowAnswers {
   journeyStage?: JourneyStage;
-  experience?: ExperienceLevel;
+  companionName?: string;
   needs?: NeedType[];
   medication?: MedicationOption;
   route?: MedicationRoute;
@@ -96,7 +94,6 @@ interface FlowAnswers {
   shotDays?: number[];
   shotHour?: number;
   goalType?: GoalType;
-  alsoTracking?: AlsoTracking;
   genderIdentity?: GenderIdentity;
   birthday?: DateParts;
   body?: BodyMeasure;
@@ -109,7 +106,6 @@ interface FlowAnswers {
   trainingStatus?: TrainingStatus;
   biggestWorry?: BiggestWorry;
   sideEffects?: SideEffectType[];
-  momentum?: MomentumAnswer;
 }
 
 function toggleEffect(effects: SideEffectType[], effect: SideEffectType): SideEffectType[] {
@@ -358,6 +354,19 @@ export function OnboardingNavigator() {
     const payload = buildOnboardingPayload(answers, new Date());
     updateDraft(payload);
     await api.completeOnboarding(payload);
+
+    // The companion name is written SEPARATELY and best-effort, never inside
+    // the completion payload. The profile schema is .strict(), so a backend
+    // that predates the field would reject the entire payload and strand the
+    // user at the last step of the funnel with no way through. Sending it on
+    // its own means an older backend simply 400s this one call: the name
+    // falls back to "Pep" until the backend catches up, and onboarding still
+    // completes. Client and server can ship in either order.
+    if (answers.companionName) {
+      await api
+        .updateProfileSettings({ companionName: answers.companionName })
+        .catch(() => undefined);
+    }
     // Draft is done — clear it (and the in-memory cache) so a future run starts fresh.
     await AsyncStorage.removeItem(ONBOARDING_DRAFT_KEY).catch(() => undefined);
     flowCache.step = 'welcome';
@@ -389,17 +398,16 @@ export function OnboardingNavigator() {
       return <WelcomeScreen onContinue={goNext} onSignIn={() => setSignInOpen(true)} />;
     case 'meetPep':
       return <MeetPepScreen progress={progress} onBack={goBack} onContinue={goNext} />;
-    case 'journeyStage':
-      return <JourneyStageScreen progress={progress} onBack={goBack} onAnswer={(journeyStage) => commit({ journeyStage })} />;
-    case 'experience':
+    case 'nameCompanion':
       return (
-        <ExperienceScreen
+        <NameCompanionScreen
           progress={progress}
           onBack={goBack}
-          context={context}
-          onAnswer={(experience) => commit({ experience })}
+          onContinue={(companionName) => commit({ companionName })}
         />
       );
+    case 'journeyStage':
+      return <JourneyStageScreen progress={progress} onBack={goBack} onAnswer={(journeyStage) => commit({ journeyStage })} />;
     case 'needs':
       return (
         <NeedsScreen
@@ -523,15 +531,6 @@ export function OnboardingNavigator() {
     case 'goalType':
       return (
         <GoalTypeScreen progress={progress} onBack={goBack} context={context} onAnswer={(goalType) => commit({ goalType })} />
-      );
-    case 'alsoTracking':
-      return (
-        <AlsoTrackingScreen
-          progress={progress}
-          onBack={goBack}
-          context={context}
-          onAnswer={(alsoTracking) => commit({ alsoTracking })}
-        />
       );
     case 'sexGender':
       return (
@@ -671,15 +670,6 @@ export function OnboardingNavigator() {
       );
     case 'fearAnswered':
       return <FearAnsweredScreen progress={progress} onBack={goBack} worry={answers.biggestWorry} onContinue={goNext} />;
-    case 'momentum':
-      return (
-        <MomentumScreen
-          progress={progress}
-          onBack={goBack}
-          context={context}
-          onAnswer={(momentum) => commit({ momentum })}
-        />
-      );
     case 'notifications': {
       const sub =
         answers.journeyStage === 'active' && (answers.shotDays?.length ?? 0) > 0

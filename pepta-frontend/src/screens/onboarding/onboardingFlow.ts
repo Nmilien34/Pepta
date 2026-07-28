@@ -21,12 +21,38 @@
 // The `referral` code turn (auth → paywall) was also removed 2026-07-27 —
 // see the note at its old position below.
 
+// ORDER IS THE FUNNEL (restructured 2026-07-27). Rhythm is deliberate:
+// reassure → ask → name the problem → promise the fix → ask → prove → pay off.
+// Two findings drove it:
+//   1. The only screen that states a PROBLEM (fearAnswered — 25–39% of weight
+//      lost can be lean mass when unmanaged) sat at step 29 of 36. Anyone who
+//      left before it never heard one reason to want this. It now lands at
+//      step 5, still personalised because `biggestWorry` moved up with it as
+//      a pair — the problem is named in the user's own words, then answered.
+//   2. There were TWELVE consecutive input turns before the first payoff, and
+//      the skip rules spare only people who are NOT on a GLP-1 — so the user
+//      most worth converting carried the most friction. The longest run is now
+//      9 (medication → shotTime), and that is the one block the skip rules DO
+//      shorten. `company` moved to sit after `goalPace`, breaking what would
+//      otherwise be a 12-long UNSKIPPABLE stretch that every single user walks.
+//      Watch that second run: it is the one nobody escapes.
+// Dropped: experience / alsoTracking / momentum. None reach the payload, and
+// each only ever produced a one-line conversational echo — a question's worth
+// of friction for a sentence. `momentum` also opened "Last one. Be honest."
+// while six screens still followed it.
+// KEPT, deliberately: `needs`. It looks like the same case on paper (also
+// absent from the payload) but it is not — `buildCraftingSteps` leads the
+// crafting checklist with the user's own picks, so the answer visibly comes
+// back. It moved late instead, next to that payoff.
 export const ONBOARDING_STEPS = [
   'welcome',
   'meetPep',
+  // Optional, never a gate — the default stays 'Pep'. Sits here so the
+  // introduction is still on screen; asking later would feel bolted on.
+  'nameCompanion',
   'journeyStage',
-  'experience',
-  'needs',
+  'biggestWorry',
+  'fearAnswered',
   'medication',
   'route',
   'currentDose',
@@ -38,20 +64,24 @@ export const ONBOARDING_STEPS = [
   'shotTime',
   'instrument',
   'goalType',
-  'alsoTracking',
   'sexGender',
   'birthday',
   'heightWeight',
   'startWeight',
   'goalWeight',
   'goalPace',
+  // Proof beat. It breaks the longest UNSKIPPABLE run in the flow — goalType
+  // through notifications — and the STEP-1 number lands best right after the
+  // user has just set a goal and a pace.
   'company',
   'dailyRoutine',
   'training',
   'sideEffects',
-  'biggestWorry',
-  'fearAnswered',
-  'momentum',
+  // Kept, and moved to sit two steps before `crafting`: this answer is what the
+  // crafting checklist leads with, ticking off the user's own words. Asked at
+  // step 5 that payoff was twenty screens away and read as a throwaway; here
+  // the loop closes almost immediately.
+  'needs',
   'notifications',
   'crafting',
   'reveal',

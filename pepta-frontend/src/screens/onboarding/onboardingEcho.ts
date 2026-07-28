@@ -12,22 +12,18 @@ import { formatShortDate } from '../../utils/dateParts';
 import { projectGoal } from '../../utils/goalProjection';
 import type { OnboardingStep } from './onboardingFlow';
 import type { JourneyStage } from './JourneyStageScreen';
-import type { ExperienceLevel } from './ExperienceScreen';
 import type { MedicationOption } from '../../data/medicationCatalog';
 import type { DoseValue } from './DoseScreen';
 import type { InjectionDeviceType } from '@pepta/shared';
 import type { ConcentrationValue } from './ConcentrationScreen';
 import type { DoseFrequency } from './FrequencyScreen';
 import type { GoalType } from './GoalTypeScreen';
-import type { AlsoTracking } from './AlsoTrackingScreen';
-import type { MomentumAnswer } from './MomentumScreen';
 import type { ActivityLevel, TrainingStatus } from '@pepta/shared';
 import type { DateParts } from '../../utils/dateParts';
 import type { SideEffectType } from './SideEffectsScreen';
 
 export interface EchoAnswers {
   journeyStage?: JourneyStage;
-  experience?: ExperienceLevel;
   medication?: MedicationOption;
   dose?: DoseValue;
   deviceType?: InjectionDeviceType;
@@ -36,7 +32,6 @@ export interface EchoAnswers {
   lastShot?: DateParts;
   shotDays?: number[];
   goalType?: GoalType;
-  alsoTracking?: AlsoTracking;
   body?: BodyMeasure;
   goalWeight?: number;
   goalWeightUnit?: 'lb' | 'kg';
@@ -44,7 +39,6 @@ export interface EchoAnswers {
   activityLevel?: ActivityLevel;
   trainingStatus?: TrainingStatus;
   sideEffects?: SideEffectType[];
-  momentum?: MomentumAnswer;
 }
 
 const DAY_SINGULAR = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -67,20 +61,6 @@ function journeyEcho(stage?: JourneyStage): string {
   }
 }
 
-function experienceEcho(level?: ExperienceLevel): string {
-  switch (level) {
-    case 'new':
-      return 'Brand new. We’ll go gentle.';
-    case 'starting':
-      return 'Getting started. Good place to be.';
-    case 'experienced':
-      return 'Experienced. We’ll keep it sharp.';
-    case 'advanced':
-      return 'Advanced. No hand-holding.';
-    default:
-      return 'Got it.';
-  }
-}
 
 function medEcho(med?: MedicationOption): string {
   return med ? `${med.name} — strong pick, and you’re far from alone on it.` : 'Got it.';
@@ -132,9 +112,6 @@ function goalTypeEcho(goal?: GoalType): string {
   }
 }
 
-function alsoTrackingEcho(value?: AlsoTracking): string {
-  return value === 'peptides' ? 'Peptides too. Side by side.' : 'Just the GLP-1. Clean focus.';
-}
 
 function activityEcho(level?: ActivityLevel): string {
   switch (level) {
@@ -166,18 +143,6 @@ function trainingEcho(status?: TrainingStatus): string {
   }
 }
 
-function momentumEcho(answer?: MomentumAnswer): string {
-  switch (answer) {
-    case 'locked_in':
-      return 'Locked in. Let’s make it airtight.';
-    case 'wobbly':
-      return 'Wobbly but going. That’s why I’m here.';
-    case 'not_started':
-      return 'Haven’t started. Perfect timing.';
-    default:
-      return 'Thank you for that.';
-  }
-}
 
 // Resolve the goal weight into the body's unit (the goal may be in a toggled unit).
 function goalInBodyUnit(a: EchoAnswers): { value: number; unit: 'lb' | 'kg' } {
@@ -201,11 +166,8 @@ function goalInBodyUnit(a: EchoAnswers): { value: number; unit: 'lb' | 'kg' } {
 export function echoFor(step: OnboardingStep, a: EchoAnswers, now: Date = new Date()): string | undefined {
   const unit = a.medication?.doseUnit ?? 'mg';
   switch (step) {
-    // T1/T2/T3 own their static openers.
-    case 'experience':
-      return journeyEcho(a.journeyStage);
-    case 'needs':
-      return experienceEcho(a.experience);
+    // Each case echoes the PREVIOUS answer, so this chain is ORDER-DEPENDENT.
+    // Rewired 2026-07-27 when the flow was restructured.
     case 'medication':
       return 'Let’s get the specifics.';
     case 'route':
@@ -228,10 +190,8 @@ export function echoFor(step: OnboardingStep, a: EchoAnswers, now: Date = new Da
       return instrumentContext(a);
     case 'goalType':
       return a.journeyStage === 'active' ? 'Level model armed. Now you.' : 'Now, the goal.';
-    case 'alsoTracking':
-      return goalTypeEcho(a.goalType);
     case 'sexGender':
-      return a.alsoTracking ? alsoTrackingEcho(a.alsoTracking) : goalTypeEcho(a.goalType);
+      return goalTypeEcho(a.goalType);
     case 'birthday':
       return 'Perfect — that sharpens your targets.';
     case 'heightWeight':
@@ -253,12 +213,11 @@ export function echoFor(step: OnboardingStep, a: EchoAnswers, now: Date = new Da
     case 'sideEffects':
       return trainingEcho(a.trainingStatus);
     case 'biggestWorry':
-      return (a.sideEffects?.length ?? 0) > 0 ? 'Noted. Now, honestly —' : 'Clean slate. Now, honestly —';
-    // fearAnswered replays the worry internally.
-    case 'momentum':
-      return 'You’ve given me everything I need.';
+      return `${journeyEcho(a.journeyStage)} Now, honestly —`;
+    case 'needs':
+      return (a.sideEffects?.length ?? 0) > 0 ? 'Noted — I’ll watch for those.' : 'Clean slate so far.';
     case 'notifications':
-      return momentumEcho(a.momentum);
+      return 'You’ve given me everything I need.';
     default:
       return undefined;
   }

@@ -4,8 +4,16 @@
 // lab `#pep` / `#pepwave` symbols, which this mirrors 1:1).
 //
 // Poses:
-//   - 'idle'  — neutral, used in-app and on most onboarding steps
-//   - 'wave'  — one arm raised, for Welcome / celebratory moments
+//   - 'idle'   — neutral, used in-app and on most onboarding steps
+//   - 'wave'   — one arm raised, for Welcome / celebratory moments
+//   - 'drowsy' — half-lidded, for the trough of the medication curve
+//   - 'asleep' — eyes closed + zzz, for an off-cycle rest week
+//   - 'cheer'  — sparkles, for a milestone
+//
+// The three new poses are OVERLAYS on the same body, not new artwork: they
+// swap the eyes and add a small decoration. Anything more would need real
+// character art. There is deliberately NO sad or disappointed pose — see
+// screens/app/pepMood.ts for why that matters on a medication tracker.
 
 import React, { useId } from 'react';
 import Svg, {
@@ -18,9 +26,10 @@ import Svg, {
   Path,
   Rect,
   Stop,
+  Text as SvgText,
 } from 'react-native-svg';
 
-export type MascotPose = 'idle' | 'wave';
+export type MascotPose = 'idle' | 'wave' | 'drowsy' | 'asleep' | 'cheer';
 
 export interface MascotProps {
   pose?: MascotPose;
@@ -31,7 +40,14 @@ export interface MascotProps {
 const VIEWBOX: Record<MascotPose, { w: number; h: number }> = {
   idle: { w: 120, h: 142 },
   wave: { w: 120, h: 150 },
+  drowsy: { w: 120, h: 142 },
+  asleep: { w: 120, h: 142 },
+  cheer: { w: 120, h: 142 },
 };
+
+// Poses that close the eyes — they replace the open-eye group rather than
+// drawing over it, so no white shows through the lids.
+const LIDDED: ReadonlySet<MascotPose> = new Set<MascotPose>(['drowsy', 'asleep']);
 
 export function Mascot({ pose = 'idle', size = 140 }: MascotProps) {
   const gradientId = useId();
@@ -63,13 +79,22 @@ export function Mascot({ pose = 'idle', size = 140 }: MascotProps) {
       />
       <Ellipse cx={48} cy={38 + dy} rx={15} ry={11} fill="#fff" opacity={0.28} />
 
-      {/* eyes */}
-      <Ellipse cx={50} cy={64 + dy} rx={8} ry={9} fill="#fff" />
-      <Ellipse cx={74} cy={64 + dy} rx={8} ry={9} fill="#fff" />
-      <Circle cx={51.5} cy={66 + dy} r={3.7} fill="#1A1430" />
-      <Circle cx={75.5} cy={66 + dy} r={3.7} fill="#1A1430" />
-      <Circle cx={53} cy={64.5 + dy} r={1.3} fill="#fff" />
-      <Circle cx={77} cy={64.5 + dy} r={1.3} fill="#fff" />
+      {/* eyes — open, or closed lids for the low-energy poses */}
+      {LIDDED.has(pose) ? (
+        <G stroke="#1A1430" strokeWidth={3} fill="none" strokeLinecap="round">
+          <Path d={`M43 ${64 + dy} q7 ${pose === 'asleep' ? 5 : 4} 14 0`} />
+          <Path d={`M67 ${64 + dy} q7 ${pose === 'asleep' ? 5 : 4} 14 0`} />
+        </G>
+      ) : (
+        <>
+          <Ellipse cx={50} cy={64 + dy} rx={8} ry={9} fill="#fff" />
+          <Ellipse cx={74} cy={64 + dy} rx={8} ry={9} fill="#fff" />
+          <Circle cx={51.5} cy={66 + dy} r={3.7} fill="#1A1430" />
+          <Circle cx={75.5} cy={66 + dy} r={3.7} fill="#1A1430" />
+          <Circle cx={53} cy={64.5 + dy} r={1.3} fill="#fff" />
+          <Circle cx={77} cy={64.5 + dy} r={1.3} fill="#fff" />
+        </>
+      )}
 
       {/* cheeks + smile */}
       <Ellipse cx={39} cy={80 + dy} rx={6} ry={3.8} fill="#FF9CB6" opacity={0.6} />
@@ -95,6 +120,25 @@ export function Mascot({ pose = 'idle', size = 140 }: MascotProps) {
       {pose === 'wave' ? (
         <G transform="rotate(22 98 64)">
           <Ellipse cx={98} cy={48} rx={8} ry={12} fill="#7C5CFC" />
+        </G>
+      ) : null}
+
+      {/* asleep — drifting z's */}
+      {pose === 'asleep' ? (
+        <G fill="#7C5CFC">
+          <SvgText x={95} y={38} fontSize={16} fontWeight="bold">z</SvgText>
+          <SvgText x={106} y={24} fontSize={11} fontWeight="bold" opacity={0.7}>z</SvgText>
+        </G>
+      ) : null}
+
+      {/* milestone — a small burst, no confetti and no numbers */}
+      {pose === 'cheer' ? (
+        <G stroke="#F5B301" strokeWidth={3} strokeLinecap="round">
+          <Line x1={16} y1={32} x2={7} y2={25} />
+          <Line x1={20} y1={19} x2={16} y2={8} />
+          <Line x1={33} y1={12} x2={31} y2={2} />
+          <Line x1={104} y1={32} x2={113} y2={25} />
+          <Line x1={100} y1={19} x2={104} y2={8} />
         </G>
       ) : null}
     </Svg>
