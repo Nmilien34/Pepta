@@ -98,6 +98,7 @@ interface FlowAnswers {
   shotDays?: number[];
   shotHour?: number;
   goalType?: GoalType;
+  goalNote?: string;
   genderIdentity?: GenderIdentity;
   birthday?: DateParts;
   body?: BodyMeasure;
@@ -562,7 +563,12 @@ export function OnboardingNavigator() {
       );
     case 'goalType':
       return (
-        <GoalTypeScreen progress={progress} onBack={goBack} context={context} onAnswer={(goalType) => commit({ goalType })} />
+        <GoalTypeScreen
+          progress={progress}
+          onBack={goBack}
+          context={context}
+          onAnswer={(answer) => commit(answer)}
+        />
       );
     case 'sexGender':
       return (

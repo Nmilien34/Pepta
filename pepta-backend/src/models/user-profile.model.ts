@@ -130,6 +130,15 @@ const userProfileSchema = new Schema<UserProfileDocument>(
       trim: true,
       maxlength: 16,
     },
+    // The user's goal in their own words, from the "Other" option on the goal
+    // turn. Descriptive only — nutrition targets read goalType, which is
+    // derived from their start and goal weights, never from this string.
+    goalNote: {
+      type: String,
+      required: false,
+      trim: true,
+      maxlength: 80,
+    },
     onboardingComplete: {
       type: Boolean,
       required: true,

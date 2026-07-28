@@ -265,6 +265,12 @@ const baseUserProfileInputSchema = z
     journeyStartDate: dateOnlySchema,
     timezone: z.string().trim().min(1).default("America/New_York"),
     sideEffectBaseline: z.array(sideEffectTypeSchema).default([]),
+    // The user's goal in their own words, when they pick "Other" on the goal
+    // turn. Purely descriptive: nutrition targets never read it, because a
+    // sentence cannot yield a protein multiplier or a calorie deficit. The
+    // computable goalType is derived from their start and goal weights
+    // instead (see goalIntent.ts).
+    goalNote: z.string().trim().min(1).max(80).optional(),
   })
   .strict();
 
@@ -315,6 +321,8 @@ export const userProfileSettingsPatchSchema = z
     activityLevel: activityLevelSchema.optional(),
     trainingStatus: trainingStatusSchema.optional(),
     goalType: goalTypeSchema.optional(),
+    /** Their goal in their own words; never feeds the nutrition maths. */
+    goalNote: z.string().trim().min(1).max(80).optional(),
     biggestWorry: biggestWorrySchema.optional(),
     doseUnitPreference: doseUnitSchema.optional(),
     journeyStartDate: dateOnlySchema.optional(),

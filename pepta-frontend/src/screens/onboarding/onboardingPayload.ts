@@ -17,7 +17,8 @@ import type {
 } from '@pepta/shared';
 import type { MedicationOption } from '../../data/medicationCatalog';
 import { toIsoDate, type DateParts } from '../../utils/dateParts';
-import type { BodyMeasure } from '../../utils/units';
+import { kgToLb, lbToKg, type BodyMeasure } from '../../utils/units';
+import { goalTypeFromWeights } from './goalIntent';
 import type { JourneyStage } from './JourneyStageScreen';
 import type { DoseValue } from './DoseScreen';
 import type { DoseFrequency } from './FrequencyScreen';
@@ -42,6 +43,8 @@ export interface OnboardingAnswers {
   /** 0–23, from the shot-time turn; times reminders + nextDoseAt. */
   shotHour?: number;
   goalType?: GoalType;
+  /** Their own words, when they picked "Something else". Never computed on. */
+  goalNote?: string;
   genderIdentity?: GenderIdentity;
   birthday?: DateParts;
   body?: BodyMeasure;
@@ -142,7 +145,22 @@ export function buildOnboardingPayload(answers: OnboardingAnswers, now: Date): O
     goalPace: paceToEnum(answers.pace),
     activityLevel: answers.activityLevel ?? 'light',
     trainingStatus: answers.trainingStatus ?? 'not_training',
-    goalType: answers.goalType ?? 'lose_fat',
+    // When they wrote their own goal there is no goalType to store, so it is
+    // derived from the direction of their own numbers. Comparing in one unit
+    // matters: goalWeight can be entered in the other unit from body.weight.
+    goalType:
+      answers.goalType ??
+      goalTypeFromWeights({
+        startWeight: body.weight,
+        goalWeight:
+          goalWeightUnit === weightUnit
+            ? goalWeight
+            : weightUnit === 'kg'
+              ? lbToKg(goalWeight)
+              : kgToLb(goalWeight),
+        unit: weightUnit,
+      }),
+    ...(answers.goalNote ? { goalNote: answers.goalNote } : {}),
     biggestWorry: answers.biggestWorry ?? 'losing_muscle',
     doseUnitPreference: answers.medication?.doseUnit ?? 'mg',
     onboardingComplete: true,

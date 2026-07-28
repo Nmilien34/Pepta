@@ -40,6 +40,7 @@ export interface EchoAnswers {
   activityLevel?: ActivityLevel;
   trainingStatus?: TrainingStatus;
   sideEffects?: SideEffectType[];
+  goalNote?: string;
 }
 
 const DAY_SINGULAR = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -182,7 +183,10 @@ export function echoFor(step: OnboardingStep, a: EchoAnswers, now: Date = new Da
     case 'goalType':
       return a.journeyStage === 'active' ? 'Level model armed. Now you.' : 'Now, the goal.';
     case 'sexGender':
-      return goalTypeEcho(a.goalType);
+      // If they wrote their own goal, say it back. The preset echoes exist to
+      // prove we heard the answer; quoting their sentence does that far better
+      // than the generic fallback goalTypeEcho would land on here.
+      return a.goalNote ? `“${a.goalNote}” — noted.` : goalTypeEcho(a.goalType);
     case 'birthday':
       return 'Perfect — that sharpens your targets.';
     case 'heightWeight':
