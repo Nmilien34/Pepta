@@ -113,7 +113,7 @@ function render(seed?: string) {
 
 function byLabel(root: ReactTestInstance, label: string): ReactTestInstance {
   const hit = root.findAll(
-    (n) => n.type === "Pressable" && n.props.accessibilityLabel === label,
+    (n) => String(n.type) === "Pressable" && n.props.accessibilityLabel === label,
   )[0];
   if (!hit) throw new Error(`no pressable "${label}"`);
   return hit;
@@ -135,14 +135,14 @@ describe("PepChatProvider", () => {
 
   it("stays closed until a screen asks for it", () => {
     const tree = render();
-    expect(tree.root.findAll((n) => n.type === "Modal")).toHaveLength(0);
+    expect(tree.root.findAll((n) => String(n.type) === "Modal")).toHaveLength(0);
   });
 
   it("opens with an empty composer when no seed is given", () => {
     const tree = render();
     act(() => byLabel(tree.root, "open-chat").props.onPress());
 
-    expect(tree.root.findAll((n) => n.type === "Modal")).toHaveLength(1);
+    expect(tree.root.findAll((n) => String(n.type) === "Modal")).toHaveLength(1);
     expect(input(tree.root).props.value).toBe("");
   });
 
@@ -189,7 +189,7 @@ describe("PepChatProvider", () => {
     // Consent card shown, nothing sent yet.
     expect(mocks.coachChat).not.toHaveBeenCalled();
     const text = tree.root
-      .findAll((n) => n.type === "Text")
+      .findAll((n) => String(n.type) === "Text")
       .map((n) => String(n.props.children ?? ""))
       .join("\n");
     expect(text).toContain("AI chat uses OpenAI");

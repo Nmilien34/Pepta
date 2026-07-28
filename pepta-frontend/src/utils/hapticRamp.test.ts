@@ -5,13 +5,13 @@ describe('buildHapticRamp', () => {
   it('accelerates — every gap is shorter than the one before it', () => {
     const ramp = buildHapticRamp({ durationMs: 1500, pulses: 10 });
     const gaps = ramp.map((pulse, i) =>
-      i === 0 ? pulse.atMs : pulse.atMs - ramp[i - 1].atMs,
+      i === 0 ? pulse.atMs : pulse.atMs - ramp[i - 1]!.atMs,
     );
 
     // This is the whole point of the ramp: taps crowd together toward the end,
     // which is what reads as "rising" when intensity alone cannot vary.
     for (let i = 1; i < gaps.length; i += 1) {
-      expect(gaps[i]).toBeLessThanOrEqual(gaps[i - 1]);
+      expect(gaps[i]!).toBeLessThanOrEqual(gaps[i - 1]!);
     }
   });
 
@@ -20,7 +20,7 @@ describe('buildHapticRamp', () => {
     const strength = ramp.map((pulse) => RAMP_STYLES.indexOf(pulse.style));
 
     for (let i = 1; i < strength.length; i += 1) {
-      expect(strength[i]).toBeGreaterThanOrEqual(strength[i - 1]);
+      expect(strength[i]!).toBeGreaterThanOrEqual(strength[i - 1]!);
     }
     expect(strength[0]).toBe(0);
     expect(strength.at(-1)).toBe(RAMP_STYLES.length - 1);
@@ -37,7 +37,7 @@ describe('buildHapticRamp', () => {
     ramp.forEach((pulse, i) => {
       expect(pulse.atMs).toBeGreaterThanOrEqual(0);
       expect(pulse.atMs).toBeLessThanOrEqual(900);
-      if (i > 0) expect(pulse.atMs).toBeGreaterThanOrEqual(ramp[i - 1].atMs);
+      if (i > 0) expect(pulse.atMs).toBeGreaterThanOrEqual(ramp[i - 1]!.atMs);
     });
   });
 
@@ -54,10 +54,10 @@ describe('buildHapticRamp', () => {
     // assertion tests the curve rather than millisecond rounding.
     const ramp = buildHapticRamp({ durationMs: 1200, pulses: 6, acceleration: 0.2 });
     const gaps = ramp.map((pulse, i) =>
-      i === 0 ? pulse.atMs : pulse.atMs - ramp[i - 1].atMs,
+      i === 0 ? pulse.atMs : pulse.atMs - ramp[i - 1]!.atMs,
     );
     for (let i = 1; i < gaps.length; i += 1) {
-      expect(gaps[i]).toBeLessThanOrEqual(gaps[i - 1]);
+      expect(gaps[i]!).toBeLessThanOrEqual(gaps[i - 1]!);
     }
   });
 });

@@ -109,7 +109,7 @@ function seedData() {
 
 function cellByLabel(root: ReactTestInstance, label: string): ReactTestInstance {
   const matches = root.findAll(
-    (node) => node.type === "Pressable" && node.props.accessibilityLabel === label,
+    (node) => String(node.type) === "Pressable" && node.props.accessibilityLabel === label,
   );
   expect(matches.length).toBe(1);
   return matches[0]!;
@@ -117,14 +117,14 @@ function cellByLabel(root: ReactTestInstance, label: string): ReactTestInstance 
 
 function dotColorOf(cell: ReactTestInstance): string {
   // The dot is the last View inside the cell.
-  const views = cell.findAll((n) => n.type === "View");
+  const views = cell.findAll((n) => String(n.type) === "View");
   const dot = views[views.length - 1]!;
   return (dot.props as { style: { backgroundColor: string } }).style.backgroundColor;
 }
 
 function textOf(node: ReactTestInstance): string {
   return node
-    .findAll((n) => n.type === "Text")
+    .findAll((n) => String(n.type) === "Text")
     .map((n) => (Array.isArray(n.props.children) ? n.props.children.join("") : String(n.props.children ?? "")))
     .join(" ");
 }
@@ -163,7 +163,7 @@ describe("ScheduleSheet", () => {
     const { root } = render();
     // Navigate June → July.
     const next = root.findAll(
-      (node) => node.type === "Pressable" && node.props.accessibilityLabel === "Next month",
+      (node) => String(node.type) === "Pressable" && node.props.accessibilityLabel === "Next month",
     )[0]!;
     act(() => next.props.onPress());
 
@@ -189,7 +189,7 @@ describe("ScheduleSheet", () => {
     expect(textOf(root)).toContain("Shot day — 5 mg Tirzepatide");
 
     const next = root.findAll(
-      (node) => node.type === "Pressable" && node.props.accessibilityLabel === "Next month",
+      (node) => String(node.type) === "Pressable" && node.props.accessibilityLabel === "Next month",
     )[0]!;
     act(() => next.props.onPress());
     act(() => cellByLabel(root, "Tue, Jul 28").props.onPress());
@@ -202,7 +202,7 @@ describe("ScheduleSheet", () => {
     const { root, onEditCycle } = render();
     expect(textOf(root)).toContain("Cycle · 8 wk on, 2 off");
     const edit = root.findAll(
-      (node) => node.type === "Pressable" && node.props.accessibilityLabel === "Edit cycle",
+      (node) => String(node.type) === "Pressable" && node.props.accessibilityLabel === "Edit cycle",
     )[0]!;
     act(() => edit.props.onPress());
     expect(onEditCycle).toHaveBeenCalledTimes(1);

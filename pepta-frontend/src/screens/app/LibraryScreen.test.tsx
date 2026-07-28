@@ -76,7 +76,7 @@ vi.mock("../../context/PeptaDataContext", () => ({
 
 function textOf(root: ReactTestInstance): string {
   return root
-    .findAll((n) => n.type === "Text")
+    .findAll((n) => String(n.type) === "Text")
     .map((n) =>
       Array.isArray(n.props.children)
         ? n.props.children.map(String).join("")
@@ -87,7 +87,7 @@ function textOf(root: ReactTestInstance): string {
 
 function byLabel(root: ReactTestInstance, label: string): ReactTestInstance {
   const match = root.findAll(
-    (n) => n.type === "Pressable" && n.props.accessibilityLabel === label,
+    (n) => String(n.type) === "Pressable" && n.props.accessibilityLabel === label,
   )[0];
   if (!match) throw new Error(`No pressable labelled "${label}"`);
   return match;

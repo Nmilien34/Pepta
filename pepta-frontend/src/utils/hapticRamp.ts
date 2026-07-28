@@ -71,5 +71,6 @@ export function rampStyleAt(fraction: number): RampStyle {
     RAMP_STYLES.length - 1,
     Math.floor(clamped * RAMP_STYLES.length),
   );
-  return RAMP_STYLES[index];
+  // index is clamped to the array's bounds above, so this is always defined.
+  return RAMP_STYLES[index]!;
 }

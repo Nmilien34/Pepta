@@ -28,7 +28,7 @@ const mocks = vi.hoisted(() => ({
   track: null as TrackResponse | null,
   progress: null as ProgressResponse | null,
   user: null as User | null,
-  exportDoseLogsCsv: vi.fn(() => Promise.resolve('date,time\n')),
+  exportDoseLogsCsv: vi.fn((_timeZone: string) => Promise.resolve('date,time\n')),
   fileWrite: vi.fn(),
 }));
 

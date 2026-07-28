@@ -93,7 +93,7 @@ vi.mock("../../context/PepChatContext", () => ({
 
 function textOf(root: ReactTestInstance): string {
   return root
-    .findAll((n) => n.type === "Text")
+    .findAll((n) => String(n.type) === "Text")
     .map((n) =>
       Array.isArray(n.props.children)
         ? n.props.children.map(String).join("")
@@ -104,7 +104,7 @@ function textOf(root: ReactTestInstance): string {
 
 function byLabel(root: ReactTestInstance, label: string): ReactTestInstance {
   const match = root.findAll(
-    (n) => n.type === "Pressable" && n.props.accessibilityLabel === label,
+    (n) => String(n.type) === "Pressable" && n.props.accessibilityLabel === label,
   )[0];
   if (!match) throw new Error(`No pressable labelled "${label}"`);
   return match;
@@ -155,11 +155,11 @@ describe("LibraryEntryScreen", () => {
 
   it("opens Add medication prefilled with the compound name", () => {
     const tree = render();
-    expect(tree.root.findAll((n) => n.type === "AddCompoundSheet")).toHaveLength(0);
+    expect(tree.root.findAll((n) => String(n.type) === "AddCompoundSheet")).toHaveLength(0);
 
     act(() => byLabel(tree.root, "Track this peptide").props.onPress());
 
-    const sheet = tree.root.findAll((n) => n.type === "AddCompoundSheet")[0]!;
+    const sheet = tree.root.findAll((n) => String(n.type) === "AddCompoundSheet")[0]!;
     expect(sheet.props.initialQuery).toBe("BPC-157");
   });
 
