@@ -86,14 +86,17 @@ export function Mascot({ pose = 'idle', size = 140 }: MascotProps) {
           <Path d={`M67 ${64 + dy} q7 ${pose === 'asleep' ? 5 : 4} 14 0`} />
         </G>
       ) : (
-        <>
+        // <G>, never a Fragment: react-native-svg walks its children looking
+        // for SVG element types and a Fragment is not one — it breaks the
+        // render rather than being transparent the way it is in normal JSX.
+        <G>
           <Ellipse cx={50} cy={64 + dy} rx={8} ry={9} fill="#fff" />
           <Ellipse cx={74} cy={64 + dy} rx={8} ry={9} fill="#fff" />
           <Circle cx={51.5} cy={66 + dy} r={3.7} fill="#1A1430" />
           <Circle cx={75.5} cy={66 + dy} r={3.7} fill="#1A1430" />
           <Circle cx={53} cy={64.5 + dy} r={1.3} fill="#fff" />
           <Circle cx={77} cy={64.5 + dy} r={1.3} fill="#fff" />
-        </>
+        </G>
       )}
 
       {/* cheeks + smile */}
