@@ -9,7 +9,8 @@ import { Animated, Easing, Platform, StyleSheet, Text, View } from 'react-native
 import Svg, { Circle, Defs, LinearGradient, Path, Stop } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import { Confetti, ConvoButton, ConvoScreen, convo } from '../../components';
-import { useHapticRamp } from '../../components/useHapticRamp';
+import { buildRevealSegments } from './revealPacing';
+import type { RampStyle } from '../../utils/hapticRamp';
 import { typography } from '../../theme/typography';
 import { formatShortDate } from '../../utils/dateParts';
 import type { GoalProjection } from '../../utils/goalProjection';
@@ -17,15 +18,19 @@ import type { PlanTargets } from '../../utils/planPreview';
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 
+const IMPACT: Record<RampStyle, Haptics.ImpactFeedbackStyle> = {
+  soft: Haptics.ImpactFeedbackStyle.Soft,
+  light: Haptics.ImpactFeedbackStyle.Light,
+  medium: Haptics.ImpactFeedbackStyle.Medium,
+  rigid: Haptics.ImpactFeedbackStyle.Rigid,
+  heavy: Haptics.ImpactFeedbackStyle.Heavy,
+};
+
 // Graph geometry (viewBox 0 0 322 150): a gentle descent from today to goal.
 const CURVE = 'M14 24 C 96 44, 196 82, 300 120';
 const CURVE_LENGTH = 330; // safely >= the real path length for the dash trick
 const ORIGIN = { x: 14, y: 24 };
-const DRAW_MS = 1500;
 const DRAW_DELAY_MS = 260; // the card settles before the line starts moving
-// Taps that swell as the line descends toward the goal, resolving into the
-// success thump when the flag pops. 12 across 1.5s reads as one rising sweep.
-const DRAW_PULSES = 12;
 
 export interface RevealScreenProps {
   progress: number;
@@ -103,23 +108,52 @@ function GoalPathCard({ start, startWeight, goalWeight, unit, dateChip, onArrive
   const draw = useRef(new Animated.Value(0)).current;
   const flagPop = useRef(new Animated.Value(0)).current;
   const arrived = useRef(false);
+  const hapticTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const onArriveRef = useRef(onArrive);
   onArriveRef.current = onArrive;
 
-  // The descent is felt as well as seen: soft at today's weight, heavier the
-  // closer the line gets to the goal.
-  useHapticRamp(start && !arrived.current, {
-    durationMs: DRAW_MS,
-    pulses: DRAW_PULSES,
-    delayMs: DRAW_DELAY_MS,
-  });
 
   useEffect(() => {
     if (!start || arrived.current) return;
+
+    // The line is ASSEMBLED, not swept: short moves separated by catches that
+    // shorten as it resolves. Each segment start fires its own haptic, so the
+    // pause is felt rather than just seen — that is what makes the next move
+    // register as progress instead of a bar sliding across. See revealPacing.
+    const segments = buildRevealSegments();
+    const steps: Animated.CompositeAnimation[] = [];
+    let elapsed = DRAW_DELAY_MS;
+
+    segments.forEach((segment) => {
+      const at = elapsed;
+      hapticTimers.current.push(
+        setTimeout(() => {
+          if (Platform.OS !== 'web') {
+            void Haptics.impactAsync(IMPACT[segment.haptic]).catch(() => undefined);
+          }
+        }, at),
+      );
+      steps.push(
+        Animated.timing(draw, {
+          toValue: segment.to,
+          duration: segment.durationMs,
+          // Linear inside a segment: the pacing lives in the plan, and an ease
+          // per segment would blur the catches into one smooth glide.
+          easing: Easing.linear,
+          useNativeDriver: false,
+        }),
+      );
+      elapsed += segment.durationMs;
+      if (segment.pauseMs > 0) {
+        steps.push(Animated.delay(segment.pauseMs));
+        elapsed += segment.pauseMs;
+      }
+    });
+
     const seq = Animated.sequence([
-      // let the card settle in first, then the line finds its way to the goal
+      // let the card settle in first, then the line starts gathering
       Animated.delay(DRAW_DELAY_MS),
-      Animated.timing(draw, { toValue: 1, duration: DRAW_MS, easing: Easing.inOut(Easing.cubic), useNativeDriver: false }),
+      ...steps,
       Animated.spring(flagPop, { toValue: 1, friction: 4, tension: 160, useNativeDriver: true }),
     ]);
     seq.start(({ finished }) => {
@@ -128,7 +162,11 @@ function GoalPathCard({ start, startWeight, goalWeight, unit, dateChip, onArrive
         onArriveRef.current();
       }
     });
-    return () => seq.stop();
+    return () => {
+      seq.stop();
+      hapticTimers.current.forEach(clearTimeout);
+      hapticTimers.current = [];
+    };
   }, [start, draw, flagPop]);
 
   const dashoffset = draw.interpolate({ inputRange: [0, 1], outputRange: [CURVE_LENGTH, 0] });

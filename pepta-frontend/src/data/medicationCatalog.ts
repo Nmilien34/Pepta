@@ -94,6 +94,32 @@ export const MEDICATION_CATALOG: readonly MedicationOption[] = [
     tintColor: '#5B45C9',
   },
   {
+    id: 'saxenda',
+    name: 'Saxenda',
+    subtitle: 'Liraglutide · daily injection',
+    drugClass: 'glp_1',
+    doseUnit: 'mg',
+    // ~13h — the only DAILY injectable here. A weekly half-life would draw a
+    // completely wrong level curve.
+    halfLifeDays: 0.54,
+    route: 'injection',
+    commonDoses: [0.6, 1.2, 1.8, 2.4, 3],
+    kind: 'brand',
+    tintColor: '#B4531C',
+  },
+  {
+    id: 'victoza',
+    name: 'Victoza',
+    subtitle: 'Liraglutide · daily injection',
+    drugClass: 'glp_1',
+    doseUnit: 'mg',
+    halfLifeDays: 0.54,
+    route: 'injection',
+    commonDoses: [0.6, 1.2, 1.8],
+    kind: 'brand',
+    tintColor: '#7A3E9D',
+  },
+  {
     id: 'rybelsus',
     name: 'Rybelsus',
     subtitle: 'Oral · daily pill',
