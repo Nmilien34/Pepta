@@ -160,6 +160,12 @@ export async function reconcileUserEntitlement(
     (user._id instanceof Types.ObjectId ? user._id.toHexString() : String(user._id));
 
   try {
+    // ⚠ getSubscriber is a CREATE-ON-READ (RevenueCat v1 GET /subscribers
+    // mints the customer if absent). Every caller of this reconciler must
+    // guarantee the user already exists in RevenueCat: resolveAccess gates on
+    // hasRevenueCatEvidence(), and the webhook path only reaches here for
+    // users an RC event just named. Reconciling an RC-less user from a new
+    // call site would re-open the phantom-customer bug (2026-07-29).
     const subscriber = await getSubscriber(appUserId);
     const sources = sourcesFromSubscriber(
       subscriber,

@@ -226,6 +226,10 @@ async function provision(
   try {
     // Read-before-grant: an ambiguous earlier timeout may already have
     // granted. Adopt the remote grant instead of issuing another.
+    // ⚠ getSubscriber is a CREATE-ON-READ. This is the ONE call site allowed
+    // to rely on that: a promotional grant needs the subscriber to exist, and
+    // this path only runs for a user holding a claimed invite. Do not copy
+    // this call into paths that run for ordinary users.
     const subscriber = await getSubscriber(appUserId);
     const existing = subscriber.entitlements?.[entitlementId];
     const existingExpiry = existing?.expires_date ? new Date(existing.expires_date) : null;
