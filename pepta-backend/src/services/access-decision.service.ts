@@ -236,7 +236,18 @@ export async function resolveAccess(userId: string): Promise<AccessDecision> {
     }
   }
 
-  if (isRevenueCatConfigured()) {
+  // ONLY reconcile users RevenueCat already knows. The reconciler reads via
+  // v1 GET /subscribers/{id}, and that read CREATES the subscriber when it
+  // does not exist — so reconciling an evidence-less fresh signup mints a
+  // server-side customer before any device SDK has configured, which is how
+  // backend-born customer records reached the production project (see the
+  // 2026-07-29 phantom-customer investigation). A user with no stored
+  // customer id, no sources and a still-"free" status has nothing to
+  // reconcile: their truthful decision comes from persisted state, and their
+  // RevenueCat customer gets created the right way — by the mobile SDK at
+  // the paywall, or by the complimentary grant path above, which is the one
+  // caller allowed to rely on create-on-read.
+  if (isRevenueCatConfigured() && hasRevenueCatEvidence(user.entitlement)) {
     try {
       await reconcileUserEntitlement(user);
     } catch {
@@ -245,6 +256,16 @@ export async function resolveAccess(userId: string): Promise<AccessDecision> {
   }
 
   return decisionFromPersistedState(user.entitlement, now);
+}
+
+/** True when RevenueCat has ever been involved with this user. */
+export function hasRevenueCatEvidence(entitlement: UserEntitlementDocument): boolean {
+  return Boolean(
+    entitlement.revenueCatCustomerId ||
+      (entitlement.revenueCatAppUserIds?.length ?? 0) > 0 ||
+      (entitlement.sources?.length ?? 0) > 0 ||
+      entitlement.status !== "free",
+  );
 }
 
 export const ACCESS_PROVISIONING_RETRY_MS = PROVISIONING_RETRY_MS;

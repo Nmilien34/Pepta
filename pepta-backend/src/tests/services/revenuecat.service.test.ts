@@ -169,7 +169,7 @@ describe('RevenueCat webhook service', () => {
       applyRevenueCatWebhook(
         event({
           id: 'evt_original',
-          appUserId: 'anonymous_rc_user',
+          appUserId: 'prior_alias_rc_id',
           originalAppUserId: 'original_rc_user',
         }),
       ),
@@ -177,14 +177,14 @@ describe('RevenueCat webhook service', () => {
 
     expect(mocks.userFindOne).toHaveBeenCalledWith({
       $or: [
-        { 'entitlement.revenueCatCustomerId': { $in: ['anonymous_rc_user', 'original_rc_user'] } },
-        { 'entitlement.revenueCatAppUserIds': { $in: ['anonymous_rc_user', 'original_rc_user'] } },
+        { 'entitlement.revenueCatCustomerId': { $in: ['prior_alias_rc_id', 'original_rc_user'] } },
+        { 'entitlement.revenueCatAppUserIds': { $in: ['prior_alias_rc_id', 'original_rc_user'] } },
       ],
     });
-    expect(user.entitlement.revenueCatCustomerId).toBe('anonymous_rc_user');
+    expect(user.entitlement.revenueCatCustomerId).toBe('prior_alias_rc_id');
     expect(user.entitlement.revenueCatAppUserIds).toEqual([
       'original_rc_user',
-      'anonymous_rc_user',
+      'prior_alias_rc_id',
     ]);
     expect(user.save).toHaveBeenCalledTimes(1);
   });
@@ -202,7 +202,7 @@ describe('RevenueCat webhook service', () => {
       applyRevenueCatWebhook(
         event({
           id: 'evt_alias',
-          appUserId: 'anonymous_rc_user',
+          appUserId: 'prior_alias_rc_id',
           originalAppUserId: 'aliased_rc_user',
         }),
       ),
@@ -210,7 +210,7 @@ describe('RevenueCat webhook service', () => {
 
     expect(user.entitlement.revenueCatAppUserIds).toEqual([
       'aliased_rc_user',
-      'anonymous_rc_user',
+      'prior_alias_rc_id',
     ]);
     expect(user.save).toHaveBeenCalledTimes(1);
   });
@@ -221,8 +221,8 @@ describe('RevenueCat webhook service', () => {
       id: userId,
       status: 'active',
       expiresAt: new Date('2026-08-01T00:00:00.000Z'),
-      revenueCatCustomerId: 'anonymous_rc_user',
-      revenueCatAppUserIds: ['anonymous_rc_user'],
+      revenueCatCustomerId: 'prior_alias_rc_id',
+      revenueCatAppUserIds: ['prior_alias_rc_id'],
     });
     mocks.processedFindOne.mockResolvedValue(null);
     mocks.processedCreate.mockResolvedValue(undefined);
@@ -233,7 +233,7 @@ describe('RevenueCat webhook service', () => {
         event: {
           id: 'evt_transfer',
           type: 'TRANSFER',
-          transferred_from: ['anonymous_rc_user'],
+          transferred_from: ['prior_alias_rc_id'],
           transferred_to: [userId],
         },
       }),
@@ -241,7 +241,7 @@ describe('RevenueCat webhook service', () => {
 
     expect(user.entitlement.status).toBe('active');
     expect(user.entitlement.revenueCatCustomerId).toBe(userId);
-    expect(user.entitlement.revenueCatAppUserIds).toEqual(['anonymous_rc_user', userId]);
+    expect(user.entitlement.revenueCatAppUserIds).toEqual(['prior_alias_rc_id', userId]);
     expect(user.save).toHaveBeenCalledTimes(1);
   });
 

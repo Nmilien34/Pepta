@@ -119,15 +119,42 @@ async function request<T>(
 }
 
 /**
- * Fetch the full subscriber. RevenueCat's GET creates the customer when it
- * does not exist, which also satisfies "ensure a customer exists".
+ * Fetch the full subscriber.
+ *
+ * ⚠ THIS READ IS A WRITE. RevenueCat's v1 GET /subscribers/{id} CREATES the
+ * customer when it does not exist. Twelve phantom customer records (no
+ * app_id, no platform, 0-second lifespan) reached the production project
+ * through this call before that was respected — see the 2026-07-29
+ * phantom-customer investigation. The rules for callers:
+ *   - Never call this for a user with no RevenueCat evidence (no stored
+ *     customer id, no sources, status still "free"). resolveAccess gates on
+ *     exactly that.
+ *   - The complimentary-access flow is the ONE caller allowed to rely on the
+ *     create-on-read side effect, because a subscriber must exist before a
+ *     promotional grant.
+ *   - The id must be a real, resolved user identifier. If you do not have
+ *     one, the correct behavior is to not make the call.
  */
 export async function getSubscriber(
   appUserId: string,
 ): Promise<RevenueCatSubscriber> {
+  const id = typeof appUserId === "string" ? appUserId.trim() : "";
+  // Guard against the exact failure that put a literal placeholder into the
+  // production customer list. Loud, not silent: a caller reaching here with
+  // no real id has a bug that must surface.
+  // Pattern, not literal: this also refuses RevenueCat's own device-side
+  // anonymous ids ($RCAnonymousID:…), which must never be passed from the
+  // server — an anonymous customer belongs to a device, not to our backend.
+  if (id.length === 0 || /anonymous/i.test(id) || id === "undefined" || id === "null") {
+    throw new RevenueCatClientError(
+      "terminal",
+      null,
+      `getSubscriber called with an unusable app user id (${JSON.stringify(appUserId)}) — refusing to create a phantom customer`,
+    );
+  }
   const payload = await request<{ subscriber?: RevenueCatSubscriber }>(
     "GET",
-    `/subscribers/${encodeURIComponent(appUserId)}`,
+    `/subscribers/${encodeURIComponent(id)}`,
   );
   if (!payload.subscriber || typeof payload.subscriber !== "object") {
     throw new RevenueCatClientError(
