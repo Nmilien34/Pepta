@@ -45,6 +45,30 @@ export interface EchoAnswers {
 
 const DAY_SINGULAR = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const DAY_PLURAL = ['Sundays', 'Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays', 'Saturdays'];
+const DAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+/**
+ * Every chosen shot day, spoken back. The old echo said only shotDays[0] —
+ * someone who picked Tue/Wed/Sat heard "Tuesdays it is." and reasonably
+ * concluded their other days were dropped. They never were (the payload
+ * always carried the full list); the echo just lied about it. An echo's one
+ * job is to prove the answer was heard, so it names all of them.
+ */
+export function shotDaysEcho(days?: number[]): string {
+  if (!days || days.length === 0) return 'Shot day set.';
+  const names = [...days].sort((a, b) => a - b).map((d) => DAY_PLURAL[d] ?? 'Shot days');
+  if (names.length === 1) return `${names[0]} it is.`;
+  if (names.length === 2) return `${names[0]} and ${names[1]} it is.`;
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}. All three locked in.`;
+}
+
+/** Compact day list for context lines: "Tue, Wed & Sat". */
+export function shotDaysCompact(days: number[]): string {
+  const names = [...days].sort((a, b) => a - b).map((d) => DAY_SHORT[d] ?? '?');
+  if (names.length === 1) return DAY_PLURAL[days[0]!] ?? 'weekly';
+  if (names.length === 2) return `${names[0]} & ${names[1]}`;
+  return `${names.slice(0, -1).join(', ')} & ${names[names.length - 1]}`;
+}
 
 function weekdayOf(parts: DateParts): number {
   return new Date(parts.year, parts.month, parts.day).getDay();
@@ -177,7 +201,7 @@ export function echoFor(step: OnboardingStep, a: EchoAnswers, now: Date = new Da
     case 'shotDay':
       return a.lastShot ? `Last shot was a ${DAY_SINGULAR[weekdayOf(a.lastShot)]}.` : undefined;
     case 'shotTime':
-      return a.shotDays && a.shotDays.length > 0 ? `${DAY_PLURAL[a.shotDays[0]!]} it is.` : 'Shot day set.';
+      return shotDaysEcho(a.shotDays);
     case 'instrument':
       return instrumentContext(a);
     case 'goalType':
@@ -249,7 +273,7 @@ export function instrumentContext(a: EchoAnswers): string {
   const parts: string[] = [];
   if (a.medication) parts.push(a.medication.name);
   if (typeof a.dose === 'number') parts.push(`${a.dose} ${a.medication?.doseUnit ?? 'mg'}`);
-  if (a.shotDays && a.shotDays.length > 0) parts.push(DAY_PLURAL[a.shotDays[0]!]!);
+  if (a.shotDays && a.shotDays.length > 0) parts.push(shotDaysCompact(a.shotDays));
   return parts.length > 0 ? `${parts.join(' · ')}.` : 'Your doses are logged.';
 }
 

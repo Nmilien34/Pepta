@@ -100,17 +100,30 @@ const FREQUENCY_INTERVAL_DAYS: Record<Exclude<DoseFrequency, 'custom'>, number> 
   biweekly: 14,
 };
 
-// Next dose = last shot + interval at the usual hour, rolled forward until it
-// lands in the future (the user may be mid-cycle when onboarding).
+// Next dose = the soonest FUTURE occurrence of the user's rhythm, at the
+// usual hour (the user may be mid-cycle when onboarding).
+//
+// Weekly users can pick several shot days (split-dose protocols): for them the
+// next dose is the next CHOSEN WEEKDAY after now, walked day by day. The old
+// interval-only math ignored the picked days entirely — a Tue/Wed/Sat user
+// whose last shot was Saturday was told the next dose was next Saturday, days
+// after their real one, which mis-armed the level model from the first hour.
 function nextDoseAt(
   lastShot: DateParts,
   frequency: DoseFrequency,
   shotHour: number | undefined,
   now: Date,
+  shotDays?: number[],
 ): string | undefined {
   if (frequency === 'custom') return undefined;
-  const interval = FREQUENCY_INTERVAL_DAYS[frequency];
   const next = new Date(lastShot.year, lastShot.month, lastShot.day, shotHour ?? 12, 0, 0, 0);
+  if (frequency === 'weekly' && shotDays && shotDays.length > 0) {
+    do {
+      next.setDate(next.getDate() + 1);
+    } while (next <= now || !shotDays.includes(next.getDay()));
+    return next.toISOString();
+  }
+  const interval = FREQUENCY_INTERVAL_DAYS[frequency];
   do {
     next.setDate(next.getDate() + interval);
   } while (next <= now);
@@ -205,7 +218,7 @@ export function buildOnboardingPayload(answers: OnboardingAnswers, now: Date): O
           active: true,
           ...(answers.lastShot
             ? (() => {
-                const next = nextDoseAt(answers.lastShot!, answers.frequency!, answers.shotHour, now);
+                const next = nextDoseAt(answers.lastShot!, answers.frequency!, answers.shotHour, now, answers.shotDays);
                 return next ? { nextDoseAt: next } : {};
               })()
             : {}),

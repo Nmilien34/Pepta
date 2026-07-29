@@ -101,3 +101,49 @@ describe('route + device answers', () => {
   });
 });
 
+describe('nextDoseAt with multiple weekly shot days', () => {
+  // Nick's TestFlight case: last shot Saturday, shot days Tue/Wed/Sat. The
+  // interval-only math said "next Saturday"; the real next dose is Tuesday.
+  it('walks to the next CHOSEN weekday, not lastShot + 7', () => {
+    const now = new Date(2026, 6, 27, 9, 0); // Monday Jul 27
+    const payload = buildOnboardingPayload(
+      {
+        ...fullAnswers,
+        frequency: 'weekly',
+        lastShot: { year: 2026, month: 6, day: 25 }, // Saturday Jul 25
+        shotDays: [2, 3, 6], // Tue, Wed, Sat
+        shotHour: 8,
+      },
+      now,
+    );
+    const next = new Date(payload.schedule!.nextDoseAt!);
+    expect(next.getDay()).toBe(2); // Tuesday
+    expect(next.getDate()).toBe(28); // Jul 28, not Aug 1
+    expect(next.getHours()).toBe(8);
+  });
+
+  it('keeps the old behavior for a single day', () => {
+    const now = new Date(2026, 6, 27, 9, 0);
+    const payload = buildOnboardingPayload(
+      {
+        ...fullAnswers,
+        frequency: 'weekly',
+        lastShot: { year: 2026, month: 6, day: 25 },
+        shotDays: [6],
+        shotHour: 8,
+      },
+      now,
+    );
+    const next = new Date(payload.schedule!.nextDoseAt!);
+    expect(next.getDay()).toBe(6);
+    expect(next.getDate()).toBe(1); // next Saturday, Aug 1
+  });
+
+  it('carries every chosen day in schedule.daysOfWeek', () => {
+    const payload = buildOnboardingPayload(
+      { ...fullAnswers, frequency: 'weekly', shotDays: [2, 3, 6] },
+      new Date(2026, 6, 27),
+    );
+    expect(payload.schedule?.daysOfWeek).toEqual([2, 3, 6]);
+  });
+});
