@@ -33,7 +33,6 @@ import { RulerPicker } from "./RulerPicker";
 import { SegmentedToggle } from "./onboarding/SegmentedToggle";
 import { cmToInches, inchesToCm, kgToLb, lbToKg } from "../utils/units";
 import { usePeptaData } from "../context/PeptaDataContext";
-import { api } from "../services/api";
 import {
   sideEffectTypeLabel,
   rotationReason,
@@ -128,6 +127,7 @@ export function QuickLogSheet({
     addWeightLog,
     addMeasurement,
     addSideEffectLog,
+    saveLog,
   } = usePeptaData();
   const [render, setRender] = useState(visible);
   const [mode, setMode] = useState<Mode>("chooser");
@@ -221,12 +221,18 @@ export function QuickLogSheet({
 
   const close = () => onClose();
 
-  // Optimistic commit: apply the local update + close instantly, then POST in the
-  // background and reconcile (refresh) on settle. A failed POST re-fetches server
-  // truth, which drops the temp row.
+  // Optimistic commit: apply the local update + close instantly, then save
+  // durably in the background.
+  //   saved  → refresh: reconcile to server truth (which now holds the row).
+  //   queued → offline/5xx: the log is in the outbox and WILL land, so the
+  //            optimistic row stays on screen and we deliberately skip the
+  //            refresh — server truth doesn't include it yet and would wipe
+  //            it. Replay-on-foreground sends it and refreshes then.
+  //   throw  → final rejection (4xx): the old behavior — error haptic and a
+  //            refresh that drops the temp row.
   const commit = (
     apply: () => void,
-    serverCall: () => Promise<unknown>,
+    serverCall: () => Promise<"saved" | "queued">,
     refresh: () => Promise<void>,
   ) => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
@@ -235,7 +241,7 @@ export function QuickLogSheet({
     apply();
     close();
     serverCall()
-      .then(() => refresh())
+      .then((result) => (result === "saved" ? refresh() : undefined))
       .catch(() => {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(
           () => undefined,
@@ -260,14 +266,14 @@ export function QuickLogSheet({
       const input = toDoseInput(dose, doseTs);
       commit(
         () => addDoseLog(input),
-        () => api.createDoseLog(input),
+        () => saveLog("dose", input),
         refreshHomeTrack,
       );
     } else if (mode === "weight") {
       const input = toWeightInput(weight, weightUnit, ts);
       commit(
         () => addWeightLog(input),
-        () => api.createWeightLog(input),
+        () => saveLog("weight", input),
         refreshHomeProgress,
       );
     } else if (mode === "protein") {
@@ -292,7 +298,7 @@ export function QuickLogSheet({
       );
       commit(
         () => addSideEffectLog(input),
-        () => api.createSideEffectLog(input),
+        () => saveLog("sideEffect", input),
         refreshTrack,
       );
     } else if (mode === "measurement") {
@@ -305,7 +311,7 @@ export function QuickLogSheet({
       );
       commit(
         () => addMeasurement(input),
-        () => api.createMeasurement(input),
+        () => saveLog("measurement", input),
         refreshProgress,
       );
     } else if (mode === "activity") {
@@ -320,7 +326,7 @@ export function QuickLogSheet({
       // update — just POST and reconcile Home (where step targets live).
       commit(
         () => undefined,
-        () => api.createActivityLog(input),
+        () => saveLog("activity", input),
         refreshHome,
       );
     }
@@ -338,7 +344,7 @@ export function QuickLogSheet({
     });
     commit(
       () => addDoseLog(input),
-      () => api.createDoseLog(input),
+      () => saveLog("dose", input),
       refreshHomeTrack,
     );
   };

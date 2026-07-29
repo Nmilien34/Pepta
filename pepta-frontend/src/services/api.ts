@@ -516,8 +516,21 @@ class PeptaApi {
     return this.request("/track", trackResponseSchema);
   }
 
-  public getProgress(): Promise<ProgressResponse> {
-    return this.request("/progress", progressResponseSchema);
+  // The server window defaults to 30 days / 100 rows when the query is empty —
+  // which is why the 90d/1y/All range buttons used to be cosmetic: they
+  // filtered a 30-day payload client-side, and anything older looked deleted.
+  // `sinceDays` widens the actual query window (Infinity → a fixed year-2000
+  // floor); limit rides at the schema's 500-row cap. Beyond that, pagination
+  // is the known follow-up.
+  public getProgress(sinceDays?: number): Promise<ProgressResponse> {
+    if (sinceDays == null) {
+      return this.request("/progress", progressResponseSchema);
+    }
+    const from = Number.isFinite(sinceDays)
+      ? new Date(Date.now() - sinceDays * 86_400_000)
+      : new Date(2000, 0, 1);
+    const query = `?from=${encodeURIComponent(from.toISOString())}&limit=500`;
+    return this.request(`/progress${query}`, progressResponseSchema);
   }
 
   // POST /protein-logs → ProteinLogResponse (201). Backed by the same log-router

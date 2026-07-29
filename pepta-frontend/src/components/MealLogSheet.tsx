@@ -83,7 +83,7 @@ export function MealLogSheet({
   onDismissed,
 }: MealLogSheetProps) {
   const theme = useTheme();
-  const { addMeal, refreshHome, refreshTrack } = usePeptaData();
+  const { addMeal, refreshHome, refreshTrack, saveLog } = usePeptaData();
   const [view, setView] = useState<View_>("chooser");
   const [result, setResult] = useState<MealScanResponse | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -163,16 +163,19 @@ export function MealLogSheet({
 
   const now = () => new Date().toISOString();
 
-  // Optimistic: fold macros into Home now, close, POST in background, reconcile.
+  // Optimistic: fold macros into Home now, close, save durably in background.
+  // saved → reconcile to server truth; queued → the outbox holds it (keep the
+  // optimistic macros — refreshing now would wipe them since the server
+  // doesn't have the meal yet); throw → final rejection, refresh drops it.
   const commit = (input: MealLogInput) => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
       () => undefined,
     );
     addMeal(input);
     onClose();
-    api
-      .createMealLog(input)
-      .then(() => {
+    saveLog("meal", input)
+      .then((result) => {
+        if (result !== "saved") return;
         void refreshHome();
         void refreshTrack();
       })

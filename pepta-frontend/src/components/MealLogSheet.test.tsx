@@ -6,6 +6,8 @@ import { api } from "../services/api";
 import { AI_CONSENT_STORAGE_KEY } from "../services/aiConsent";
 import { testStorage } from "../tests/testStorage";
 
+const saveLogMock = vi.hoisted(() => vi.fn(async () => "saved" as const));
+
 const audioMocks = vi.hoisted(() => ({
   fileBase64: vi.fn(),
   recorder: {
@@ -113,6 +115,7 @@ vi.mock("../theme", () => ({
 
 vi.mock("../context/PeptaDataContext", () => ({
   usePeptaData: () => ({
+    saveLog: saveLogMock,
     addMeal: vi.fn(),
     refreshHome: vi.fn(),
     refreshTrack: vi.fn(),
@@ -541,7 +544,9 @@ describe("MealLogSheet", () => {
       tree!.root.findByProps({ label: "Confirm & log" }).props.onPress();
     });
 
-    expect(api.createMealLog).toHaveBeenCalledWith(
+    // Meals now go through the durable outbox path, not a bare POST.
+    expect(saveLogMock).toHaveBeenCalledWith(
+      "meal",
       expect.objectContaining({
         foodName: "Chobani Zero Sugar Greek Yogurt",
         source: "barcode",

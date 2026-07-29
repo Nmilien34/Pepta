@@ -94,6 +94,7 @@ vi.mock("../theme", () => ({
 
 vi.mock("../context/PeptaDataContext", () => ({
   usePeptaData: () => ({
+    saveLog: vi.fn(async () => "saved" as const),
     addDoseLog: vi.fn(),
     addMeasurement: vi.fn(),
     addSideEffectLog: vi.fn(),

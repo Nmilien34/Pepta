@@ -39,6 +39,14 @@ import type {
 import { api } from "../services/api";
 import { useAuth } from "./AuthContext";
 import { readSnapshot, writeSnapshot } from "../services/peptaSnapshotStore";
+import {
+  outboxCount,
+  replayOutbox,
+  saveLogDurably,
+  type OutboxKind,
+  type SaveResult,
+} from "../services/mutationOutbox";
+import { AppState } from "react-native";
 import { hasAIDataSharingConsent } from "../services/aiConsent";
 import { extractApiError, isOffline } from "../services/apiError";
 
@@ -95,7 +103,18 @@ interface PeptaDataContextValue {
   progressLoading: boolean;
   progressRefreshing: boolean;
   progressError: string | null;
-  refreshProgress(): Promise<void>;
+  /**
+   * Durable log save: tries now, queues on offline/5xx (resolving "queued"),
+   * throws only for final rejections. Queued logs replay automatically on
+   * foreground/sign-in; the server dedupes by idempotency key, so replays can
+   * never create duplicates.
+   */
+  saveLog(kind: OutboxKind, payload: Record<string, unknown>): Promise<SaveResult>;
+  /** How many logs are waiting to reach the server. */
+  pendingLogs: number;
+  /** When data on screen last came from the server (or the cache's savedAt). */
+  lastSyncedAt: string | null;
+  refreshProgress(sinceDays?: number): Promise<void>;
   addCompound(input: CompoundInput): Promise<CompoundResponse>;
   // Optimistic inserts for the QuickLog sheet (prepend a temp row; the next
   // refresh reconciles to server truth).
@@ -211,9 +230,14 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
   const [progressLoading, setProgressLoading] = useState(false);
   const [progressRefreshing, setProgressRefreshing] = useState(false);
   const [progressError, setProgressError] = useState<string | null>(null);
+  const [pendingLogs, setPendingLogs] = useState(0);
+  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
   const hasData = useRef(false);
   const hasTrack = useRef(false);
   const hasProgress = useRef(false);
+  // The server window Progress last asked for (days; Infinity = everything).
+  // Undefined until a range is chosen — the server's default window applies.
+  const progressWindowRef = useRef<number | undefined>(undefined);
 
   // ── Account isolation (P0) ─────────────────────────────────────────────
   // This provider mounts ONCE, above AccessGate, and used to keep its state
@@ -227,6 +251,9 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
   // account's session.
   const { user } = useAuth();
   const userId = user?.id ?? null;
+  const saveLogRef = useRef<(kind: OutboxKind, payload: Record<string, unknown>) => Promise<SaveResult>>(
+    async () => "saved",
+  );
   const sessionEpoch = useRef(0);
   const [boundUserId, setBoundUserId] = useState<string | null>(userId);
   if (boundUserId !== userId) {
@@ -247,6 +274,9 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
     setProgressLoading(false);
     setProgressRefreshing(false);
     setProgressError(null);
+    setPendingLogs(0);
+    setLastSyncedAt(null);
+    progressWindowRef.current = undefined;
     hasData.current = false;
     hasTrack.current = false;
     hasProgress.current = false;
@@ -265,6 +295,7 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
         const data = await api.getHome(nextRange, { aiDataSharingConsent });
         if (epoch !== sessionEpoch.current) return;
         setHome(data);
+        setLastSyncedAt(new Date().toISOString());
         hasData.current = true;
       } catch (error) {
         if (epoch !== sessionEpoch.current) return;
@@ -318,8 +349,10 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
           : h,
       );
       if (grams <= 0) return;
-      api
-        .createProteinLog({ grams, datetime: new Date().toISOString() })
+      // Durable: offline/5xx queues the log (optimistic total stays — the log
+      // WILL land); only a final server rejection reverts the total.
+      saveLogRef
+        .current("protein", { grams, datetime: new Date().toISOString() })
         .catch(() => {
           if (epoch !== sessionEpoch.current) return;
           setHome((h) =>
@@ -360,8 +393,8 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
           : h,
       );
       if (oz <= 0) return;
-      api
-        .createWaterLog({ amountOz: oz, datetime: new Date().toISOString() })
+      saveLogRef
+        .current("water", { amountOz: oz, datetime: new Date().toISOString() })
         .catch(() => {
           if (epoch !== sessionEpoch.current) return;
           setHome((h) =>
@@ -398,8 +431,8 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
           : h,
       );
       if (grams <= 0) return;
-      api
-        .createFiberLog({ grams, datetime: new Date().toISOString() })
+      saveLogRef
+        .current("fiber", { grams, datetime: new Date().toISOString() })
         .catch(() => {
           if (epoch !== sessionEpoch.current) return;
           setHome((h) =>
@@ -571,13 +604,14 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
     [refreshHome, refreshTrack],
   );
 
-  const refreshProgress = useCallback(async () => {
+  const refreshProgress = useCallback(async (sinceDays?: number) => {
     const epoch = sessionEpoch.current;
+    if (sinceDays != null) progressWindowRef.current = sinceDays;
     setProgressError(null);
     if (hasProgress.current) setProgressRefreshing(true);
     else setProgressLoading(true);
     try {
-      const data = await api.getProgress();
+      const data = await api.getProgress(progressWindowRef.current);
       if (epoch !== sessionEpoch.current) return;
       setProgress(data);
       hasProgress.current = true;
@@ -591,6 +625,55 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
       }
     }
   }, []);
+
+  // ── Durable log outbox ─────────────────────────────────────────────────
+  // saveLog is the single write path for log mutations: try now, queue on
+  // offline/5xx, throw only on final rejection. Replay fires on sign-in and
+  // whenever the app returns to the foreground; the server's idempotency
+  // index makes any replay safe. saveLogRef exists so the bump callbacks
+  // above (declared earlier) can reach it without a use-before-declare.
+  const refreshOutboxCount = useCallback(async () => {
+    if (!userId) return;
+    const count = await outboxCount(userId);
+    setPendingLogs((current) => (current === count ? current : count));
+  }, [userId]);
+
+  const saveLog = useCallback(
+    async (kind: OutboxKind, payload: Record<string, unknown>): Promise<SaveResult> => {
+      if (!userId) throw new Error("saveLog requires a signed-in user");
+      const result = await saveLogDurably(userId, kind, payload);
+      if (result === "queued") void refreshOutboxCount();
+      return result;
+    },
+    [userId, refreshOutboxCount],
+  );
+
+  saveLogRef.current = saveLog;
+
+  const runReplay = useCallback(async () => {
+    if (!userId) return;
+    const epoch = sessionEpoch.current;
+    const result = await replayOutbox(userId);
+    if (epoch !== sessionEpoch.current) return;
+    setPendingLogs(result.remaining);
+    if (result.sent > 0) {
+      // Queued logs just landed: pull server truth so totals include them.
+      const { refreshHome: rh, refreshTrack: rt, refreshProgress: rp } = refreshersRef.current;
+      void rh();
+      void rt();
+      void rp();
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    if (!userId) return undefined;
+    void refreshOutboxCount();
+    void runReplay();
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") void runReplay();
+    });
+    return () => subscription.remove();
+  }, [userId, refreshOutboxCount, runReplay]);
 
   // ── Durable last-known snapshot (per user) ────────────────────────────
   // The cache the app never had: Home/Track/Progress lived only in React
@@ -619,6 +702,7 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
       if (snapshot.home) hasData.current = true;
       if (snapshot.track) hasTrack.current = true;
       if (snapshot.progress) hasProgress.current = true;
+      setLastSyncedAt((at) => at ?? snapshot.savedAt);
       // Hydration makes the screens' fetch-on-null triggers see non-null, so
       // freshness is the provider's job here: kick background refreshes now.
       const { refreshHome: rh, refreshTrack: rt, refreshProgress: rp } = refreshersRef.current;
@@ -642,6 +726,9 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<PeptaDataContextValue>(
     () => ({
+      saveLog,
+      pendingLogs,
+      lastSyncedAt,
       home,
       homeLoading,
       homeRefreshing,
@@ -673,6 +760,9 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
       addMeal,
     }),
     [
+      saveLog,
+      pendingLogs,
+      lastSyncedAt,
       home,
       homeLoading,
       homeRefreshing,

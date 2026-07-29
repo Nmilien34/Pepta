@@ -32,10 +32,28 @@ const HOME_RANGES: { key: HomeRangeKey; label: string; short: string }[] = [
   { key: 'year', label: 'Yearly', short: 'Year' },
 ];
 
+// "Updated 8:41 PM" / "Updated Jul 27" — the honest one-liner for how fresh
+// the dashboard is. Between cache hydration and the background refresh landing
+// (or through a whole offline session) the user is reading a snapshot; this is
+// what tells them so.
+function formatSyncTime(iso: string): string {
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return 'recently';
+  const now = new Date();
+  const sameDay =
+    at.getFullYear() === now.getFullYear() &&
+    at.getMonth() === now.getMonth() &&
+    at.getDate() === now.getDate();
+  if (sameDay) {
+    return at.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  }
+  return at.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
 export function HomeScreen() {
   const theme = useTheme();
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
-  const { home, track, homeLoading, homeError, homeRefreshing, homeRange, refreshHome, refreshTrack, bumpProtein, bumpWater, bumpFiber } = usePeptaData();
+  const { home, track, homeLoading, homeError, homeRefreshing, homeRange, refreshHome, refreshTrack, bumpProtein, bumpWater, bumpFiber, pendingLogs, lastSyncedAt } = usePeptaData();
   const { openQuickLog, openMeal } = useLogSheets();
   const [rangeOpen, setRangeOpen] = useState(false);
 
@@ -142,9 +160,20 @@ export function HomeScreen() {
               <View style={{ width: 34, height: 34, borderRadius: theme.radii.pill, backgroundColor: '#EFEBFF', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
                 <Mascot pose="idle" size={29} />
               </View>
-              <AppText variant="screenTitle" style={{ fontSize: 21 }}>
-                Pepta
-              </AppText>
+              <View>
+                <AppText variant="screenTitle" style={{ fontSize: 21 }}>
+                  Pepta
+                </AppText>
+                {pendingLogs > 0 ? (
+                  <AppText variant="caption" style={{ fontSize: 10, fontWeight: '700', color: '#B58500' }}>
+                    {pendingLogs === 1 ? '1 log saving — will sync when online' : `${pendingLogs} logs saving — will sync when online`}
+                  </AppText>
+                ) : lastSyncedAt ? (
+                  <AppText variant="caption" color="textTertiary" style={{ fontSize: 10 }}>
+                    Updated {formatSyncTime(lastSyncedAt)}
+                  </AppText>
+                ) : null}
+              </View>
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
               <View style={{ position: 'relative' }}>

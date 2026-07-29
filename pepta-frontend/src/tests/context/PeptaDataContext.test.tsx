@@ -1,4 +1,5 @@
 import React from "react";
+import { ApiError } from "../../services/apiError";
 import { testStorage } from "../testStorage";
 import TestRenderer, { act } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -111,9 +112,12 @@ describe("PeptaDataContext", () => {
     );
   });
 
-  it("rolls the protein total back if the log POST fails", async () => {
+  it("keeps the optimistic total and queues the log when the POST fails transiently", async () => {
+    // The old contract rolled back here — which meant an offline dose of
+    // protein was silently LOST. The durable outbox changes the grammar:
+    // a transient failure keeps the total (the log is queued and WILL land);
+    // only a final server rejection rolls back — covered next.
     const harness = await renderWithHome(makeHome({ todayProteinGrams: 40 }));
-    // Defer the rejection so we can observe the optimistic value first.
     let reject: (() => void) | undefined;
     mockApi.createProteinLog.mockReturnValue(
       new Promise((_resolve, rej) => {
@@ -132,7 +136,25 @@ describe("PeptaDataContext", () => {
     });
     await flush();
 
-    expect(harness.value().home?.todayProteinGrams).toBe(40); // reverted
+    // Total stays: the log is in the outbox, not lost.
+    expect(harness.value().home?.todayProteinGrams).toBe(60);
+    expect(harness.value().pendingLogs).toBe(1);
+  });
+
+  it("rolls the protein total back only on a FINAL server rejection", async () => {
+    const harness = await renderWithHome(makeHome({ todayProteinGrams: 40 }));
+    mockApi.createProteinLog.mockRejectedValue(
+      new ApiError(422, "VALIDATION", "grams out of range"),
+    );
+
+    await act(async () => {
+      harness.value().bumpProtein(20);
+    });
+    await flush();
+
+    // A 4xx can never succeed on retry — reverting is the honest move.
+    expect(harness.value().home?.todayProteinGrams).toBe(40);
+    expect(harness.value().pendingLogs).toBe(0);
   });
 
   it("folds a logged meal into today's macro totals and meal history", async () => {

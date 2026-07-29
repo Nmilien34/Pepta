@@ -27,6 +27,7 @@ import {
 
 import { usePeptaData } from '../../context/PeptaDataContext';
 import {
+  RANGE_DAYS,
   RANGE_KEYS,
   formatShortDate,
   mergeWeightsWithLatest,
@@ -99,6 +100,11 @@ export function ProgressScreen() {
   const pickRange = (r: RangeKey) => {
     Haptics.selectionAsync().catch(() => undefined);
     setRange(r);
+    // The buttons used to only filter the already-downloaded 30-day payload,
+    // so 90d/1y/All showed a month of data at best and older logs looked
+    // deleted. Widening the range now re-queries the server for the real
+    // window; the client-side filter stays as the display cut.
+    void refreshProgress(RANGE_DAYS[r]);
   };
 
   return (
