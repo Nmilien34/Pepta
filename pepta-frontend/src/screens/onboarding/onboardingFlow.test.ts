@@ -16,9 +16,9 @@ describe('onboarding flow', () => {
     expect(ONBOARDING_STEPS[ONBOARDING_STEPS.length - 1]).toBe('welcomeIn');
     expect(nextStep('welcome')).toBe('meetPep');
     // The rating ask is post-purchase (WelcomeInScreen), never a quiz turn.
-    expect(nextStep('reveal')).toBe('auth');
+    expect(nextStep('reveal')).toBe('paywall');
     // The referral code turn was removed — auth hands straight to the wall.
-    expect(nextStep('auth')).toBe('paywall');
+    
     expect(nextStep('paywall')).toBe('welcomeIn');
   });
 
@@ -67,9 +67,12 @@ describe('onboarding flow', () => {
     expect(ONBOARDING_STEPS).not.toContain('rateApp');
   });
 
-  it('skips the sign-in step once authenticated', () => {
-    expect(shouldSkipStep('auth', {})).toBe(false);
-    expect(shouldSkipStep('auth', { authenticated: true })).toBe(true);
+  it('has no standalone sign-in step — auth lives on the merged reveal', () => {
+    // Merged 2026-07-29: the reveal carries the save-your-plan auth block for
+    // signed-out users and the plain Start-today CTA for signed-in ones. A
+    // separate auth turn reappearing here means the merge regressed.
+    expect(ONBOARDING_STEPS).not.toContain('auth');
+    expect(nextStep('reveal')).toBe('paywall');
   });
 
   it('skips the paywall for resolved-active access (creators/subscribers)', () => {
@@ -115,7 +118,7 @@ describe('onboarding flow', () => {
     // the question "is this really a payoff?" rather than passing silently.
     const BEATS = new Set<string>([
       'welcome', 'meetPep', 'fearAnswered', 'leanMass', 'company', 'instrument', 'symptomWeek',
-      'crafting', 'reveal', 'auth', 'paywall', 'welcomeIn',
+      'crafting', 'reveal', 'paywall', 'welcomeIn',
     ]);
     const runLength = (steps: readonly string[]) => {
       let run = 0;

@@ -3,7 +3,7 @@
 // backend creates the account if new or signs in if it exists. On success the
 // AuthContext flips `isAuthenticated` and the root state machine advances.
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -20,12 +20,9 @@ import {
 import { Icon } from "../../components/Icon";
 import * as AppleAuthentication from "expo-apple-authentication";
 import * as Haptics from "expo-haptics";
-import { GoogleSignin } from "@react-native-google-signin/google-signin";
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
-  GOOGLE_IOS_CLIENT_ID,
-  GOOGLE_WEB_CLIENT_ID,
   PRIVACY_URL,
   TERMS_URL,
 } from "../../config";
@@ -33,8 +30,7 @@ import { useTheme } from "../../theme";
 import { AppText, Float, Mascot, Reveal } from "../../components";
 import { useAuth } from "../../context/AuthContext";
 import { extractApiError } from "../../services/apiError";
-import { runAppleSignIn, shouldRenderAppleSignIn } from "./appleSignIn";
-import { runGoogleSignIn } from "./googleSignIn";
+import { useProviderSignIn } from "./useProviderSignIn";
 
 export interface SignInScreenProps {
   onBack(): void;
@@ -44,8 +40,6 @@ export interface SignInScreenProps {
   subtitle?: string;
 }
 
-type Provider = "apple" | "google" | "demo";
-
 export function SignInScreen({
   onBack,
   title = "Save your plan",
@@ -53,73 +47,13 @@ export function SignInScreen({
 }: SignInScreenProps) {
   const theme = useTheme();
   const auth = useAuth();
-  const [busy, setBusy] = useState<Provider | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [reviewerOpen, setReviewerOpen] = useState(false);
   const [reviewerEmail, setReviewerEmail] = useState("review@pepta.app");
   const [reviewerPassword, setReviewerPassword] = useState("");
-  const showApple = shouldRenderAppleSignIn(Platform.OS);
-
-  useEffect(() => {
-    // Native Google config. The web client ID must match the backend audience.
-    GoogleSignin.configure({
-      iosClientId: GOOGLE_IOS_CLIENT_ID || undefined,
-      webClientId: GOOGLE_WEB_CLIENT_ID || undefined,
-      scopes: ["profile", "email"],
-      offlineAccess: false,
-    });
-  }, []);
-
-  const handleApple = async () => {
-    if (busy) return;
-    setBusy("apple");
-    setError(null);
-    void Haptics.selectionAsync();
-    try {
-      await runAppleSignIn({
-        requestCredential: () =>
-          AppleAuthentication.signInAsync({
-            requestedScopes: [
-              AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
-              AppleAuthentication.AppleAuthenticationScope.EMAIL,
-            ],
-          }),
-        signInWithApple: auth.signInWithApple,
-      });
-    } catch {
-      // Dev bridge: the backend is deferred, so a failed sign-in drops into a
-      // local session to keep the flow traversable. Remove when auth is live.
-      if (__DEV__) {
-        auth.devSignIn();
-        return;
-      }
-      setError("We couldn’t sign you in with Apple. Please try again.");
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const handleGoogle = async () => {
-    if (busy) return;
-    setBusy("google");
-    setError(null);
-    void Haptics.selectionAsync();
-    try {
-      await runGoogleSignIn({
-        hasPlayServices: () => GoogleSignin.hasPlayServices(),
-        signIn: () => GoogleSignin.signIn(),
-        signInWithGoogle: auth.signInWithGoogle,
-      });
-    } catch {
-      if (__DEV__) {
-        auth.devSignIn();
-        return;
-      }
-      setError("We couldn’t sign you in with Google. Please try again.");
-    } finally {
-      setBusy(null);
-    }
-  };
+  // Shared with the merged reveal+auth onboarding turn — one implementation
+  // of the provider sign-in machinery, two button surfaces.
+  const { busy, setBusy, error, setError, showApple, handleApple, handleGoogle } =
+    useProviderSignIn();
 
   const handleReviewerSignIn = async () => {
     if (busy || !reviewerPassword) return;
@@ -424,7 +358,7 @@ interface ProviderButtonProps {
   onPress(): void;
 }
 
-function ProviderButton({
+export function ProviderButton({
   variant,
   label,
   busy,

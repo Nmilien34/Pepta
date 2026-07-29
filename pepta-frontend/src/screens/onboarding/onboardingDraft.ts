@@ -25,6 +25,20 @@ export function serializeDraft(step: string, answers: Record<string, unknown>): 
   return JSON.stringify({ step, answers });
 }
 
+/**
+ * Steps that no longer exist, mapped to where their drafts should resume.
+ * 'auth' was merged into 'reveal' (2026-07-29): someone who quit at the old
+ * sign-in screen resumes at the merged reveal, which now carries the auth
+ * block — the exact same decision point they left at.
+ */
+const LEGACY_STEP_MAP: Record<string, string> = {
+  auth: 'reveal',
+};
+
+export function migrateLegacyStep(step: string): string {
+  return LEGACY_STEP_MAP[step] ?? step;
+}
+
 export function parseDraft(raw: string | null | undefined): StoredDraft | null {
   if (!raw) return null;
   try {

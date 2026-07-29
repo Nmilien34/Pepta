@@ -7,7 +7,7 @@
 // context BEFORE choosing the next step, so the very next turn is never chosen
 // from stale answers.
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { Modal, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
@@ -21,7 +21,7 @@ import {
 } from './onboardingFlow';
 import { OnboardingMotionContext, convo } from '../../components';
 import { StepFade } from './StepFade';
-import { ONBOARDING_DRAFT_KEY, parseDraft, serializeDraft } from './onboardingDraft';
+import { ONBOARDING_DRAFT_KEY, migrateLegacyStep, parseDraft, serializeDraft } from './onboardingDraft';
 import { echoFor, instrumentContext, companyContext, leanMassContext } from './onboardingEcho';
 import { symptomForWeekBeat } from './symptomWeek';
 import { MeetPepScreen } from './MeetPepScreen';
@@ -242,8 +242,13 @@ export function OnboardingNavigator() {
     AsyncStorage.getItem(ONBOARDING_DRAFT_KEY)
       .then(parseDraft)
       .then((draft) => {
-        if (active && draft && (ONBOARDING_STEPS as readonly string[]).includes(draft.step)) {
-          setStep(draft.step as OnboardingStep);
+        if (!active || !draft) return;
+        // A draft can name a step that no longer exists ('auth' → 'reveal');
+        // migrate before the membership check so those users resume instead
+        // of restarting the whole quiz.
+        const step = migrateLegacyStep(draft.step);
+        if ((ONBOARDING_STEPS as readonly string[]).includes(step)) {
+          setStep(step as OnboardingStep);
           setAnswers(draft.answers as FlowAnswers);
         }
       })
@@ -295,7 +300,6 @@ export function OnboardingNavigator() {
   const progress = progressForStep(step);
   const ctx = {
     ...ctxFromAnswers(answers),
-    authenticated: auth.isAuthenticated,
     accessActive,
   };
   const context = useMemo(() => echoFor(step, answers), [step, answers]);
@@ -319,8 +323,7 @@ export function OnboardingNavigator() {
     setAnswers(merged);
     const next = advanceWith(step, 1, {
       ...ctxFromAnswers(merged),
-      authenticated: auth.isAuthenticated,
-      accessActive,
+        accessActive,
     });
     if (next) {
       setAnimateEntrance(true);
@@ -337,18 +340,20 @@ export function OnboardingNavigator() {
     }
   };
 
-  // Signing in — at the `auth` step, or via the welcome's returning-user "Sign
-  // in" — is the trigger to move on: close the sheet, and if we're on the auth
-  // step, advance to the paywall. (An already-onboarded returning user is routed
-  // straight to the app by AppShell, which unmounts this navigator.)
+  // Signing in — from the merged reveal's save block, or via the welcome's
+  // returning-user "Sign in" — is the trigger to move on: close the sheet, and
+  // if the sign-in HAPPENED on the reveal, advance to the paywall. The ref
+  // makes this transition-only: a user who resumes already signed in lands on
+  // the reveal's Start-today variant and taps through themselves, instead of
+  // being flung past their own payoff screen on mount.
+  const wasAuthenticated = useRef(auth.isAuthenticated);
   useEffect(() => {
+    const was = wasAuthenticated.current;
+    wasAuthenticated.current = auth.isAuthenticated;
     if (!auth.isAuthenticated) return;
     setSignInOpen(false);
-    if (step === 'auth') {
-      const next = advanceWith('auth', 1, {
-        ...ctxFromAnswers(answers),
-        authenticated: true,
-      });
+    if (!was && step === 'reveal') {
+      const next = advanceWith('reveal', 1, ctxFromAnswers(answers));
       if (next) {
         setAnimateEntrance(true);
         setStep(next);
@@ -742,6 +747,7 @@ export function OnboardingNavigator() {
       });
       return (
         <RevealScreen
+          authenticated={auth.isAuthenticated}
           progress={progress}
           startWeight={answers.startWeight ?? body.weight}
           goalWeight={goalInBodyUnit}
@@ -752,8 +758,6 @@ export function OnboardingNavigator() {
         />
       );
     }
-    case 'auth':
-      return <SignInScreen onBack={goBack} />;
     case 'paywall':
       return <PaywallScreen onComplete={goNext} />;
     case 'welcomeIn':

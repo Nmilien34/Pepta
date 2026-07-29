@@ -8,7 +8,12 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Platform, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Defs, LinearGradient, Path, Stop } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
+import * as AppleAuthentication from 'expo-apple-authentication';
+import { Linking } from 'react-native';
 import { Confetti, ConvoButton, ConvoScreen, convo } from '../../components';
+import { ProviderButton } from '../auth/SignInScreen';
+import { useProviderSignIn } from '../auth/useProviderSignIn';
+import { PRIVACY_URL, TERMS_URL } from '../../config';
 import { buildRevealSegments } from './revealPacing';
 import type { RampStyle } from '../../utils/hapticRamp';
 import { typography } from '../../theme/typography';
@@ -39,6 +44,13 @@ export interface RevealScreenProps {
   unit: 'lb' | 'kg';
   targets: PlanTargets;
   projection: GoalProjection;
+  /**
+   * The merged reveal+auth turn: signed-out users get the save-your-plan auth
+   * block where the CTA used to be — auth IS the claim action, and a
+   * successful sign-in advances the flow (the navigator watches auth state).
+   * Signed-in users (resume, re-onboarding) keep the single Start today CTA.
+   */
+  authenticated: boolean;
   onContinue(): void;
 }
 
@@ -49,6 +61,7 @@ export function RevealScreen({
   unit,
   targets,
   projection,
+  authenticated,
   onContinue,
 }: RevealScreenProps) {
   const [revealed, setRevealed] = useState(false);
@@ -77,7 +90,13 @@ export function RevealScreen({
         question="Your tracker is ready"
         questionAccent
         onTyped={() => setRevealed(true)}
-        footer={<ConvoButton label="Start today" onPress={onContinue} />}
+        footer={
+          authenticated ? (
+            <ConvoButton label="Start today" onPress={onContinue} />
+          ) : (
+            <SavePlanAuth />
+          )
+        }
       >
         <GoalPathCard
           start={revealed}
@@ -94,6 +113,78 @@ export function RevealScreen({
     </View>
   );
 }
+
+// The save block that replaced both the old Start today CTA and the entire
+// standalone auth screen. Copy rule: this is the user protecting the plan
+// they just watched being built — never "create an account" / "sign up".
+function SavePlanAuth() {
+  const { busy, error, showApple, handleApple, handleGoogle } = useProviderSignIn();
+  return (
+    <View>
+      <Text style={authStyles.heading}>Save your plan to start today</Text>
+      <View style={{ gap: 9, marginTop: 12 }}>
+        <ProviderButton
+          variant="google"
+          label="Continue with Google"
+          busy={busy === 'google'}
+          disabled={busy != null}
+          onPress={() => void handleGoogle()}
+        />
+        {showApple ? (
+          // Apple's own button — App Review guideline 4 requires the system
+          // artwork, not a redrawn logo.
+          <AppleAuthentication.AppleAuthenticationButton
+            buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+            buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+            cornerRadius={999}
+            style={{ height: 52, opacity: busy != null && busy !== 'apple' ? 0.5 : 1 }}
+            onPress={() => {
+              if (busy == null) void handleApple();
+            }}
+          />
+        ) : null}
+      </View>
+      {error ? <Text style={authStyles.error}>{error}</Text> : null}
+      <Text style={authStyles.legal}>
+        By continuing you agree to our{' '}
+        <Text style={authStyles.legalLink} onPress={() => void Linking.openURL(TERMS_URL)}>
+          Terms
+        </Text>{' '}
+        and{' '}
+        <Text style={authStyles.legalLink} onPress={() => void Linking.openURL(PRIVACY_URL)}>
+          Privacy Policy
+        </Text>
+        .
+      </Text>
+    </View>
+  );
+}
+
+const authStyles = StyleSheet.create({
+  heading: {
+    fontFamily: typography.fonts.heavy,
+    fontSize: 16,
+    letterSpacing: -0.2,
+    color: convo.ink,
+    textAlign: 'center',
+  },
+  error: {
+    fontFamily: typography.fonts.semiBold,
+    fontSize: 12,
+    color: '#C43D3D',
+    textAlign: 'center',
+    marginTop: 9,
+  },
+  legal: {
+    fontFamily: typography.fonts.medium,
+    fontSize: 10,
+    lineHeight: 15,
+    color: convo.faint,
+    textAlign: 'center',
+    marginTop: 9,
+  },
+  legalLink: { textDecorationLine: 'underline', color: convo.soft },
+});
 
 interface GoalPathCardProps {
   start: boolean;

@@ -94,12 +94,16 @@ export const ONBOARDING_STEPS = [
   'needs',
   'notifications',
   'crafting',
+  // The standalone `auth` turn was MERGED INTO `reveal` (2026-07-29): the
+  // save-your-plan auth block lives where Start today used to be, so signing
+  // in IS claiming the plan — one screen fewer, and the dead tap between
+  // "here is your plan" and "make an account" is gone. A saved draft sitting
+  // at 'auth' resumes at 'reveal' via migrateLegacyStep in onboardingDraft.
   'reveal',
-  'auth',
-  // NOTE: the 'referral' code-entry turn used to sit here (auth → paywall).
-  // Removed 2026-07-27 — near-everyone who reached it tapped Skip, so it was
-  // pure friction in front of the wall. `ReferralCodeScreen` is kept (it is the
-  // only code-claim surface in the app) pending a lower-friction home for it.
+  // NOTE: the 'referral' code-entry turn used to sit between auth and the
+  // paywall. Removed 2026-07-27 — near-everyone who reached it tapped Skip.
+  // `ReferralCodeScreen` is kept (the only code-claim surface in the app)
+  // pending a lower-friction home for it.
   'paywall',
   'welcomeIn',
 ] as const;
@@ -136,8 +140,6 @@ export function progressForStep(step: OnboardingStep): number {
 // Answers that gate which steps apply. Kept as plain literals so this module
 // stays free of screen imports.
 export interface FlowContext {
-  // Whether the user has signed in — the `auth` step is skipped once true.
-  authenticated?: boolean;
   // Resolved active access (approved creator or existing subscriber): the
   // referral and paywall steps are skipped — Auth → welcomeIn directly.
   accessActive?: boolean;
@@ -166,8 +168,6 @@ const MEDICATION_BLOCK: readonly OnboardingStep[] = [
 ];
 
 export function shouldSkipStep(step: OnboardingStep, ctx: FlowContext): boolean {
-  // Already signed in → the sign-in step is unnecessary.
-  if (step === 'auth' && ctx.authenticated) return true;
   // Approved creators / active subscribers never see the wall.
   if (step === 'paywall' && ctx.accessActive) return true;
   // Not actively dosing → skip the dose/frequency/shot-day block (and the
