@@ -9,6 +9,7 @@ import React, {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -36,6 +37,8 @@ import type {
   WeightLogResponse,
 } from "@pepta/shared";
 import { api } from "../services/api";
+import { useAuth } from "./AuthContext";
+import { readSnapshot, writeSnapshot } from "../services/peptaSnapshotStore";
 import { hasAIDataSharingConsent } from "../services/aiConsent";
 import { extractApiError, isOffline } from "../services/apiError";
 
@@ -212,9 +215,47 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
   const hasTrack = useRef(false);
   const hasProgress = useRef(false);
 
+  // ── Account isolation (P0) ─────────────────────────────────────────────
+  // This provider mounts ONCE, above AccessGate, and used to keep its state
+  // across logout/login. On a shared device, account B could briefly see
+  // account A's Home/Track/Progress. The wipe below runs in the RENDER phase
+  // (React's derived-state pattern), so it completes before anything paints —
+  // an effect would run after paint, which is one frame too late for a
+  // privacy wipe. The epoch invalidates in-flight async work: any fetch or
+  // optimistic revert started under a previous account checks the epoch
+  // before touching state, so a slow response can never land in the wrong
+  // account's session.
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
+  const sessionEpoch = useRef(0);
+  const [boundUserId, setBoundUserId] = useState<string | null>(userId);
+  if (boundUserId !== userId) {
+    sessionEpoch.current += 1;
+    setBoundUserId(userId);
+    setHome(null);
+    setHomeLoading(false);
+    setHomeRefreshing(false);
+    setHomeError(null);
+    setHomeRange("today");
+    setTrack(null);
+    setTrackLoading(false);
+    setTrackRefreshing(false);
+    setTrackError(null);
+    setSchedules(null);
+    setCycles(null);
+    setProgress(null);
+    setProgressLoading(false);
+    setProgressRefreshing(false);
+    setProgressError(null);
+    hasData.current = false;
+    hasTrack.current = false;
+    hasProgress.current = false;
+  }
+
   const refreshHome = useCallback(
     async (range?: HomeRangeKey) => {
       const nextRange = range ?? homeRange;
+      const epoch = sessionEpoch.current;
       if (range) setHomeRange(range);
       setHomeError(null);
       if (hasData.current) setHomeRefreshing(true);
@@ -222,13 +263,17 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
       try {
         const aiDataSharingConsent = await hasAIDataSharingConsent().catch(() => false);
         const data = await api.getHome(nextRange, { aiDataSharingConsent });
+        if (epoch !== sessionEpoch.current) return;
         setHome(data);
         hasData.current = true;
       } catch (error) {
+        if (epoch !== sessionEpoch.current) return;
         setHomeError(errorMessage(error));
       } finally {
-        setHomeLoading(false);
-        setHomeRefreshing(false);
+        if (epoch === sessionEpoch.current) {
+          setHomeLoading(false);
+          setHomeRefreshing(false);
+        }
       }
     },
     [homeRange],
@@ -255,6 +300,7 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
   // next refresh reconciles to server truth). On a failed POST we revert.
   const bumpProtein = useCallback(
     (grams: number) => {
+      const epoch = sessionEpoch.current;
       setHome((h) =>
         h
           ? updateRangeTotals(
@@ -275,6 +321,7 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
       api
         .createProteinLog({ grams, datetime: new Date().toISOString() })
         .catch(() => {
+          if (epoch !== sessionEpoch.current) return;
           setHome((h) =>
             h
               ? updateRangeTotals(
@@ -298,6 +345,7 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
   );
   const bumpWater = useCallback(
     (oz: number) => {
+      const epoch = sessionEpoch.current;
       setHome((h) =>
         h
           ? updateRangeTotals(
@@ -315,6 +363,7 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
       api
         .createWaterLog({ amountOz: oz, datetime: new Date().toISOString() })
         .catch(() => {
+          if (epoch !== sessionEpoch.current) return;
           setHome((h) =>
             h
               ? updateRangeTotals(
@@ -334,6 +383,7 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
   );
   const bumpFiber = useCallback(
     (grams: number) => {
+      const epoch = sessionEpoch.current;
       setHome((h) =>
         h
           ? updateRangeTotals(
@@ -351,6 +401,7 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
       api
         .createFiberLog({ grams, datetime: new Date().toISOString() })
         .catch(() => {
+          if (epoch !== sessionEpoch.current) return;
           setHome((h) =>
             h
               ? updateRangeTotals(
@@ -373,18 +424,23 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
   );
 
   const refreshTrack = useCallback(async () => {
+    const epoch = sessionEpoch.current;
     setTrackError(null);
     if (hasTrack.current) setTrackRefreshing(true);
     else setTrackLoading(true);
     try {
       const data = await api.getTrack();
+      if (epoch !== sessionEpoch.current) return;
       setTrack(data);
       hasTrack.current = true;
     } catch (error) {
+      if (epoch !== sessionEpoch.current) return;
       setTrackError(errorMessage(error));
     } finally {
-      setTrackLoading(false);
-      setTrackRefreshing(false);
+      if (epoch === sessionEpoch.current) {
+        setTrackLoading(false);
+        setTrackRefreshing(false);
+      }
     }
   }, []);
 
@@ -505,7 +561,9 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
 
   const addCompound = useCallback(
     async (input: CompoundInput) => {
+      const epoch = sessionEpoch.current;
       const compound = await api.createCompound(input);
+      if (epoch !== sessionEpoch.current) return compound;
       setHome((h) => homeWithAddedCompound(h, compound));
       await Promise.all([refreshHome(), refreshTrack()]).catch(() => undefined);
       return compound;
@@ -514,20 +572,73 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
   );
 
   const refreshProgress = useCallback(async () => {
+    const epoch = sessionEpoch.current;
     setProgressError(null);
     if (hasProgress.current) setProgressRefreshing(true);
     else setProgressLoading(true);
     try {
       const data = await api.getProgress();
+      if (epoch !== sessionEpoch.current) return;
       setProgress(data);
       hasProgress.current = true;
     } catch (error) {
+      if (epoch !== sessionEpoch.current) return;
       setProgressError(errorMessage(error));
     } finally {
-      setProgressLoading(false);
-      setProgressRefreshing(false);
+      if (epoch === sessionEpoch.current) {
+        setProgressLoading(false);
+        setProgressRefreshing(false);
+      }
     }
   }, []);
+
+  // ── Durable last-known snapshot (per user) ────────────────────────────
+  // The cache the app never had: Home/Track/Progress lived only in React
+  // memory, so every cold start and every re-login began with a spinner even
+  // for a user whose data was on this device minutes ago. On sign-in we
+  // hydrate whatever is still empty from the user's OWN snapshot (keyed by
+  // user id — account B can never read account A's cache), then immediately
+  // refresh from the server in the background. hasX is set before the kick so
+  // the refreshers take the quiet "refreshing" path: the user reads cached
+  // data instead of watching a spinner. The snapshot is never truth — every
+  // fresh payload overwrites it via the write-through effect below.
+  const refreshersRef = useRef({ refreshHome, refreshTrack, refreshProgress });
+  refreshersRef.current = { refreshHome, refreshTrack, refreshProgress };
+
+  useEffect(() => {
+    if (!userId) return undefined;
+    const epoch = sessionEpoch.current;
+    let alive = true;
+    void readSnapshot(userId).then((snapshot) => {
+      if (!alive || epoch !== sessionEpoch.current) return;
+      if (!snapshot) return; // fresh account: screens fetch on mount as always
+      // A fetch that already landed wins over the cache, always.
+      setHome((h) => h ?? snapshot.home);
+      setTrack((t) => t ?? snapshot.track);
+      setProgress((p) => p ?? snapshot.progress);
+      if (snapshot.home) hasData.current = true;
+      if (snapshot.track) hasTrack.current = true;
+      if (snapshot.progress) hasProgress.current = true;
+      // Hydration makes the screens' fetch-on-null triggers see non-null, so
+      // freshness is the provider's job here: kick background refreshes now.
+      const { refreshHome: rh, refreshTrack: rt, refreshProgress: rp } = refreshersRef.current;
+      void rh();
+      void rt();
+      void rp();
+    });
+    return () => {
+      alive = false;
+    };
+    // Depends on userId only: the refreshers are reached through the ref so a
+    // homeRange change cannot re-run hydration and re-kick three fetches.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
+
+  useEffect(() => {
+    if (!userId) return;
+    if (!home && !track && !progress) return;
+    void writeSnapshot(userId, { home, track, progress });
+  }, [userId, home, track, progress]);
 
   const value = useMemo<PeptaDataContextValue>(
     () => ({

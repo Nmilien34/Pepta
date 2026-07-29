@@ -1,4 +1,5 @@
 import React from "react";
+import { testStorage } from "../testStorage";
 import TestRenderer, { act } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PeptaDataProvider, usePeptaData } from "../../context/PeptaDataContext";
@@ -16,6 +17,12 @@ const { mockApi } = vi.hoisted(() => ({
     createCompound: vi.fn(),
   },
 }));
+// The provider now binds its state to the authenticated user (account
+// isolation); these tests exercise one fixed user.
+vi.mock("../../context/AuthContext", () => ({
+  useAuth: () => ({ user: { id: "test-user" } }),
+}));
+
 vi.mock("../../services/api", () => ({ api: mockApi }));
 
 type DataValue = ReturnType<typeof usePeptaData>;
@@ -55,6 +62,9 @@ const flush = () => act(async () => { await Promise.resolve(); });
 
 describe("PeptaDataContext", () => {
   beforeEach(() => {
+    // The provider now write-throughs to the snapshot cache; without this,
+    // one test's cache hydrates the next test's mount.
+    testStorage.clear();
     vi.clearAllMocks();
   });
   afterEach(() => {
