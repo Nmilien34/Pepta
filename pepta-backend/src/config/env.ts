@@ -43,11 +43,14 @@ const envSchema = z
     // time; these only override (PEPTA_LATEST_VERSION is the escape hatch for
     // a stale Lookup API, PEPTA_MINIMUM_VERSION + PEPTA_FORCE_UPDATE=true arm
     // the dormant hard gate).
-    PEPTA_MINIMUM_VERSION: z.string().min(1).optional(),
+    // Deliberately NOT min(1): a var left set-but-empty in the Render
+    // dashboard must read as unset, never fail startup — an update-prompt
+    // knob can not be allowed to take production down.
+    PEPTA_MINIMUM_VERSION: z.string().optional(),
     PEPTA_FORCE_UPDATE: z.string().optional(),
-    PEPTA_UPDATE_TITLE: z.string().min(1).optional(),
-    PEPTA_UPDATE_MESSAGE: z.string().min(1).optional(),
-    PEPTA_LATEST_VERSION: z.string().min(1).optional(),
+    PEPTA_UPDATE_TITLE: z.string().optional(),
+    PEPTA_UPDATE_MESSAGE: z.string().optional(),
+    PEPTA_LATEST_VERSION: z.string().optional(),
     SCHEDULER_TIMEZONE: z.string().min(1).default('America/New_York'),
     WEEKLY_RETENTION_CRON: z.string().min(1).default('0 8 * * 1'),
     MEDICATION_LEVEL_CRON: z.string().min(1).default('0 3 * * *'),
@@ -119,6 +122,11 @@ if (!parsed.success) {
   throw new Error('Invalid environment configuration');
 }
 
+function emptyToNull(value?: string): string | null {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+}
+
 function decodeApplePrivateKey(value?: string): string | undefined {
   return value ? Buffer.from(value, 'base64').toString('utf8').replace(/\\n/g, '\n') : undefined;
 }
@@ -180,11 +188,13 @@ export const env = {
     hmacKeysJson: parsed.data.COMPLIMENTARY_ACCESS_HMAC_KEYS_JSON,
   },
   appUpdate: {
-    minimumVersion: parsed.data.PEPTA_MINIMUM_VERSION ?? null,
-    forceUpdate: parsed.data.PEPTA_FORCE_UPDATE === 'true',
-    title: parsed.data.PEPTA_UPDATE_TITLE ?? null,
-    message: parsed.data.PEPTA_UPDATE_MESSAGE ?? null,
-    latestVersionOverride: parsed.data.PEPTA_LATEST_VERSION ?? null,
+    minimumVersion: emptyToNull(parsed.data.PEPTA_MINIMUM_VERSION),
+    // Tolerant parse ("TRUE", " true ") — but anything else stays false:
+    // the hard gate must be impossible to arm by accident.
+    forceUpdate: parsed.data.PEPTA_FORCE_UPDATE?.trim().toLowerCase() === 'true',
+    title: emptyToNull(parsed.data.PEPTA_UPDATE_TITLE),
+    message: emptyToNull(parsed.data.PEPTA_UPDATE_MESSAGE),
+    latestVersionOverride: emptyToNull(parsed.data.PEPTA_LATEST_VERSION),
   },
   scheduler: {
     timezone: parsed.data.SCHEDULER_TIMEZONE,

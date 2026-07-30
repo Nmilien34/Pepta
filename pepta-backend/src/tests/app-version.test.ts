@@ -174,6 +174,43 @@ describe('GET /app-config/version', () => {
   });
 });
 
+describe('PEPTA_* env parsing can never take the server down', () => {
+  it('empty-string vars read as unset and boot succeeds; force flag is tolerant but strict', async () => {
+    // A var left set-but-empty in the Render dashboard must behave exactly
+    // like an unset one — the HMAC keyring incident class, closed here.
+    vi.resetModules();
+    process.env.PEPTA_LATEST_VERSION = '';
+    process.env.PEPTA_MINIMUM_VERSION = '   ';
+    process.env.PEPTA_UPDATE_TITLE = '';
+    process.env.PEPTA_FORCE_UPDATE = ' TRUE ';
+    try {
+      const { env } = await import('../config/env');
+      expect(env.appUpdate.latestVersionOverride).toBeNull();
+      expect(env.appUpdate.minimumVersion).toBeNull();
+      expect(env.appUpdate.title).toBeNull();
+      // Case/whitespace tolerant…
+      expect(env.appUpdate.forceUpdate).toBe(true);
+    } finally {
+      delete process.env.PEPTA_LATEST_VERSION;
+      delete process.env.PEPTA_MINIMUM_VERSION;
+      delete process.env.PEPTA_UPDATE_TITLE;
+      delete process.env.PEPTA_FORCE_UPDATE;
+      vi.resetModules();
+    }
+    // …but anything that is not "true" stays false: the hard gate must be
+    // impossible to arm by accident.
+    vi.resetModules();
+    process.env.PEPTA_FORCE_UPDATE = 'yes';
+    try {
+      const { env } = await import('../config/env');
+      expect(env.appUpdate.forceUpdate).toBe(false);
+    } finally {
+      delete process.env.PEPTA_FORCE_UPDATE;
+      vi.resetModules();
+    }
+  });
+});
+
 describe('bundle id hygiene', () => {
   it('matches pepta-frontend/app.config.js — the lookup must query OUR app', () => {
     const appConfig = readFileSync(

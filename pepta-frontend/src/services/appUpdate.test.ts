@@ -99,6 +99,22 @@ describe("selectUpdateMode", () => {
     ).toBe("hard");
   });
 
+  it("bricking guard: never hard-gates someone already on the newest known version", () => {
+    // Misconfig: floor typo'd ABOVE the real store release. Users on the
+    // latest have nothing to update to — a non-dismissible gate would brick
+    // them. They must see nothing at all.
+    const typoFloor = {
+      latestVersion: "1.0.5",
+      minimumVersion: "1.0.6",
+      forceUpdate: true,
+    };
+    expect(selectUpdateMode("1.0.5", typoFloor)).toBeNull();
+    expect(selectUpdateMode("1.0.6", typoFloor)).toBeNull();
+    // Users genuinely behind still get gated (updating to 1.0.5 then
+    // releases them via the guard above — self-healing, no loop).
+    expect(selectUpdateMode("1.0.3", typoFloor)).toBe("hard");
+  });
+
   it("null latestVersion with no gate means show nothing", () => {
     expect(selectUpdateMode("1.0.4", { ...baseConfig, latestVersion: null })).toBeNull();
   });

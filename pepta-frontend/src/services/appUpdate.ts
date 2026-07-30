@@ -85,7 +85,14 @@ export function selectUpdateMode(
   if (
     config.forceUpdate &&
     config.minimumVersion &&
-    compareVersions(runningVersion, config.minimumVersion) < 0
+    compareVersions(runningVersion, config.minimumVersion) < 0 &&
+    // Bricking guard: never hard-gate someone already on (or past) the
+    // newest version the store is known to carry — a floor typo'd above the
+    // real release would otherwise lock users out with nothing to update
+    // to. With latestVersion unknown (Apple down, no cache) the floor is
+    // trusted as-is, so an armed gate still works through an Apple outage.
+    (!config.latestVersion ||
+      compareVersions(runningVersion, config.latestVersion) < 0)
   ) {
     return "hard";
   }
