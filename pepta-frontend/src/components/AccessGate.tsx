@@ -9,6 +9,7 @@ import { useAuth } from '../context/AuthContext';
 import { useAccess } from '../context/AccessContext';
 import { useTheme } from '../theme';
 import { MainTabs } from '../navigation/MainTabs';
+import { AppUpdateGate } from './AppUpdateGate';
 import { OnboardingNavigator } from '../screens/onboarding/OnboardingNavigator';
 import { PaywallScreen } from '../screens/onboarding/PaywallScreen';
 import { AccessSetupScreen } from '../screens/access/AccessSetupScreen';
@@ -33,9 +34,13 @@ export function AccessGate() {
   // Authenticated but undecided: hold the first frame — never guess.
   if (!decision) return <Blank />;
 
+  // AppUpdateGate lives ONLY in the onboarded shell: mid-onboarding users
+  // never see an update prompt (the funnel is not interrupted); their check
+  // simply happens whenever this shell first mounts.
   const shell = onboarded ? (
     <NavigationContainer>
       <MainTabs />
+      <AppUpdateGate />
     </NavigationContainer>
   ) : (
     <OnboardingNavigator />

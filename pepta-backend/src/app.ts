@@ -38,6 +38,7 @@ import {
   createSchedulesRouter,
 } from "./routes/catalog.routes";
 import { createLogRouter } from "./routes/log-routes.factory";
+import { createAppConfigRouter } from "./routes/app-config.routes";
 import { createHealthRouter } from "./routes/health.routes";
 import diagnosticsRoutes from "./routes/diagnostics.routes";
 import homeRoutes from "./routes/home.routes";
@@ -130,6 +131,9 @@ export function createApp(options: CreateAppOptions = {}): Express {
   app.use(express.json({ limit: "1mb" }));
 
   app.use(createHealthRouter(healthCheck));
+  // Public app config (update prompt): no auth — must answer on a cold
+  // launch before sign-in. Part of the unauthenticated allowlist below.
+  app.use("/app-config", createAppConfigRouter());
   app.use(
     "/auth",
     createInMemoryRateLimiter({
@@ -145,7 +149,7 @@ export function createApp(options: CreateAppOptions = {}): Express {
   app.use("/me", meRoutes);
   // Premium product routes: requireAuth first (guard reads req.user), then
   // persisted-projection authorization. Allowlisted (design doc): auth, me,
-  // access, onboarding, referrals, webhooks, legal, health.
+  // access, onboarding, referrals, webhooks, legal, health, app-config.
   const premium = [requireAuth, requireActiveAccess] as const;
   app.use("/onboarding", onboardingRoutes);
   app.use("/referrals", referralRoutes);

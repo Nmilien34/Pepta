@@ -104,6 +104,24 @@ export function logPaywallOfferingDebug(payload: {
   });
 }
 
+// Update-prompt engagement: shown fires once per displayed prompt, action
+// fires per button press, so shown-without-action measures ignored prompts.
+export function logUpdatePromptShown(payload: {
+  runningVersion: string;
+  latestVersion: string | null;
+  mode: "soft" | "hard";
+}): void {
+  void appsFlyer.logAnalyticsEvent("update_prompt_shown", {
+    runningVersion: payload.runningVersion,
+    latestVersion: payload.latestVersion ?? "null",
+    mode: payload.mode,
+  });
+}
+
+export function logUpdatePromptAction(action: "update" | "later"): void {
+  void appsFlyer.logAnalyticsEvent("update_prompt_action", { action });
+}
+
 export function logPurchaseStarted(
   variant: string,
   packageType: "monthly" | "annual",

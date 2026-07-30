@@ -22,6 +22,11 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("react-native", () => ({ View: "View" }));
+// This suite is about routing; the update prompt's own behavior (and its
+// placement in the onboarded shell) is pinned in AppUpdateGate.test.tsx.
+vi.mock("./AppUpdateGate", () => ({
+  AppUpdateGate: () => React.createElement("AppUpdateGate"),
+}));
 vi.mock("@react-navigation/native", () => ({
   NavigationContainer: ({ children }: { children?: React.ReactNode }) =>
     React.createElement("NavigationContainer", null, children),

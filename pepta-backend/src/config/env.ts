@@ -38,6 +38,16 @@ const envSchema = z
     APPLE_CLIENT_ID: z.string().min(1).optional(),
     APPLE_KEY_ID: z.string().min(1).optional(),
     APPLE_PRIVATE_KEY_BASE64: z.string().min(1).optional(),
+    // App-update prompt overrides — ALL optional and unset by default. The
+    // latest version normally comes from Apple's iTunes Lookup API at request
+    // time; these only override (PEPTA_LATEST_VERSION is the escape hatch for
+    // a stale Lookup API, PEPTA_MINIMUM_VERSION + PEPTA_FORCE_UPDATE=true arm
+    // the dormant hard gate).
+    PEPTA_MINIMUM_VERSION: z.string().min(1).optional(),
+    PEPTA_FORCE_UPDATE: z.string().optional(),
+    PEPTA_UPDATE_TITLE: z.string().min(1).optional(),
+    PEPTA_UPDATE_MESSAGE: z.string().min(1).optional(),
+    PEPTA_LATEST_VERSION: z.string().min(1).optional(),
     SCHEDULER_TIMEZONE: z.string().min(1).default('America/New_York'),
     WEEKLY_RETENTION_CRON: z.string().min(1).default('0 8 * * 1'),
     MEDICATION_LEVEL_CRON: z.string().min(1).default('0 3 * * *'),
@@ -168,6 +178,13 @@ export const env = {
   complimentaryAccess: {
     hmacActiveKeyId: parsed.data.COMPLIMENTARY_ACCESS_HMAC_ACTIVE_KEY_ID,
     hmacKeysJson: parsed.data.COMPLIMENTARY_ACCESS_HMAC_KEYS_JSON,
+  },
+  appUpdate: {
+    minimumVersion: parsed.data.PEPTA_MINIMUM_VERSION ?? null,
+    forceUpdate: parsed.data.PEPTA_FORCE_UPDATE === 'true',
+    title: parsed.data.PEPTA_UPDATE_TITLE ?? null,
+    message: parsed.data.PEPTA_UPDATE_MESSAGE ?? null,
+    latestVersionOverride: parsed.data.PEPTA_LATEST_VERSION ?? null,
   },
   scheduler: {
     timezone: parsed.data.SCHEDULER_TIMEZONE,

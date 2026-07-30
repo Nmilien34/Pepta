@@ -26,6 +26,13 @@ vi.mock("react-native", () => ({
   },
 }));
 
+// expo-constants pulls in expo-modules-core, which touches the __DEV__
+// global at import time and crashes under node. Tests that care about the
+// version (appUpdate.test.ts) override this with their own mock.
+vi.mock("expo-constants", () => ({
+  default: { expoConfig: { version: "0.0.0-test" } },
+}));
+
 vi.mock("react-native-purchases", () => ({
   LOG_LEVEL: {
     VERBOSE: "VERBOSE",

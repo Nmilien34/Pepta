@@ -5,6 +5,8 @@ import {
   logOnboardingStep,
   logPaywallShown,
   logPurchaseStarted,
+  logUpdatePromptAction,
+  logUpdatePromptShown,
   resetFunnelSessionGuardsForTest,
 } from "./funnelEvents";
 
@@ -78,6 +80,26 @@ describe("funnel events", () => {
     expect(mocks.logAnalyticsEvent).toHaveBeenCalledWith("purchase_started", {
       variant: "default",
       package: "annual",
+    });
+  });
+
+  it("stringifies update-prompt events, mapping a null latestVersion to \"null\"", async () => {
+    logUpdatePromptShown({ runningVersion: "1.0.4", latestVersion: "1.0.5", mode: "soft" });
+    logUpdatePromptShown({ runningVersion: "1.0.4", latestVersion: null, mode: "hard" });
+    logUpdatePromptAction("later");
+    await settle();
+    expect(mocks.logAnalyticsEvent).toHaveBeenCalledWith("update_prompt_shown", {
+      runningVersion: "1.0.4",
+      latestVersion: "1.0.5",
+      mode: "soft",
+    });
+    expect(mocks.logAnalyticsEvent).toHaveBeenCalledWith("update_prompt_shown", {
+      runningVersion: "1.0.4",
+      latestVersion: "null",
+      mode: "hard",
+    });
+    expect(mocks.logAnalyticsEvent).toHaveBeenCalledWith("update_prompt_action", {
+      action: "later",
     });
   });
 
