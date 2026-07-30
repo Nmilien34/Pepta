@@ -157,6 +157,7 @@ vi.mock("../../services/revenueCat", () => ({
 vi.mock("../../services/funnelEvents", () => ({
   logPaywallShown: mocks.logPaywallShown,
   logPurchaseStarted: mocks.logPurchaseStarted,
+  logPaywallOfferingDebug: vi.fn(),
 }));
 
 function nodeText(node: ReactTestInstance): string {
@@ -418,7 +419,10 @@ describe("PaywallScreen legal links", () => {
     });
 
     expect(mocks.logPaywallShown).toHaveBeenCalledTimes(1);
-    expect(mocks.logPaywallShown).toHaveBeenCalledWith("trial-offer");
+    expect(mocks.logPaywallShown).toHaveBeenCalledWith("trial-offer", {
+      defaultSelectedPlan: "yearly",
+      trialCopyShown: true,
+    });
   });
 
   it("fires purchase_started with variant and package before the store sheet", async () => {

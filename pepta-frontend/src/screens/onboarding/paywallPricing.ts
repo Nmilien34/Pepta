@@ -103,6 +103,24 @@ function trialDurationLabel(trial: { periodNumberOfUnits: number; periodUnit: st
   return `${trial.periodNumberOfUnits} ${plural}`;
 }
 
+/**
+ * The monthly plan-row badge ("3 days free"), derived from the product's own
+ * intro offer — never hardcoded. This is what makes the trial visible on
+ * first render even though yearly is preselected: without it, variant-B users
+ * only ever saw trial copy after tapping the monthly card. Returns undefined
+ * (no badge) when the product has no zero-price intro or copy is not
+ * permitted, which is exactly the control arm's rendering — the two arms
+ * differ only in this badge and the CTA copy.
+ */
+function monthlyTrialBadge(
+  monthly: PricePackage,
+  trialEligible: boolean,
+): string | undefined {
+  const trial = freeTrialOf(monthly);
+  if (!trial || !trialEligible) return undefined;
+  return `${trialDurationLabel(trial)} free`;
+}
+
 function monthlyCta(
   monthly: PricePackage,
   price: string,
@@ -202,6 +220,7 @@ export function buildPaywallPricing(
       sub: "billed monthly",
       price: monthlyPrice,
       per: "/mo",
+      badge: monthlyTrialBadge(monthly, trialEligible),
     },
     footer: {
       yearly: `${annualPrice}/year. Cancel anytime · Terms & Privacy`,

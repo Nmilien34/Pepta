@@ -158,4 +158,28 @@ describe("buildPaywallPricing", () => {
       expect(JSON.stringify(pricing)).not.toContain("$0.00");
     }
   });
+
+  it("puts the trial badge on the monthly ROW, derived from the product, only when permitted", () => {
+    // The visibility fix: yearly is preselected in both arms, so without a
+    // row badge variant-B users only saw trial copy after tapping monthly.
+    const withTrial = {
+      monthly: {
+        product: {
+          price: 9.99,
+          priceString: "$9.99",
+          introPrice: { price: 0, periodNumberOfUnits: 3, periodUnit: "DAY" },
+        },
+      },
+      yearly: packageWithPrice("$40.00", 40),
+    };
+    expect(buildPaywallPricing(withTrial, true).monthly.badge).toBe("3 days free");
+    // Control arm / no intro: no badge — the arms differ only in the trial.
+    expect(buildPaywallPricing(withTrial, false).monthly.badge).toBeUndefined();
+    expect(
+      buildPaywallPricing(
+        { monthly: packageWithPrice("$9.99", 9.99), yearly: packageWithPrice("$40.00", 40) },
+        true,
+      ).monthly.badge,
+    ).toBeUndefined();
+  });
 });

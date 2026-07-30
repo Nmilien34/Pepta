@@ -149,8 +149,38 @@ describe("RevenueCat client", () => {
       yearly,
       offeringId: "default",
       monthlyTrialEligible: false,
+      monthlyTrialEligibilityStatus: null,
     });
     expect(sdk.getOfferings).toHaveBeenCalledTimes(1);
+  });
+
+  it("maps eligibility permissively: UNKNOWN allows copy, INELIGIBLE never does", async () => {
+    // TRIAL_COPY_PERMISSIVE_ON_UNKNOWN: UNKNOWN is common on TestFlight and
+    // fresh Apple IDs; suppressing copy there hid the trial from users who
+    // would in fact receive it. Only an explicit INELIGIBLE suppresses.
+    const cases: Array<[number, boolean]> = [
+      [0, true], // UNKNOWN → permissive
+      [1, false], // INELIGIBLE → never
+      [2, true], // ELIGIBLE
+      [3, true], // NO_INTRO_OFFER_EXISTS → introPrice gate hides copy anyway
+    ];
+    for (const [status, expected] of cases) {
+      const { sdk } = makeSdk();
+      Object.assign(sdk, {
+        checkTrialOrIntroductoryPriceEligibility: vi.fn(async (ids: string[]) => ({
+          [ids[0]!]: { status },
+        })),
+      });
+      const client = createRevenueCatClient({
+        sdk,
+        apiKey: "appl_test_key",
+        platformOS: "ios",
+        devMode: false,
+      });
+      const packages = await client.getPaywallPackages("user_1");
+      expect(packages.monthlyTrialEligible).toBe(expected);
+      expect(packages.monthlyTrialEligibilityStatus).toBe(status);
+    }
   });
 
   it("renders the experiment's assigned offering: current beats the default", async () => {

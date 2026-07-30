@@ -19,11 +19,13 @@ export interface PaywallPackages {
   /** Identifier of the offering these packages came from (experiment arm). */
   offeringId: string;
   /**
-   * Whether THIS user can still receive the monthly product's intro offer.
-   * False on Android, on error, and on RevenueCat's UNKNOWN — the paywall
-   * must not advertise "$0.00" it cannot deliver. See monthlyCta().
+   * Whether trial copy is permitted for the monthly product. False on
+   * Android, on error, and — per TRIAL_COPY_PERMISSIVE_ON_UNKNOWN — on an
+   * explicit INELIGIBLE. See monthlyCta().
    */
   monthlyTrialEligible: boolean;
+  /** Apple's raw eligibility status for diagnostics; null if the check never ran. */
+  monthlyTrialEligibilityStatus: number | null;
 }
 
 export interface RevenueCatResult {
@@ -89,26 +91,51 @@ function packageByIdentifier(
 // than imported so this module keeps its structural-only dependency on the SDK
 // (which is what lets the whole client be unit-tested against a fake).
 const INTRO_ELIGIBILITY_ELIGIBLE = 2;
+const INTRO_ELIGIBILITY_INELIGIBLE = 1;
 
 /**
- * iOS-only. Android and any failure resolve to false: the caller uses this to
- * decide whether to promise a $0.00 trial, and the only safe default for a
- * price claim is "do not make it".
+ * When true, trial copy is permitted unless Apple says INELIGIBLE outright —
+ * UNKNOWN (common on TestFlight and possible on fresh Apple IDs before a
+ * StoreKit sync) no longer suppresses it. The tradeoff, accepted 2026-07-29:
+ * we may occasionally advertise a trial that Apple then does not honor at
+ * purchase. Flip to false to restore strict ELIGIBLE-only copy.
+ */
+export const TRIAL_COPY_PERMISSIVE_ON_UNKNOWN = true;
+
+interface TrialEligibilityResult {
+  eligible: boolean;
+  /** Apple's numeric status, for diagnostics; null when the check never ran. */
+  rawStatus: number | null;
+}
+
+/**
+ * iOS-only. Android, a missing SDK static, and any thrown error resolve to
+ * not-eligible: the caller uses this to decide whether to promise a $0.00
+ * trial, and the only safe default for a price claim is "do not make it".
+ * Within a successful check, the mapping is governed by
+ * TRIAL_COPY_PERMISSIVE_ON_UNKNOWN above.
  */
 async function resolveTrialEligibility(
   sdk: RevenueCatSdk,
   productIdentifier: string | undefined,
   platformOS: string,
-): Promise<boolean> {
-  if (platformOS !== "ios" || !productIdentifier) return false;
-  if (typeof sdk.checkTrialOrIntroductoryPriceEligibility !== "function") return false;
+): Promise<TrialEligibilityResult> {
+  if (platformOS !== "ios" || !productIdentifier) return { eligible: false, rawStatus: null };
+  if (typeof sdk.checkTrialOrIntroductoryPriceEligibility !== "function") {
+    return { eligible: false, rawStatus: null };
+  }
   try {
     const result = await sdk.checkTrialOrIntroductoryPriceEligibility([productIdentifier]);
-    return result?.[productIdentifier]?.status === INTRO_ELIGIBILITY_ELIGIBLE;
+    const status = result?.[productIdentifier]?.status;
+    const rawStatus = typeof status === "number" ? status : null;
+    const eligible = TRIAL_COPY_PERMISSIVE_ON_UNKNOWN
+      ? rawStatus !== null && rawStatus !== INTRO_ELIGIBILITY_INELIGIBLE
+      : rawStatus === INTRO_ELIGIBILITY_ELIGIBLE;
+    return { eligible, rawStatus };
   } catch {
     // An unreachable eligibility check is not a reason to block the paywall —
     // it is a reason to sell it without the trial claim.
-    return false;
+    return { eligible: false, rawStatus: null };
   }
 }
 
@@ -251,6 +278,11 @@ export function createRevenueCatClient(options: RevenueCatClientOptions) {
       offering.monthly ?? packageByIdentifier(offerings, "$rc_monthly"),
       "monthly",
     );
+    const eligibility = await resolveTrialEligibility(
+      sdk,
+      monthly.product.identifier,
+      platformOS,
+    );
 
     return {
       monthly,
@@ -259,11 +291,8 @@ export function createRevenueCatClient(options: RevenueCatClientOptions) {
         "yearly",
       ),
       offeringId: offering.identifier,
-      monthlyTrialEligible: await resolveTrialEligibility(
-        sdk,
-        monthly.product.identifier,
-        platformOS,
-      ),
+      monthlyTrialEligible: eligibility.eligible,
+      monthlyTrialEligibilityStatus: eligibility.rawStatus,
     };
   }
 

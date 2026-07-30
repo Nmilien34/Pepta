@@ -64,8 +64,44 @@ export function logOnboardingStep(stepId: string, index: number): void {
   });
 }
 
-export function logPaywallShown(variant: string): void {
-  void appsFlyer.logAnalyticsEvent("paywall_shown", { variant });
+export function logPaywallShown(
+  variant: string,
+  extras: { defaultSelectedPlan: string; trialCopyShown: boolean },
+): void {
+  // Per-arm trial-visibility rates without waiting on RevenueCat: the wrapper
+  // takes string values only, so the bool is stringified.
+  void appsFlyer.logAnalyticsEvent("paywall_shown", {
+    variant,
+    defaultSelectedPlan: extras.defaultSelectedPlan,
+    trialCopyShown: String(extras.trialCopyShown),
+  });
+}
+
+// TODO(remove): temporary diagnostic for the trial-offer experiment
+// (expa9f87848e1). One event per paywall open, answering on a cable-free
+// TestFlight build: which offering came back, which monthly product it
+// carried, whether that product had an intro offer, what Apple's raw
+// eligibility status was, how it mapped, and whether the badge rendered.
+// Delete once the experiment's trial visibility is confirmed in AppsFlyer.
+export function logPaywallOfferingDebug(payload: {
+  offeringId: string;
+  monthlyProductId: string;
+  hasIntroPrice: boolean;
+  introOfferPeriod: string | null;
+  rawEligibilityStatus: number | null;
+  monthlyTrialEligible: boolean;
+  trialCopyShown: boolean;
+}): void {
+  void appsFlyer.logAnalyticsEvent("paywall_offering_debug", {
+    offeringId: payload.offeringId,
+    monthlyProductId: payload.monthlyProductId,
+    hasIntroPrice: String(payload.hasIntroPrice),
+    introOfferPeriod: payload.introOfferPeriod ?? "null",
+    rawEligibilityStatus:
+      payload.rawEligibilityStatus === null ? "null" : String(payload.rawEligibilityStatus),
+    monthlyTrialEligible: String(payload.monthlyTrialEligible),
+    trialCopyShown: String(payload.trialCopyShown),
+  });
 }
 
 export function logPurchaseStarted(

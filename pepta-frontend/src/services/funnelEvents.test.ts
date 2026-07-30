@@ -63,10 +63,12 @@ describe("funnel events", () => {
   });
 
   it("passes the offering variant through paywall_shown", async () => {
-    logPaywallShown("trial-offer");
+    logPaywallShown("trial-offer", { defaultSelectedPlan: "yearly", trialCopyShown: true });
     await settle();
     expect(mocks.logAnalyticsEvent).toHaveBeenCalledWith("paywall_shown", {
       variant: "trial-offer",
+      defaultSelectedPlan: "yearly",
+      trialCopyShown: "true",
     });
   });
 

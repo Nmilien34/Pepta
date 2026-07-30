@@ -18,7 +18,7 @@ import {
   REVENUECAT_ENTITLEMENT_ID,
   type RevenueCatPlan,
 } from "../../services/revenueCat";
-import { logPaywallShown, logPurchaseStarted } from "../../services/funnelEvents";
+import { logPaywallOfferingDebug, logPaywallShown, logPurchaseStarted } from "../../services/funnelEvents";
 import { buildPaywallPricing } from "./paywallPricing";
 import { scheduleTrialEndReminder } from "../../services/trialReminder.service";
 
@@ -66,10 +66,12 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
   // (so `variant` is the real experiment arm, or 'unknown' on failure).
   const shownLogged = useRef(false);
 
-  const logShownOnce = (variant: string) => {
+  const logShownOnce = (variant: string, trialCopyShown: boolean) => {
     if (shownLogged.current) return;
     shownLogged.current = true;
-    logPaywallShown(variant);
+    // The default plan is the useState initial above — restate it here so the
+    // dashboard shows it explicitly rather than by convention.
+    logPaywallShown(variant, { defaultSelectedPlan: "yearly", trialCopyShown });
   };
 
   useEffect(() => {
@@ -87,7 +89,26 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
       .then((packages) => {
         if (!mounted) return;
         setPaywallPackages(packages);
-        logShownOnce(packages?.offeringId ?? "unknown");
+        // Same derivation the render uses — badge presence IS trial visibility.
+        const trialCopyShown =
+          buildPaywallPricing(packages, packages?.monthlyTrialEligible ?? false).monthly.badge != null;
+        logShownOnce(packages?.offeringId ?? "unknown", trialCopyShown);
+        if (packages) {
+          // TODO(remove): temporary experiment diagnostic — see funnelEvents.
+          const intro = packages.monthly.product.introPrice;
+          logPaywallOfferingDebug({
+            offeringId: packages.offeringId,
+            monthlyProductId: packages.monthly.product.identifier,
+            hasIntroPrice: intro != null,
+            introOfferPeriod:
+              intro?.periodNumberOfUnits != null && intro?.periodUnit != null
+                ? `${intro.periodNumberOfUnits} ${String(intro.periodUnit).toLowerCase()}`
+                : null,
+            rawEligibilityStatus: packages.monthlyTrialEligibilityStatus,
+            monthlyTrialEligible: packages.monthlyTrialEligible,
+            trialCopyShown,
+          });
+        }
       })
       .catch((error) => {
         // Loud by design: a silent fallback here would hide the experiment
@@ -95,7 +116,7 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
         console.error("[Paywall] getOfferings failed:", error);
         if (!mounted) return;
         setPaywallPackages(null);
-        logShownOnce("unknown");
+        logShownOnce("unknown", false);
       });
 
     return () => {
@@ -297,6 +318,7 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
               sub={pricing.monthly.sub}
               price={pricing.monthly.price}
               per={pricing.monthly.per}
+              badge={pricing.monthly.badge}
             />
           </View>
         </ScrollView>
