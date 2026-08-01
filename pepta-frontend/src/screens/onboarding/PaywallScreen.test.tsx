@@ -60,6 +60,22 @@ vi.mock("react-native", () => ({
   ScrollView: ({ children, ...props }: { children?: React.ReactNode }) =>
     React.createElement("ScrollView", props, children),
   StatusBar: "StatusBar",
+  StyleSheet: { create: (styles: unknown) => styles },
+  Platform: { OS: "ios" },
+  Easing: { bezier: () => "bezier", inOut: (v: unknown) => v, quad: "quad" },
+  Animated: {
+    Value: class {
+      constructor(public value: number) {}
+      interpolate() {
+        return 0;
+      }
+      setValue() {}
+    },
+    View: ({ children, ...props }: { children?: React.ReactNode }) =>
+      React.createElement("Animated.View", props, children),
+    timing: () => ({ start: (cb?: (r: { finished: boolean }) => void) => cb?.({ finished: true }), stop: () => undefined }),
+    spring: () => ({ start: (cb?: (r: { finished: boolean }) => void) => cb?.({ finished: true }), stop: () => undefined }),
+  },
   Text: ({ children, ...props }: { children?: React.ReactNode }) =>
     React.createElement("Text", props, children),
   View: "View",
@@ -262,7 +278,7 @@ describe("PaywallScreen legal links", () => {
     expect(
       tree!.root.findAll((node) => node.props.accessibilityLabel === "Close"),
     ).toHaveLength(0);
-    expect(button(tree!.root, "Subscribe")).toBeTruthy();
+    expect(button(tree!.root, "Start my year — $40.00")).toBeTruthy();
     expect(allText(tree!.root).toLowerCase()).not.toContain("free trial");
     expect(allText(tree!.root).toLowerCase()).not.toContain("7 days free");
 
@@ -284,7 +300,7 @@ describe("PaywallScreen legal links", () => {
       );
     });
 
-    const subscribe = button(tree!.root, "Subscribe");
+    const subscribe = button(tree!.root, "Start my year — $39.99");
     expect(subscribe.props.disabled).toBe(true);
     expect(allText(tree!.root)).toContain("Loading App Store plans");
 
@@ -307,7 +323,7 @@ describe("PaywallScreen legal links", () => {
     });
 
     await act(async () => {
-      await button(tree!.root, "Subscribe").props.onPress();
+      await button(tree!.root, "Start my year — $40.00").props.onPress();
     });
 
     expect(mocks.purchasePlan).toHaveBeenCalledWith("u1", "yearly");
@@ -330,7 +346,7 @@ describe("PaywallScreen legal links", () => {
     });
 
     await act(async () => {
-      await button(tree!.root, "Subscribe").props.onPress();
+      await button(tree!.root, "Start my year — $40.00").props.onPress();
     });
 
     expect(mocks.purchasePlan).toHaveBeenCalledWith("u1", "yearly");
@@ -356,7 +372,7 @@ describe("PaywallScreen legal links", () => {
     });
 
     await act(async () => {
-      await button(tree!.root, "Subscribe").props.onPress();
+      await button(tree!.root, "Start my year — $40.00").props.onPress();
     });
 
     expect(mocks.purchasePlan).toHaveBeenCalledWith("u1", "yearly");
@@ -385,8 +401,8 @@ describe("PaywallScreen legal links", () => {
       );
     });
 
-    // Yearly (default selection) has no trial — plain Subscribe CTA.
-    expect(button(tree!.root, "Subscribe")).toBeTruthy();
+    // Yearly (default selection) has no trial — an honest purchase CTA.
+    expect(button(tree!.root, "Start my year — $40.00")).toBeTruthy();
 
     // Select the monthly plan (second radio card).
     const monthlyRadio = tree!.root.findAll(
@@ -399,9 +415,9 @@ describe("PaywallScreen legal links", () => {
     });
 
     // Duration and renewal price are derived from the product, not literals.
-    expect(button(tree!.root, "Start 3 days for $0.00")).toBeTruthy();
+    expect(button(tree!.root, "Try today for $0.00")).toBeTruthy();
     const text = allText(tree!.root);
-    expect(text).toContain("We'll remind you before it ends. Then $9.99/mo, auto-renews. Cancel anytime in Settings.");
+    expect(text).toContain("3 days free — we'll remind you before it ends. Then $9.99/mo, auto-renews. Cancel anytime in Settings.");
   });
 
   it("fires paywall_shown once per presentation with the offering variant", async () => {
@@ -439,7 +455,7 @@ describe("PaywallScreen legal links", () => {
     });
 
     await act(async () => {
-      await button(tree!.root, "Subscribe").props.onPress();
+      await button(tree!.root, "Start my year — $40.00").props.onPress();
     });
 
     expect(mocks.logPurchaseStarted).toHaveBeenCalledTimes(1);

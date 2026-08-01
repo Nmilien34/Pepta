@@ -57,6 +57,8 @@ import { FearAnsweredScreen } from './FearAnsweredScreen';
 import { NotificationsScreen } from './NotificationsScreen';
 import { CraftingScreen } from './CraftingScreen';
 import { RevealScreen } from './RevealScreen';
+import { TrialOfferScreen } from './TrialOfferScreen';
+import { TrialCarouselScreen } from './TrialCarouselScreen';
 import { PaywallScreen } from './PaywallScreen';
 import { WelcomeInScreen } from './WelcomeInScreen';
 import type { ActivityLevel, BiggestWorry, InjectionDeviceType, TrainingStatus } from '@pepta/shared';
@@ -342,7 +344,8 @@ export function OnboardingNavigator() {
 
   // Signing in — from the merged reveal's save block, or via the welcome's
   // returning-user "Sign in" — is the trigger to move on: close the sheet, and
-  // if the sign-in HAPPENED on the reveal, advance to the paywall. The ref
+  // if the sign-in HAPPENED on the reveal, advance to the next step (the trial
+  // warm-up, or straight to the wall when it gates itself out). The ref
   // makes this transition-only: a user who resumes already signed in lands on
   // the reveal's Start-today variant and taps through themselves, instead of
   // being flung past their own payoff screen on mount.
@@ -758,6 +761,26 @@ export function OnboardingNavigator() {
         />
       );
     }
+    case 'trialOffer':
+      return (
+        <TrialOfferScreen
+          progress={progress}
+          onBack={goBack}
+          onContinue={goNext}
+          // Control arm / no eligible trial / error: skip the whole warm-up.
+          // Advancing from trialCarousel walks shouldSkipStep, so this lands
+          // on the paywall (or past it, for active-access users).
+          onSkipToWall={() => {
+            const next = advanceWith('trialCarousel', 1, ctx);
+            if (next) {
+              setAnimateEntrance(true);
+              setStep(next);
+            }
+          }}
+        />
+      );
+    case 'trialCarousel':
+      return <TrialCarouselScreen progress={progress} onBack={goBack} onContinue={goNext} />;
     case 'paywall':
       return <PaywallScreen onComplete={goNext} />;
     case 'welcomeIn':

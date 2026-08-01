@@ -26,6 +26,8 @@ export { Typewriter } from "./onboarding/Typewriter";
 export {
   ConvoScreen,
   ConvoButton,
+  ConvoProgressHeader,
+  ConvoGround,
   OnboardingMotionContext,
   type ConvoOption,
 } from "./onboarding/ConvoScreen";

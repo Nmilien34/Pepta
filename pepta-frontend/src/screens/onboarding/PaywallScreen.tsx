@@ -1,13 +1,32 @@
-// Onboarding screen 25 — Paywall. Value-forward, with an interactive plan
-// selector. Restore-only chrome rather than the progress scaffold, matching
-// the design lab.
+// Onboarding — Paywall (screen C of the trial warm-up sequence,
+// design-lab/trial-warmup.html). Arrival framing, not transaction framing:
+// the headline announces the trial starting, a data-driven timeline names the
+// reminder day and the exact charge date (naming the charge is what removes
+// the silently-billed fear), and the plans sit side by side beneath it.
+// When the SELECTED plan carries no trial — the control arm, or yearly today —
+// the timeline collapses to its "Today" row and the features grid reclaims
+// the space, so the component never promises free days the selected plan
+// won't deliver. Restore-only chrome, no progress scaffold.
 
 import React, { useEffect, useRef, useState } from "react";
-import { Linking, Pressable, ScrollView, StatusBar, View } from "react-native";
+import {
+  Animated,
+  Easing,
+  Linking,
+  Platform,
+  Pressable,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  View,
+} from "react-native";
+import * as Haptics from "expo-haptics";
 import { Icon } from "../../components/Icon";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "../../theme";
-import { AppText, Button, Mascot } from "../../components";
+import { AppText, Button } from "../../components";
+import { typography } from "../../theme/typography";
+import { buildTrialTimeline, freeStartHeadline, type TrialTimelineRow } from "./paywallTimeline";
 import { useAuth } from "../../context/AuthContext";
 import { PRIVACY_URL, TERMS_URL } from "../../config";
 import { api } from "../../services/api";
@@ -19,7 +38,7 @@ import {
   type RevenueCatPlan,
 } from "../../services/revenueCat";
 import { logPaywallOfferingDebug, logPaywallShown, logPurchaseStarted } from "../../services/funnelEvents";
-import { buildPaywallPricing } from "./paywallPricing";
+import { buildPaywallPricing, freeTrialOf } from "./paywallPricing";
 import { scheduleTrialEndReminder } from "../../services/trialReminder.service";
 
 export interface PaywallScreenProps {
@@ -51,7 +70,13 @@ function openLegalUrl(url: string) {
 export function PaywallScreen({ onComplete }: PaywallScreenProps) {
   const theme = useTheme();
   const auth = useAuth();
-  const [plan, setPlan] = useState<Plan>("yearly");
+  const [plan, setPlanState] = useState<Plan>("yearly");
+  // A selection tick on every plan switch — the whole screen re-keys off it.
+  const setPlan = (next: Plan) => {
+    if (next === plan) return;
+    if (Platform.OS !== "web") void Haptics.selectionAsync().catch(() => undefined);
+    setPlanState(next);
+  };
   const [completing, setCompleting] = useState(false);
   const [failed, setFailed] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -222,6 +247,30 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
     }
   };
 
+  // The selected plan's trial drives the whole upper half: headline, timeline
+  // vs features grid, and the CTA (via pricing). Yearly has no intro offer on
+  // either arm today, so its branch is dormant until Apple-side config adds
+  // one — at which point eligibility resolution must extend to that product
+  // (see the note in paywallPricing) before this advertises $0.00.
+  const selectedTrial =
+    paywallPackages == null
+      ? null
+      : plan === "monthly"
+        ? paywallPackages.monthlyTrialEligible
+          ? freeTrialOf(paywallPackages.monthly)
+          : null
+        : freeTrialOf(paywallPackages.yearly);
+  const bothPlansTrial =
+    paywallPackages != null &&
+    freeTrialOf(paywallPackages.yearly) != null &&
+    paywallPackages.monthlyTrialEligible &&
+    freeTrialOf(paywallPackages.monthly) != null;
+  // Design rule (badge conflict, resolved by scope): the monthly badge marks
+  // the trial only when it DIFFERENTIATES the rows; when both plans carry a
+  // trial the timeline owns the story and no trial badge renders.
+  const monthlyBadge = bothPlansTrial ? undefined : pricing.monthly.badge;
+  const timeline = selectedTrial ? buildTrialTimeline(selectedTrial, new Date()) : null;
+
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.bg }}>
       <StatusBar barStyle="dark-content" />
@@ -257,51 +306,53 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
           showsVerticalScrollIndicator={false}
         >
           <View style={{ alignItems: "center", gap: 4 }}>
-            <Mascot pose="idle" size={74} />
             <AppText variant="obTitle" align="center">
-              Unlock the full tracker
+              {selectedTrial ? freeStartHeadline(selectedTrial) : "Your plan is ready"}
             </AppText>
             <AppText variant="caption" color="textSecondary" align="center">
-              Levels, muscle, meals, insights — everything Pepta does.
+              Everything Pepta does, unlocked today.
             </AppText>
           </View>
 
-          <View
-            style={{
-              flexDirection: "row",
-              flexWrap: "wrap",
-              rowGap: 9,
-              marginTop: theme.spacing.lg,
-            }}
-          >
-            {FEATURES.map((f) => (
-              <View
-                key={f}
-                style={{
-                  flexBasis: "50%",
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 7,
-                }}
-              >
-                <Icon
-                  name="checkmark-circle"
-                  size={16}
-                  color={theme.colors.fiber}
+          {/* Keyed by the selected plan so the rows replay their stagger when
+              the trial state flips with a selection change. */}
+          <View key={plan} style={[styles.timelineCard, { backgroundColor: theme.colors.surface }]}>
+            {timeline ? (
+              <>
+                {timeline.length > 1 ? <View style={styles.timelineRail} /> : null}
+                {timeline.map((row, index) => (
+                  <TimelineRow key={row.key} row={row} index={index} />
+                ))}
+              </>
+            ) : (
+              <>
+                <TimelineRow
+                  row={{
+                    key: "today",
+                    title: "Instant access",
+                    sub: "Your plan, levels and tracking — all of it, right now.",
+                    day: "Today",
+                  }}
+                  index={0}
                 />
-                <AppText
-                  variant="caption"
-                  color="textPrimary"
-                  style={{ flex: 1 }}
-                >
-                  {f}
-                </AppText>
-              </View>
-            ))}
+                {/* No trial on the selected plan: the space the timeline
+                    vacates is reclaimed by the features grid. */}
+                <View style={styles.featureGrid}>
+                  {FEATURES.map((f) => (
+                    <View key={f} style={styles.featureItem}>
+                      <Icon name="checkmark-circle" size={14} color={theme.colors.fiber} />
+                      <AppText variant="caption" color="textPrimary" style={{ flex: 1, fontSize: 11 }}>
+                        {f}
+                      </AppText>
+                    </View>
+                  ))}
+                </View>
+              </>
+            )}
           </View>
 
-          <View style={{ marginTop: theme.spacing.xl, gap: 10 }}>
-            <PlanCard
+          <View style={{ flexDirection: "row", gap: 9, marginTop: theme.spacing.md }}>
+            <PlanColumn
               selected={plan === "yearly"}
               onPress={() => setPlan("yearly")}
               title={pricing.yearly.title}
@@ -311,15 +362,35 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
               priceNote={pricing.yearly.priceNote}
               badge={pricing.yearly.badge}
             />
-            <PlanCard
+            <PlanColumn
               selected={plan === "monthly"}
               onPress={() => setPlan("monthly")}
               title={pricing.monthly.title}
               sub={pricing.monthly.sub}
               price={pricing.monthly.price}
               per={pricing.monthly.per}
-              badge={pricing.monthly.badge}
+              badge={monthlyBadge}
+              badgeTone="trial"
             />
+          </View>
+
+          <View style={styles.reassureRow}>
+            <View style={styles.reassureItem}>
+              <Icon name="checkmark" size={12} color={theme.colors.fiber} />
+              <AppText variant="caption" color="textSecondary" style={{ fontSize: 10.5 }}>
+                Cancel anytime
+              </AppText>
+            </View>
+            <View style={styles.reassureItem}>
+              <Icon name="checkmark" size={12} color={theme.colors.fiber} />
+              <AppText variant="caption" color="textSecondary" style={{ fontSize: 10.5 }}>
+                {selectedTrial
+                  ? "Reminder before charge"
+                  : plan === "yearly"
+                    ? "Billed once a year"
+                    : "Billed monthly"}
+              </AppText>
+            </View>
           </View>
         </ScrollView>
 
@@ -422,7 +493,58 @@ function PaywallLegalFooter({ text }: { text: string }) {
   );
 }
 
-interface PlanCardProps {
+const TIMELINE_ICON: Record<TrialTimelineRow["key"], string> = {
+  today: "lock-open-outline",
+  reminder: "notifications-outline",
+  charge: "calendar-outline",
+};
+
+/** One timeline step, staggering into place (fade + rise, the flow's ease). */
+function TimelineRow({ row, index }: { row: TrialTimelineRow; index: number }) {
+  const theme = useTheme();
+  const rise = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const animation = Animated.timing(rise, {
+      toValue: 1,
+      duration: 360,
+      delay: index * 110,
+      easing: Easing.bezier(0.2, 0.7, 0.2, 1),
+      useNativeDriver: true,
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [rise, index]);
+  const now = row.key === "today";
+  return (
+    <Animated.View
+      style={[
+        styles.timelineRow,
+        index > 0 && { marginTop: 12 },
+        {
+          opacity: rise,
+          transform: [{ translateY: rise.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }],
+        },
+      ]}
+    >
+      <View style={[styles.timelineIcon, now && { backgroundColor: theme.colors.primary }]}>
+        <Icon name={TIMELINE_ICON[row.key]} size={15} color={now ? "#FFFFFF" : theme.colors.primary} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <AppText variant="bodyStrong" style={{ fontSize: 12.5, fontWeight: "800" }}>
+          {row.title}
+        </AppText>
+        <AppText variant="caption" color="textSecondary" style={{ fontSize: 10.5, marginTop: 1 }}>
+          {row.sub}
+        </AppText>
+      </View>
+      <AppText variant="caption" color="textTertiary" style={styles.timelineDay}>
+        {row.day.toUpperCase()}
+      </AppText>
+    </Animated.View>
+  );
+}
+
+interface PlanColumnProps {
   selected: boolean;
   onPress(): void;
   title: string;
@@ -432,9 +554,13 @@ interface PlanCardProps {
   /** Billed total in light type under a per-month anchor (3.1.2(c)). */
   priceNote?: string;
   badge?: string;
+  /** "trial" renders the badge green (fiber) so "free" never reads as "selected". */
+  badgeTone?: "save" | "trial";
 }
 
-function PlanCard({
+/** A plan card in the side-by-side column layout. Same anatomy as the old
+ * stacked PlanCard — radius 16, 2px border, #F7F4FF selected — just upright. */
+function PlanColumn({
   selected,
   onPress,
   title,
@@ -443,80 +569,153 @@ function PlanCard({
   per,
   priceNote,
   badge,
-}: PlanCardProps) {
+  badgeTone = "save",
+}: PlanColumnProps) {
   const theme = useTheme();
+  const press = useRef(new Animated.Value(1)).current;
   return (
     <Pressable
       onPress={onPress}
+      onPressIn={() =>
+        Animated.spring(press, { toValue: 0.97, friction: 6, tension: 200, useNativeDriver: true }).start()
+      }
+      onPressOut={() =>
+        Animated.spring(press, { toValue: 1, friction: 6, tension: 200, useNativeDriver: true }).start()
+      }
       accessibilityRole="radio"
       accessibilityState={{ selected }}
-      style={{
-        position: "relative",
-        borderRadius: 16,
-        borderWidth: 2,
-        borderColor: selected ? theme.colors.primary : theme.colors.border,
-        backgroundColor: selected ? "#F7F4FF" : theme.colors.surface,
-        padding: 14,
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "space-between",
-      }}
+      style={{ flex: 1 }}
     >
-      {badge ? (
-        <View
-          style={{
-            position: "absolute",
-            top: -9,
-            right: 14,
-            backgroundColor: theme.colors.primary,
-            paddingVertical: 3,
-            paddingHorizontal: 9,
-            borderRadius: theme.radii.pill,
-          }}
-        >
-          <AppText
-            variant="caption"
-            style={{
-              color: "#FFFFFF",
-              fontWeight: "800",
-              fontSize: 10,
-              letterSpacing: 0.4,
-            }}
+      <Animated.View
+        style={[
+          styles.planColumn,
+          {
+            borderColor: selected ? theme.colors.primary : theme.colors.border,
+            backgroundColor: selected ? "#F7F4FF" : theme.colors.surface,
+            transform: [{ scale: press }],
+          },
+        ]}
+      >
+        {badge ? (
+          <View
+            style={[
+              styles.planBadge,
+              { backgroundColor: badgeTone === "trial" ? theme.colors.fiber : theme.colors.primary },
+            ]}
           >
-            {badge}
-          </AppText>
+            <AppText variant="caption" style={styles.planBadgeText}>
+              {badge.toUpperCase()}
+            </AppText>
+          </View>
+        ) : null}
+        <View style={styles.planRadio}>
+          <Icon
+            name={selected ? "checkmark-circle" : "ellipse-outline"}
+            size={17}
+            color={selected ? theme.colors.primary : theme.colors.textTertiary}
+          />
         </View>
-      ) : null}
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-        <Icon
-          name={selected ? "checkmark-circle" : "ellipse-outline"}
-          size={20}
-          color={selected ? theme.colors.primary : theme.colors.textTertiary}
-        />
-        <View>
-          <AppText variant="bodyStrong" style={{ fontWeight: "700" }}>
-            {title}
-          </AppText>
-          <AppText variant="caption" color="textSecondary">
-            {sub}
-          </AppText>
-        </View>
-      </View>
-      <View style={{ alignItems: "flex-end" }}>
-        <View style={{ flexDirection: "row", alignItems: "baseline" }}>
-          <AppText variant="statMedium" style={{ fontSize: 20 }}>
+        <AppText variant="bodyStrong" style={{ fontWeight: "700", fontSize: 14 }}>
+          {title}
+        </AppText>
+        <AppText variant="caption" color="textSecondary" style={{ fontSize: 10.5 }}>
+          {sub}
+        </AppText>
+        <View style={{ flexDirection: "row", alignItems: "baseline", marginTop: 8 }}>
+          <AppText variant="statMedium" style={{ fontSize: 19 }}>
             {price}
           </AppText>
           <AppText variant="caption" color="textSecondary">
             {per}
           </AppText>
         </View>
-        {priceNote ? (
-          <AppText variant="caption" color="textTertiary" style={{ marginTop: 1 }}>
-            {priceNote}
-          </AppText>
-        ) : null}
-      </View>
+        <AppText variant="caption" color="textTertiary" style={{ marginTop: 1, fontSize: 10 }}>
+          {priceNote ?? " "}
+        </AppText>
+      </Animated.View>
     </Pressable>
   );
 }
+
+const styles = StyleSheet.create({
+  timelineCard: {
+    marginTop: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(14,14,18,0.08)",
+    paddingHorizontal: 14,
+    paddingTop: 14,
+    paddingBottom: 12,
+    position: "relative",
+  },
+  timelineRail: {
+    position: "absolute",
+    left: 29,
+    top: 26,
+    bottom: 24,
+    width: 2,
+    backgroundColor: "#EDE9FB",
+  },
+  timelineRow: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
+  timelineIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: "#F1EDFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  timelineDay: {
+    fontSize: 8.5,
+    letterSpacing: 0.5,
+    fontFamily: typography.fonts.heavy,
+    paddingTop: 2,
+  },
+  featureGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    rowGap: 7,
+    marginTop: 12,
+    paddingTop: 11,
+    borderTopWidth: 0.5,
+    borderTopColor: "rgba(14,14,18,0.08)",
+  },
+  featureItem: {
+    flexBasis: "50%",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingRight: 6,
+  },
+  reassureRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 16,
+    marginTop: 12,
+  },
+  reassureItem: { flexDirection: "row", alignItems: "center", gap: 4 },
+  planColumn: {
+    position: "relative",
+    borderRadius: 16,
+    borderWidth: 2,
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: 11,
+  },
+  planBadge: {
+    position: "absolute",
+    top: -9,
+    right: 14,
+    paddingVertical: 3,
+    paddingHorizontal: 9,
+    borderRadius: 999,
+    zIndex: 1,
+  },
+  planBadgeText: {
+    color: "#FFFFFF",
+    fontWeight: "800",
+    fontSize: 9,
+    letterSpacing: 0.4,
+  },
+  planRadio: { position: "absolute", top: 11, right: 10 },
+});

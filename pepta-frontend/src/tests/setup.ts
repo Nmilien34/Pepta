@@ -53,6 +53,17 @@ vi.mock("react-native-purchases", () => ({
   },
 }));
 
+// expo-haptics reaches expo-modules-core (crashes on __DEV__ under node).
+// Screens fire haptics fire-and-forget, so inert mocks are all tests need;
+// suites asserting haptic ORDER (useSpeechHaptic) override this locally.
+vi.mock("expo-haptics", () => ({
+  impactAsync: vi.fn(() => Promise.resolve()),
+  notificationAsync: vi.fn(() => Promise.resolve()),
+  selectionAsync: vi.fn(() => Promise.resolve()),
+  ImpactFeedbackStyle: { Soft: "s", Light: "l", Medium: "m", Rigid: "r", Heavy: "h" },
+  NotificationFeedbackType: { Success: "success", Warning: "warning", Error: "error" },
+}));
+
 vi.mock("expo-notifications", () => ({
   AndroidImportance: { DEFAULT: 5 },
   SchedulableTriggerInputTypes: {

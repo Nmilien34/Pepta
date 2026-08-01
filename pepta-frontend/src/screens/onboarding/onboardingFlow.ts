@@ -100,6 +100,17 @@ export const ONBOARDING_STEPS = [
   // "here is your plan" and "make an account" is gone. A saved draft sitting
   // at 'auth' resumes at 'reveal' via migrateLegacyStep in onboardingDraft.
   'reveal',
+  // Trial warm-up (2026-08-01, design-lab/trial-warmup.html): the offer
+  // announcement and the value carousel, AFTER the merged reveal+auth turn —
+  // "See my FREE offer" landing on an account wall would be a bait-and-switch
+  // that breaks the micro-commitment ladder, and 1.0.4's funnel shows auth
+  // isn't leaking (8 reached the wall, 8 registered), so the gift framing is
+  // spent warming the paywall instead. Both steps are also TRIAL-GATED at
+  // runtime inside TrialOfferScreen: the control arm of expa9f87848e1 has no
+  // trial, and these screens silently skip themselves rather than promise
+  // free days that arm's wall won't deliver.
+  'trialOffer',
+  'trialCarousel',
   // NOTE: the 'referral' code-entry turn used to sit between auth and the
   // paywall. Removed 2026-07-27 — near-everyone who reached it tapped Skip.
   // `ReferralCodeScreen` is kept (the only code-claim surface in the app)
@@ -168,8 +179,14 @@ const MEDICATION_BLOCK: readonly OnboardingStep[] = [
 ];
 
 export function shouldSkipStep(step: OnboardingStep, ctx: FlowContext): boolean {
-  // Approved creators / active subscribers never see the wall.
-  if (step === 'paywall' && ctx.accessActive) return true;
+  // Approved creators / active subscribers never see the wall — and a trial
+  // pitch for a wall they'll never see is worse than pointless.
+  if (
+    (step === 'paywall' || step === 'trialOffer' || step === 'trialCarousel') &&
+    ctx.accessActive
+  ) {
+    return true;
+  }
   // Not actively dosing → skip the dose/frequency/shot-day block (and the
   // instrument beat — there's no level model to arm yet).
   if (ctx.journeyStage && ctx.journeyStage !== 'active' && MEDICATION_BLOCK.includes(step)) {

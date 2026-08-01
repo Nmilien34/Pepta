@@ -16,7 +16,8 @@ describe('onboarding flow', () => {
     expect(ONBOARDING_STEPS[ONBOARDING_STEPS.length - 1]).toBe('welcomeIn');
     expect(nextStep('welcome')).toBe('meetPep');
     // The rating ask is post-purchase (WelcomeInScreen), never a quiz turn.
-    expect(nextStep('reveal')).toBe('paywall');
+    expect(nextStep('reveal')).toBe('trialOffer'); // the warm-up sits between auth and the wall
+    expect(nextStep('trialCarousel')).toBe('paywall');
     // The referral code turn was removed — auth hands straight to the wall.
     
     expect(nextStep('paywall')).toBe('welcomeIn');
@@ -72,7 +73,8 @@ describe('onboarding flow', () => {
     // signed-out users and the plain Start-today CTA for signed-in ones. A
     // separate auth turn reappearing here means the merge regressed.
     expect(ONBOARDING_STEPS).not.toContain('auth');
-    expect(nextStep('reveal')).toBe('paywall');
+    expect(nextStep('reveal')).toBe('trialOffer'); // the warm-up sits between auth and the wall
+    expect(nextStep('trialCarousel')).toBe('paywall');
   });
 
   it('skips the paywall for resolved-active access (creators/subscribers)', () => {

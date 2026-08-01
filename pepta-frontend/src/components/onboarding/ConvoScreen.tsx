@@ -183,6 +183,45 @@ const ACKNOWLEDGE_MS = 950;
 // trick) so it grows forward and shrinks back instead of resetting each mount.
 const progressFill = new Animated.Value(0);
 
+/**
+ * The back-chevron + hairline progress header, shareable by turns that need a
+ * custom body (the trial warm-up beats). Drives the SAME module-level
+ * progressFill as ConvoScreen, so the bar keeps its position when the flow
+ * hands off between ConvoScreen turns and custom ones instead of resetting.
+ */
+export function ConvoProgressHeader({ progress, onBack }: { progress: number; onBack?: () => void }) {
+  useEffect(() => {
+    const animation = Animated.timing(progressFill, {
+      toValue: Math.max(0, Math.min(1, progress)),
+      duration: 500,
+      easing: Easing.bezier(0.4, 0, 0.2, 1),
+      useNativeDriver: false, // animating width
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [progress]);
+  const width = progressFill.interpolate({ inputRange: [0, 1], outputRange: ["0%", "100%"] });
+  return (
+    <View style={styles.header}>
+      {onBack ? (
+        <Pressable accessibilityRole="button" accessibilityLabel="Back" hitSlop={12} onPress={onBack}>
+          <Icon name="chevron-back" size={22} color={convo.ink} />
+        </Pressable>
+      ) : (
+        <View style={{ width: 22 }} />
+      )}
+      <View style={styles.track}>
+        <Animated.View style={[styles.fill, { width }]} />
+      </View>
+    </View>
+  );
+}
+
+/** The ground orbs, shareable by custom turns so their air matches the flow. */
+export function ConvoGround() {
+  return <Ground />;
+}
+
 interface ConvoScreenProps<T> {
   /** 0..1 position in the funnel. */
   progress: number;

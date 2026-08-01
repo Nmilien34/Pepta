@@ -9,11 +9,14 @@
 //   - 'drowsy' — half-lidded, for the trough of the medication curve
 //   - 'asleep' — eyes closed + zzz, for an off-cycle rest week
 //   - 'cheer'  — sparkles, for a milestone
+//   - 'gift'   — arms cradling a heart at the chest, for the trial offer beat
+//   - 'peek'   — top-of-barrel crop (eyes over an edge), for the value carousel
 //
-// The three new poses are OVERLAYS on the same body, not new artwork: they
-// swap the eyes and add a small decoration. Anything more would need real
-// character art. There is deliberately NO sad or disappointed pose — see
-// screens/app/pepMood.ts for why that matters on a medication tracker.
+// The added poses are OVERLAYS on the same body, not new artwork: they
+// swap the eyes and add a small decoration ('peek' is a crop of the same
+// geometry). Anything more would need real character art. There is
+// deliberately NO sad or disappointed pose — see screens/app/pepMood.ts for
+// why that matters on a medication tracker.
 
 import React, { useId } from 'react';
 import Svg, {
@@ -29,7 +32,7 @@ import Svg, {
   Text as SvgText,
 } from 'react-native-svg';
 
-export type MascotPose = 'idle' | 'wave' | 'drowsy' | 'asleep' | 'cheer';
+export type MascotPose = 'idle' | 'wave' | 'drowsy' | 'asleep' | 'cheer' | 'gift' | 'peek';
 
 export interface MascotProps {
   pose?: MascotPose;
@@ -43,6 +46,8 @@ const VIEWBOX: Record<MascotPose, { w: number; h: number }> = {
   drowsy: { w: 120, h: 142 },
   asleep: { w: 120, h: 142 },
   cheer: { w: 120, h: 142 },
+  gift: { w: 120, h: 142 },
+  peek: { w: 120, h: 70 },
 };
 
 // Poses that close the eyes — they replace the open-eye group rather than
@@ -53,6 +58,33 @@ export function Mascot({ pose = 'idle', size = 140 }: MascotProps) {
   const gradientId = useId();
   const vb = VIEWBOX[pose];
   const width = (size * vb.w) / vb.h;
+
+  // 'peek' is a crop, not an overlay: just the plunger, the top arc of the
+  // barrel, and the eyes rising over an edge (the carousel card's top rim).
+  if (pose === 'peek') {
+    return (
+      <Svg width={width} height={size} viewBox="0 0 120 70">
+        <Defs>
+          <LinearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor="#9C82FF" />
+            <Stop offset="1" stopColor="#6E4EF0" />
+          </LinearGradient>
+        </Defs>
+        <Rect x={34} y={4} width={52} height={7} rx={3.5} fill="#6E4EF0" />
+        <Rect x={55} y={9} width={10} height={10} rx={3} fill="#7C5CFC" />
+        <Path d="M27 70 v-13 a33 33 0 0 1 66 0 v13 Z" fill={`url(#${gradientId})`} />
+        <G>
+          <Ellipse cx={50} cy={44} rx={7} ry={8} fill="#fff" />
+          <Ellipse cx={74} cy={44} rx={7} ry={8} fill="#fff" />
+          <Circle cx={52.5} cy={46} r={3.4} fill="#1A1430" />
+          <Circle cx={76.5} cy={46} r={3.4} fill="#1A1430" />
+          <Circle cx={54} cy={44.5} r={1.2} fill="#fff" />
+          <Circle cx={78} cy={44.5} r={1.2} fill="#fff" />
+        </G>
+      </Svg>
+    );
+  }
+
   // The wave pose shifts the body +10 on the y axis to make room for the plunger.
   const dy = pose === 'wave' ? 10 : 0;
   const stripeTop = 94 + dy;
@@ -131,6 +163,30 @@ export function Mascot({ pose = 'idle', size = 140 }: MascotProps) {
         <G fill="#7C5CFC">
           <SvgText x={95} y={38} fontSize={16} fontWeight="bold">z</SvgText>
           <SvgText x={106} y={24} fontSize={11} fontWeight="bold" opacity={0.7}>z</SvgText>
+        </G>
+      ) : null}
+
+      {/* the trial-offer beat — arms cradling a heart at the chest */}
+      {pose === 'gift' ? (
+        <G>
+          <G transform="rotate(-34 24 100)">
+            <Ellipse cx={24} cy={100} rx={7.5} ry={11.5} fill="#7C5CFC" />
+          </G>
+          <G transform="rotate(34 96 100)">
+            <Ellipse cx={96} cy={100} rx={7.5} ry={11.5} fill="#7C5CFC" />
+          </G>
+          <Path
+            d="M60 95 c-5 -9 -18 -8 -18 3 c0 8 11 13 18 18 c7 -5 18 -10 18 -18 c0 -11 -13 -12 -18 -3 Z"
+            fill="#E25CC4"
+          />
+          <Path
+            d="M50 94.5 a5 5 0 0 1 5.5 -2"
+            stroke="#fff"
+            strokeWidth={2}
+            fill="none"
+            strokeLinecap="round"
+            opacity={0.7}
+          />
         </G>
       ) : null}
 

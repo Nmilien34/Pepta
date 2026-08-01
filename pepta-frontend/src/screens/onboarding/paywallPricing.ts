@@ -60,7 +60,7 @@ const FALLBACK_PRICING: PaywallPricingCopy = {
     sub: "billed yearly",
     price: "$3.33",
     per: "/mo",
-    priceNote: "$40.00/yr",
+    priceNote: "$39.99/yr",
     badge: "SAVE 67%",
   },
   monthly: {
@@ -70,13 +70,14 @@ const FALLBACK_PRICING: PaywallPricingCopy = {
     per: "/mo",
   },
   footer: {
-    yearly: "$40.00/year. Cancel anytime · Terms & Privacy",
+    yearly: "$39.99/year. Cancel anytime · Terms & Privacy",
     monthly: "$9.99/month. Cancel anytime · Terms & Privacy",
   },
-  // Pre-load fallback: no product yet, so never advertise a trial.
+  // Pre-load fallback: no product yet, so never advertise a trial. (The
+  // button is disabled until plans load; these labels are the disabled text.)
   cta: {
-    monthly: { label: "Subscribe" },
-    yearly: { label: "Subscribe" },
+    monthly: { label: "Start my month — $9.99" },
+    yearly: { label: "Start my year — $39.99" },
   },
 };
 
@@ -95,9 +96,9 @@ export function freeTrialOf(
 }
 
 // "3 days", "1 week", … — duration comes from the product, never a literal.
-// Reads as a noun ("Start 3 days for $0.00"), not the adjective form the old
-// "3-day free trial" wording needed.
-function trialDurationLabel(trial: { periodNumberOfUnits: number; periodUnit: string }): string {
+// Exported for the warm-up screens ("3 days on us") so every surface derives
+// the duration from the same product field.
+export function trialDurationLabel(trial: { periodNumberOfUnits: number; periodUnit: string }): string {
   const unit = trial.periodUnit.toLowerCase();
   const plural = trial.periodNumberOfUnits === 1 ? unit : `${unit}s`;
   return `${trial.periodNumberOfUnits} ${plural}`;
@@ -134,15 +135,19 @@ function monthlyCta(
   // to them would be a false price claim on the paywall — worse than the old
   // "free trial" wording, which was merely optimistic. RevenueCat's own
   // guidance for an indeterminate answer is to show non-intro pricing.
-  if (!trial || !trialEligible) return { label: "Subscribe" };
+  // No trial for this user: an honest purchase in arrival language, price on
+  // the button (identical in both experiment arms).
+  if (!trial || !trialEligible) return { label: `Start my month — ${price}` };
   return {
     // "$0.00" rather than "free": a concrete number reads as a real price the
     // user is being charged today, which converts better than the word free.
-    label: `Start ${trialDurationLabel(trial)} for $0.00`,
-    // Apple requires duration, the price after, and the auto-renewal
-    // disclosure near the CTA. The reminder promise rides along — and is kept
-    // by trialReminder.ts. Unwire that and this sentence must come out too.
-    subline: `We'll remind you before it ends. Then ${price}/mo, auto-renews. Cancel anytime in Settings.`,
+    // The duration deliberately does NOT live on the button (per Nick) — the
+    // timeline directly above the CTA carries it, and the subline repeats it
+    // for the Apple 3.1.2 disclosure trio (duration, price after, renewal).
+    label: "Try today for $0.00",
+    // The reminder promise rides along — and is kept by trialReminder.ts.
+    // Unwire that and this sentence must come out too.
+    subline: `${trialDurationLabel(trial)} free — we'll remind you before it ends. Then ${price}/mo, auto-renews. Cancel anytime in Settings.`,
   };
 }
 
@@ -194,7 +199,7 @@ export function buildPaywallPricing(
   const monthly = packages.monthly;
   const yearly = packages.yearly;
   const monthlyPrice = priceString(monthly, FALLBACK_PRICING.monthly.price);
-  const annualPrice = priceString(yearly, "$40.00");
+  const annualPrice = priceString(yearly, "$39.99");
 
   const perMonthAnchor = monthlyEquivalent(yearly);
 
@@ -228,8 +233,11 @@ export function buildPaywallPricing(
     },
     cta: {
       monthly: monthlyCta(monthly, monthlyPrice, trialEligible),
-      // The annual product has no trial on either arm — identical both ways.
-      yearly: { label: "Subscribe" },
+      // The annual product has no intro offer on either arm today, so this is
+      // always the purchase CTA — identical both ways. If a yearly trial ever
+      // ships, follow monthlyCta's shape AND extend eligibility resolution to
+      // that product before advertising $0.00 here.
+      yearly: { label: `Start my year — ${annualPrice}` },
     },
   };
 }

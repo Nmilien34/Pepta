@@ -55,12 +55,12 @@ describe("buildPaywallPricing", () => {
     expect(pricing.monthly.price).toBe("$9.99");
     expect(pricing.yearly.price).toBe("$3.33");
     expect(pricing.yearly.per).toBe("/mo");
-    expect(pricing.yearly.priceNote).toBe("$40.00/yr");
+    expect(pricing.yearly.priceNote).toBe("$39.99/yr");
     expect(pricing.yearly.sub).toBe("billed yearly");
     // $9.99 × 12 = $119.88 → $40/yr saves 67% (matches the computed path).
     expect(pricing.yearly.badge).toBe("SAVE 67%");
     expect(pricing.footer.yearly).toBe(
-      "$40.00/year. Cancel anytime · Terms & Privacy",
+      "$39.99/year. Cancel anytime · Terms & Privacy",
     );
     expect(pricing.footer.monthly).toBe(
       "$9.99/month. Cancel anytime · Terms & Privacy",
@@ -85,15 +85,17 @@ describe("buildPaywallPricing", () => {
     }, true);
 
     // "$0.00" rather than "free" — a concrete number reads as a real price.
-    expect(pricing.cta.monthly.label).toBe("Start 3 days for $0.00");
+    // The duration deliberately does NOT live on the button (it moved to the
+    // timeline + subline); the trial-ness of the CTA is the $0.00.
+    expect(pricing.cta.monthly.label).toBe("Try today for $0.00");
     // Duration, price after, auto-renewal: all three are required near the
     // CTA. The reminder promise is kept by trialReminder.ts — if that is ever
     // unwired, this sentence has to come out with it.
     expect(pricing.cta.monthly.subline).toBe(
-      "We'll remind you before it ends. Then $9.99/mo, auto-renews. Cancel anytime in Settings.",
+      "3 days free — we'll remind you before it ends. Then $9.99/mo, auto-renews. Cancel anytime in Settings.",
     );
     // The annual plan is identical on both arms.
-    expect(pricing.cta.yearly).toEqual({ label: "Subscribe" });
+    expect(pricing.cta.yearly).toEqual({ label: "Start my year — $40.00" });
   });
 
   it("reads the trial duration from the product, not a literal", () => {
@@ -108,7 +110,8 @@ describe("buildPaywallPricing", () => {
       yearly: packageWithPrice("$40.00", 40),
     }, true);
 
-    expect(pricing.cta.monthly.label).toBe("Start 1 week for $0.00");
+    expect(pricing.cta.monthly.label).toBe("Try today for $0.00");
+    expect(pricing.cta.monthly.subline).toContain("1 week free");
     expect(pricing.cta.monthly.subline).toContain("Then $4.99/mo, auto-renews.");
   });
 
@@ -117,7 +120,7 @@ describe("buildPaywallPricing", () => {
       monthly: packageWithPrice("$9.99", 9.99),
       yearly: packageWithPrice("$40.00", 40),
     });
-    expect(control.cta.monthly).toEqual({ label: "Subscribe" });
+    expect(control.cta.monthly).toEqual({ label: "Start my month — $9.99" });
 
     const paidIntro = buildPaywallPricing({
       monthly: {
@@ -129,11 +132,11 @@ describe("buildPaywallPricing", () => {
       },
       yearly: packageWithPrice("$40.00", 40),
     });
-    expect(paidIntro.cta.monthly).toEqual({ label: "Subscribe" });
+    expect(paidIntro.cta.monthly).toEqual({ label: "Start my month — $9.99" });
   });
 
   it("never advertises a trial before packages load", () => {
-    expect(buildPaywallPricing(null).cta.monthly).toEqual({ label: "Subscribe" });
+    expect(buildPaywallPricing(null).cta.monthly).toEqual({ label: "Start my month — $9.99" });
   });
 
   it("makes no $0.00 claim to a user who is not eligible for the intro offer", () => {
@@ -154,7 +157,7 @@ describe("buildPaywallPricing", () => {
     };
 
     for (const pricing of [buildPaywallPricing(withTrial, false), buildPaywallPricing(withTrial)]) {
-      expect(pricing.cta.monthly).toEqual({ label: "Subscribe" });
+      expect(pricing.cta.monthly).toEqual({ label: "Start my month — $9.99" });
       expect(JSON.stringify(pricing)).not.toContain("$0.00");
     }
   });
