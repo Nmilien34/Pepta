@@ -1,0 +1,466 @@
+<!doctype html><html><head><meta charset="utf-8">
+<title>Pepta — Pre-paywall trial warm-up (design)</title>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3/dist/tabler-icons.min.css" rel="stylesheet">
+<style>
+/* ============================================================
+   Pepta pre-paywall trial warm-up — DESIGN ONLY.
+   Two screens inserted between reveal (32) and the paywall, plus
+   a paywall redesign. Mechanics adapted from the DreamMe pattern:
+   gift framing → value carousel → transparent trial timeline.
+
+   Fidelity sources (design-from-shipped-components rule):
+   · convo palette = src/components/onboarding/convoTokens.ts
+   · mascot        = src/components/Mascot.tsx, ported path-for-path;
+                     'gift' and 'peek' are NEW overlay poses on the
+                     same body, per that file's own overlay convention
+   · plan cards    = PaywallScreen.tsx PlanCard: radius 16, 2px
+                     border, selected #F7F4FF + primary border,
+                     floating badge top:-9 right:14, 10px 800 badge
+   · app minis     = index.html idioms (level card, next-dose ring,
+                     week strip, curve) — the hub's shipped-app forms
+   ============================================================ */
+:root{
+  --ink:#17141F; --dim:rgba(23,20,31,.5); --ts:#6B6B76; --tt:#A8A5B2;
+  --primary:#7C5CFC; --accent:#6E4EF0;
+  --ground:#FCFBFE; --orb:rgba(124,92,252,.05); --orb2:rgba(124,92,252,.075);
+  --hair:rgba(23,20,31,.12); --hairsoft:rgba(23,20,31,.07);
+  --appbg:#FAFAFB; --surface:#FFF; --border:#E8E8EE;
+  --fiber:#34C759; --protein:#FF8A3D; --water:#2FA8FF; --weight:#E25CC4;
+  --f:"Hanken Grotesk",-apple-system,system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#EDEBF2;font-family:var(--f);color:var(--ink);padding:40px}
+h1{font-size:28px;font-weight:800;letter-spacing:-.5px}
+h2{font-size:18px;font-weight:800;margin:44px 0 6px}
+.note{color:var(--ts);font-size:13.5px;line-height:1.55;max-width:900px;margin-top:6px}
+.note b{color:var(--ink)}
+.gallery{display:flex;flex-wrap:wrap;gap:34px;margin-top:22px}
+.fw{width:300px}
+.fl{font-weight:700;font-size:13px;color:var(--ts);margin-bottom:8px}
+.spec{font-size:11.5px;color:var(--tt);line-height:1.45;margin-top:8px}
+.spec b{color:var(--ts)}
+
+/* device — onboarding-v2 frame */
+.dev{width:300px;height:650px;border-radius:44px;border:8px solid #0A0A0E;background:var(--ground);overflow:hidden;position:relative;box-shadow:0 24px 50px -20px rgba(20,16,40,.35)}
+.dev.app{background:var(--appbg)}
+.orbs i{position:absolute;border-radius:999px}
+.orbs i:nth-child(1){width:300px;height:300px;background:var(--orb2);top:-90px;left:-110px}
+.orbs i:nth-child(2){width:260px;height:260px;background:var(--orb);bottom:120px;right:-120px}
+.orbs i:nth-child(3){width:220px;height:220px;background:var(--orb);bottom:-90px;left:60px}
+.scr{position:relative;height:100%;padding:24px 24px 22px;display:flex;flex-direction:column}
+.top{display:flex;align-items:center;gap:12px;margin-top:10px}
+.back{font-size:16px;color:var(--ink);font-weight:700}
+.prog{flex:1;height:2px;background:rgba(23,20,31,.1);border-radius:2px}
+.prog>i{display:block;height:100%;background:var(--ink);border-radius:2px}
+
+/* warm-up type */
+.eyebrow{font-size:13px;font-weight:700;letter-spacing:.2px;color:var(--tt);text-align:center}
+.hero{font-size:27px;font-weight:800;letter-spacing:-.7px;line-height:1.16;text-align:center}
+.hero .sq{color:var(--primary)}
+.herosub{font-size:14px;color:var(--ts);font-weight:600;text-align:center;line-height:1.45}
+
+/* CTAs — solid purple is the funnel's single-CTA convention */
+.cta{margin-top:auto;border:1.5px solid var(--hair);border-radius:999px;padding:15px;text-align:center;font-weight:800;font-size:15.5px;color:var(--ink);background:rgba(255,255,255,.6)}
+.cta.solid{background:var(--primary);border-color:var(--primary);color:#fff}
+.ctasub{font-size:10.5px;color:var(--ts);font-weight:600;text-align:center;margin-top:9px;line-height:1.45}
+.legal{font-size:10px;color:var(--tt);font-weight:600;text-align:center;margin-top:7px}
+.legal b{color:var(--primary);font-weight:800}
+
+/* screen A gift beat */
+.gifthalo{position:relative;display:flex;justify-content:center;align-items:center;margin:26px 0 8px}
+.gifthalo .halo{position:absolute;width:196px;height:196px;border-radius:999px;background:rgba(124,92,252,.07)}
+.gifthalo .halo2{position:absolute;width:136px;height:136px;border-radius:999px;background:rgba(124,92,252,.09)}
+.sparks i{position:absolute;color:var(--primary);opacity:.55;font-size:13px}
+
+/* screen B carousel */
+.slide{border:1px solid var(--hairsoft);background:rgba(255,255,255,.78);border-radius:22px;padding:16px 16px 14px;margin-top:16px;position:relative}
+.minidev{width:100%;border-radius:24px;border:5px solid #0A0A0E;background:var(--appbg);overflow:hidden;box-shadow:0 10px 24px -12px rgba(20,16,40,.3)}
+.minidev .mscr{padding:12px 11px 10px}
+.caption{font-size:15px;font-weight:800;letter-spacing:-.2px;text-align:center;margin-top:13px;line-height:1.3}
+.dotsrow{display:flex;gap:6px;justify-content:center;margin-top:13px}
+.dotsrow i{width:6px;height:6px;border-radius:99px;background:rgba(23,20,31,.16)}
+.dotsrow i.on{background:var(--ink);width:16px}
+.peek{position:absolute;right:6px;top:-26px}
+
+/* mini app idioms (ported from index.html shipped-app forms, scaled) */
+.mcard{background:var(--surface);border-radius:14px;padding:11px;border:.5px solid rgba(14,14,18,.08);box-shadow:0 1px 1.5px rgba(16,16,24,.05),0 4px 12px rgba(16,16,24,.06)}
+.mrow{display:flex;align-items:center}.mbt{justify-content:space-between}
+.mnm{font-weight:700;font-size:11.5px;letter-spacing:-.1px}
+.mlab{font-weight:500;font-size:9px;color:var(--ts)}
+.msec{font-weight:700;font-size:8px;letter-spacing:.7px;text-transform:uppercase;color:var(--tt)}
+.mbig{font-weight:800;font-size:19px;letter-spacing:-.5px;line-height:1}
+.munit{font-weight:700;font-size:10px;color:var(--ts)}
+.mstate{font-weight:600;font-size:8.5px;color:var(--ts);background:#F3F4F7;padding:3px 7px;border-radius:999px}
+.mpill{display:inline-flex;align-items:center;gap:3px;padding:3px 7px;border-radius:999px;font-weight:700;font-size:8.5px}
+.mt6{margin-top:6px}.mt8{margin-top:8px}.mt10{margin-top:10px}
+.mwks{display:flex;justify-content:space-between;margin-top:9px;padding-top:8px;border-top:.5px solid rgba(14,14,18,.08)}
+.mwkd{display:flex;flex-direction:column;align-items:center;gap:2px}
+.mwkd .dw{font-size:7.5px;font-weight:600;color:var(--tt)}
+.mwkd .dn{font-size:9.5px;font-weight:700}
+.mwkd .dd{width:5px;height:5px;border-radius:9px}
+.mwkd.on .dn{color:var(--primary)}
+.mlogchip{display:inline-flex;align-items:center;gap:4px;border:.5px solid rgba(14,14,18,.1);border-radius:999px;padding:4px 8px;font-size:8.5px;font-weight:600}
+
+/* ============ screen C — the paywall (light, per shipped PaywallScreen) ============ */
+.pw .restore{font-size:11px;color:var(--ts);font-weight:600;text-align:right;margin-top:6px}
+.pwhead{text-align:center;margin-top:4px}
+.pwtitle{font-size:21px;font-weight:800;letter-spacing:-.5px;margin-top:2px}
+.pwsub{font-size:11.5px;color:var(--ts);font-weight:600;margin-top:3px;line-height:1.4}
+/* timeline — data-driven: day labels + date computed from the loaded trial */
+.tl{border:1px solid rgba(14,14,18,.08);background:var(--surface);border-radius:16px;padding:14px 14px 12px;margin-top:14px;position:relative;box-shadow:0 1px 1.5px rgba(16,16,24,.05),0 4px 12px rgba(16,16,24,.06)}
+.tl .rail{position:absolute;left:29px;top:26px;bottom:24px;width:2px;background:#EDE9FB}
+.tlrow{display:flex;gap:12px;position:relative}
+.tlrow+.tlrow{margin-top:13px}
+.tlic{width:32px;height:32px;border-radius:10px;background:#F1EDFF;display:flex;align-items:center;justify-content:center;flex:none;position:relative;z-index:1}
+.tlic i{font-size:16px;color:var(--primary)}
+.tlrow.now .tlic{background:var(--primary)}
+.tlrow.now .tlic i{color:#fff}
+.tlb b{display:block;font-size:12px;font-weight:800;letter-spacing:-.1px}
+.tlb span{display:block;font-size:10px;color:var(--ts);font-weight:600;margin-top:1px;line-height:1.4}
+.tlday{margin-left:auto;font-size:9px;font-weight:800;color:var(--tt);letter-spacing:.5px;text-transform:uppercase;flex:none;padding-top:2px}
+/* plan cards — shipped PlanCard values, side-by-side */
+.plans{display:flex;gap:9px;margin-top:12px}
+.plan{flex:1;position:relative;border-radius:16px;border:2px solid var(--border);background:var(--surface);padding:12px 11px 11px}
+.plan.sel{border-color:var(--primary);background:#F7F4FF}
+.plan .t{font-weight:700;font-size:13px}
+.plan .s{font-size:9.5px;color:var(--ts);font-weight:600;margin-top:1px}
+.plan .p{font-weight:800;font-size:19px;letter-spacing:-.4px;margin-top:8px}
+.plan .p small{font-weight:600;font-size:10px;color:var(--ts);letter-spacing:0}
+.plan .pn{font-size:9.5px;color:var(--tt);font-weight:600;margin-top:1px}
+.plan .radio{position:absolute;top:11px;right:10px;font-size:15px;color:#C9C9D2}
+.plan.sel .radio{color:var(--primary)}
+.pbadge{position:absolute;top:-9px;right:14px;background:var(--primary);color:#fff;font-size:9px;font-weight:800;letter-spacing:.4px;padding:3px 9px;border-radius:999px}
+.pbadge.trial{background:var(--fiber)}
+.reassure{display:flex;justify-content:center;gap:14px;margin-top:12px}
+.reassure span{font-size:9.5px;color:var(--ts);font-weight:600;display:flex;align-items:center;gap:4px}
+.reassure i{font-size:11px;color:var(--fiber)}
+/* solid app-style CTA (shipped Button, not the convo pill) */
+.appcta{margin-top:auto;background:var(--primary);border-radius:16px;padding:14px;text-align:center;font-weight:800;font-size:15px;color:#fff}
+</style></head><body>
+
+<h1>Pre-paywall trial warm-up</h1>
+<p class="note">
+  Two screens inserted between <b>reveal (32)</b> and the <b>paywall</b> (which moves 33 → 35), plus a paywall
+  redesign. The job: shift the frame from “I'm being asked for money” to “I'm being given something” before any
+  price is visible. Mechanics adapted from DreamMe — gift framing, a micro-commitment ladder (two chosen taps
+  before the wall), deferred price disclosure, value demonstration right before the ask, and radical transparency
+  about the charge. Their palette stays theirs; everything below is built from Pepta's shipped components.
+  Funnel context: 9/9 of users who reach screen 6 reach screen 32 — length is not what loses this audience.
+</p>
+
+<!-- ============================================================ A ============================================================ -->
+<div class="gallery">
+  <div class="fw"><div class="fl">A · The offer — step 33</div>
+    <div class="dev"><div class="orbs"><i></i><i></i><i></i></div>
+      <div class="scr">
+        <div class="top"><span class="back">‹</span><div class="prog"><i style="width:94%"></i></div></div>
+        <div style="margin-top:44px" class="eyebrow">One last thing…</div>
+        <div class="gifthalo">
+          <div class="halo"></div><div class="halo2"></div>
+          <div class="sparks">
+            <i class="ti ti-sparkles" style="top:6px;left:38px"></i>
+            <i class="ti ti-sparkles" style="top:24px;right:30px;font-size:10px"></i>
+            <i class="ti ti-sparkles" style="bottom:16px;left:24px;font-size:10px"></i>
+          </div>
+          <!-- Pep 'gift' — NEW pose: same body, arms cradling a heart at the chest (overlay convention) -->
+          <svg width="152" height="180" viewBox="0 0 120 142">
+            <defs><linearGradient id="pgA" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9C82FF"/><stop offset="1" stop-color="#6E4EF0"/></linearGradient></defs>
+            <rect x="34" y="1" width="52" height="7" rx="3.5" fill="#6E4EF0"/><rect x="55" y="6" width="10" height="10" rx="3" fill="#7C5CFC"/>
+            <rect x="27" y="14" width="66" height="112" rx="33" fill="url(#pgA)"/>
+            <path d="M27 70 a33 33 0 0 0 66 0 v23 a33 33 0 0 1 -66 0 Z" fill="#0E0E12" opacity=".07"/>
+            <ellipse cx="48" cy="38" rx="15" ry="11" fill="#fff" opacity=".28"/>
+            <ellipse cx="50" cy="64" rx="8" ry="9" fill="#fff"/><ellipse cx="74" cy="64" rx="8" ry="9" fill="#fff"/>
+            <circle cx="51.5" cy="66" r="3.7" fill="#1A1430"/><circle cx="75.5" cy="66" r="3.7" fill="#1A1430"/>
+            <circle cx="53" cy="64.5" r="1.3" fill="#fff"/><circle cx="77" cy="64.5" r="1.3" fill="#fff"/>
+            <ellipse cx="39" cy="80" rx="6" ry="3.8" fill="#FF9CB6" opacity=".6"/><ellipse cx="85" cy="80" rx="6" ry="3.8" fill="#FF9CB6" opacity=".6"/>
+            <path d="M53 81 q7 6.5 14 0" stroke="#1A1430" stroke-width="3.2" fill="none" stroke-linecap="round"/>
+            <g stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".6">
+              <line x1="33" y1="94" x2="45" y2="94"/><line x1="33" y1="101" x2="40" y2="101"/><line x1="33" y1="108" x2="45" y2="108"/>
+            </g>
+            <g transform="rotate(-34 24 100)"><ellipse cx="24" cy="100" rx="7.5" ry="11.5" fill="#7C5CFC"/></g>
+            <g transform="rotate(34 96 100)"><ellipse cx="96" cy="100" rx="7.5" ry="11.5" fill="#7C5CFC"/></g>
+            <path d="M60 95 c-5 -9 -18 -8 -18 3 c0 8 11 13 18 18 c7 -5 18 -10 18 -18 c0 -11 -13 -12 -18 -3 Z" fill="#E25CC4"/>
+            <path d="M50 94.5 a5 5 0 0 1 5.5 -2" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" opacity=".7"/>
+          </svg>
+        </div>
+        <div class="hero" style="margin-top:14px">We'd love you<br>to try Pepta —<br><span class="sq">3 days on us</span></div>
+        <div class="herosub" style="margin-top:12px">Your plan is built. The first<br>3 days are our gift.</div>
+        <div class="cta solid">See my free offer</div>
+      </div>
+    </div>
+    <div class="spec"><b>One idea, nothing else.</b> No price, no plan names, no bullets, no social proof — the screen's power is its emptiness. Eyebrow 13/700 tt · headline 27/800 (convo scale) with the offer line in primary — the screen's one accent · Pep centered in a 2-ring halo (orb tints ×1.4). CTA is the solid pill (funnel single-CTA convention), first-person claiming: <b>“See my free offer.”</b> Progress bar continues from reveal (~94%) — this reads as onboarding, not a checkout.</div>
+  </div>
+
+<!-- ============================================================ B ============================================================ -->
+  <div class="fw"><div class="fl">B · Value carousel — step 34 (slide 2 of 4 shown)</div>
+    <div class="dev"><div class="orbs"><i></i><i></i><i></i></div>
+      <div class="scr">
+        <div class="top"><span class="back">‹</span><div class="prog"><i style="width:97%"></i></div></div>
+        <div class="hero" style="margin-top:26px;font-size:21px">Here's what you're<br>getting free</div>
+        <div class="slide">
+          <!-- Pep 'peek' — NEW pose: eyes + plunger over the card edge -->
+          <div class="peek">
+            <svg width="58" height="34" viewBox="0 0 120 70">
+              <defs><linearGradient id="pgB" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9C82FF"/><stop offset="1" stop-color="#6E4EF0"/></linearGradient></defs>
+              <rect x="34" y="4" width="52" height="7" rx="3.5" fill="#6E4EF0"/><rect x="55" y="9" width="10" height="10" rx="3" fill="#7C5CFC"/>
+              <path d="M27 50 v-13 a33 33 0 0 1 66 0 v13 Z" fill="url(#pgB)"/>
+              <ellipse cx="50" cy="44" rx="7" ry="8" fill="#fff"/><ellipse cx="74" cy="44" rx="7" ry="8" fill="#fff"/>
+              <circle cx="52.5" cy="46" r="3.4" fill="#1A1430"/><circle cx="76.5" cy="46" r="3.4" fill="#1A1430"/>
+              <circle cx="54" cy="44.5" r="1.2" fill="#fff"/><circle cx="78" cy="44.5" r="1.2" fill="#fff"/>
+            </svg>
+          </div>
+          <div class="minidev"><div class="mscr">
+            <div class="mcard">
+              <div class="mrow mbt"><div class="mrow" style="gap:5px"><i class="ti ti-vaccine" style="color:var(--primary);font-size:13px"></i><span class="mnm">Medication Level</span></div><span class="mstate">Steady</span></div>
+              <div class="mrow mbt mt8" style="align-items:flex-end">
+                <div><div class="mbig" style="color:var(--primary)">1.42<span class="munit"> mg</span></div><div class="mlab mt6">In your body right now</div></div>
+              </div>
+              <svg viewBox="0 0 300 90" class="mt8" style="width:100%;height:56px">
+                <defs><linearGradient id="mlB" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="rgba(124,92,252,.22)"/><stop offset="1" stop-color="rgba(124,92,252,0)"/></linearGradient></defs>
+                <line x1="0" y1="72" x2="300" y2="72" stroke="#F0F0F3"/><line x1="0" y1="40" x2="300" y2="40" stroke="#F0F0F3"/>
+                <path d="M0 64 C40 58 60 26 98 22 C140 18 152 52 192 56 C232 60 256 34 300 26 L300 84 L0 84 Z" fill="url(#mlB)"/>
+                <path d="M0 64 C40 58 60 26 98 22 C140 18 152 52 192 56 C232 60 256 34 300 26" fill="none" stroke="#7C5CFC" stroke-width="3" stroke-linecap="round"/>
+                <circle cx="192" cy="56" r="5" fill="#7C5CFC" stroke="#fff" stroke-width="2.5"/>
+              </svg>
+              <div class="mrow mbt mt6"><span class="mlab">Peak 2.1 mg</span><span class="mlab">Trough 0.9 mg</span></div>
+            </div>
+          </div></div>
+          <div class="caption">See the medicine working<br>in your body, every day</div>
+          <div class="dotsrow"><i></i><i class="on"></i><i></i><i></i></div>
+        </div>
+        <div class="cta solid">See my free offer</div>
+      </div>
+    </div>
+    <div class="spec"><b>Swipeable, manual only</b> — no auto-advance: these cards carry medical content people actually read, and a mover fights that. Page dots visible; CTA persists across slides, identical first-person copy as A. Each slide = one shipped screen region in a mini device frame + one caption in the user's words. Pep peeks over the card — present, not competing.</div>
+  </div>
+
+  <div class="fw"><div class="fl">B · all 4 slides (frame contents + captions)</div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="slide" style="margin-top:0;padding:12px 14px">
+        <div class="mrow" style="gap:10px">
+          <div style="flex:none;width:96px"><div class="minidev"><div class="mscr" style="padding:8px 7px">
+            <div class="mcard" style="padding:8px">
+              <div class="msec">Next dose</div><div class="mbig mt6" style="font-size:15px">3d 9h</div>
+              <div class="mwks"><div class="mwkd"><div class="dw">M</div></div><div class="mwkd"><div class="dw">T</div></div><div class="mwkd on"><div class="dw" style="color:var(--ink)">W</div></div><div class="mwkd"><div class="dw">T</div></div><div class="mwkd"><div class="dw">F</div></div><div class="mwkd"><div class="dw">S</div><div class="dd" style="background:var(--primary)"></div></div></div>
+            </div>
+          </div></div></div>
+          <div><b style="font-size:13px">1 · “Never wonder when your next shot is”</b><div class="spec" style="margin-top:4px">Track's next-dose card: countdown, week strip, the due-day dot. The first anxiety a new GLP-1 user has is logistics — answer it first.</div></div>
+        </div>
+      </div>
+      <div class="slide" style="margin-top:0;padding:12px 14px">
+        <div class="mrow" style="gap:10px">
+          <div style="flex:none;width:96px"><div class="minidev"><div class="mscr" style="padding:8px 7px">
+            <div class="mcard" style="padding:8px">
+              <div class="mnm" style="font-size:9.5px;color:var(--primary)">Medication Level</div>
+              <svg viewBox="0 0 300 90" class="mt6" style="width:100%;height:34px"><path d="M0 64 C40 58 60 26 98 22 C140 18 152 52 192 56 C232 60 256 34 300 26" fill="none" stroke="#7C5CFC" stroke-width="6" stroke-linecap="round"/></svg>
+            </div>
+          </div></div></div>
+          <div><b style="font-size:13px">2 · “See the medicine working in your body, every day”</b><div class="spec" style="margin-top:4px">The level curve — the hero slide (shown on the device left). No other tracker shows this; it is the single strongest “what do I actually get.”</div></div>
+        </div>
+      </div>
+      <div class="slide" style="margin-top:0;padding:12px 14px">
+        <div class="mrow" style="gap:10px">
+          <div style="flex:none;width:96px"><div class="minidev"><div class="mscr" style="padding:8px 7px">
+            <div class="mcard" style="padding:8px">
+              <div class="mrow mbt"><span class="mnm" style="font-size:9.5px">Weight</span><span class="mpill" style="color:#A8327D;background:#FBEAF6">−12 lb</span></div>
+              <svg viewBox="0 0 300 80" class="mt6" style="width:100%;height:30px"><path d="M0 18 C60 22 120 34 180 48 C230 58 270 62 300 64" fill="none" stroke="#E25CC4" stroke-width="6" stroke-linecap="round"/></svg>
+              <div class="mpill mt6" style="color:#1E8E40;background:#E8F8EE"><i class="ti ti-shield-check" style="font-size:9px"></i>Muscle protected</div>
+            </div>
+          </div></div></div>
+          <div><b style="font-size:13px">3 · “Watch the scale drop — without losing your muscle”</b><div class="spec" style="margin-top:4px">Progress: weight trend + the muscle-retention chip. Speaks to the #1 informed fear on GLP-1s (lean-mass loss) that onboarding just taught them.</div></div>
+        </div>
+      </div>
+      <div class="slide" style="margin-top:0;padding:12px 14px">
+        <div class="mrow" style="gap:10px">
+          <div style="flex:none;width:96px"><div class="minidev"><div class="mscr" style="padding:8px 7px">
+            <div class="mcard" style="padding:8px">
+              <div class="mnm" style="font-size:9.5px">This week</div>
+              <div class="mrow mt6" style="gap:4px;flex-wrap:wrap"><span class="mlogchip">Nausea · mild</span><span class="mlogchip">Day 2</span><span class="mlogchip" style="border-color:rgba(52,199,89,.4);color:#1E8E40">Eased by day 4</span></div>
+            </div>
+          </div></div></div>
+          <div><b style="font-size:13px">4 · “Notice patterns in how you feel”</b><div class="spec" style="margin-top:4px">Side-effect log rendered as pattern, not data entry — reassurance that rough days are trackable and usually temporary. Ends the carousel on care, which hands off to the gift framing of the wall.</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="spec"><b>Not picked:</b> reminders (a settings surface, weak as a promise), meal scan (strong but crowded — belongs in a later winback, not the first four), injection-site map (great visual, but slide 1 already owns dose logistics; two logistics slides would repeat a beat).</div>
+  </div>
+</div>
+
+<!-- ============================================================ C ============================================================ -->
+<h2>C · The paywall — step 35, redesigned (both trial states)</h2>
+<p class="note">
+  Light screen porting the shipped PaywallScreen (bg #FAFAFB, PlanCard radius 16 / 2px border / #F7F4FF selected /
+  floating badge). The design-lab's old dark “wall” is a generation behind the shipped app and is retired here.
+  Headline is arrival, not transaction. The trial timeline is a <b>data-driven component</b>: day labels come from the
+  loaded intro offer (reminder day = trialDays − 1, floor 1) and the charge date is computed from “today + trial
+  length” at render (“Aug 3” below assumes a Jul 31 open) — nothing is baked into artwork, so a changed Apple
+  offer re-renders correctly with zero design work.
+</p>
+<div class="gallery">
+
+  <div class="fw"><div class="fl">C1 · trial on BOTH plans — yearly preselected</div>
+    <div class="dev app">
+      <div class="scr" style="padding:20px 20px 18px">
+        <div class="pw" style="display:flex;flex-direction:column;height:100%">
+          <div class="restore">Restore</div>
+          <div class="pwhead">
+            <div class="pwtitle">Your 3 free days<br>start now</div>
+            <div class="pwsub">Everything you just saw, unlocked today.</div>
+          </div>
+          <div class="tl">
+            <div class="rail"></div>
+            <div class="tlrow now"><div class="tlic"><i class="ti ti-lock-open"></i></div><div class="tlb"><b>Instant access</b><span>Your plan, levels and tracking — all of it, right now.</span></div><div class="tlday">Today</div></div>
+            <div class="tlrow"><div class="tlic"><i class="ti ti-bell"></i></div><div class="tlb"><b>We remind you</b><span>A notification that your trial is ending. No surprises.</span></div><div class="tlday">Day 2</div></div>
+            <div class="tlrow"><div class="tlic"><i class="ti ti-calendar-check"></i></div><div class="tlb"><b>First charge — Aug 3</b><span>Cancel anytime before, in one tap.</span></div><div class="tlday">Day 3</div></div>
+          </div>
+          <div class="plans">
+            <div class="plan sel">
+              <span class="pbadge">SAVE 67%</span><i class="ti ti-circle-check radio"></i>
+              <div class="t">Yearly</div><div class="s">billed yearly</div>
+              <div class="p">$3.33<small>/mo</small></div><div class="pn">$39.99/yr</div>
+            </div>
+            <div class="plan">
+              <i class="ti ti-circle radio"></i>
+              <div class="t">Monthly</div><div class="s">billed monthly</div>
+              <div class="p">$9.99<small>/mo</small></div><div class="pn">&nbsp;</div>
+            </div>
+          </div>
+          <div class="reassure"><span><i class="ti ti-check"></i>Cancel anytime</span><span><i class="ti ti-check"></i>Reminder before charge</span></div>
+          <div class="appcta">Try 3 days for $0.00</div>
+          <div class="ctasub">Then $39.99/yr, auto-renews. Cancel anytime in Settings.</div>
+          <div class="legal">$39.99/year after trial. Cancel anytime · <b>Terms</b> &amp; <b>Privacy</b></div>
+        </div>
+      </div>
+    </div>
+    <div class="spec"><b>The reference pattern, working as intended.</b> Trial applies to the preselected yearly, so the zero-price CTA is truthful with yearly highlighted. Timeline owns the trial story; badges stay single-purpose (yearly = SAVE 67%, monthly = none — the trial isn't a differentiator when both plans have it). Apple 3.1.2(c): billed total under the /mo anchor AND in the legal footer, unchanged from shipped.</div>
+  </div>
+
+  <div class="fw"><div class="fl">C2 · trial on MONTHLY only (today's reality) — yearly preselected</div>
+    <div class="dev app">
+      <div class="scr" style="padding:20px 20px 18px">
+        <div class="pw" style="display:flex;flex-direction:column;height:100%">
+          <div class="restore">Restore</div>
+          <div class="pwhead">
+            <div class="pwtitle">Your plan is ready</div>
+            <div class="pwsub">Everything you just saw, unlocked today.</div>
+          </div>
+          <div class="tl">
+            <div class="tlrow now"><div class="tlic"><i class="ti ti-lock-open"></i></div><div class="tlb"><b>Instant access</b><span>Your plan, levels and tracking — all of it, right now.</span></div><div class="tlday">Today</div></div>
+            <!-- The space the collapsed timeline vacates is reclaimed by the
+                 shipped paywall's FEATURES grid — same list, same green checks -->
+            <div style="display:flex;flex-wrap:wrap;row-gap:7px;margin-top:12px;padding-top:11px;border-top:.5px solid rgba(14,14,18,.08)">
+              <span style="flex-basis:50%;display:flex;align-items:center;gap:5px;font-size:9.5px;font-weight:600"><i class="ti ti-circle-check" style="color:var(--fiber);font-size:12px"></i>Medication level &amp; curve</span>
+              <span style="flex-basis:50%;display:flex;align-items:center;gap:5px;font-size:9.5px;font-weight:600"><i class="ti ti-circle-check" style="color:var(--fiber);font-size:12px"></i>Injection-site map</span>
+              <span style="flex-basis:50%;display:flex;align-items:center;gap:5px;font-size:9.5px;font-weight:600"><i class="ti ti-circle-check" style="color:var(--fiber);font-size:12px"></i>Muscle-protection tracking</span>
+              <span style="flex-basis:50%;display:flex;align-items:center;gap:5px;font-size:9.5px;font-weight:600"><i class="ti ti-circle-check" style="color:var(--fiber);font-size:12px"></i>Unlimited AI insights</span>
+              <span style="flex-basis:50%;display:flex;align-items:center;gap:5px;font-size:9.5px;font-weight:600"><i class="ti ti-circle-check" style="color:var(--fiber);font-size:12px"></i>Meal scan &amp; voice</span>
+              <span style="flex-basis:50%;display:flex;align-items:center;gap:5px;font-size:9.5px;font-weight:600"><i class="ti ti-circle-check" style="color:var(--fiber);font-size:12px"></i>Report export</span>
+            </div>
+          </div>
+          <div class="plans">
+            <div class="plan sel">
+              <span class="pbadge">SAVE 67%</span><i class="ti ti-circle-check radio"></i>
+              <div class="t">Yearly</div><div class="s">billed yearly</div>
+              <div class="p">$3.33<small>/mo</small></div><div class="pn">$39.99/yr</div>
+            </div>
+            <div class="plan">
+              <span class="pbadge trial">3 DAYS FREE</span><i class="ti ti-circle radio"></i>
+              <div class="t">Monthly</div><div class="s">billed monthly</div>
+              <div class="p">$9.99<small>/mo</small></div><div class="pn">&nbsp;</div>
+            </div>
+          </div>
+          <div class="reassure"><span><i class="ti ti-check"></i>Cancel anytime</span><span><i class="ti ti-check"></i>Billed once a year</span></div>
+          <div class="appcta">Start my year — $39.99</div>
+          <div class="ctasub">Billed today, renews yearly. Cancel anytime in Settings.</div>
+          <div class="legal">$39.99/year. Cancel anytime · <b>Terms</b> &amp; <b>Privacy</b></div>
+        </div>
+      </div>
+    </div>
+    <div class="spec"><b>The timeline is trial-scoped, so it collapses to its “Today” row</b> when the selected plan has no trial — the component never promises free days the selected plan won't deliver. The free affordance lives on the monthly card as the green <b>3 DAYS FREE</b> badge (green, not primary, so it never reads as “selected”). CTA is an honest purchase in arrival language.</div>
+  </div>
+
+  <div class="fw"><div class="fl">C2 · monthly tapped — timeline grows back</div>
+    <div class="dev app">
+      <div class="scr" style="padding:20px 20px 18px">
+        <div class="pw" style="display:flex;flex-direction:column;height:100%">
+          <div class="restore">Restore</div>
+          <div class="pwhead">
+            <div class="pwtitle">Your 3 free days<br>start now</div>
+            <div class="pwsub">Everything you just saw, unlocked today.</div>
+          </div>
+          <div class="tl">
+            <div class="rail"></div>
+            <div class="tlrow now"><div class="tlic"><i class="ti ti-lock-open"></i></div><div class="tlb"><b>Instant access</b><span>Your plan, levels and tracking — all of it, right now.</span></div><div class="tlday">Today</div></div>
+            <div class="tlrow"><div class="tlic"><i class="ti ti-bell"></i></div><div class="tlb"><b>We remind you</b><span>A notification that your trial is ending. No surprises.</span></div><div class="tlday">Day 2</div></div>
+            <div class="tlrow"><div class="tlic"><i class="ti ti-calendar-check"></i></div><div class="tlb"><b>First charge — Aug 3</b><span>Cancel anytime before, in one tap.</span></div><div class="tlday">Day 3</div></div>
+          </div>
+          <div class="plans">
+            <div class="plan">
+              <span class="pbadge">SAVE 67%</span><i class="ti ti-circle radio"></i>
+              <div class="t">Yearly</div><div class="s">billed yearly</div>
+              <div class="p">$3.33<small>/mo</small></div><div class="pn">$39.99/yr</div>
+            </div>
+            <div class="plan sel">
+              <span class="pbadge trial">3 DAYS FREE</span><i class="ti ti-circle-check radio"></i>
+              <div class="t">Monthly</div><div class="s">billed monthly</div>
+              <div class="p">$9.99<small>/mo</small></div><div class="pn">&nbsp;</div>
+            </div>
+          </div>
+          <div class="reassure"><span><i class="ti ti-check"></i>Cancel anytime</span><span><i class="ti ti-check"></i>Reminder before charge</span></div>
+          <div class="appcta">Try 3 days for $0.00</div>
+          <div class="ctasub">We'll remind you before it ends. Then $9.99/mo, auto-renews. Cancel anytime in Settings.</div>
+          <div class="legal">$9.99/month after trial. Cancel anytime · <b>Terms</b> &amp; <b>Privacy</b></div>
+        </div>
+      </div>
+    </div>
+    <div class="spec">Headline, timeline and CTA all flip together with the selection — one state machine, keyed off the selected plan's intro offer, exactly how <b>paywallPricing.buildPaywallPricing</b> already derives copy. Subline is the shipped Apple-compliant disclosure verbatim.</div>
+  </div>
+</div>
+
+<!-- ============================================================ rationale ============================================================ -->
+<h2>Rationale &amp; handoff notes</h2>
+<p class="note">
+  <b>Carousel picks.</b> Dose countdown → level curve → progress-with-muscle → side-effect patterns. Order is
+  deliberate: logistics first (the immediate anxiety), the differentiator second (the curve nothing else has),
+  outcome third, care last. Captions are outcomes in the user's words, never feature names.
+</p>
+<p class="note">
+  <b>Badge conflict — resolved by scope, not by stacking.</b> One badge per row stays the rule (the shipped
+  PlanCard has one slot; two floats would collide at top-right and read as noise). Yearly's slot always carries
+  SAVE 67%. The trial is communicated by the <b>timeline component</b> whenever the selected plan carries it; the
+  green 3 DAYS FREE badge on monthly appears <b>only</b> in the monthly-only state, where the trial genuinely
+  differentiates the rows. If the trial ever lands on both plans, that badge disappears entirely (C1). Green
+  (fiber #34C759) keeps “free” visually distinct from “selected” (primary).
+</p>
+<p class="note">
+  <b>New mascot assets required (2).</b> <i>Pep · gift</i> — both arms raised holding the #E25CC4 heart; built as
+  overlays on the existing body per Mascot.tsx's own convention (mirrored wave-arms + one heart path + happier
+  eye position). <i>Pep · peek</i> — top-of-barrel crop, eyes over an edge; a clip of the existing body, no new
+  drawing. Both stay react-native-svg overlays until the 3D renders are commissioned.
+</p>
+<p class="note">
+  <b>What had to bend.</b> (1) The design-lab's dark paywall “wall” is retired — the shipped paywall is light,
+  and A/B must flow seamlessly into C, so C stays on the app ground with the convo progress bar ending at A/B.
+  (2) The timeline is a new component with no existing equivalent; it borrows the level-card's surface, radius-16
+  icon squares (#F1EDFF), and hairline rules, so it introduces zero new colors or radii. (3) Plan cards go
+  side-by-side (from stacked) to give the timeline vertical room — same card anatomy, price scale drops 20→19.
+  (4) Screen A intentionally breaks the funnel's type rhythm with a centered layout — it is the only centered
+  screen in onboarding, which is what makes it read as a moment.
+</p>
+<p class="note">
+  <b>Open decision, informed not resolved.</b> The warm-up promises “3 days on us” twice before the wall. In C2
+  (today's monthly-only reality) a yearly-preselected wall keeps that promise only if the user spots the monthly
+  badge — a real broken-promise risk after two screens of gift framing. C1 is the design the sequence wants:
+  either add the intro offer to the annual product, or preselect monthly in the treatment arm. Both change what
+  the experiment measures, so it's a product call — but shipping A+B with C2-yearly-preselected is the weakest
+  of the four combinations and the data (2 taps / 1 trial / 0 purchases from 8) will stay noisy at this volume.
+</p>
+<p class="note">
+  <b>Numbers.</b> Brief specifies $39.99/year; the shipped fallback copy renders $40.00/yr (FALLBACK_PRICING in
+  paywallPricing.ts). Real store products drive the display either way, but the fallback should be aligned to
+  $39.99 at implementation time. Trial length, day labels, and the charge date are all data-driven from the
+  loaded intro offer — the Apple-side offer expiry can change the trial without touching these screens.
+</p>
+
+</body></html>
