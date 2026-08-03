@@ -657,15 +657,20 @@ function PlanColumn({
         ]}
       >
         {badge ? (
-          <View
-            style={[
-              styles.planBadge,
-              { backgroundColor: badgeTone === "trial" ? theme.colors.fiber : theme.colors.primary },
-            ]}
-          >
-            <AppText variant="caption" style={styles.planBadgeText}>
-              {badge.toUpperCase()}
-            </AppText>
+          // Centered over the card, not right-pinned: on the narrow
+          // side-by-side columns a right-aligned float lands on the radio
+          // control below it (Nick, 1.0.5 (28) TestFlight).
+          <View style={styles.planBadgeWrap} pointerEvents="none">
+            <View
+              style={[
+                styles.planBadge,
+                { backgroundColor: badgeTone === "trial" ? theme.colors.fiber : theme.colors.primary },
+              ]}
+            >
+              <AppText variant="caption" style={styles.planBadgeText} numberOfLines={1}>
+                {badge.toUpperCase()}
+              </AppText>
+            </View>
           </View>
         ) : null}
         <View style={styles.planRadio}>
@@ -762,14 +767,18 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 11,
   },
-  planBadge: {
+  planBadgeWrap: {
     position: "absolute",
     top: -9,
-    right: 14,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    zIndex: 1,
+  },
+  planBadge: {
     paddingVertical: 3,
     paddingHorizontal: 9,
     borderRadius: 999,
-    zIndex: 1,
   },
   planBadgeText: {
     color: "#FFFFFF",
