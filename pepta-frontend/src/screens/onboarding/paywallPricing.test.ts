@@ -82,7 +82,7 @@ describe("buildPaywallPricing", () => {
         },
       },
       yearly: packageWithPrice("$40.00", 40),
-    }, true);
+    }, { monthly: true, yearly: false });
 
     // "$0.00" rather than "free" — a concrete number reads as a real price.
     // The duration deliberately does NOT live on the button (it moved to the
@@ -108,7 +108,7 @@ describe("buildPaywallPricing", () => {
         },
       },
       yearly: packageWithPrice("$40.00", 40),
-    }, true);
+    }, { monthly: true, yearly: false });
 
     expect(pricing.cta.monthly.label).toBe("Try today for $0.00");
     expect(pricing.cta.monthly.subline).toContain("1 week free");
@@ -156,7 +156,7 @@ describe("buildPaywallPricing", () => {
       yearly: packageWithPrice("$40.00", 40),
     };
 
-    for (const pricing of [buildPaywallPricing(withTrial, false), buildPaywallPricing(withTrial)]) {
+    for (const pricing of [buildPaywallPricing(withTrial, { monthly: false, yearly: false }), buildPaywallPricing(withTrial)]) {
       expect(pricing.cta.monthly).toEqual({ label: "Start my month — $9.99" });
       expect(JSON.stringify(pricing)).not.toContain("$0.00");
     }
@@ -175,14 +175,99 @@ describe("buildPaywallPricing", () => {
       },
       yearly: packageWithPrice("$40.00", 40),
     };
-    expect(buildPaywallPricing(withTrial, true).monthly.badge).toBe("3 days free");
+    expect(buildPaywallPricing(withTrial, { monthly: true, yearly: false }).monthly.badge).toBe("3 days free");
     // Control arm / no intro: no badge — the arms differ only in the trial.
-    expect(buildPaywallPricing(withTrial, false).monthly.badge).toBeUndefined();
+    expect(buildPaywallPricing(withTrial, { monthly: false, yearly: false }).monthly.badge).toBeUndefined();
     expect(
       buildPaywallPricing(
         { monthly: packageWithPrice("$9.99", 9.99), yearly: packageWithPrice("$40.00", 40) },
-        true,
+        { monthly: true, yearly: true },
       ).monthly.badge,
     ).toBeUndefined();
+  });
+
+  // The package-agnostic contract: every combination of intro offers renders
+  // correctly with zero code awareness of WHICH product carries the trial.
+  describe("per-plan trial matrix", () => {
+    const trialPkg = (price: string, amount: number, units: number, unit: string) => ({
+      product: {
+        price: amount,
+        priceString: price,
+        introPrice: { price: 0, periodNumberOfUnits: units, periodUnit: unit },
+      },
+    });
+
+    it("trial on BOTH plans: both CTAs free, yearly badge = trial with SAVE relocated to its sub-line", () => {
+      const pricing = buildPaywallPricing(
+        { monthly: trialPkg("$9.99", 9.99, 3, "DAY"), yearly: trialPkg("$40.00", 40, 3, "DAY") },
+        { monthly: true, yearly: true },
+      );
+      expect(pricing.cta.yearly.label).toBe("Try today for $0.00");
+      expect(pricing.cta.monthly.label).toBe("Try today for $0.00");
+      // Yearly's post-trial price is the YEARLY price — never monthly leaking.
+      expect(pricing.cta.yearly.subline).toBe(
+        "3 days free — we'll remind you before it ends. Then $40.00/yr, auto-renews. Cancel anytime in Settings.",
+      );
+      // Badge collision resolution: trial claims the slot, SAVE moves to sub.
+      expect(pricing.yearly.badge).toBe("3 days free");
+      expect(pricing.yearly.badgeTone).toBe("trial");
+      expect(pricing.yearly.sub).toBe("billed yearly · save 67%");
+      expect(pricing.monthly.badge).toBe("3 days free");
+    });
+
+    it("trial on MONTHLY only (today's live state): exact pre-change rendering", () => {
+      const pricing = buildPaywallPricing(
+        { monthly: trialPkg("$9.99", 9.99, 3, "DAY"), yearly: packageWithPrice("$40.00", 40) },
+        { monthly: true, yearly: false },
+      );
+      expect(pricing.yearly.badge).toBe("SAVE 67%");
+      expect(pricing.yearly.badgeTone).toBe("save");
+      expect(pricing.yearly.sub).toBe("billed yearly");
+      expect(pricing.monthly.badge).toBe("3 days free");
+      expect(pricing.cta.yearly.label).toBe("Start my year — $40.00");
+      expect(pricing.cta.monthly.label).toBe("Try today for $0.00");
+    });
+
+    it("trial on ANNUAL only: yearly free, monthly honest purchase", () => {
+      const pricing = buildPaywallPricing(
+        { monthly: packageWithPrice("$9.99", 9.99), yearly: trialPkg("$40.00", 40, 3, "DAY") },
+        { monthly: false, yearly: true },
+      );
+      expect(pricing.cta.yearly.label).toBe("Try today for $0.00");
+      expect(pricing.cta.monthly.label).toBe("Start my month — $9.99");
+      expect(pricing.yearly.badge).toBe("3 days free");
+      expect(pricing.monthly.badge).toBeUndefined();
+    });
+
+    it("trial on NEITHER: purchase CTAs, SAVE badge back in yearly's slot", () => {
+      const pricing = buildPaywallPricing(
+        { monthly: packageWithPrice("$9.99", 9.99), yearly: packageWithPrice("$40.00", 40) },
+        { monthly: false, yearly: false },
+      );
+      expect(pricing.yearly.badge).toBe("SAVE 67%");
+      expect(pricing.monthly.badge).toBeUndefined();
+      expect(JSON.stringify(pricing)).not.toContain("$0.00");
+    });
+
+    it("an ineligible user sees no trial copy even when both products carry intros", () => {
+      const pricing = buildPaywallPricing(
+        { monthly: trialPkg("$9.99", 9.99, 3, "DAY"), yearly: trialPkg("$40.00", 40, 3, "DAY") },
+        { monthly: false, yearly: false },
+      );
+      expect(JSON.stringify(pricing)).not.toContain("$0.00");
+      expect(pricing.yearly.badge).toBe("SAVE 67%");
+    });
+
+    it("differing durations: each plan derives from its OWN intro offer", () => {
+      const pricing = buildPaywallPricing(
+        { monthly: trialPkg("$9.99", 9.99, 3, "DAY"), yearly: trialPkg("$40.00", 40, 1, "WEEK") },
+        { monthly: true, yearly: true },
+      );
+      expect(pricing.yearly.badge).toBe("1 week free");
+      expect(pricing.yearly.sub).toBe("billed yearly · save 67%");
+      expect(pricing.cta.yearly.subline).toContain("1 week free");
+      expect(pricing.monthly.badge).toBe("3 days free");
+      expect(pricing.cta.monthly.subline).toContain("3 days free");
+    });
   });
 });

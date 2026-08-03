@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   logOnboardingCompleted,
+  logPaywallDismissed,
+  logPaywallOfferingDebug,
   logOnboardingStarted,
   logOnboardingStep,
   logPaywallShown,
@@ -64,12 +66,63 @@ describe("funnel events", () => {
     expect(mocks.logAnalyticsEvent).toHaveBeenCalledWith("onboarding_completed", {});
   });
 
-  it("passes the offering variant through paywall_shown", async () => {
-    logPaywallShown("trial-offer", { defaultSelectedPlan: "yearly", trialCopyShown: true });
+  it("passes the offering variant through paywall_shown, with unambiguous trial scope", async () => {
+    logPaywallShown("trial-offer", {
+      defaultSelectedPlan: "yearly",
+      trialCopyShown: true,
+      trialCopyPlans: "both",
+    });
     await settle();
     expect(mocks.logAnalyticsEvent).toHaveBeenCalledWith("paywall_shown", {
       variant: "trial-offer",
       defaultSelectedPlan: "yearly",
+      trialCopyShown: "true",
+      trialCopyPlans: "both",
+    });
+  });
+
+  it("flattens paywall_offering_debug per package", async () => {
+    logPaywallOfferingDebug({
+      offeringId: "default",
+      monthly: {
+        productId: "ai.boltzman.pepta.monthly.trial",
+        hasIntroPrice: true,
+        introOfferPeriod: "3 day",
+        rawEligibilityStatus: 2,
+        trialEligible: true,
+      },
+      yearly: {
+        productId: "ai.boltzman.pepta.annual",
+        hasIntroPrice: false,
+        introOfferPeriod: null,
+        rawEligibilityStatus: null,
+        trialEligible: false,
+      },
+      trialCopyShown: false,
+    });
+    await settle();
+    expect(mocks.logAnalyticsEvent).toHaveBeenCalledWith("paywall_offering_debug", {
+      offeringId: "default",
+      monthlyProductId: "ai.boltzman.pepta.monthly.trial",
+      monthlyHasIntro: "true",
+      monthlyIntroPeriod: "3 day",
+      monthlyEligibilityStatus: "2",
+      monthlyTrialEligible: "true",
+      yearlyProductId: "ai.boltzman.pepta.annual",
+      yearlyHasIntro: "false",
+      yearlyIntroPeriod: "null",
+      yearlyEligibilityStatus: "null",
+      yearlyTrialEligible: "false",
+      trialCopyShown: "false",
+    });
+  });
+
+  it("stringifies paywall_dismissed", async () => {
+    logPaywallDismissed({ variant: "default", selectedPlan: "yearly", trialCopyShown: true });
+    await settle();
+    expect(mocks.logAnalyticsEvent).toHaveBeenCalledWith("paywall_dismissed", {
+      variant: "default",
+      selectedPlan: "yearly",
       trialCopyShown: "true",
     });
   });

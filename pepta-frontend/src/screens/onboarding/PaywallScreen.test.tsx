@@ -14,6 +14,8 @@ const mocks = vi.hoisted(() => ({
   purchasePlan: vi.fn(),
   restore: vi.fn(),
   updateCachedUser: vi.fn(),
+  appStateListeners: [] as Array<(state: string) => void>,
+  logPaywallDismissed: vi.fn(),
 }));
 
 // Control arm: no introductory offer on the monthly product.
@@ -21,7 +23,10 @@ const paywallPackages = {
   monthly: { product: { price: 9.99, priceString: "$9.99", currencyCode: "USD" } },
   yearly: { product: { price: 40, priceString: "$40.00", currencyCode: "USD" } },
   offeringId: "default",
-  monthlyTrialEligible: false,
+  trial: {
+    monthly: { eligible: false, rawStatus: null },
+    yearly: { eligible: false, rawStatus: null },
+  },
 };
 
 // Treatment arm: monthly carries a 3-day free intro offer (derived, never
@@ -37,10 +42,45 @@ const trialPaywallPackages = {
   },
   yearly: { product: { price: 40, priceString: "$40.00", currencyCode: "USD" } },
   offeringId: "trial-offer",
-  monthlyTrialEligible: true,
+  trial: {
+    monthly: { eligible: true, rawStatus: 2 },
+    yearly: { eligible: false, rawStatus: null },
+  },
+};
+
+// Both plans carry an eligible trial (the 1.0.5 rollout state), with
+// DIFFERENT durations so per-package derivation is observable.
+const bothTrialPaywallPackages = {
+  monthly: {
+    product: {
+      price: 9.99,
+      priceString: "$9.99",
+      currencyCode: "USD",
+      introPrice: { price: 0, periodNumberOfUnits: 3, periodUnit: "DAY" },
+    },
+  },
+  yearly: {
+    product: {
+      price: 40,
+      priceString: "$40.00",
+      currencyCode: "USD",
+      introPrice: { price: 0, periodNumberOfUnits: 1, periodUnit: "WEEK" },
+    },
+  },
+  offeringId: "default",
+  trial: {
+    monthly: { eligible: true, rawStatus: 2 },
+    yearly: { eligible: true, rawStatus: 2 },
+  },
 };
 
 vi.mock("react-native", () => ({
+  AppState: {
+    addEventListener: (_event: string, cb: (state: string) => void) => {
+      mocks.appStateListeners.push(cb);
+      return { remove: vi.fn() };
+    },
+  },
   Linking: {
     openURL: mocks.openURL,
   },
@@ -174,6 +214,7 @@ vi.mock("../../services/funnelEvents", () => ({
   logPaywallShown: mocks.logPaywallShown,
   logPurchaseStarted: mocks.logPurchaseStarted,
   logPaywallOfferingDebug: vi.fn(),
+  logPaywallDismissed: mocks.logPaywallDismissed,
 }));
 
 function nodeText(node: ReactTestInstance): string {
@@ -231,6 +272,8 @@ describe("PaywallScreen legal links", () => {
     mocks.isPurchaseCancelled.mockReset();
     mocks.isPurchaseCancelled.mockReturnValue(false);
     mocks.logPaywallShown.mockClear();
+    mocks.logPaywallDismissed.mockClear();
+    mocks.appStateListeners.length = 0;
     mocks.logPurchaseStarted.mockClear();
     mocks.onComplete.mockClear();
     mocks.openURL.mockClear();
@@ -435,9 +478,74 @@ describe("PaywallScreen legal links", () => {
     });
 
     expect(mocks.logPaywallShown).toHaveBeenCalledTimes(1);
+    // Unambiguous semantics: trialCopyShown refers to the DEFAULT-SELECTED
+    // plan (yearly, which has no trial in this fixture); trialCopyPlans names
+    // where trial copy actually rendered.
     expect(mocks.logPaywallShown).toHaveBeenCalledWith("trial-offer", {
       defaultSelectedPlan: "yearly",
+      trialCopyShown: false,
+      trialCopyPlans: "monthly",
+    });
+  });
+
+  it("with trials on BOTH plans, first render is the yearly trial — yearly values, not monthly's", async () => {
+    mocks.getPaywallPackages.mockResolvedValue(bothTrialPaywallPackages);
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+    await act(async () => {
+      tree = TestRenderer.create(<PaywallScreen onComplete={mocks.onComplete} />);
+    });
+
+    // Yearly preselected: free CTA immediately, with the YEARLY duration and
+    // the YEARLY post-trial price (1 week / $40.00, never 3 days / $9.99).
+    expect(button(tree!.root, "Try today for $0.00")).toBeTruthy();
+    const text = allText(tree!.root);
+    expect(text).toContain(
+      "1 week free — we'll remind you before it ends. Then $40.00/yr, auto-renews. Cancel anytime in Settings.",
+    );
+    expect(text).not.toContain("Then $9.99/mo");
+    // Badge collision resolved: yearly slot carries its trial, SAVE moves to
+    // the support line.
+    expect(text).toContain("1 WEEK FREE");
+    expect(text).toContain("billed yearly · save 67%");
+    expect(mocks.logPaywallShown).toHaveBeenCalledWith("default", {
+      defaultSelectedPlan: "yearly",
       trialCopyShown: true,
+      trialCopyPlans: "both",
+    });
+
+    // Switching to monthly re-derives everything from monthly's own package.
+    const monthlyRadio = tree!.root.findAll(
+      (node) =>
+        (node.type as unknown) === "Pressable" &&
+        node.props.accessibilityRole === "radio",
+    )[1]!;
+    await act(async () => {
+      monthlyRadio.props.onPress();
+    });
+    expect(allText(tree!.root)).toContain(
+      "3 days free — we'll remind you before it ends. Then $9.99/mo, auto-renews. Cancel anytime in Settings.",
+    );
+  });
+
+  it("fires paywall_dismissed once when the app is backgrounded without a purchase", async () => {
+    mocks.getPaywallPackages.mockResolvedValue(trialPaywallPackages);
+    await act(async () => {
+      TestRenderer.create(<PaywallScreen onComplete={mocks.onComplete} />);
+    });
+    // The StoreKit sheet only drives 'inactive' — that must NOT count.
+    await act(async () => {
+      mocks.appStateListeners.forEach((cb) => cb("inactive"));
+    });
+    expect(mocks.logPaywallDismissed).not.toHaveBeenCalled();
+    await act(async () => {
+      mocks.appStateListeners.forEach((cb) => cb("background"));
+      mocks.appStateListeners.forEach((cb) => cb("background"));
+    });
+    expect(mocks.logPaywallDismissed).toHaveBeenCalledTimes(1);
+    expect(mocks.logPaywallDismissed).toHaveBeenCalledWith({
+      variant: "trial-offer",
+      selectedPlan: "yearly",
+      trialCopyShown: false,
     });
   });
 

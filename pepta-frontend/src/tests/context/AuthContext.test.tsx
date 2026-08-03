@@ -120,7 +120,7 @@ describe("AuthContext", () => {
       await signInPromise;
     });
 
-    expect(mockRevenueCat.identify).toHaveBeenCalledWith("user_1");
+    expect(mockRevenueCat.identify).toHaveBeenCalledWith("user_1", expect.objectContaining({}));
     expect(harness.value().isAuthenticated).toBe(true);
   });
 
@@ -226,7 +226,7 @@ describe("AuthContext", () => {
     expect(harness.value().user?.id).toBe("user_1");
     expect(mockApi.setAuthToken).toHaveBeenCalledWith("token_1");
     expect(mockAppsFlyer.initialize).toHaveBeenCalledWith("user_1");
-    expect(mockRevenueCat.identify).toHaveBeenCalledWith("user_1");
+    expect(mockRevenueCat.identify).toHaveBeenCalledWith("user_1", expect.objectContaining({}));
   });
 
   it("registers a 401 handler that signs the user out", async () => {

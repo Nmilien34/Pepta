@@ -11,6 +11,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
   Animated,
+  AppState,
   Easing,
   Linking,
   Platform,
@@ -37,7 +38,12 @@ import {
   REVENUECAT_ENTITLEMENT_ID,
   type RevenueCatPlan,
 } from "../../services/revenueCat";
-import { logPaywallOfferingDebug, logPaywallShown, logPurchaseStarted } from "../../services/funnelEvents";
+import {
+  logPaywallDismissed,
+  logPaywallOfferingDebug,
+  logPaywallShown,
+  logPurchaseStarted,
+} from "../../services/funnelEvents";
 import { buildPaywallPricing, freeTrialOf } from "./paywallPricing";
 import { scheduleTrialEndReminder } from "../../services/trialReminder.service";
 
@@ -82,21 +88,33 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
   const [message, setMessage] = useState<string | null>(null);
   const [paywallPackages, setPaywallPackages] =
     useState<PaywallPackages | null>(null);
-  const pricing = buildPaywallPricing(
-    paywallPackages,
-    paywallPackages?.monthlyTrialEligible ?? false,
-  );
+  const pricing = buildPaywallPricing(paywallPackages, {
+    monthly: paywallPackages?.trial.monthly.eligible ?? false,
+    yearly: paywallPackages?.trial.yearly.eligible ?? false,
+  });
   const plansReady = paywallPackages !== null;
   // paywall_shown fires once per presentation, when the offering load settles
   // (so `variant` is the real experiment arm, or 'unknown' on failure).
   const shownLogged = useRef(false);
+  // paywall_dismissed context for the AppState listener (refs so the listener
+  // never re-subscribes and never fires with stale closure state).
+  const dismissContext = useRef({ variant: "unknown", trialCopyShown: false });
+  const selectedPlanRef = useRef<Plan>(plan);
+  selectedPlanRef.current = plan;
+  const purchasedRef = useRef(false);
+  const dismissLogged = useRef(false);
 
-  const logShownOnce = (variant: string, trialCopyShown: boolean) => {
+  const logShownOnce = (
+    variant: string,
+    trialCopyShown: boolean,
+    trialCopyPlans: "none" | "monthly" | "yearly" | "both",
+  ) => {
     if (shownLogged.current) return;
     shownLogged.current = true;
+    dismissContext.current = { variant, trialCopyShown };
     // The default plan is the useState initial above — restate it here so the
     // dashboard shows it explicitly rather than by convention.
-    logPaywallShown(variant, { defaultSelectedPlan: "yearly", trialCopyShown });
+    logPaywallShown(variant, { defaultSelectedPlan: "yearly", trialCopyShown, trialCopyPlans });
   };
 
   useEffect(() => {
@@ -114,24 +132,46 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
       .then((packages) => {
         if (!mounted) return;
         setPaywallPackages(packages);
-        // Same derivation the render uses — badge presence IS trial visibility.
-        const trialCopyShown =
-          buildPaywallPricing(packages, packages?.monthlyTrialEligible ?? false).monthly.badge != null;
-        logShownOnce(packages?.offeringId ?? "unknown", trialCopyShown);
+        // Same derivation the render uses: a plan "shows trial copy" when its
+        // OWN package yields trial copy (badge or free CTA) for this user.
+        const yearlyTrialVisible =
+          packages != null &&
+          packages.trial.yearly.eligible &&
+          freeTrialOf(packages.yearly) != null;
+        const monthlyTrialVisible =
+          packages != null &&
+          packages.trial.monthly.eligible &&
+          freeTrialOf(packages.monthly) != null;
+        const trialCopyPlans =
+          yearlyTrialVisible && monthlyTrialVisible
+            ? "both"
+            : yearlyTrialVisible
+              ? "yearly"
+              : monthlyTrialVisible
+                ? "monthly"
+                : "none";
+        // Unambiguous: refers to the DEFAULT-SELECTED plan (yearly).
+        logShownOnce(packages?.offeringId ?? "unknown", yearlyTrialVisible, trialCopyPlans);
         if (packages) {
-          // TODO(remove): temporary experiment diagnostic — see funnelEvents.
-          const intro = packages.monthly.product.introPrice;
+          // TODO(remove): temporary paywall diagnostic — see funnelEvents.
+          const debugFor = (pkg: typeof packages.monthly, plan: "monthly" | "yearly") => {
+            const intro = pkg.product.introPrice;
+            return {
+              productId: pkg.product.identifier,
+              hasIntroPrice: intro != null,
+              introOfferPeriod:
+                intro?.periodNumberOfUnits != null && intro?.periodUnit != null
+                  ? `${intro.periodNumberOfUnits} ${String(intro.periodUnit).toLowerCase()}`
+                  : null,
+              rawEligibilityStatus: packages.trial[plan].rawStatus,
+              trialEligible: packages.trial[plan].eligible,
+            };
+          };
           logPaywallOfferingDebug({
             offeringId: packages.offeringId,
-            monthlyProductId: packages.monthly.product.identifier,
-            hasIntroPrice: intro != null,
-            introOfferPeriod:
-              intro?.periodNumberOfUnits != null && intro?.periodUnit != null
-                ? `${intro.periodNumberOfUnits} ${String(intro.periodUnit).toLowerCase()}`
-                : null,
-            rawEligibilityStatus: packages.monthlyTrialEligibilityStatus,
-            monthlyTrialEligible: packages.monthlyTrialEligible,
-            trialCopyShown,
+            monthly: debugFor(packages.monthly, "monthly"),
+            yearly: debugFor(packages.yearly, "yearly"),
+            trialCopyShown: yearlyTrialVisible,
           });
         }
       })
@@ -141,13 +181,31 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
         console.error("[Paywall] getOfferings failed:", error);
         if (!mounted) return;
         setPaywallPackages(null);
-        logShownOnce("unknown", false);
+        logShownOnce("unknown", false, "none");
       });
 
     return () => {
       mounted = false;
     };
   }, [auth.user?.id]);
+
+  // paywall_dismissed: the wall has no dismiss control, so the only "leave"
+  // is backgrounding the app. 'background' only — the StoreKit purchase sheet
+  // drives the app 'inactive', and counting that would tag every purchaser as
+  // having dismissed. Once per presentation.
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state !== "background") return;
+      if (dismissLogged.current || purchasedRef.current) return;
+      dismissLogged.current = true;
+      logPaywallDismissed({
+        variant: dismissContext.current.variant,
+        selectedPlan: selectedPlanRef.current,
+        trialCopyShown: dismissContext.current.trialCopyShown,
+      });
+    });
+    return () => subscription.remove();
+  }, []);
 
   const refreshEntitlement = async (optimisticActive: boolean) => {
     if (!auth.user) return;
@@ -184,6 +242,9 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
   };
 
   const completeSetup = async (optimisticActive: boolean) => {
+    // Success path (purchase or restore): whatever happens to the app state
+    // after this, it is not a dismissal.
+    purchasedRef.current = true;
     await refreshEntitlement(optimisticActive);
     await onComplete();
   };
@@ -201,9 +262,13 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
     try {
       const result = await revenueCat.purchasePlan(auth.user.id, plan);
       // Keep the paywall's promise. No-ops when this was not a trial, and
-      // never throws — see scheduleTrialEndReminder.
+      // never throws — see scheduleTrialEndReminder. The renewal price in the
+      // reminder is the PURCHASED plan's own billed price ("$40.00" for a
+      // yearly trial), never a monthly value leaking through.
+      const purchasedPackage =
+        plan === "yearly" ? paywallPackages?.yearly : paywallPackages?.monthly;
       await scheduleTrialEndReminder(result.customerInfo, REVENUECAT_ENTITLEMENT_ID, {
-        priceString: pricing.monthly.price,
+        priceString: purchasedPackage?.product.priceString ?? null,
       });
       if (!result.entitlementActive) {
         setFailed(true);
@@ -248,27 +313,21 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
   };
 
   // The selected plan's trial drives the whole upper half: headline, timeline
-  // vs features grid, and the CTA (via pricing). Yearly has no intro offer on
-  // either arm today, so its branch is dormant until Apple-side config adds
-  // one — at which point eligibility resolution must extend to that product
-  // (see the note in paywallPricing) before this advertises $0.00.
-  const selectedTrial =
+  // vs features grid, and the CTA (via pricing). PACKAGE-AGNOSTIC: each
+  // plan's trial comes from its OWN package's introPrice and its OWN
+  // eligibility, so the timeline, headline, charge date, and post-trial price
+  // all follow the selection — including when the two plans carry different
+  // trial lengths.
+  const selectedPackage =
     paywallPackages == null
       ? null
       : plan === "monthly"
-        ? paywallPackages.monthlyTrialEligible
-          ? freeTrialOf(paywallPackages.monthly)
-          : null
-        : freeTrialOf(paywallPackages.yearly);
-  const bothPlansTrial =
-    paywallPackages != null &&
-    freeTrialOf(paywallPackages.yearly) != null &&
-    paywallPackages.monthlyTrialEligible &&
-    freeTrialOf(paywallPackages.monthly) != null;
-  // Design rule (badge conflict, resolved by scope): the monthly badge marks
-  // the trial only when it DIFFERENTIATES the rows; when both plans carry a
-  // trial the timeline owns the story and no trial badge renders.
-  const monthlyBadge = bothPlansTrial ? undefined : pricing.monthly.badge;
+        ? paywallPackages.monthly
+        : paywallPackages.yearly;
+  const selectedTrial =
+    paywallPackages != null && selectedPackage != null && paywallPackages.trial[plan].eligible
+      ? freeTrialOf(selectedPackage)
+      : null;
   const timeline = selectedTrial ? buildTrialTimeline(selectedTrial, new Date()) : null;
 
   return (
@@ -361,6 +420,7 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
               per={pricing.yearly.per}
               priceNote={pricing.yearly.priceNote}
               badge={pricing.yearly.badge}
+              badgeTone={pricing.yearly.badgeTone}
             />
             <PlanColumn
               selected={plan === "monthly"}
@@ -369,8 +429,8 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
               sub={pricing.monthly.sub}
               price={pricing.monthly.price}
               per={pricing.monthly.per}
-              badge={monthlyBadge}
-              badgeTone="trial"
+              badge={pricing.monthly.badge}
+              badgeTone={pricing.monthly.badgeTone}
             />
           </View>
 

@@ -148,8 +148,10 @@ describe("RevenueCat client", () => {
       monthly,
       yearly,
       offeringId: "default",
-      monthlyTrialEligible: false,
-      monthlyTrialEligibilityStatus: null,
+      trial: {
+        monthly: { eligible: false, rawStatus: null },
+        yearly: { eligible: false, rawStatus: null },
+      },
     });
     expect(sdk.getOfferings).toHaveBeenCalledTimes(1);
   });
@@ -166,11 +168,10 @@ describe("RevenueCat client", () => {
     ];
     for (const [status, expected] of cases) {
       const { sdk } = makeSdk();
-      Object.assign(sdk, {
-        checkTrialOrIntroductoryPriceEligibility: vi.fn(async (ids: string[]) => ({
-          [ids[0]!]: { status },
-        })),
-      });
+      const check = vi.fn(async (ids: string[]) =>
+        Object.fromEntries(ids.map((id) => [id, { status }])),
+      );
+      Object.assign(sdk, { checkTrialOrIntroductoryPriceEligibility: check });
       const client = createRevenueCatClient({
         sdk,
         apiKey: "appl_test_key",
@@ -178,9 +179,33 @@ describe("RevenueCat client", () => {
         devMode: false,
       });
       const packages = await client.getPaywallPackages("user_1");
-      expect(packages.monthlyTrialEligible).toBe(expected);
-      expect(packages.monthlyTrialEligibilityStatus).toBe(status);
+      // Per-package results, resolved for BOTH products in ONE batched call.
+      expect(packages.trial.monthly.eligible).toBe(expected);
+      expect(packages.trial.monthly.rawStatus).toBe(status);
+      expect(packages.trial.yearly.eligible).toBe(expected);
+      expect(packages.trial.yearly.rawStatus).toBe(status);
+      expect(check).toHaveBeenCalledTimes(1);
+      expect(check.mock.calls[0]![0]).toHaveLength(2);
     }
+  });
+
+  it("resolves eligibility INDEPENDENTLY per product — mixed verdicts stay per-package", async () => {
+    const { sdk } = makeSdk();
+    // Apple says the user already burned the monthly intro but not yearly's.
+    Object.assign(sdk, {
+      checkTrialOrIntroductoryPriceEligibility: vi.fn(async (ids: string[]) =>
+        Object.fromEntries(ids.map((id, i) => [id, { status: i === 0 ? 1 : 2 }])),
+      ),
+    });
+    const client = createRevenueCatClient({
+      sdk,
+      apiKey: "appl_test_key",
+      platformOS: "ios",
+      devMode: false,
+    });
+    const packages = await client.getPaywallPackages("user_1");
+    expect(packages.trial.monthly).toEqual({ eligible: false, rawStatus: 1 });
+    expect(packages.trial.yearly).toEqual({ eligible: true, rawStatus: 2 });
   });
 
   it("renders the experiment's assigned offering: current beats the default", async () => {

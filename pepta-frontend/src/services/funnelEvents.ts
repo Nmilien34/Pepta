@@ -66,40 +66,72 @@ export function logOnboardingStep(stepId: string, index: number): void {
 
 export function logPaywallShown(
   variant: string,
-  extras: { defaultSelectedPlan: string; trialCopyShown: boolean },
+  extras: {
+    defaultSelectedPlan: string;
+    /** Trial copy visible on first render FOR THE DEFAULT-SELECTED plan. */
+    trialCopyShown: boolean;
+    /** Which plans carried visible trial copy: none | monthly | yearly | both. */
+    trialCopyPlans: "none" | "monthly" | "yearly" | "both";
+  },
 ): void {
-  // Per-arm trial-visibility rates without waiting on RevenueCat: the wrapper
-  // takes string values only, so the bool is stringified.
+  // The wrapper takes string values only, so bools are stringified.
   void appsFlyer.logAnalyticsEvent("paywall_shown", {
     variant,
     defaultSelectedPlan: extras.defaultSelectedPlan,
     trialCopyShown: String(extras.trialCopyShown),
+    trialCopyPlans: extras.trialCopyPlans,
   });
 }
 
-// TODO(remove): temporary diagnostic for the trial-offer experiment
-// (expa9f87848e1). One event per paywall open, answering on a cable-free
-// TestFlight build: which offering came back, which monthly product it
-// carried, whether that product had an intro offer, what Apple's raw
-// eligibility status was, how it mapped, and whether the badge rendered.
-// Delete once the experiment's trial visibility is confirmed in AppsFlyer.
-export function logPaywallOfferingDebug(payload: {
-  offeringId: string;
-  monthlyProductId: string;
+export interface PaywallPackageDebug {
+  productId: string;
   hasIntroPrice: boolean;
   introOfferPeriod: string | null;
   rawEligibilityStatus: number | null;
-  monthlyTrialEligible: boolean;
+  trialEligible: boolean;
+}
+
+// TODO(remove): temporary paywall diagnostic. One event per paywall open,
+// answering on a cable-free TestFlight build: which offering came back, and
+// PER PACKAGE whether it carried an intro offer, what Apple's raw eligibility
+// status was, and how it mapped. Delete once trial-on-both-plans is confirmed
+// healthy in AppsFlyer.
+export function logPaywallOfferingDebug(payload: {
+  offeringId: string;
+  monthly: PaywallPackageDebug;
+  yearly: PaywallPackageDebug;
   trialCopyShown: boolean;
 }): void {
+  const flat = (prefix: "monthly" | "yearly", pkg: PaywallPackageDebug) => ({
+    [`${prefix}ProductId`]: pkg.productId,
+    [`${prefix}HasIntro`]: String(pkg.hasIntroPrice),
+    [`${prefix}IntroPeriod`]: pkg.introOfferPeriod ?? "null",
+    [`${prefix}EligibilityStatus`]:
+      pkg.rawEligibilityStatus === null ? "null" : String(pkg.rawEligibilityStatus),
+    [`${prefix}TrialEligible`]: String(pkg.trialEligible),
+  });
   void appsFlyer.logAnalyticsEvent("paywall_offering_debug", {
     offeringId: payload.offeringId,
-    monthlyProductId: payload.monthlyProductId,
-    hasIntroPrice: String(payload.hasIntroPrice),
-    introOfferPeriod: payload.introOfferPeriod ?? "null",
-    rawEligibilityStatus:
-      payload.rawEligibilityStatus === null ? "null" : String(payload.rawEligibilityStatus),
-    monthlyTrialEligible: String(payload.monthlyTrialEligible),
+    ...flat("monthly", payload.monthly),
+    ...flat("yearly", payload.yearly),
+    trialCopyShown: String(payload.trialCopyShown),
+  });
+}
+
+/**
+ * The paywall is a hard wall with no dismiss affordance, so "dismissed" here
+ * means the user LEFT THE APP from the paywall (backgrounded without
+ * purchasing) — the only exit that exists. Fired at most once per paywall
+ * presentation.
+ */
+export function logPaywallDismissed(payload: {
+  variant: string;
+  selectedPlan: string;
+  trialCopyShown: boolean;
+}): void {
+  void appsFlyer.logAnalyticsEvent("paywall_dismissed", {
+    variant: payload.variant,
+    selectedPlan: payload.selectedPlan,
     trialCopyShown: String(payload.trialCopyShown),
   });
 }

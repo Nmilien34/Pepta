@@ -176,8 +176,18 @@ export function TrialOfferScreen({
       .getPaywallPackages(userId)
       .then((packages) => {
         if (!mounted) return;
-        const trial = packages ? freeTrialOf(packages.monthly) : null;
-        if (trial && packages?.monthlyTrialEligible) {
+        // Package-agnostic: any plan's own eligible zero-price intro counts.
+        // When durations could differ between plans, announce the PRESELECTED
+        // plan's (yearly) so the promise matches the wall the user lands on;
+        // monthly's is only announced when yearly carries no trial at all.
+        const yearlyTrial = packages?.trial.yearly.eligible
+          ? freeTrialOf(packages.yearly)
+          : null;
+        const monthlyTrial = packages?.trial.monthly.eligible
+          ? freeTrialOf(packages.monthly)
+          : null;
+        const trial = yearlyTrial ?? monthlyTrial;
+        if (trial) {
           setTrialLabel(trialDurationLabel(trial));
         } else {
           onSkipToWall();

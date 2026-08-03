@@ -19,13 +19,17 @@ export interface PaywallPackages {
   /** Identifier of the offering these packages came from (experiment arm). */
   offeringId: string;
   /**
-   * Whether trial copy is permitted for the monthly product. False on
+   * Per-package trial eligibility — PACKAGE-AGNOSTIC by contract: every
+   * consumer derives trial UI from a package's own introPrice plus ITS entry
+   * here, so adding or removing an intro offer on any product in App Store
+   * Connect reflects in the app with no code change. `eligible` is false on
    * Android, on error, and — per TRIAL_COPY_PERMISSIVE_ON_UNKNOWN — on an
-   * explicit INELIGIBLE. See monthlyCta().
+   * explicit INELIGIBLE.
    */
-  monthlyTrialEligible: boolean;
-  /** Apple's raw eligibility status for diagnostics; null if the check never ran. */
-  monthlyTrialEligibilityStatus: number | null;
+  trial: {
+    monthly: TrialEligibilityResult;
+    yearly: TrialEligibilityResult;
+  };
 }
 
 export interface RevenueCatResult {
@@ -46,6 +50,8 @@ interface RevenueCatSdk {
     productIdentifiers: string[],
   ): Promise<Record<string, { status: number }>>;
   restorePurchases(): Promise<CustomerInfo>;
+  setEmail?(email: string): Promise<void>;
+  setDisplayName?(displayName: string): Promise<void>;
   collectDeviceIdentifiers?(): Promise<void>;
   setAppsflyerID?(appsflyerID: string | null): Promise<void>;
   setLogHandler?(handler: LogHandler): void;
@@ -102,40 +108,48 @@ const INTRO_ELIGIBILITY_INELIGIBLE = 1;
  */
 export const TRIAL_COPY_PERMISSIVE_ON_UNKNOWN = true;
 
-interface TrialEligibilityResult {
+export interface TrialEligibilityResult {
   eligible: boolean;
   /** Apple's numeric status, for diagnostics; null when the check never ran. */
   rawStatus: number | null;
 }
 
+const NOT_ELIGIBLE: TrialEligibilityResult = { eligible: false, rawStatus: null };
+
 /**
- * iOS-only. Android, a missing SDK static, and any thrown error resolve to
- * not-eligible: the caller uses this to decide whether to promise a $0.00
+ * iOS-only, resolved for ALL given products in one SDK call. Android, a
+ * missing SDK static, and any thrown error resolve every product to
+ * not-eligible: the callers use this to decide whether to promise a $0.00
  * trial, and the only safe default for a price claim is "do not make it".
  * Within a successful check, the mapping is governed by
  * TRIAL_COPY_PERMISSIVE_ON_UNKNOWN above.
  */
-async function resolveTrialEligibility(
+async function resolveTrialEligibilities(
   sdk: RevenueCatSdk,
-  productIdentifier: string | undefined,
+  productIdentifiers: string[],
   platformOS: string,
-): Promise<TrialEligibilityResult> {
-  if (platformOS !== "ios" || !productIdentifier) return { eligible: false, rawStatus: null };
+): Promise<Record<string, TrialEligibilityResult>> {
+  const fallback = Object.fromEntries(productIdentifiers.map((id) => [id, NOT_ELIGIBLE]));
+  if (platformOS !== "ios" || productIdentifiers.length === 0) return fallback;
   if (typeof sdk.checkTrialOrIntroductoryPriceEligibility !== "function") {
-    return { eligible: false, rawStatus: null };
+    return fallback;
   }
   try {
-    const result = await sdk.checkTrialOrIntroductoryPriceEligibility([productIdentifier]);
-    const status = result?.[productIdentifier]?.status;
-    const rawStatus = typeof status === "number" ? status : null;
-    const eligible = TRIAL_COPY_PERMISSIVE_ON_UNKNOWN
-      ? rawStatus !== null && rawStatus !== INTRO_ELIGIBILITY_INELIGIBLE
-      : rawStatus === INTRO_ELIGIBILITY_ELIGIBLE;
-    return { eligible, rawStatus };
+    const result = await sdk.checkTrialOrIntroductoryPriceEligibility(productIdentifiers);
+    return Object.fromEntries(
+      productIdentifiers.map((id) => {
+        const status = result?.[id]?.status;
+        const rawStatus = typeof status === "number" ? status : null;
+        const eligible = TRIAL_COPY_PERMISSIVE_ON_UNKNOWN
+          ? rawStatus !== null && rawStatus !== INTRO_ELIGIBILITY_INELIGIBLE
+          : rawStatus === INTRO_ELIGIBILITY_ELIGIBLE;
+        return [id, { eligible, rawStatus }];
+      }),
+    );
   } catch {
     // An unreachable eligibility check is not a reason to block the paywall —
     // it is a reason to sell it without the trial claim.
-    return { eligible: false, rawStatus: null };
+    return fallback;
   }
 }
 
@@ -253,13 +267,26 @@ export function createRevenueCatClient(options: RevenueCatClientOptions) {
     }
   }
 
-  async function identify(appUserId: string): Promise<void> {
+  async function identify(
+    appUserId: string,
+    attributes?: { email?: string | null; displayName?: string | null },
+  ): Promise<void> {
     assertAvailable();
     await configure();
 
     if (currentUserId !== appUserId) {
       await sdk.logIn(appUserId);
       currentUserId = appUserId;
+    }
+
+    // Subscriber attributes so RC customer records are findable by email
+    // instead of a Mongo ObjectId lookup. Best-effort by design: attribute
+    // failures must never break identify (which gates the paywall).
+    if (attributes?.email && typeof sdk.setEmail === "function") {
+      await sdk.setEmail(attributes.email).catch(() => undefined);
+    }
+    if (attributes?.displayName && typeof sdk.setDisplayName === "function") {
+      await sdk.setDisplayName(attributes.displayName).catch(() => undefined);
     }
 
     await syncAppsFlyerAttributionFromCurrentSdk(appUserId);
@@ -278,21 +305,25 @@ export function createRevenueCatClient(options: RevenueCatClientOptions) {
       offering.monthly ?? packageByIdentifier(offerings, "$rc_monthly"),
       "monthly",
     );
-    const eligibility = await resolveTrialEligibility(
+    const yearly = assertPackage(
+      offering.annual ?? packageByIdentifier(offerings, "$rc_annual"),
+      "yearly",
+    );
+    // One batched check for every product on the wall — per-package results.
+    const eligibility = await resolveTrialEligibilities(
       sdk,
-      monthly.product.identifier,
+      [monthly.product.identifier, yearly.product.identifier],
       platformOS,
     );
 
     return {
       monthly,
-      yearly: assertPackage(
-        offering.annual ?? packageByIdentifier(offerings, "$rc_annual"),
-        "yearly",
-      ),
+      yearly,
       offeringId: offering.identifier,
-      monthlyTrialEligible: eligibility.eligible,
-      monthlyTrialEligibilityStatus: eligibility.rawStatus,
+      trial: {
+        monthly: eligibility[monthly.product.identifier] ?? NOT_ELIGIBLE,
+        yearly: eligibility[yearly.product.identifier] ?? NOT_ELIGIBLE,
+      },
     };
   }
 

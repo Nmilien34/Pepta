@@ -78,10 +78,19 @@ async function initializeAppsFlyerForUser(
   });
 }
 
-async function identifyRevenueCatUser(userId: string): Promise<void> {
-  await revenueCat.identify(userId).catch((error) => {
-    warnInDev("[RevenueCat] Could not identify user.", error);
-  });
+async function identifyRevenueCatUser(user: {
+  id: string;
+  email?: string;
+  displayName?: string;
+}): Promise<void> {
+  // Email + display name ride along as RC subscriber attributes so a customer
+  // record is findable by email in the dashboard instead of via a Mongo
+  // ObjectId lookup. identify() applies them best-effort.
+  await revenueCat
+    .identify(user.id, { email: user.email, displayName: user.displayName })
+    .catch((error) => {
+      warnInDev("[RevenueCat] Could not identify user.", error);
+    });
 }
 
 async function logCompleteRegistrationIfNeeded(
@@ -116,7 +125,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (active && stored) {
           api.setAuthToken(stored.token);
           await initializeAppsFlyerForUser(stored.user.id);
-          await identifyRevenueCatUser(stored.user.id);
+          await identifyRevenueCatUser(stored.user);
           if (active) setAuth(stored);
           return;
         }
@@ -139,7 +148,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     persistAuth(response);
     await initializeAppsFlyerForUser(response.user.id);
     await logCompleteRegistrationIfNeeded(response, method);
-    await identifyRevenueCatUser(response.user.id);
+    await identifyRevenueCatUser(response.user);
     setAuth(response);
     return response.user;
   }, []);

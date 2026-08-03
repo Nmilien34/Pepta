@@ -14,7 +14,7 @@ module.exports = {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "ai.boltzman.peptaapp",
-      buildNumber: "27",
+      buildNumber: "28",
       usesAppleSignIn: true,
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,

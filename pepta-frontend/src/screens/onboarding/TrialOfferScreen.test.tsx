@@ -105,14 +105,35 @@ vi.mock("../../services/revenueCat", () => ({
 import { TrialOfferScreen } from "./TrialOfferScreen";
 import { TrialCarouselScreen } from "./TrialCarouselScreen";
 
-function packagesWithTrial(eligible: boolean, intro: object | null) {
+function makePackages(options: {
+  monthlyIntro?: object | null;
+  yearlyIntro?: object | null;
+  monthlyEligible?: boolean;
+  yearlyEligible?: boolean;
+}) {
+  const {
+    monthlyIntro = null,
+    yearlyIntro = null,
+    monthlyEligible = false,
+    yearlyEligible = false,
+  } = options;
   return {
-    offeringId: "trial-offer",
-    monthly: { product: { identifier: "m", price: 9.99, priceString: "$9.99", introPrice: intro } },
-    yearly: { product: { identifier: "y", price: 40, priceString: "$40.00", introPrice: null } },
-    monthlyTrialEligible: eligible,
-    monthlyTrialEligibilityStatus: eligible ? 2 : 1,
+    offeringId: "default",
+    monthly: {
+      product: { identifier: "m", price: 9.99, priceString: "$9.99", introPrice: monthlyIntro },
+    },
+    yearly: {
+      product: { identifier: "y", price: 40, priceString: "$40.00", introPrice: yearlyIntro },
+    },
+    trial: {
+      monthly: { eligible: monthlyEligible, rawStatus: monthlyEligible ? 2 : 1 },
+      yearly: { eligible: yearlyEligible, rawStatus: yearlyEligible ? 2 : 1 },
+    },
   };
+}
+
+function packagesWithTrial(eligible: boolean, intro: object | null) {
+  return makePackages({ monthlyIntro: intro, monthlyEligible: eligible });
 }
 
 const TRIAL = { price: 0, periodNumberOfUnits: 3, periodUnit: "DAY" };
@@ -184,6 +205,43 @@ describe("TrialOfferScreen trial gate", () => {
     mocks.getPaywallPackages.mockRejectedValue(new Error("offline"));
     const { onSkipToWall } = await mount();
     expect(onSkipToWall).toHaveBeenCalledTimes(1);
+  });
+
+  it("trial on the ANNUAL product only: still warms up, announcing yearly's duration", async () => {
+    mocks.getPaywallPackages.mockResolvedValue(
+      makePackages({ yearlyIntro: TRIAL, yearlyEligible: true }),
+    );
+    const { tree, onSkipToWall } = await mount();
+    expect(nodeText(tree.root)).toContain("3 days on us");
+    expect(onSkipToWall).not.toHaveBeenCalled();
+  });
+
+  it("differing durations: announces the PRESELECTED plan's (yearly), never monthly's", async () => {
+    mocks.getPaywallPackages.mockResolvedValue(
+      makePackages({
+        monthlyIntro: TRIAL, // 3 days
+        yearlyIntro: { price: 0, periodNumberOfUnits: 1, periodUnit: "WEEK" },
+        monthlyEligible: true,
+        yearlyEligible: true,
+      }),
+    );
+    const { tree } = await mount();
+    const text = nodeText(tree.root);
+    expect(text).toContain("1 week on us");
+    expect(text).not.toContain("3 days on us");
+  });
+
+  it("yearly intro exists but user is ineligible for it: falls back to monthly's trial", async () => {
+    mocks.getPaywallPackages.mockResolvedValue(
+      makePackages({
+        monthlyIntro: TRIAL,
+        yearlyIntro: { price: 0, periodNumberOfUnits: 1, periodUnit: "WEEK" },
+        monthlyEligible: true,
+        yearlyEligible: false,
+      }),
+    );
+    const { tree } = await mount();
+    expect(nodeText(tree.root)).toContain("3 days on us");
   });
 
   it("no signed-in user (cannot happen post-reveal, but never dead-end): skip", async () => {

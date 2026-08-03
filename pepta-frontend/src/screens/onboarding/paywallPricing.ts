@@ -4,6 +4,8 @@ export interface PaywallPlanCopy {
   price: string;
   per: string;
   badge?: string;
+  /** Renders the trial badge green (fiber) so "free" never reads as "selected". */
+  badgeTone?: "save" | "trial";
   /** Light line under the price — the billed total behind a per-month anchor. */
   priceNote?: string;
 }
@@ -105,39 +107,38 @@ export function trialDurationLabel(trial: { periodNumberOfUnits: number; periodU
 }
 
 /**
- * The monthly plan-row badge ("3 days free"), derived from the product's own
- * intro offer — never hardcoded. This is what makes the trial visible on
- * first render even though yearly is preselected: without it, variant-B users
- * only ever saw trial copy after tapping the monthly card. Returns undefined
- * (no badge) when the product has no zero-price intro or copy is not
- * permitted, which is exactly the control arm's rendering — the two arms
- * differ only in this badge and the CTA copy.
+ * A plan row's trial badge ("3 days free"), derived from THAT package's own
+ * intro offer — never hardcoded, never cross-plan. This is what keeps the
+ * trial visible on first render regardless of which plan is preselected.
+ * Returns undefined when the package has no zero-price intro or copy is not
+ * permitted for this user.
  */
-function monthlyTrialBadge(
-  monthly: PricePackage,
-  trialEligible: boolean,
-): string | undefined {
-  const trial = freeTrialOf(monthly);
+function trialBadge(pkg: PricePackage, trialEligible: boolean): string | undefined {
+  const trial = freeTrialOf(pkg);
   if (!trial || !trialEligible) return undefined;
   return `${trialDurationLabel(trial)} free`;
 }
 
-function monthlyCta(
-  monthly: PricePackage,
+/**
+ * Per-plan CTA, derived from the plan's own package. ELIGIBILITY, NOT JUST
+ * EXISTENCE: `introPrice` describes the product as configured; it says
+ * nothing about whether THIS user can still get it. Anyone who already used
+ * an intro offer in this subscription group is charged the full price
+ * immediately by StoreKit, so advertising "$0.00" to them would be a false
+ * price claim on the paywall. RevenueCat's own guidance for an indeterminate
+ * answer is to show non-intro pricing.
+ */
+function planCta(
+  pkg: PricePackage,
   price: string,
+  perLabel: "mo" | "yr",
+  planNoun: "month" | "year",
   trialEligible: boolean,
 ): PaywallCtaCopy {
-  const trial = freeTrialOf(monthly);
-  // ELIGIBILITY, NOT JUST EXISTENCE. `introPrice` describes the product as
-  // configured; it says nothing about whether THIS user can still get it.
-  // Anyone who already used an intro offer in this subscription group is
-  // charged the full price immediately by StoreKit, so advertising "$0.00"
-  // to them would be a false price claim on the paywall — worse than the old
-  // "free trial" wording, which was merely optimistic. RevenueCat's own
-  // guidance for an indeterminate answer is to show non-intro pricing.
+  const trial = freeTrialOf(pkg);
   // No trial for this user: an honest purchase in arrival language, price on
-  // the button (identical in both experiment arms).
-  if (!trial || !trialEligible) return { label: `Start my month — ${price}` };
+  // the button.
+  if (!trial || !trialEligible) return { label: `Start my ${planNoun} — ${price}` };
   return {
     // "$0.00" rather than "free": a concrete number reads as a real price the
     // user is being charged today, which converts better than the word free.
@@ -147,7 +148,7 @@ function monthlyCta(
     label: "Try today for $0.00",
     // The reminder promise rides along — and is kept by trialReminder.ts.
     // Unwire that and this sentence must come out too.
-    subline: `${trialDurationLabel(trial)} free — we'll remind you before it ends. Then ${price}/mo, auto-renews. Cancel anytime in Settings.`,
+    subline: `${trialDurationLabel(trial)} free — we'll remind you before it ends. Then ${price}/${perLabel}, auto-renews. Cancel anytime in Settings.`,
   };
 }
 
@@ -185,14 +186,21 @@ function savingsBadge(monthly: PricePackage, yearly: PricePackage): string | und
   return savings > 0 ? `SAVE ${savings}%` : undefined;
 }
 
+export interface PlanTrialEligibility {
+  monthly: boolean;
+  yearly: boolean;
+}
+
+const NO_TRIALS: PlanTrialEligibility = { monthly: false, yearly: false };
+
 export function buildPaywallPricing(
   packages: { monthly: PricePackage; yearly: PricePackage } | null,
   /**
-   * Whether this user can actually receive the intro offer. Defaults to false
-   * so a caller that has not resolved eligibility yet advertises no trial —
-   * the safe direction is under-promising.
+   * Per-plan: whether this user can actually receive that plan's intro offer.
+   * Defaults to none so a caller that has not resolved eligibility yet
+   * advertises no trial — the safe direction is under-promising.
    */
-  trialEligible = false,
+  trialEligible: PlanTrialEligibility = NO_TRIALS,
 ): PaywallPricingCopy {
   if (!packages) return FALLBACK_PRICING;
 
@@ -203,41 +211,55 @@ export function buildPaywallPricing(
 
   const perMonthAnchor = monthlyEquivalent(yearly);
 
+  // BADGE COLLISION, resolved by slot priority (2026-08-03): one badge per
+  // row stays the rule — two floats collide at top-right and read as noise.
+  // A row's slot goes to its OWN trial when it has one (green — the action
+  // driver); yearly's SAVE badge then relocates into its support line, e.g.
+  // "billed yearly · save 67%", so the discount stays visible without a
+  // second float. With no yearly trial (today's live state until the ASC
+  // config lands) yearly renders exactly as before: SAVE badge, plain sub.
+  const yearlyTrialBadge = trialBadge(yearly, trialEligible.yearly);
+  const savings = savingsBadge(monthly, yearly);
+  const yearlyBadge = yearlyTrialBadge ?? savings;
+  const yearlySub =
+    yearlyTrialBadge && savings
+      ? `billed yearly · ${savings.toLowerCase()}`
+      : "billed yearly";
+
   return {
     yearly: perMonthAnchor
       ? {
           title: "Yearly",
-          sub: "billed yearly",
+          sub: yearlySub,
           price: perMonthAnchor,
           per: "/mo",
           priceNote: `${annualPrice}/yr`,
-          badge: savingsBadge(monthly, yearly),
+          badge: yearlyBadge,
+          badgeTone: yearlyTrialBadge ? "trial" : "save",
         }
       : {
           title: "Yearly",
-          sub: "billed yearly",
+          sub: yearlySub,
           price: annualPrice,
           per: "/yr",
-          badge: savingsBadge(monthly, yearly),
+          badge: yearlyBadge,
+          badgeTone: yearlyTrialBadge ? "trial" : "save",
         },
     monthly: {
       title: "Monthly",
       sub: "billed monthly",
       price: monthlyPrice,
       per: "/mo",
-      badge: monthlyTrialBadge(monthly, trialEligible),
+      badge: trialBadge(monthly, trialEligible.monthly),
+      badgeTone: "trial",
     },
     footer: {
       yearly: `${annualPrice}/year. Cancel anytime · Terms & Privacy`,
       monthly: `${monthlyPrice}/month. Cancel anytime · Terms & Privacy`,
     },
     cta: {
-      monthly: monthlyCta(monthly, monthlyPrice, trialEligible),
-      // The annual product has no intro offer on either arm today, so this is
-      // always the purchase CTA — identical both ways. If a yearly trial ever
-      // ships, follow monthlyCta's shape AND extend eligibility resolution to
-      // that product before advertising $0.00 here.
-      yearly: { label: `Start my year — ${annualPrice}` },
+      monthly: planCta(monthly, monthlyPrice, "mo", "month", trialEligible.monthly),
+      yearly: planCta(yearly, annualPrice, "yr", "year", trialEligible.yearly),
     },
   };
 }

@@ -426,12 +426,14 @@ h2{font-size:18px;font-weight:800;margin:44px 0 6px}
   outcome third, care last. Captions are outcomes in the user's words, never feature names.
 </p>
 <p class="note">
-  <b>Badge conflict — resolved by scope, not by stacking.</b> One badge per row stays the rule (the shipped
-  PlanCard has one slot; two floats would collide at top-right and read as noise). Yearly's slot always carries
-  SAVE 67%. The trial is communicated by the <b>timeline component</b> whenever the selected plan carries it; the
-  green 3 DAYS FREE badge on monthly appears <b>only</b> in the monthly-only state, where the trial genuinely
-  differentiates the rows. If the trial ever lands on both plans, that badge disappears entirely (C1). Green
-  (fiber #34C759) keeps “free” visually distinct from “selected” (primary).
+  <b>Badge conflict — resolved by slot priority (rev. 2026-08-03, supersedes the suppression rule shipped in
+  32fb5fb).</b> One badge per row stays the rule (one slot; two floats collide at top-right and read as noise).
+  A row's slot goes to its <b>own trial</b> when it has one — green 3 DAYS FREE, the action driver — and yearly's
+  SAVE 67% then relocates into its support line (“billed yearly · save 67%”), so discount and trial coexist with
+  no wrap risk at 320-pt widths. With no trial on a row, yearly's slot reverts to the SAVE badge and monthly's
+  stays empty — today's live rendering, unchanged. Fully package-derived: each badge reads its own product's
+  introPrice, so ASC config changes re-render with zero code. Green (fiber #34C759) keeps “free” visually
+  distinct from “selected” (primary).
 </p>
 <p class="note">
   <b>New mascot assets required (2).</b> <i>Pep · gift</i> — both arms raised holding the #E25CC4 heart; built as
