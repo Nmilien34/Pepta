@@ -7,7 +7,7 @@
 // context BEFORE choosing the next step, so the very next turn is never chosen
 // from stale answers.
 
-import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Modal, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
@@ -198,10 +198,21 @@ function buildCraftingSteps(answers: FlowAnswers): string[] {
 // INSTANTLY from here instead of flashing the hydration blank and re-reading the
 // AsyncStorage draft (which was the "flash to splash, then back to where I was").
 // Reset on completion so a later run starts clean.
-const flowCache: { step: OnboardingStep; answers: FlowAnswers; hydrated: boolean } = {
+const flowCache: {
+  step: OnboardingStep;
+  answers: FlowAnswers;
+  hydrated: boolean;
+  // The auth-transition memory lives HERE, not in a ref: signing in flips
+  // AccessGate through its authenticated-undecided branch, which unmounts and
+  // remounts this navigator — a ref re-initializes to "already signed in" and
+  // the reveal→warm-up auto-advance is lost, so the user lands back on a
+  // rebuilt reveal with a redundant Start-today tap (Nick, 1.0.5 (28)).
+  wasAuthenticated: boolean;
+} = {
   step: 'welcome',
   answers: {},
   hydrated: false,
+  wasAuthenticated: false,
 };
 
 export function OnboardingNavigator() {
@@ -240,6 +251,10 @@ export function OnboardingNavigator() {
   // position is already restored from the cache above, so there's no blank.
   useEffect(() => {
     if (flowCache.hydrated) return;
+    // First mount of the session: seed the auth-transition memory with the
+    // CURRENT state, so a user who resumes already signed in reads as
+    // "no transition" and is never flung past their own payoff screen.
+    flowCache.wasAuthenticated = auth.isAuthenticated;
     let active = true;
     AsyncStorage.getItem(ONBOARDING_DRAFT_KEY)
       .then(parseDraft)
@@ -261,7 +276,7 @@ export function OnboardingNavigator() {
     return () => {
       active = false;
     };
-  }, [setStep, setAnswers, setHydrated]);
+  }, [setStep, setAnswers, setHydrated, auth.isAuthenticated]);
 
   // Persist the draft as the user moves through the flow (after hydration so we
   // don't clobber the saved draft with the initial empty state).
@@ -349,10 +364,9 @@ export function OnboardingNavigator() {
   // makes this transition-only: a user who resumes already signed in lands on
   // the reveal's Start-today variant and taps through themselves, instead of
   // being flung past their own payoff screen on mount.
-  const wasAuthenticated = useRef(auth.isAuthenticated);
   useEffect(() => {
-    const was = wasAuthenticated.current;
-    wasAuthenticated.current = auth.isAuthenticated;
+    const was = flowCache.wasAuthenticated;
+    flowCache.wasAuthenticated = auth.isAuthenticated;
     if (!auth.isAuthenticated) return;
     setSignInOpen(false);
     if (!was && step === 'reveal') {
@@ -388,6 +402,7 @@ export function OnboardingNavigator() {
     flowCache.step = 'welcome';
     flowCache.answers = {};
     flowCache.hydrated = false;
+    flowCache.wasAuthenticated = false;
     // Only enter the app after profile + medication setup have persisted.
     auth.markOnboardingComplete();
   };
