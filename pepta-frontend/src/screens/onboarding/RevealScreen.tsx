@@ -3,9 +3,18 @@
 // line from today's weight down to the goal. The moment it reaches the flag, the
 // flag pops, a success haptic thumps, and a confetti burst falls — the plan is
 // claimed. Every number is derived live from the user's answers.
+//
+// SEQUENCING (2026-08-04, the screen-32 drop): the payoff lands
+// UNCONDITIONALLY. Everyone gets the Start today button; for signed-out users
+// the tap — a cheap, chosen yes, the same micro-commitment mechanic as the
+// warm-up's "See my free offer" — raises the save-your-plan auth sheet OVER
+// the still-visible plan. The ask only ever follows a self-initiated step
+// toward it, and the user is looking at the thing they'd be protecting while
+// they decide. The earlier merge put the identity ask INSIDE the payoff
+// moment, which read as three asks in a row (32 questions → identity → pay).
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Platform, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Defs, LinearGradient, Path, Stop } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import * as AppleAuthentication from 'expo-apple-authentication';
@@ -15,6 +24,7 @@ import { ProviderButton } from '../auth/SignInScreen';
 import { useProviderSignIn } from '../auth/useProviderSignIn';
 import { PRIVACY_URL, TERMS_URL } from '../../config';
 import { buildRevealSegments } from './revealPacing';
+import { logRevealClaimTapped } from '../../services/funnelEvents';
 import type { RampStyle } from '../../utils/hapticRamp';
 import { typography } from '../../theme/typography';
 import { formatShortDate } from '../../utils/dateParts';
@@ -45,10 +55,10 @@ export interface RevealScreenProps {
   targets: PlanTargets;
   projection: GoalProjection;
   /**
-   * The merged reveal+auth turn: signed-out users get the save-your-plan auth
-   * block where the CTA used to be — auth IS the claim action, and a
-   * successful sign-in advances the flow (the navigator watches auth state).
-   * Signed-in users (resume, re-onboarding) keep the single Start today CTA.
+   * Everyone gets Start today. Signed-in users advance directly; signed-out
+   * users get the save-your-plan sheet on tap — a successful sign-in advances
+   * the flow (the navigator watches auth state), a dismissal simply returns
+   * to the plan with the button still there.
    */
   authenticated: boolean;
   onContinue(): void;
@@ -66,6 +76,7 @@ export function RevealScreen({
 }: RevealScreenProps) {
   const [revealed, setRevealed] = useState(false);
   const [celebrate, setCelebrate] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const dateChip = projection.estimatedDate ? formatShortDate(projection.estimatedDate) : null;
 
   const handleArrive = () => {
@@ -91,11 +102,19 @@ export function RevealScreen({
         questionAccent
         onTyped={() => setRevealed(true)}
         footer={
-          authenticated ? (
-            <ConvoButton label="Start today" onPress={onContinue} />
-          ) : (
-            <SavePlanAuth />
-          )
+          <ConvoButton
+            label="Start today"
+            onPress={() => {
+              if (authenticated) {
+                onContinue();
+                return;
+              }
+              // The claim tap, instrumented separately from registration so
+              // the funnel can tell payoff-drop from ask-drop.
+              logRevealClaimTapped();
+              setSheetOpen(true);
+            }}
+          />
         }
       >
         <GoalPathCard
@@ -110,18 +129,50 @@ export function RevealScreen({
       </ConvoScreen>
 
       {celebrate ? <Confetti /> : null}
+
+      <SavePlanSheet open={sheetOpen} onClose={() => setSheetOpen(false)} />
     </View>
   );
 }
 
-// The save block that replaced both the old Start today CTA and the entire
-// standalone auth screen. Copy rule: this is the user protecting the plan
-// they just watched being built — never "create an account" / "sign up".
-function SavePlanAuth() {
+// The save sheet. Rises over the still-visible plan on the Start-today tap.
+// Copy rule: this is the user protecting the plan they just watched being
+// built — never "create an account" / "sign up". Dismissal (backdrop tap) is
+// allowed and just returns to the reveal; a successful sign-in advances the
+// flow via the navigator's auth watcher, which unmounts this screen.
+function SavePlanSheet({ open, onClose }: { open: boolean; onClose(): void }) {
   const { busy, error, showApple, handleApple, handleGoogle } = useProviderSignIn();
+  const rise = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!open) return;
+    rise.setValue(0);
+    Animated.spring(rise, { toValue: 1, friction: 9, tension: 70, useNativeDriver: true }).start();
+    if (Platform.OS !== 'web') {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft).catch(() => undefined);
+    }
+  }, [open, rise]);
+
   return (
-    <View>
-      <Text style={authStyles.heading}>Save your plan to start today</Text>
+    <Modal visible={open} transparent animationType="none" onRequestClose={onClose}>
+      <Animated.View style={[authStyles.backdrop, { opacity: rise }]}>
+        <Pressable style={StyleSheet.absoluteFill} accessibilityLabel="Close" onPress={onClose} />
+      </Animated.View>
+      <View style={authStyles.sheetHost} pointerEvents="box-none">
+        <Animated.View
+          style={[
+            authStyles.sheet,
+            {
+              opacity: rise,
+              transform: [
+                { translateY: rise.interpolate({ inputRange: [0, 1], outputRange: [280, 0] }) },
+              ],
+            },
+          ]}
+        >
+          <View style={authStyles.grabber} />
+          <Text style={authStyles.heading}>Save your plan</Text>
+          <Text style={authStyles.privacy}>Your plan is private to you.</Text>
       <View style={{ gap: 9, marginTop: 12 }}>
         <ProviderButton
           variant="google"
@@ -145,28 +196,64 @@ function SavePlanAuth() {
         ) : null}
       </View>
       {error ? <Text style={authStyles.error}>{error}</Text> : null}
-      <Text style={authStyles.legal}>
-        By continuing you agree to our{' '}
-        <Text style={authStyles.legalLink} onPress={() => void Linking.openURL(TERMS_URL)}>
-          Terms
-        </Text>{' '}
-        and{' '}
-        <Text style={authStyles.legalLink} onPress={() => void Linking.openURL(PRIVACY_URL)}>
-          Privacy Policy
-        </Text>
-        .
-      </Text>
-    </View>
+          <Text style={authStyles.legal}>
+            By continuing you agree to our{' '}
+            <Text style={authStyles.legalLink} onPress={() => void Linking.openURL(TERMS_URL)}>
+              Terms
+            </Text>{' '}
+            and{' '}
+            <Text style={authStyles.legalLink} onPress={() => void Linking.openURL(PRIVACY_URL)}>
+              Privacy Policy
+            </Text>
+            .
+          </Text>
+        </Animated.View>
+      </View>
+    </Modal>
   );
 }
 
 const authStyles = StyleSheet.create({
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(23,20,31,0.28)',
+  },
+  sheetHost: { flex: 1, justifyContent: 'flex-end' },
+  sheet: {
+    backgroundColor: convo.surface,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 24,
+    paddingTop: 10,
+    paddingBottom: 34,
+    shadowColor: '#171128',
+    shadowOffset: { width: 0, height: -12 },
+    shadowRadius: 30,
+    shadowOpacity: 0.18,
+    elevation: 12,
+  },
+  grabber: {
+    alignSelf: 'center',
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: convo.hairline,
+    marginBottom: 16,
+  },
   heading: {
     fontFamily: typography.fonts.heavy,
-    fontSize: 16,
-    letterSpacing: -0.2,
+    fontSize: 19,
+    letterSpacing: -0.3,
     color: convo.ink,
     textAlign: 'center',
+  },
+  privacy: {
+    fontFamily: typography.fonts.medium,
+    fontSize: 12.5,
+    color: convo.soft,
+    textAlign: 'center',
+    marginTop: 5,
+    marginBottom: 4,
   },
   error: {
     fontFamily: typography.fonts.semiBold,

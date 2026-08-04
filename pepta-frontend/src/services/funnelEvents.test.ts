@@ -7,6 +7,7 @@ import {
   logOnboardingStep,
   logPaywallShown,
   logPurchaseStarted,
+  logRevealClaimTapped,
   logUpdatePromptAction,
   logUpdatePromptShown,
   resetFunnelSessionGuardsForTest,
@@ -125,6 +126,19 @@ describe("funnel events", () => {
       selectedPlan: "yearly",
       trialCopyShown: "true",
     });
+  });
+
+  it("fires reveal_claim_tapped once per session (reopening the sheet is the same decision)", async () => {
+    logRevealClaimTapped();
+    logRevealClaimTapped();
+    await settle();
+    expect(mocks.logAnalyticsEvent).toHaveBeenCalledTimes(1);
+    expect(mocks.logAnalyticsEvent).toHaveBeenCalledWith("reveal_claim_tapped", {});
+    // a fresh session re-enters the funnel
+    resetFunnelSessionGuardsForTest();
+    logRevealClaimTapped();
+    await settle();
+    expect(mocks.logAnalyticsEvent).toHaveBeenCalledTimes(2);
   });
 
   it("passes variant + package through purchase_started", async () => {

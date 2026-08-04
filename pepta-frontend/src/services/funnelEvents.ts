@@ -136,6 +136,18 @@ export function logPaywallDismissed(payload: {
   });
 }
 
+// The reveal's claim tap (signed-out users only): tapping Start today is the
+// self-initiated step BEFORE the save-your-plan sheet. Instrumented apart
+// from af_complete_registration so the funnel can distinguish "bounced off
+// the payoff" from "refused the identity ask". Once per session — reopening
+// the sheet after a dismissal is the same decision, not a new funnel entry.
+let revealClaimLogged = false;
+export function logRevealClaimTapped(): void {
+  if (revealClaimLogged) return;
+  revealClaimLogged = true;
+  void appsFlyer.logAnalyticsEvent("reveal_claim_tapped", {});
+}
+
 // Update-prompt engagement: shown fires once per displayed prompt, action
 // fires per button press, so shown-without-action measures ignored prompts.
 export function logUpdatePromptShown(payload: {
@@ -168,4 +180,5 @@ export function logPurchaseStarted(
 export function resetFunnelSessionGuardsForTest(): void {
   firedThisSession.clear();
   stepsSeenThisSession.clear();
+  revealClaimLogged = false;
 }
