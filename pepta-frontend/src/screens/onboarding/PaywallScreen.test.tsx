@@ -506,7 +506,7 @@ describe("PaywallScreen legal links", () => {
     // Badge collision resolved: yearly slot carries its trial, SAVE moves to
     // the support line.
     expect(text).toContain("1 WEEK FREE");
-    expect(text).toContain("billed yearly · save 66%");
+    expect(text).toContain("billed yearly · save 67%");
     expect(mocks.logPaywallShown).toHaveBeenCalledWith("default", {
       defaultSelectedPlan: "yearly",
       trialCopyShown: true,

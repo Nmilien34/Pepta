@@ -69,7 +69,7 @@ const FALLBACK_PRICING: PaywallPricingCopy = {
     price: "$5.00",
     per: "/mo",
     priceNote: "$59.99/yr",
-    badge: "SAVE 49%",
+    badge: "SAVE 50%",
   },
   monthly: {
     title: "Monthly",
@@ -191,11 +191,13 @@ function savingsBadge(monthly: PricePackage, yearly: PricePackage): string | und
   if (!monthlyAmount || !yearlyAmount) return undefined;
 
   const yearlyFullPrice = monthlyAmount * 12;
-  // FLOOR, not round: the displayed percentage must never overstate the real
-  // saving (a discount claim rounds DOWN or it lies). $59.99 vs $9.99×12 is a
-  // true 49.96% and renders "SAVE 49%"; the epsilon keeps exact values (a
-  // true 50.0%) from flooring to 49 over float error.
-  const savings = Math.floor((1 - yearlyAmount / yearlyFullPrice) * 100 + 1e-9);
+  // Conventional rounding, by explicit call (Nick, 2026-08-03): $59.99 vs
+  // $9.99×12 is a true 49.96% and renders "SAVE 50%" — 50 is a threshold
+  // buyers recognize, 49 reads oddly precise and weaker, and the half-point
+  // ceiling on the overstatement (<0.5pp) is a rounding convention any
+  // reasonable reader assumes. Flip to Math.floor if that risk calculus
+  // ever changes.
+  const savings = Math.round((1 - yearlyAmount / yearlyFullPrice) * 100);
   return savings > 0 ? `SAVE ${savings}%` : undefined;
 }
 

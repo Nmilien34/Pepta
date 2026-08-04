@@ -24,8 +24,8 @@ describe("buildPaywallPricing", () => {
     expect(pricing.yearly.per).toBe("/mo");
     expect(pricing.yearly.priceNote).toBe("$39.99/yr");
     expect(pricing.yearly.sub).toBe("billed yearly");
-    // floor(66.64) — round's 67 overstated the real 66.64% saving.
-    expect(pricing.yearly.badge).toBe("SAVE 66%");
+    // round(66.64) — conventional rounding, per Nick (49 "reads weaker").
+    expect(pricing.yearly.badge).toBe("SAVE 67%");
     // 3.1.2(c): the billed amount stays explicit in the footer too.
     expect(pricing.footer.yearly).toBe(
       "$39.99/year. Cancel anytime · Terms & Privacy",
@@ -59,7 +59,7 @@ describe("buildPaywallPricing", () => {
     expect(pricing.yearly.priceNote).toBe("$59.99/yr");
     expect(pricing.yearly.sub).toBe("billed yearly");
     // Last-resort constants, aligned to the Aug 5 2026 US list prices.
-    expect(pricing.yearly.badge).toBe("SAVE 49%");
+    expect(pricing.yearly.badge).toBe("SAVE 50%");
     expect(pricing.footer.yearly).toBe(
       "$59.99/year. Cancel anytime · Terms & Privacy",
     );
@@ -212,7 +212,7 @@ describe("buildPaywallPricing", () => {
       // Badge collision resolution: trial claims the slot, SAVE moves to sub.
       expect(pricing.yearly.badge).toBe("3 days free");
       expect(pricing.yearly.badgeTone).toBe("trial");
-      expect(pricing.yearly.sub).toBe("billed yearly · save 66%");
+      expect(pricing.yearly.sub).toBe("billed yearly · save 67%");
       expect(pricing.monthly.badge).toBe("3 days free");
     });
 
@@ -221,7 +221,7 @@ describe("buildPaywallPricing", () => {
         { monthly: trialPkg("$9.99", 9.99, 3, "DAY"), yearly: packageWithPrice("$40.00", 40) },
         { monthly: true, yearly: false },
       );
-      expect(pricing.yearly.badge).toBe("SAVE 66%");
+      expect(pricing.yearly.badge).toBe("SAVE 67%");
       expect(pricing.yearly.badgeTone).toBe("save");
       expect(pricing.yearly.sub).toBe("billed yearly");
       expect(pricing.monthly.badge).toBe("3 days free");
@@ -245,7 +245,7 @@ describe("buildPaywallPricing", () => {
         { monthly: packageWithPrice("$9.99", 9.99), yearly: packageWithPrice("$40.00", 40) },
         { monthly: false, yearly: false },
       );
-      expect(pricing.yearly.badge).toBe("SAVE 66%");
+      expect(pricing.yearly.badge).toBe("SAVE 67%");
       expect(pricing.monthly.badge).toBeUndefined();
       expect(JSON.stringify(pricing)).not.toContain("$0.00");
     });
@@ -256,7 +256,7 @@ describe("buildPaywallPricing", () => {
         { monthly: false, yearly: false },
       );
       expect(JSON.stringify(pricing)).not.toContain("$0.00");
-      expect(pricing.yearly.badge).toBe("SAVE 66%");
+      expect(pricing.yearly.badge).toBe("SAVE 67%");
     });
 
     it("differing durations: each plan derives from its OWN intro offer", () => {
@@ -265,24 +265,25 @@ describe("buildPaywallPricing", () => {
         { monthly: true, yearly: true },
       );
       expect(pricing.yearly.badge).toBe("1 week free");
-      expect(pricing.yearly.sub).toBe("billed yearly · save 66%");
+      expect(pricing.yearly.sub).toBe("billed yearly · save 67%");
       expect(pricing.cta.yearly.subline).toContain("1 week free");
       expect(pricing.monthly.badge).toBe("3 days free");
       expect(pricing.cta.monthly.subline).toContain("3 days free");
     });
   });
 
-  it("never overstates the saving: floors the percentage, live at the Aug 5 prices", () => {
-    // $59.99/yr vs $9.99×12 = a true 49.96% saving → "SAVE 49%", never 50.
+  it("rounds the saving conventionally, live at the Aug 5 prices", () => {
+    // $59.99/yr vs $9.99×12 = a true 49.96% saving → "SAVE 50%" (deliberate:
+    // conventional rounding beats a technically-purer 49, per Nick).
     const pricing = buildPaywallPricing({
       monthly: packageWithPrice("$9.99", 9.99),
       yearly: packageWithPrice("$59.99", 59.99),
     });
-    expect(pricing.yearly.badge).toBe("SAVE 49%");
+    expect(pricing.yearly.badge).toBe("SAVE 50%");
     expect(pricing.yearly.price).toBe("$5.00");
     expect(pricing.yearly.priceNote).toBe("$59.99/yr");
     expect(pricing.cta.yearly.label).toBe("Start my year — $59.99");
-    // An exact saving must not floor down over float error.
+    // An exact saving stays exact.
     const exact = buildPaywallPricing({
       monthly: packageWithPrice("$10.00", 10),
       yearly: packageWithPrice("$60.00", 60),
