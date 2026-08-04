@@ -213,7 +213,10 @@ describe("buildPaywallPricing", () => {
       expect(pricing.yearly.badge).toBe("3 days free");
       expect(pricing.yearly.badgeTone).toBe("trial");
       expect(pricing.yearly.sub).toBe("billed yearly · save 67%");
-      expect(pricing.monthly.badge).toBe("3 days free");
+      // Badge priority: yearly's eligible trial wins the badge; two identical
+      // badges cancel each other out. Monthly's trial stays live and fully
+      // disclosed — its CTA above proves it — the BADGE is what moves.
+      expect(pricing.monthly.badge).toBeUndefined();
     });
 
     it("trial on MONTHLY only (today's live state): exact pre-change rendering", () => {
@@ -267,7 +270,9 @@ describe("buildPaywallPricing", () => {
       expect(pricing.yearly.badge).toBe("1 week free");
       expect(pricing.yearly.sub).toBe("billed yearly · save 67%");
       expect(pricing.cta.yearly.subline).toContain("1 week free");
-      expect(pricing.monthly.badge).toBe("3 days free");
+      // yearly's badge suppresses monthly's, but monthly's CTA still
+      // discloses ITS OWN trial — display choice, not disclosure choice.
+      expect(pricing.monthly.badge).toBeUndefined();
       expect(pricing.cta.monthly.subline).toContain("3 days free");
     });
   });
@@ -295,5 +300,36 @@ describe("buildPaywallPricing", () => {
       yearly: packageWithPrice("$59.99", 59.99),
     });
     expect(broken.yearly.badge).toBeUndefined();
+  });
+
+  it("badge priority: exactly one row wears a badge in every eligibility case", () => {
+    const trialPkg = (price: string, amount: number) => ({
+      product: {
+        price: amount,
+        priceString: price,
+        introPrice: { price: 0, periodNumberOfUnits: 3, periodUnit: "DAY" },
+      },
+    });
+    const both = { monthly: trialPkg("$9.99", 9.99), yearly: trialPkg("$59.99", 59.99) };
+
+    // 1. Yearly eligible → yearly wears the trial badge, monthly none.
+    const caseOne = buildPaywallPricing(both, { monthly: true, yearly: true });
+    expect(caseOne.yearly.badge).toBe("3 days free");
+    expect(caseOne.monthly.badge).toBeUndefined();
+
+    // 2. Yearly ineligible (consumed the annual intro), monthly eligible →
+    //    the badge moves to monthly; yearly reverts to its SAVE badge. This
+    //    is the user Screen A promised "free" — the wall must show where
+    //    free lives.
+    const caseTwo = buildPaywallPricing(both, { monthly: true, yearly: false });
+    expect(caseTwo.monthly.badge).toBe("3 days free");
+    expect(caseTwo.yearly.badge).toBe("SAVE 50%");
+    expect(caseTwo.yearly.badgeTone).toBe("save");
+
+    // 3. Neither eligible → SAVE badge only, no trial badge anywhere.
+    const caseThree = buildPaywallPricing(both, { monthly: false, yearly: false });
+    expect(caseThree.yearly.badge).toBe("SAVE 50%");
+    expect(caseThree.monthly.badge).toBeUndefined();
+    expect(JSON.stringify(caseThree)).not.toContain("$0.00");
   });
 });

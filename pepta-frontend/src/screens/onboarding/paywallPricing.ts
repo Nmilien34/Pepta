@@ -234,6 +234,15 @@ export function buildPaywallPricing(
   // second float. With no yearly trial (today's live state until the ASC
   // config lands) yearly renders exactly as before: SAVE badge, plain sub.
   const yearlyTrialBadge = trialBadge(yearly, trialEligible.yearly);
+  // BADGE PRIORITY (Nick, Aug 4): a badge marks ONE card as the deal — two
+  // identical trial badges cancel each other out. Yearly's eligible trial
+  // wins the badge and suppresses monthly's; monthly's renders only when
+  // yearly is NOT eligible (the per-user case that matters: a returning
+  // user who consumed the annual intro but not monthly's — Screen A promised
+  // them "free", so the wall must still show where free lives). DISPLAY
+  // ONLY: monthly's trial stays live, purchasable, and fully disclosed in
+  // the CTA/subline; analytics report the offer, not the pixel.
+  const monthlyBadge = yearlyTrialBadge ? undefined : trialBadge(monthly, trialEligible.monthly);
   const savings = savingsBadge(monthly, yearly);
   const yearlyBadge = yearlyTrialBadge ?? savings;
   const yearlySub =
@@ -265,7 +274,7 @@ export function buildPaywallPricing(
       sub: "billed monthly",
       price: monthlyPrice,
       per: "/mo",
-      badge: trialBadge(monthly, trialEligible.monthly),
+      badge: monthlyBadge,
       badgeTone: "trial",
     },
     footer: {
