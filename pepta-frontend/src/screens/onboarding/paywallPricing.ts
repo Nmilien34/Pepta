@@ -56,14 +56,20 @@ interface PricePackage {
 // the BILLED amount must stay clearly visible — it renders adjacent under the
 // anchor AND in the legal footer. Never ship the /mo anchor without both (an
 // earlier build was rejected over paywall pricing clarity).
+// LAST-RESORT CONSTANTS — the only literal prices in the app, and they WILL
+// drift from App Store Connect. They render solely while getPaywallPackages
+// is unresolved (or failed): the CTA is disabled with "Loading App Store
+// plans…" visible the whole time, so nothing here is purchasable copy. Keep
+// aligned with ASC on every price change anyway (US list as of Aug 5 2026:
+// annual $59.99, monthly $9.99), because a slow network shows this frame.
 const FALLBACK_PRICING: PaywallPricingCopy = {
   yearly: {
     title: "Yearly",
     sub: "billed yearly",
-    price: "$3.33",
+    price: "$5.00",
     per: "/mo",
-    priceNote: "$39.99/yr",
-    badge: "SAVE 67%",
+    priceNote: "$59.99/yr",
+    badge: "SAVE 49%",
   },
   monthly: {
     title: "Monthly",
@@ -72,14 +78,14 @@ const FALLBACK_PRICING: PaywallPricingCopy = {
     per: "/mo",
   },
   footer: {
-    yearly: "$39.99/year. Cancel anytime · Terms & Privacy",
+    yearly: "$59.99/year. Cancel anytime · Terms & Privacy",
     monthly: "$9.99/month. Cancel anytime · Terms & Privacy",
   },
   // Pre-load fallback: no product yet, so never advertise a trial. (The
   // button is disabled until plans load; these labels are the disabled text.)
   cta: {
     monthly: { label: "Start my month — $9.99" },
-    yearly: { label: "Start my year — $39.99" },
+    yearly: { label: "Start my year — $59.99" },
   },
 };
 
@@ -163,7 +169,8 @@ function numericPrice(pkg: PricePackage | null | undefined): number | null {
 }
 
 /**
- * "$3.33" from a $40.00/yr product — the per-month anchor. Uses the numeric
+ * The per-month anchor from the annual product ("$5.00" from $59.99/yr) —
+ * computed, never a literal, so ASC price changes need no build. Uses the numeric
  * price for math and the priceString's leading symbol for display; if the
  * currency formats with a suffix (e.g. "39,99 €") we can't format faithfully,
  * so return null and the card falls back to showing the billed price bold.
@@ -179,10 +186,16 @@ function monthlyEquivalent(yearly: PricePackage): string | null {
 function savingsBadge(monthly: PricePackage, yearly: PricePackage): string | undefined {
   const monthlyAmount = numericPrice(monthly);
   const yearlyAmount = numericPrice(yearly);
-  if (!monthlyAmount || !yearlyAmount) return FALLBACK_PRICING.yearly.badge;
+  // A loaded product without a numeric price gets NO badge — never the stale
+  // fallback constant, which would be a false discount claim on live goods.
+  if (!monthlyAmount || !yearlyAmount) return undefined;
 
   const yearlyFullPrice = monthlyAmount * 12;
-  const savings = Math.round((1 - yearlyAmount / yearlyFullPrice) * 100);
+  // FLOOR, not round: the displayed percentage must never overstate the real
+  // saving (a discount claim rounds DOWN or it lies). $59.99 vs $9.99×12 is a
+  // true 49.96% and renders "SAVE 49%"; the epsilon keeps exact values (a
+  // true 50.0%) from flooring to 49 over float error.
+  const savings = Math.floor((1 - yearlyAmount / yearlyFullPrice) * 100 + 1e-9);
   return savings > 0 ? `SAVE ${savings}%` : undefined;
 }
 
@@ -207,7 +220,7 @@ export function buildPaywallPricing(
   const monthly = packages.monthly;
   const yearly = packages.yearly;
   const monthlyPrice = priceString(monthly, FALLBACK_PRICING.monthly.price);
-  const annualPrice = priceString(yearly, "$39.99");
+  const annualPrice = priceString(yearly, "$59.99");
 
   const perMonthAnchor = monthlyEquivalent(yearly);
 

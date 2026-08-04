@@ -24,7 +24,8 @@ describe("buildPaywallPricing", () => {
     expect(pricing.yearly.per).toBe("/mo");
     expect(pricing.yearly.priceNote).toBe("$39.99/yr");
     expect(pricing.yearly.sub).toBe("billed yearly");
-    expect(pricing.yearly.badge).toBe("SAVE 67%");
+    // floor(66.64) — round's 67 overstated the real 66.64% saving.
+    expect(pricing.yearly.badge).toBe("SAVE 66%");
     // 3.1.2(c): the billed amount stays explicit in the footer too.
     expect(pricing.footer.yearly).toBe(
       "$39.99/year. Cancel anytime · Terms & Privacy",
@@ -53,14 +54,14 @@ describe("buildPaywallPricing", () => {
     const pricing = buildPaywallPricing(null);
 
     expect(pricing.monthly.price).toBe("$9.99");
-    expect(pricing.yearly.price).toBe("$3.33");
+    expect(pricing.yearly.price).toBe("$5.00");
     expect(pricing.yearly.per).toBe("/mo");
-    expect(pricing.yearly.priceNote).toBe("$39.99/yr");
+    expect(pricing.yearly.priceNote).toBe("$59.99/yr");
     expect(pricing.yearly.sub).toBe("billed yearly");
-    // $9.99 × 12 = $119.88 → $40/yr saves 67% (matches the computed path).
-    expect(pricing.yearly.badge).toBe("SAVE 67%");
+    // Last-resort constants, aligned to the Aug 5 2026 US list prices.
+    expect(pricing.yearly.badge).toBe("SAVE 49%");
     expect(pricing.footer.yearly).toBe(
-      "$39.99/year. Cancel anytime · Terms & Privacy",
+      "$59.99/year. Cancel anytime · Terms & Privacy",
     );
     expect(pricing.footer.monthly).toBe(
       "$9.99/month. Cancel anytime · Terms & Privacy",
@@ -211,7 +212,7 @@ describe("buildPaywallPricing", () => {
       // Badge collision resolution: trial claims the slot, SAVE moves to sub.
       expect(pricing.yearly.badge).toBe("3 days free");
       expect(pricing.yearly.badgeTone).toBe("trial");
-      expect(pricing.yearly.sub).toBe("billed yearly · save 67%");
+      expect(pricing.yearly.sub).toBe("billed yearly · save 66%");
       expect(pricing.monthly.badge).toBe("3 days free");
     });
 
@@ -220,7 +221,7 @@ describe("buildPaywallPricing", () => {
         { monthly: trialPkg("$9.99", 9.99, 3, "DAY"), yearly: packageWithPrice("$40.00", 40) },
         { monthly: true, yearly: false },
       );
-      expect(pricing.yearly.badge).toBe("SAVE 67%");
+      expect(pricing.yearly.badge).toBe("SAVE 66%");
       expect(pricing.yearly.badgeTone).toBe("save");
       expect(pricing.yearly.sub).toBe("billed yearly");
       expect(pricing.monthly.badge).toBe("3 days free");
@@ -244,7 +245,7 @@ describe("buildPaywallPricing", () => {
         { monthly: packageWithPrice("$9.99", 9.99), yearly: packageWithPrice("$40.00", 40) },
         { monthly: false, yearly: false },
       );
-      expect(pricing.yearly.badge).toBe("SAVE 67%");
+      expect(pricing.yearly.badge).toBe("SAVE 66%");
       expect(pricing.monthly.badge).toBeUndefined();
       expect(JSON.stringify(pricing)).not.toContain("$0.00");
     });
@@ -255,7 +256,7 @@ describe("buildPaywallPricing", () => {
         { monthly: false, yearly: false },
       );
       expect(JSON.stringify(pricing)).not.toContain("$0.00");
-      expect(pricing.yearly.badge).toBe("SAVE 67%");
+      expect(pricing.yearly.badge).toBe("SAVE 66%");
     });
 
     it("differing durations: each plan derives from its OWN intro offer", () => {
@@ -264,10 +265,34 @@ describe("buildPaywallPricing", () => {
         { monthly: true, yearly: true },
       );
       expect(pricing.yearly.badge).toBe("1 week free");
-      expect(pricing.yearly.sub).toBe("billed yearly · save 67%");
+      expect(pricing.yearly.sub).toBe("billed yearly · save 66%");
       expect(pricing.cta.yearly.subline).toContain("1 week free");
       expect(pricing.monthly.badge).toBe("3 days free");
       expect(pricing.cta.monthly.subline).toContain("3 days free");
     });
+  });
+
+  it("never overstates the saving: floors the percentage, live at the Aug 5 prices", () => {
+    // $59.99/yr vs $9.99×12 = a true 49.96% saving → "SAVE 49%", never 50.
+    const pricing = buildPaywallPricing({
+      monthly: packageWithPrice("$9.99", 9.99),
+      yearly: packageWithPrice("$59.99", 59.99),
+    });
+    expect(pricing.yearly.badge).toBe("SAVE 49%");
+    expect(pricing.yearly.price).toBe("$5.00");
+    expect(pricing.yearly.priceNote).toBe("$59.99/yr");
+    expect(pricing.cta.yearly.label).toBe("Start my year — $59.99");
+    // An exact saving must not floor down over float error.
+    const exact = buildPaywallPricing({
+      monthly: packageWithPrice("$10.00", 10),
+      yearly: packageWithPrice("$60.00", 60),
+    });
+    expect(exact.yearly.badge).toBe("SAVE 50%");
+    // A loaded product with no numeric price gets NO badge — never a stale claim.
+    const broken = buildPaywallPricing({
+      monthly: { product: { priceString: "$9.99" } },
+      yearly: packageWithPrice("$59.99", 59.99),
+    });
+    expect(broken.yearly.badge).toBeUndefined();
   });
 });

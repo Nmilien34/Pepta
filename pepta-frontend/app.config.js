@@ -7,14 +7,14 @@ module.exports = {
   expo: {
     name: "Pepta",
     slug: "pepta",
-    version: "1.0.5",
+    version: "1.0.6",
     orientation: "portrait",
     userInterfaceStyle: "automatic",
     icon: "./assets/icon.png",
     ios: {
       supportsTablet: true,
       bundleIdentifier: "ai.boltzman.peptaapp",
-      buildNumber: "29",
+      buildNumber: "30",
       usesAppleSignIn: true,
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,

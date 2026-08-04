@@ -343,7 +343,7 @@ describe("PaywallScreen legal links", () => {
       );
     });
 
-    const subscribe = button(tree!.root, "Start my year — $39.99");
+    const subscribe = button(tree!.root, "Start my year — $59.99");
     expect(subscribe.props.disabled).toBe(true);
     expect(allText(tree!.root)).toContain("Loading App Store plans");
 
@@ -506,7 +506,7 @@ describe("PaywallScreen legal links", () => {
     // Badge collision resolved: yearly slot carries its trial, SAVE moves to
     // the support line.
     expect(text).toContain("1 WEEK FREE");
-    expect(text).toContain("billed yearly · save 67%");
+    expect(text).toContain("billed yearly · save 66%");
     expect(mocks.logPaywallShown).toHaveBeenCalledWith("default", {
       defaultSelectedPlan: "yearly",
       trialCopyShown: true,
