@@ -722,6 +722,12 @@ export const homeRangeTotalsSchema = z
     waterOz: z.number().nonnegative(),
     dayCount: z.number().int().positive(),
     hasData: z.boolean(),
+    // Activity totals, server-computed over the full range so they are never
+    // capped by the /track payload window. Present only for clients that sent
+    // a `tz` with GET /home — the schema is strict, so shipped builds without
+    // these keys must never receive them.
+    steps: z.number().nonnegative().optional(),
+    workoutMinutes: z.number().nonnegative().optional(),
   })
   .strict();
 

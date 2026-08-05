@@ -35,7 +35,7 @@ describe('buildActivity', () => {
     expect(a.workoutTarget).toBe(30);
   });
 
-  it('sums the selected range and scales targets', () => {
+  it('sums the selected rolling range and scales targets by its full day count', () => {
     const t = track({ activityLogs: [
       { steps: 4000, workoutMinutes: 10, datetime: todayIso, deletedAt: null },
       { steps: 2240, workoutMinutes: 12, datetime: yesterdayIso, deletedAt: null },
@@ -44,8 +44,38 @@ describe('buildActivity', () => {
     const a = buildActivity(t, { dailyStepTarget: 3000 } as unknown as UserProfileResponse, now, 'week');
     expect(a.steps).toBe(6240);
     expect(a.workoutMin).toBe(22);
-    expect(a.stepTarget).toBe(9000);
-    expect(a.workoutTarget).toBe(90);
+    expect(a.stepTarget).toBe(21000);
+    expect(a.workoutTarget).toBe(210);
+  });
+
+  it('month means the past 30 days, so a late-May log counts on Jun 23', () => {
+    const t = track({ activityLogs: [
+      { steps: 4000, workoutMinutes: 10, datetime: todayIso, deletedAt: null },
+      { steps: 9999, workoutMinutes: 99, datetime: lastMonthIso, deletedAt: null },
+    ] as unknown as TrackResponse['activityLogs'] });
+    const a = buildActivity(t, null, now, 'month');
+    expect(a.steps).toBe(13999);
+    expect(a.stepTarget).toBe(8000 * 30);
+  });
+
+  it('prefers server range totals for long ranges (the /track payload is capped)', () => {
+    const t = track({ activityLogs: [
+      { steps: 4000, workoutMinutes: 10, datetime: todayIso, deletedAt: null },
+    ] as unknown as TrackResponse['activityLogs'] });
+    const totals = { key: 'month', steps: 250000, workoutMinutes: 600 } as unknown as HomeResponse['rangeTotals'];
+    const a = buildActivity(t, null, now, 'month', totals);
+    expect(a.steps).toBe(250000);
+    expect(a.workoutMin).toBe(600);
+  });
+
+  it('ignores server totals for today (optimistic local rows must show) and for a stale range key', () => {
+    const t = track({ activityLogs: [
+      { steps: 4000, workoutMinutes: 10, datetime: todayIso, deletedAt: null },
+    ] as unknown as TrackResponse['activityLogs'] });
+    const todayTotals = { key: 'today', steps: 111, workoutMinutes: 1 } as unknown as HomeResponse['rangeTotals'];
+    expect(buildActivity(t, null, now, 'today', todayTotals).steps).toBe(4000);
+    const staleTotals = { key: 'week', steps: 111, workoutMinutes: 1 } as unknown as HomeResponse['rangeTotals'];
+    expect(buildActivity(t, null, now, 'month', staleTotals).steps).toBe(4000);
   });
 });
 

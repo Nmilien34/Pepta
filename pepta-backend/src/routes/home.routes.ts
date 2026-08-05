@@ -15,6 +15,7 @@ router.get(
       res,
       await getHome(req.user!.id, new Date(), req.query.range, {
         allowAIInsightProse: req.get("x-pepta-ai-consent") === "true",
+        tz: req.query.tz,
       }),
     );
   }),

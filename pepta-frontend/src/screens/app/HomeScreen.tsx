@@ -121,7 +121,7 @@ export function HomeScreen() {
   const gettingStarted = buildGettingStarted(home);
   const selectedRange = home.selectedRange ?? homeRange;
   const rangeAvailability = home.rangeAvailability ?? { today: true, week: false, month: false, year: false };
-  const activity = buildActivity(track, home.profile, new Date(), selectedRange);
+  const activity = buildActivity(track, home.profile, new Date(), selectedRange, home.rangeTotals);
   const todaysLog = buildTodaysLog(track, home, new Date(), selectedRange);
   const selectRange = (range: HomeRangeKey) => {
     if (!rangeAvailability[range]) return;

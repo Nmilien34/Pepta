@@ -8,22 +8,21 @@ function startOfLocalDay(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
 
+// DECLARED range semantics (2026-08-05, mirrors backend lib/homeRange.ts):
+// every range is a ROLLING window ending today — month = past 30 days from
+// ask, not the calendar month — cut at local midnight. The backend cuts at
+// the same boundaries because the app sends the device zone with GET /home.
+const RANGE_DAYS: Record<HomeRangeKey, number> = { today: 1, week: 7, month: 30, year: 365 };
+
 function rangeStart(range: HomeRangeKey, now: Date): Date {
   const day = startOfLocalDay(now);
-  if (range === 'week') {
-    const start = new Date(day);
-    start.setDate(day.getDate() - day.getDay());
-    return start;
-  }
-  if (range === 'month') return new Date(now.getFullYear(), now.getMonth(), 1);
-  if (range === 'year') return new Date(now.getFullYear(), 0, 1);
-  return day;
+  const start = new Date(day);
+  start.setDate(day.getDate() - (RANGE_DAYS[range] - 1));
+  return start;
 }
 
-function rangeDayCount(range: HomeRangeKey, now: Date): number {
-  const start = rangeStart(range, now);
-  const end = startOfLocalDay(now);
-  return Math.max(1, Math.floor((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000)) + 1);
+function rangeDayCount(range: HomeRangeKey): number {
+  return RANGE_DAYS[range];
 }
 
 function inLocalRange(iso: string, now: Date, range: HomeRangeKey): boolean {
@@ -43,13 +42,27 @@ export function buildActivity(
   profile: UserProfileResponse | null,
   now: Date,
   range: HomeRangeKey = 'today',
+  rangeTotals?: HomeResponse['rangeTotals'] | null,
 ): ActivitySummary {
-  const days = rangeDayCount(range, now);
-  const items = (track?.activityLogs ?? []).filter((a) => a.deletedAt == null && inLocalRange(a.datetime, now, range));
+  const days = rangeDayCount(range);
+  // Server totals win for week/month/year: they cover the full window, while
+  // the /track payload is capped (30 days / 100 rows per type), which silently
+  // undercounts long ranges for heavy loggers. 'today' stays locally computed
+  // — the cap can't bite a single day, and the local sum includes optimistic
+  // just-logged rows the server hasn't confirmed yet.
+  const serverTotals =
+    range !== 'today' && rangeTotals?.key === range && typeof rangeTotals.steps === 'number'
+      ? rangeTotals
+      : null;
+  const items = serverTotals
+    ? []
+    : (track?.activityLogs ?? []).filter((a) => a.deletedAt == null && inLocalRange(a.datetime, now, range));
   return {
-    steps: items.reduce((s, a) => s + (a.steps ?? 0), 0),
+    steps: serverTotals ? serverTotals.steps ?? 0 : items.reduce((s, a) => s + (a.steps ?? 0), 0),
     stepTarget: (profile?.dailyStepTarget && profile.dailyStepTarget > 0 ? profile.dailyStepTarget : 8000) * days,
-    workoutMin: items.reduce((s, a) => s + (a.workoutMinutes ?? 0), 0),
+    workoutMin: serverTotals
+      ? serverTotals.workoutMinutes ?? 0
+      : items.reduce((s, a) => s + (a.workoutMinutes ?? 0), 0),
     workoutTarget: 30 * days,
   };
 }

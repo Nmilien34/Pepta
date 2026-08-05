@@ -6,7 +6,8 @@ import {
   userProfileResponseSchema,
   weightLogResponseSchema,
 } from '@pepta/shared';
-import { addUtcDays, startOfUtcDay, startOfUtcWeek } from '../lib/dates';
+import { addUtcDays, startOfUtcDay } from '../lib/dates';
+import { parseHomeTimezone, resolveHomeWindow } from '../lib/homeRange';
 import { consecutiveActivityStreak } from '../lib/streak';
 import {
   ActivityLogModel,
@@ -40,36 +41,6 @@ function parseHomeRange(input: unknown): HomeRangeKey {
   return parsed.success ? parsed.data : 'today';
 }
 
-function utcMonthRange(now: Date) {
-  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
-  return { start, end };
-}
-
-function utcYearRange(now: Date) {
-  const start = new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
-  const end = new Date(Date.UTC(now.getUTCFullYear() + 1, 0, 1));
-  return { start, end };
-}
-
-function rangeBounds(range: HomeRangeKey, now: Date) {
-  if (range === 'week') {
-    const start = startOfUtcWeek(now);
-    return { start, end: addUtcDays(start, 7) };
-  }
-  if (range === 'month') return utcMonthRange(now);
-  if (range === 'year') return utcYearRange(now);
-  const start = startOfUtcDay(now);
-  return { start, end: addUtcDays(start, 1) };
-}
-
-function rangeDayCount(range: HomeRangeKey, now: Date) {
-  const { start, end } = rangeBounds(range, now);
-  const tomorrowStart = addUtcDays(startOfUtcDay(now), 1);
-  const effectiveEnd = new Date(Math.min(end.getTime(), tomorrowStart.getTime()));
-  const ms = Math.max(effectiveEnd.getTime() - start.getTime(), 24 * 60 * 60 * 1000);
-  return Math.max(1, Math.ceil(ms / (24 * 60 * 60 * 1000)));
-}
 
 async function getProfile(userId: string) {
   const profile = await UserProfileModel.findOne({ userId });
@@ -81,13 +52,33 @@ async function getActiveCompounds(userId: string) {
   return compounds.map((compound) => serializeWithSchema(compoundResponseSchema, compound));
 }
 
-async function getRangeTotals(userId: string, now: Date, range: HomeRangeKey) {
-  const { start, end } = rangeBounds(range, now);
-  const [meals, proteins, fibers, waterLogs] = await Promise.all([
+interface RangeTotals {
+  protein: number;
+  fiber: number;
+  calories: number;
+  waterOz: number;
+  dayCount: number;
+  hasLog: boolean;
+  /** Present only in tz mode — see getRangeTotals. */
+  steps?: number;
+  workoutMinutes?: number;
+}
+
+async function getRangeTotals(
+  userId: string,
+  now: Date,
+  range: HomeRangeKey,
+  tz: string | null,
+): Promise<RangeTotals> {
+  const { start, end, dayCount } = resolveHomeWindow(range, now, tz);
+  const [meals, proteins, fibers, waterLogs, activities] = await Promise.all([
     MealLogModel.find({ userId, datetime: { $gte: start, $lt: end } }),
     ProteinLogModel.find({ userId, datetime: { $gte: start, $lt: end } }),
     FiberLogModel.find({ userId, datetime: { $gte: start, $lt: end } }),
     WaterLogModel.find({ userId, datetime: { $gte: start, $lt: end } }),
+    // Activity totals ride along only for tz-mode clients — legacy builds
+    // strict-parse rangeTotals and must not receive the extra keys.
+    tz ? ActivityLogModel.find({ userId, datetime: { $gte: start, $lt: end } }) : Promise.resolve([]),
   ]);
 
   return {
@@ -99,13 +90,22 @@ async function getRangeTotals(userId: string, now: Date, range: HomeRangeKey) {
       fibers.reduce((sum, fiber) => sum + fiber.grams, 0),
     calories: meals.reduce((sum, meal) => sum + meal.calories, 0),
     waterOz: waterLogs.reduce((sum, water) => sum + water.amountOz, 0),
-    dayCount: rangeDayCount(range, now),
+    dayCount,
     hasLog: meals.length + proteins.length + fibers.length + waterLogs.length > 0,
+    ...(tz
+      ? {
+          steps: activities.reduce((sum, activity) => sum + (activity.steps ?? 0), 0),
+          workoutMinutes: activities.reduce(
+            (sum, activity) => sum + (activity.workoutMinutes ?? 0),
+            0,
+          ),
+        }
+      : {}),
   };
 }
 
-async function getRangeAvailability(userId: string, now: Date) {
-  const todayStart = startOfUtcDay(now);
+async function getRangeAvailability(userId: string, now: Date, tz: string | null) {
+  const todayStart = resolveHomeWindow('today', now, tz).start;
   const availability: Record<HomeRangeKey, boolean> = {
     today: true,
     week: false,
@@ -115,7 +115,7 @@ async function getRangeAvailability(userId: string, now: Date) {
 
   await Promise.all(
     (['week', 'month', 'year'] as const).map(async (range) => {
-      const { start } = rangeBounds(range, now);
+      const { start } = resolveHomeWindow(range, now, tz);
       const query = { userId, datetime: { $gte: start, $lt: todayStart } };
       const [meals, proteins, fibers, waterLogs, activities, weights, doses] = await Promise.all([
         MealLogModel.exists(query),
@@ -179,9 +179,10 @@ export async function getHome(
   userId: string,
   now = new Date(),
   rangeInput: unknown = 'today',
-  options: { allowAIInsightProse?: boolean } = {},
+  options: { allowAIInsightProse?: boolean; tz?: unknown } = {},
 ) {
   const selectedRange = parseHomeRange(rangeInput);
+  const tz = parseHomeTimezone(options.tz);
   const [
     profileResult,
     compoundsResult,
@@ -197,9 +198,9 @@ export async function getHome(
     getProfile(userId),
     getActiveCompounds(userId),
     getMedicationLevels(userId, now),
-    getRangeTotals(userId, now, selectedRange),
-    getRangeTotals(userId, now, 'today'),
-    getRangeAvailability(userId, now),
+    getRangeTotals(userId, now, selectedRange, tz),
+    getRangeTotals(userId, now, 'today', tz),
+    getRangeAvailability(userId, now, tz),
     getLatestWeight(userId),
     getInsights(userId, now, { allowAIProse: options.allowAIInsightProse === true }),
     getWeeklyRetention(userId, now),
@@ -213,7 +214,14 @@ export async function getHome(
     totals:
       totalsResult.status === 'fulfilled'
         ? totalsResult.value
-        : { protein: 0, fiber: 0, calories: 0, waterOz: 0, dayCount: rangeDayCount(selectedRange, now), hasLog: false },
+        : {
+            protein: 0,
+            fiber: 0,
+            calories: 0,
+            waterOz: 0,
+            dayCount: resolveHomeWindow(selectedRange, now, tz).dayCount,
+            hasLog: false,
+          },
     todayTotals:
       todayTotalsResult.status === 'fulfilled'
         ? todayTotalsResult.value
@@ -265,6 +273,9 @@ export async function getHome(
       waterOz: results.totals.waterOz,
       dayCount: results.totals.dayCount,
       hasData: results.totals.hasLog,
+      ...(results.totals.steps !== undefined
+        ? { steps: results.totals.steps, workoutMinutes: results.totals.workoutMinutes }
+        : {}),
     },
     rangeAvailability: results.rangeAvailability,
     todayProteinGrams: results.totals.protein,

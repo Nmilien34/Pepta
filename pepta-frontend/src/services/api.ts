@@ -134,6 +134,16 @@ interface HomeRequestOptions {
   aiDataSharingConsent?: boolean;
 }
 
+/** Device IANA zone ("America/New_York"), or null when Intl can't say. */
+export function deviceTimeZone(): string | null {
+  try {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    return typeof tz === "string" && tz.length > 0 ? tz : null;
+  } catch {
+    return null;
+  }
+}
+
 // Frontend-defined contract for the (pending) AI companion-notes endpoint
 // (backend /coach → OpenAI, key server-side). See docs/coach-endpoint.md.
 const coachNotesResponseSchema = z.object({
@@ -367,9 +377,16 @@ class PeptaApi {
     range?: HomeRangeKey,
     options: HomeRequestOptions = {},
   ): Promise<HomeResponse> {
-    const suffix =
-      range && range !== "today" ? `?range=${encodeURIComponent(range)}` : "";
-    return this.request(`/home${suffix}`, homeResponseSchema, {
+    const params = new URLSearchParams();
+    if (range && range !== "today") params.set("range", range);
+    // The device zone opts the request into the declared range semantics:
+    // rolling windows (month = past 30 days) cut at the user's local midnight,
+    // plus server-computed activity totals. Without it the backend serves the
+    // legacy UTC calendar windows shipped builds expect.
+    const tz = deviceTimeZone();
+    if (tz) params.set("tz", tz);
+    const query = params.toString();
+    return this.request(`/home${query ? `?${query}` : ""}`, homeResponseSchema, {
       headers: options.aiDataSharingConsent
         ? { "x-pepta-ai-consent": "true" }
         : undefined,

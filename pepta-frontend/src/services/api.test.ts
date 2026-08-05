@@ -254,13 +254,31 @@ describe("PeptaApi resilience", () => {
     ).rejects.toThrow();
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://localhost:8080/home",
+      expect.stringContaining("http://localhost:8080/home"),
       expect.objectContaining({
         headers: expect.objectContaining({
           "x-pepta-ai-consent": "true",
         }),
       }),
     );
+  });
+
+  it("sends the device timezone and range so the backend cuts local rolling windows", async () => {
+    let url = "";
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      url = String(input);
+      return new Response(
+        JSON.stringify({ error: { code: "FORBIDDEN", message: "Upgrade required" } }),
+        { status: 403, headers: { "content-type": "application/json" } },
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(api.getHome("month")).rejects.toThrow();
+
+    expect(url).toContain("range=month");
+    // The exact zone is host-dependent; what matters is that one is sent.
+    expect(url).toMatch(/[?&]tz=./);
   });
 });
 
