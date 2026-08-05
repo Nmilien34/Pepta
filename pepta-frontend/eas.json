@@ -5,7 +5,8 @@
   },
   "build": {
     "production": {
-      "distribution": "store"
+      "distribution": "store",
+      "channel": "production"
     }
   },
   "submit": {

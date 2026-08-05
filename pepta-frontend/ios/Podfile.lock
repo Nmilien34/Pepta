@@ -14,6 +14,8 @@ PODS:
   - AppsFlyerFramework (6.18.0):
     - AppsFlyerFramework/Main (= 6.18.0)
   - AppsFlyerFramework/Main (6.18.0)
+  - EASClient (1.0.8):
+    - ExpoModulesCore
   - EXApplication (7.0.8):
     - ExpoModulesCore
   - EXConstants (18.0.13):
@@ -276,6 +278,35 @@ PODS:
     - ExpoModulesCore
   - ExpoTrackingTransparency (6.0.8):
     - ExpoModulesCore
+  - EXStructuredHeaders (5.0.0)
+  - EXUpdates (29.0.19):
+    - EASClient
+    - EXManifests
+    - ExpoModulesCore
+    - EXStructuredHeaders
+    - EXUpdatesInterface
+    - hermes-engine
+    - RCTRequired
+    - RCTTypeSafety
+    - ReachabilitySwift
+    - React-Core
+    - React-Core-prebuilt
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - ReactNativeDependencies
+    - Yoga
   - EXUpdatesInterface (2.0.0):
     - ExpoModulesCore
   - FBLazyVector (0.81.5)
@@ -311,6 +342,7 @@ PODS:
     - FBLazyVector (= 0.81.5)
     - RCTRequired (= 0.81.5)
     - React-Core (= 0.81.5)
+  - ReachabilitySwift (5.2.4)
   - React (0.81.5):
     - React-Core (= 0.81.5)
     - React-Core/DevSupport (= 0.81.5)
@@ -2324,6 +2356,7 @@ PODS:
     - ZXingObjC/Core
 
 DEPENDENCIES:
+  - EASClient (from `../../node_modules/expo-eas-client/ios`)
   - EXApplication (from `../../node_modules/expo-application/ios`)
   - EXConstants (from `../../node_modules/expo-constants/ios`)
   - EXImageLoader (from `../../node_modules/expo-image-loader/ios`)
@@ -2349,6 +2382,8 @@ DEPENDENCIES:
   - ExpoModulesCore (from `../../node_modules/expo-modules-core`)
   - ExpoStoreReview (from `../../node_modules/expo-store-review/ios`)
   - ExpoTrackingTransparency (from `../../node_modules/expo-tracking-transparency/ios`)
+  - EXStructuredHeaders (from `../../node_modules/expo-structured-headers/ios`)
+  - EXUpdates (from `../../node_modules/expo-updates/ios`)
   - EXUpdatesInterface (from `../../node_modules/expo-updates-interface/ios`)
   - FBLazyVector (from `../../node_modules/react-native/Libraries/FBLazyVector`)
   - hermes-engine (from `../../node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec`)
@@ -2441,11 +2476,14 @@ SPEC REPOS:
     - PromisesObjC
     - PromisesSwift
     - PurchasesHybridCommon
+    - ReachabilitySwift
     - RecaptchaInterop
     - RevenueCat
     - ZXingObjC
 
 EXTERNAL SOURCES:
+  EASClient:
+    :path: "../../node_modules/expo-eas-client/ios"
   EXApplication:
     :path: "../../node_modules/expo-application/ios"
   EXConstants:
@@ -2496,6 +2534,10 @@ EXTERNAL SOURCES:
     :path: "../../node_modules/expo-store-review/ios"
   ExpoTrackingTransparency:
     :path: "../../node_modules/expo-tracking-transparency/ios"
+  EXStructuredHeaders:
+    :path: "../../node_modules/expo-structured-headers/ios"
+  EXUpdates:
+    :path: "../../node_modules/expo-updates/ios"
   EXUpdatesInterface:
     :path: "../../node_modules/expo-updates-interface/ios"
   FBLazyVector:
@@ -2658,6 +2700,7 @@ SPEC CHECKSUMS:
   AppAuth: ef4da5a3fc2e10b90c09a0a94a9baeaedc0341d5
   AppCheckCore: 214137f5c378d1dec88a68425c467fe65aaff637
   AppsFlyerFramework: c1e1e4cd3b98ffdca2fe32b17ae93909e409b6ab
+  EASClient: 40dd9e740684782610c49becab2643782ea1a20c
   EXApplication: 1e98d4b1dccdf30627f92917f4b2c5a53c330e5f
   EXConstants: fce59a631a06c4151602843667f7cfe35f81e271
   EXImageLoader: 189e3476581efe3ad4d1d3fb4735b7179eb26f05
@@ -2683,6 +2726,8 @@ SPEC CHECKSUMS:
   ExpoModulesCore: b0bd53ca36654854eca93afbd73547c4553c9ba7
   ExpoStoreReview: 32bb43b6fae9c8db3e33cad69996dff3785eef5f
   ExpoTrackingTransparency: 4f823a38ff7c0efea4cac722ecbc0589278ff548
+  EXStructuredHeaders: c951e77f2d936f88637421e9588c976da5827368
+  EXUpdates: cb0e229e08997919836803ffe55f911a5dcd381b
   EXUpdatesInterface: 5adf50cb41e079c861da6d9b4b954c3db9a50734
   FBLazyVector: e95a291ad2dadb88e42b06e0c5fb8262de53ec12
   GoogleSignIn: e449a40a92e9f2eea56e98b5214d13725dc5a00a
@@ -2696,6 +2741,7 @@ SPEC CHECKSUMS:
   RCTDeprecation: 943572d4be82d480a48f4884f670135ae30bf990
   RCTRequired: 8f3cfc90cc25cf6e420ddb3e7caaaabc57df6043
   RCTTypeSafety: 16a4144ca3f959583ab019b57d5633df10b5e97c
+  ReachabilitySwift: 32793e867593cfc1177f5d16491e3a197d2fccda
   React: 914f8695f9bf38e6418228c2ffb70021e559f92f
   React-callinvoker: 1c0808402aee0c6d4a0d8e7220ce6547af9fba71
   React-Core: c61410ef0ca6055e204a963992e363227e0fd1c5

@@ -1,3 +1,9 @@
+// Single source for marketing + OTA runtime version WITHIN this file (the
+// bare workflow forbids runtime-version policies, so it must be a literal).
+// Info.plist and pbxproj still hardcode their own copies — bump ALL of them
+// together; preflight-release.sh step 7 fails the archive on drift.
+const marketingVersion = "1.0.6";
+
 const appsFlyerDevKey = process.env.EXPO_PUBLIC_APPSFLYER_DEV_KEY ?? "";
 const appsFlyerAppId = process.env.EXPO_PUBLIC_APPSFLYER_APP_ID ?? "";
 const appsFlyerDiagnosticEventEnabled =
@@ -7,7 +13,8 @@ module.exports = {
   expo: {
     name: "Pepta",
     slug: "pepta",
-    version: "1.0.6",
+    owner: "boltzman",
+    version: marketingVersion,
     orientation: "portrait",
     userInterfaceStyle: "automatic",
     icon: "./assets/icon.png",
@@ -41,6 +48,15 @@ module.exports = {
     },
     web: {
       bundler: "metro",
+    },
+    // OTA updates (EAS Update). The runtime version IS the marketing version:
+    // any native change already forces a marketing bump (closed trains), which
+    // is exactly when OTA compatibility breaks. JS-only fixes ship with
+    // `eas update --channel production`; the native Expo.plist must carry the
+    // SAME url/runtime version — preflight-release.sh step 7 checks parity.
+    runtimeVersion: marketingVersion,
+    updates: {
+      url: "https://u.expo.dev/4004b063-3984-463d-825d-01fb70cc4fa5",
     },
     plugins: [
       "expo-font",
@@ -100,6 +116,9 @@ module.exports = {
       appsFlyerDevKey,
       appsFlyerAppId,
       appsFlyerDiagnosticEventEnabled,
+      eas: {
+        projectId: "4004b063-3984-463d-825d-01fb70cc4fa5",
+      },
     },
   },
 };

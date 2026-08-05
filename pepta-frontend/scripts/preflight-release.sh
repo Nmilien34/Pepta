@@ -17,7 +17,7 @@ say()  { printf '%s\n' "$*"; }
 ok()   { say "  ✓ $*"; }
 bad()  { say "  ✗ $*"; fail=1; }
 
-say "1/6 JS ↔ native module parity (autolinking vs Podfile.lock)"
+say "1/7 JS ↔ native module parity (autolinking vs Podfile.lock)"
 missing=$(npx expo-modules-autolinking resolve -p apple --json 2>/dev/null | python3 -c '
 import json, re, sys
 resolved = json.load(sys.stdin)
@@ -38,14 +38,14 @@ else
   ok "every autolinked Expo module has its pod in Podfile.lock"
 fi
 
-say "2/6 Pods in sync with lockfile"
+say "2/7 Pods in sync with lockfile"
 if [ -f ios/Pods/Manifest.lock ] && diff -q ios/Podfile.lock ios/Pods/Manifest.lock >/dev/null 2>&1; then
   ok "ios/Pods matches Podfile.lock"
 else
   bad "ios/Pods out of sync with Podfile.lock (run: cd ios && pod install)"
 fi
 
-say "3/6 Production env baked into the bundle"
+say "3/7 Production env baked into the bundle"
 if [ ! -f .env ]; then
   bad ".env missing — EXPO_PUBLIC_* vars won't be inlined"
 else
@@ -60,18 +60,37 @@ else
     || bad "EXPO_PUBLIC_REVENUECAT_IOS_API_KEY missing or malformed"
 fi
 
-say "4/6 Typecheck"
+say "4/7 Typecheck"
 if npx tsc --noEmit >/dev/null 2>&1; then ok "tsc clean"; else bad "tsc failed (run: npm run typecheck)"; fi
 
-say "5/6 Lint (rules-of-hooks is the load-bearing part)"
+say "5/7 Lint (rules-of-hooks is the load-bearing part)"
 # A conditional hook is a guaranteed runtime crash, not a style problem —
 # builds 20-22 shipped one in HomeScreen that blanked the app on entry the
 # moment /home data arrived. eslint-plugin-react-hooks now guards the whole
 # tree, but a rule that never runs before an archive protects nobody.
 if npx eslint src >/dev/null 2>&1; then ok "eslint clean"; else bad "eslint failed (run: npx eslint src)"; fi
 
-say "6/6 Tests"
+say "6/7 Tests"
 if npm run -s test >/dev/null 2>&1; then ok "tests pass"; else bad "tests failed (run: npm test)"; fi
+
+say "7/7 OTA runtime version parity (Expo.plist vs Info.plist vs app.config)"
+# An OTA update only reaches binaries whose EXUpdatesRuntimeVersion equals the
+# published runtime (policy: the marketing version). If the plist lags a
+# version bump, every user on that build is stranded off the update channel —
+# silently. Same class of drift as the three version sources, so same gate.
+ota=$(/usr/libexec/PlistBuddy -c 'Print :EXUpdatesRuntimeVersion' ios/Pepta/Supporting/Expo.plist 2>/dev/null)
+mkt=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' ios/Pepta/Info.plist 2>/dev/null)
+cfg=$(node -e 'process.stdout.write(require("./app.config.js").expo.version)' 2>/dev/null)
+if [ -n "$ota" ] && [ "$ota" = "$mkt" ] && [ "$ota" = "$cfg" ]; then
+  ok "runtime version $ota matches Info.plist and app.config"
+else
+  bad "runtime version drift — Expo.plist '$ota' vs Info.plist '$mkt' vs app.config '$cfg'"
+fi
+if /usr/libexec/PlistBuddy -c 'Print :EXUpdatesEnabled' ios/Pepta/Supporting/Expo.plist 2>/dev/null | grep -q true; then
+  ok "EXUpdatesEnabled true"
+else
+  bad "EXUpdatesEnabled is not true in Expo.plist — OTA client would ship dead"
+fi
 
 echo
 if [ "$fail" -ne 0 ]; then
