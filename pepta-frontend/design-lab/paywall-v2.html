@@ -255,8 +255,8 @@ with the motion layer specified below. Hit <b>Replay motion</b> to watch the ent
 
       <div class="foot a6">
         <div class="cta">Try today for $0.00</div>
-        <div class="ctasub">3 days free — we'll remind you before it ends. Then $59.99/yr, auto-renews. Cancel anytime in Settings.</div>
-        <div class="legal">$59.99/year. Cancel anytime · <b>Terms</b> &amp; <b>Privacy</b></div>
+        <div class="ctasub">3 days free — we'll remind you before it ends.</div>
+        <div class="legal">Then $59.99/year, auto-renews. Cancel anytime · <b>Terms</b> &amp; <b>Privacy</b></div>
       </div>
     </div></div>
     <div class="spec"><b>Tiles:</b> 34px gradient chips, one accent each (level purple / vial water / muscle protein) —
@@ -265,8 +265,10 @@ with the motion layer specified below. Hit <b>Replay motion</b> to watch the ent
       element, because &ldquo;live&rdquo; is that row's literal claim. <b>Entrance:</b> rows fade+rise with
       110ms stagger (TimelineRow's exact curve), tiles pop 60ms behind their row, then cards → strip → CTA
       continue the chain. <b>Terms carousel</b> (rev 4): the old 3-step timeline as a looping one-slot pill —
-      each term holds 2.2s then slide-fades to the next, dots sync on the right. Values from paywallTimeline;
-      3.1.2 trio intact in subline + legal regardless of which slide is showing.</div>
+      each term holds 2.2s then slide-fades to the next, dots sync on the right. Values from paywallTimeline.
+      <b>Disclosure split (rev 5, Nick):</b> subline carries only the trial promise; price + auto-renewal
+      moved to the always-visible legal footer — the 3.1.2 trio stays on-screen (card note · footer),
+      just not at reading size beside the button.</div>
   </div>
 
   <!-- ============ STATE 2: NO TRIAL (monthly selected / ineligible) ============ -->
@@ -370,9 +372,17 @@ with the motion layer specified below. Hit <b>Replay motion</b> to watch the ent
   <h3>Compressed trial terms (trial state only) — looped carousel</h3>
   <p><b>Free today — full access</b> → <b>Day 2 — we remind you</b> → <b>Day 3 — first charge, Aug 8</b> —
   one pill slot directly above the CTA, cycling with sync'd dots; every value derived
-  (<code>paywallTimeline.ts</code>). Because any single slide may be on screen at decision time, the full
-  3.1.2 disclosure stays verbatim in the always-visible CTA subline — the carousel is a reassurance layer,
-  never the compliance surface.</p>
+  (<code>paywallTimeline.ts</code>). The carousel is a reassurance layer, never the compliance surface.</p>
+  <h3>Disclosure placement (rev 5 — deliberate, Nick 2026-08-05)</h3>
+  <p>CTA subline is now only <b>&ldquo;3 days free — we'll remind you before it ends.&rdquo;</b> The price
+  sentence (&ldquo;Then $59.99/yr, auto-renews…&rdquo;) was <b>deliberately demoted</b> from beside the button:
+  restating the annual total at reading size at the moment of tap creates hesitance. The 3.1.2 trio remains
+  on-screen — duration in the subline, billed amount on the selected card (<code>$59.99/yr</code> note), and
+  price + auto-renewal + cancel in the always-visible legal footer, now trial-aware:
+  <b>&ldquo;Then $59.99/year, auto-renews. Cancel anytime · Terms &amp; Privacy&rdquo;</b>. Review risk noted
+  and accepted: the app has one prior 3.1.2 rejection (build 4, per-month anchor without visible billed
+  total) — that case was about the CARD, which keeps its billed note. If review ever pushes back, the
+  one-line revert is putting the price sentence back in the subline.</p>
 </div>
 
 <h2>What was cut, kept, and the Screen B overlap</h2>
