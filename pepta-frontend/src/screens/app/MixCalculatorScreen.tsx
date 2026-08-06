@@ -6,12 +6,12 @@
 // appears for FDA-labeled compounds (doseRanges), advises, and routes to the
 // prescriber; research peptides get no invented range and no warning.
 
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, TextInput, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { AppText, Button, Card } from '../../components';
+import { AddCompoundSheet, AppText, Button, Card } from '../../components';
 import { Icon } from '../../components/Icon';
 import { SegmentedToggle } from '../../components/onboarding/SegmentedToggle';
 import { usePeptaData } from '../../context/PeptaDataContext';
@@ -54,6 +54,13 @@ export function MixCalculatorScreen() {
   const [waterOverride, setWaterOverride] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  // No medication yet? "Save as my dose" opens the add sheet instead of
+  // dead-ending (2026-08-05: the disabled button + hint stranded every
+  // not-yet-medicated user — exactly the people doing first-shot vial math).
+  // The ref remembers the save intent so the dose lands on the compound the
+  // sheet just created.
+  const [addOpen, setAddOpen] = useState(false);
+  const pendingSaveRef = useRef(false);
 
   const mix = useMemo(
     () =>
@@ -85,25 +92,45 @@ export function MixCalculatorScreen() {
     setSaved(false);
   };
 
+  const saveDose = useCallback(
+    async (target: { id: string }) => {
+      setSaving(true);
+      try {
+        // Store in the compound's own unit family: whole mg stay mg, else mcg.
+        const asMg = doseMcg >= 1000 && doseMcg % 1000 === 0;
+        await api.updateCompound(target.id, {
+          plannedDose: asMg ? doseMcg / 1000 : doseMcg,
+          doseUnit: asMg ? 'mg' : 'mcg',
+        });
+        await refreshHome().catch(() => undefined);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
+        setSaved(true);
+      } catch {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => undefined);
+      } finally {
+        setSaving(false);
+      }
+    },
+    [doseMcg, refreshHome],
+  );
+
   const onSave = async () => {
-    if (!compound || saving) return;
-    setSaving(true);
-    try {
-      // Store in the compound's own unit family: whole mg stay mg, else mcg.
-      const asMg = doseMcg >= 1000 && doseMcg % 1000 === 0;
-      await api.updateCompound(compound.id, {
-        plannedDose: asMg ? doseMcg / 1000 : doseMcg,
-        doseUnit: asMg ? 'mg' : 'mcg',
-      });
-      await refreshHome().catch(() => undefined);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
-      setSaved(true);
-    } catch {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => undefined);
-    } finally {
-      setSaving(false);
+    if (!mix || saving || saved) return;
+    if (!compound) {
+      pendingSaveRef.current = true;
+      setAddOpen(true);
+      return;
     }
+    await saveDose(compound);
   };
+
+  // The sheet created the medication (context puts it in home immediately) —
+  // finish the save the user asked for.
+  useEffect(() => {
+    if (!pendingSaveRef.current || !compound) return;
+    pendingSaveRef.current = false;
+    void saveDose(compound);
+  }, [compound, saveDose]);
 
   const fillPct = mix ? Math.min(1, mix.unitsToDraw / syringeUnits) : 0;
 
@@ -298,18 +325,26 @@ export function MixCalculatorScreen() {
             <Button
               label={saved ? 'Saved as your dose' : 'Save as my dose'}
               onPress={onSave}
-              disabled={!compound || !mix || saved}
+              disabled={!mix || saved}
               loading={saving}
               fullWidth
             />
-            {!compound ? (
+            {!compound && !saved ? (
               <AppText variant="caption" color="textSecondary" style={{ marginTop: 10, textAlign: 'center' }}>
-                Add a medication on Track to save this dose to it.
+                We’ll add your medication first, then save this dose to it.
               </AppText>
             ) : null}
           </View>
         </ScrollView>
       </SafeAreaView>
+      <AddCompoundSheet
+        visible={addOpen}
+        onClose={() => setAddOpen(false)}
+        onDismissed={() => {
+          // Sheet closed without a compound → the save intent is void.
+          if (!compound) pendingSaveRef.current = false;
+        }}
+      />
     </View>
   );
 }
