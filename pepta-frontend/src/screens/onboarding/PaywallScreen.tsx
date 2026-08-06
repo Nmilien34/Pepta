@@ -1,15 +1,19 @@
-// Onboarding — Paywall (screen C of the trial warm-up sequence,
-// design-lab/trial-warmup.html). Arrival framing, not transaction framing:
-// the headline announces the trial starting, a data-driven timeline names the
-// reminder day and the exact charge date (naming the charge is what removes
-// the silently-billed fear), and the plans sit side by side beneath it.
-// When the SELECTED plan carries no trial — the control arm, or yearly today —
-// the timeline collapses to its "Today" row and the features grid reclaims
-// the space, so the component never promises free days the selected plan
-// won't deliver. Restore-only chrome, no progress scaffold.
+// Onboarding — Paywall v2 (design-lab/paywall-v2.html, "a reason to say yes").
+// Outcome framing, not offer framing: the headline pays off the store
+// listing's promise, three benefit rows sell what changes for the user (on
+// BOTH states — the value doesn't depend on the selected plan, only the
+// terms do), and the offer's mechanics are demoted to a compact looping
+// terms carousel above the CTA. The v1 hero timeline and the six-item
+// feature grid are gone — v1 sold the terms of the offer; nothing sold the
+// app. Motion: one entrance stagger chain (TimelineRow's old curve), then
+// exactly two loops — the live-level dot (that row's literal claim) and the
+// terms carousel (information delivery, three terms sharing one slot).
+// Benefits do NOT re-animate on plan switch; only the terms zone swaps.
+// Restore-only chrome, no progress scaffold.
 
 import React, { useEffect, useRef, useState } from "react";
 import {
+  AccessibilityInfo,
   Animated,
   AppState,
   Easing,
@@ -20,14 +24,17 @@ import {
   StatusBar,
   StyleSheet,
   View,
+  type StyleProp,
+  type ViewStyle,
 } from "react-native";
 import * as Haptics from "expo-haptics";
+import { LinearGradient } from "expo-linear-gradient";
 import { Icon } from "../../components/Icon";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "../../theme";
 import { AppText, Button } from "../../components";
 import { typography } from "../../theme/typography";
-import { buildTrialTimeline, freeStartHeadline, type TrialTimelineRow } from "./paywallTimeline";
+import { trialTermSlides, type TrialTermSlide } from "./paywallTimeline";
 import { useAuth } from "../../context/AuthContext";
 import { PRIVACY_URL, TERMS_URL } from "../../config";
 import { api } from "../../services/api";
@@ -53,14 +60,47 @@ export interface PaywallScreenProps {
 
 type Plan = RevenueCatPlan;
 
-const FEATURES = [
-  "Medication level & curve",
-  "Injection-site map",
-  "Muscle-protection tracking",
-  "Unlimited AI insights",
-  "Meal scan & voice",
-  "Report export",
-];
+// The three outcomes, in brief order (design-lab/paywall-v2.html): the level
+// curve is the differentiator no competitor lists, vial math is the
+// highest-anxiety task in the category, muscle is the community's dominant
+// fear. Bold lines are outcomes in the user's words — the competitor test:
+// "covered, or in a trough" can't sit on anyone else's screen. Copy is
+// static by design; only prices/durations derive from StoreKit.
+const BENEFITS = [
+  {
+    key: "level",
+    icon: "pulse",
+    title: "Know what’s still working — right now",
+    sub: "Your live medication level between shots: covered, or in a trough.",
+    live: true,
+  },
+  {
+    key: "vial",
+    icon: "medical",
+    title: "Never do vial math again",
+    sub: "Exact units from your vial and dose. No spreadsheets, no second-guessing.",
+    live: false,
+  },
+  {
+    key: "muscle",
+    icon: "dumbbell",
+    title: "Lose the fat. Keep the muscle.",
+    sub: "Protein and muscle-protection tracking, tuned to your dose.",
+    live: false,
+  },
+] as const;
+
+// Tile gradients (design rev 2): level = the brand primary gradient tokens;
+// vial/muscle are deepened→lightened sweeps around the water/protein accents.
+const TILE_GRADIENTS: Record<(typeof BENEFITS)[number]["key"], [string, string]> = {
+  level: ["#6751E8", "#8C63F4"],
+  vial: ["#1E96EF", "#54BAFF"],
+  muscle: ["#F0761F", "#FF9E52"],
+};
+
+// The entrance chain's shared curve — TimelineRow's exact shipped easing.
+const RISE_EASING = Easing.bezier(0.2, 0.7, 0.2, 1);
+const RISE_STEP_MS = 110;
 const LEGAL_FOOTER_LABEL = "Terms & Privacy";
 const PREMIUM_ENTITLEMENT_STATUSES = new Set([
   "trialing",
@@ -328,7 +368,7 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
     paywallPackages != null && selectedPackage != null && paywallPackages.trial[plan].eligible
       ? freeTrialOf(selectedPackage)
       : null;
-  const timeline = selectedTrial ? buildTrialTimeline(selectedTrial, new Date()) : null;
+  const termSlides = selectedTrial ? trialTermSlides(selectedTrial, new Date()) : null;
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.bg }}>
@@ -364,97 +404,93 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
           }}
           showsVerticalScrollIndicator={false}
         >
-          <View style={{ alignItems: "center", gap: 4 }}>
+          <Rise delay={0} style={{ alignItems: "center", gap: 4 }}>
             <AppText variant="obTitle" align="center">
-              {selectedTrial ? freeStartHeadline(selectedTrial) : "Your plan is ready"}
+              Never wonder what’s in your body again
             </AppText>
             <AppText variant="caption" color="textSecondary" align="center">
-              Everything Pepta does, unlocked today.
+              The only tracker your protocol will ever need.
             </AppText>
+          </Rise>
+
+          {/* NOT keyed by plan — the benefits don't change with the selection,
+              so they must not re-animate when the user compares plans. */}
+          <View style={[styles.benefitCard, { backgroundColor: theme.colors.surface }]}>
+            {BENEFITS.map((benefit, index) => (
+              <Rise
+                key={benefit.key}
+                delay={index * RISE_STEP_MS}
+                style={index > 0 ? { marginTop: 13 } : undefined}
+              >
+                <BenefitRow benefit={benefit} delay={index * RISE_STEP_MS} />
+              </Rise>
+            ))}
           </View>
 
-          {/* Keyed by the selected plan so the rows replay their stagger when
-              the trial state flips with a selection change. */}
-          <View key={plan} style={[styles.timelineCard, { backgroundColor: theme.colors.surface }]}>
-            {timeline ? (
-              <>
-                {timeline.length > 1 ? <View style={styles.timelineRail} /> : null}
-                {timeline.map((row, index) => (
-                  <TimelineRow key={row.key} row={row} index={index} />
-                ))}
-              </>
+          <Rise delay={3 * RISE_STEP_MS}>
+            <View style={{ flexDirection: "row", gap: 9, marginTop: theme.spacing.md }}>
+              <PlanColumn
+                selected={plan === "yearly"}
+                onPress={() => setPlan("yearly")}
+                title={pricing.yearly.title}
+                sub={pricing.yearly.sub}
+                price={pricing.yearly.price}
+                per={pricing.yearly.per}
+                priceNote={pricing.yearly.priceNote}
+                badge={pricing.yearly.badge}
+                badgeTone={pricing.yearly.badgeTone}
+              />
+              <PlanColumn
+                selected={plan === "monthly"}
+                onPress={() => setPlan("monthly")}
+                title={pricing.monthly.title}
+                sub={pricing.monthly.sub}
+                price={pricing.monthly.price}
+                per={pricing.monthly.per}
+                badge={pricing.monthly.badge}
+                badgeTone={pricing.monthly.badgeTone}
+              />
+            </View>
+          </Rise>
+
+          {/* Terms zone: carousel when the selected plan has a trial, the
+              reassure row otherwise. Re-keyed by zone TYPE only, so plan
+              switches cross-fade the zone (160ms) without replaying the
+              benefits above. */}
+          <Rise delay={4 * RISE_STEP_MS}>
+            {termSlides ? (
+              <FadeIn key="terms-carousel">
+                <TrialTermsCarousel slides={termSlides} />
+              </FadeIn>
             ) : (
-              <>
-                <TimelineRow
-                  row={{
-                    key: "today",
-                    title: "Instant access",
-                    sub: "Your plan, levels and tracking — all of it, right now.",
-                    day: "Today",
-                  }}
-                  index={0}
-                />
-                {/* No trial on the selected plan: the space the timeline
-                    vacates is reclaimed by the features grid. */}
-                <View style={styles.featureGrid}>
-                  {FEATURES.map((f) => (
-                    <View key={f} style={styles.featureItem}>
-                      <Icon name="checkmark-circle" size={14} color={theme.colors.fiber} />
-                      <AppText variant="caption" color="textPrimary" style={{ flex: 1, fontSize: 11 }}>
-                        {f}
-                      </AppText>
-                    </View>
-                  ))}
+              <FadeIn key="terms-reassure">
+                <View style={styles.reassureRow}>
+                  <View style={styles.reassureItem}>
+                    <Icon name="checkmark" size={12} color={theme.colors.fiber} />
+                    <AppText variant="caption" color="textSecondary" style={{ fontSize: 10.5 }}>
+                      Cancel anytime
+                    </AppText>
+                  </View>
+                  <View style={styles.reassureItem}>
+                    <Icon name="checkmark" size={12} color={theme.colors.fiber} />
+                    <AppText variant="caption" color="textSecondary" style={{ fontSize: 10.5 }}>
+                      {plan === "yearly" ? "Billed once a year" : "Billed monthly"}
+                    </AppText>
+                  </View>
+                  <View style={styles.reassureItem}>
+                    <Icon name="checkmark" size={12} color={theme.colors.fiber} />
+                    <AppText variant="caption" color="textSecondary" style={{ fontSize: 10.5 }}>
+                      Full access today
+                    </AppText>
+                  </View>
                 </View>
-              </>
+              </FadeIn>
             )}
-          </View>
-
-          <View style={{ flexDirection: "row", gap: 9, marginTop: theme.spacing.md }}>
-            <PlanColumn
-              selected={plan === "yearly"}
-              onPress={() => setPlan("yearly")}
-              title={pricing.yearly.title}
-              sub={pricing.yearly.sub}
-              price={pricing.yearly.price}
-              per={pricing.yearly.per}
-              priceNote={pricing.yearly.priceNote}
-              badge={pricing.yearly.badge}
-              badgeTone={pricing.yearly.badgeTone}
-            />
-            <PlanColumn
-              selected={plan === "monthly"}
-              onPress={() => setPlan("monthly")}
-              title={pricing.monthly.title}
-              sub={pricing.monthly.sub}
-              price={pricing.monthly.price}
-              per={pricing.monthly.per}
-              badge={pricing.monthly.badge}
-              badgeTone={pricing.monthly.badgeTone}
-            />
-          </View>
-
-          <View style={styles.reassureRow}>
-            <View style={styles.reassureItem}>
-              <Icon name="checkmark" size={12} color={theme.colors.fiber} />
-              <AppText variant="caption" color="textSecondary" style={{ fontSize: 10.5 }}>
-                Cancel anytime
-              </AppText>
-            </View>
-            <View style={styles.reassureItem}>
-              <Icon name="checkmark" size={12} color={theme.colors.fiber} />
-              <AppText variant="caption" color="textSecondary" style={{ fontSize: 10.5 }}>
-                {selectedTrial
-                  ? "Reminder before charge"
-                  : plan === "yearly"
-                    ? "Billed once a year"
-                    : "Billed monthly"}
-              </AppText>
-            </View>
-          </View>
+          </Rise>
         </ScrollView>
 
-        <View
+        <Rise
+          delay={5 * RISE_STEP_MS}
           style={{
             paddingHorizontal: theme.spacing.xl,
             paddingTop: theme.spacing.sm,
@@ -498,7 +534,7 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
             </AppText>
           ) : null}
           <PaywallLegalFooter text={pricing.footer[plan]} />
-        </View>
+        </Rise>
       </SafeAreaView>
     </View>
   );
@@ -553,54 +589,243 @@ function PaywallLegalFooter({ text }: { text: string }) {
   );
 }
 
-const TIMELINE_ICON: Record<TrialTimelineRow["key"], string> = {
-  today: "lock-open-outline",
-  reminder: "notifications-outline",
-  charge: "calendar-outline",
-};
-
-/** One timeline step, staggering into place (fade + rise, the flow's ease). */
-function TimelineRow({ row, index }: { row: TrialTimelineRow; index: number }) {
-  const theme = useTheme();
+/**
+ * One entrance step of the stagger chain: fade + rise 8px on the shared
+ * curve (the v1 TimelineRow's exact motion, promoted to the whole screen).
+ * Runs once per mount — the chain must not replay on plan switches.
+ */
+function Rise({
+  delay,
+  style,
+  children,
+}: {
+  delay: number;
+  style?: StyleProp<ViewStyle>;
+  children: React.ReactNode;
+}) {
   const rise = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     const animation = Animated.timing(rise, {
       toValue: 1,
       duration: 360,
-      delay: index * 110,
-      easing: Easing.bezier(0.2, 0.7, 0.2, 1),
+      delay,
+      easing: RISE_EASING,
       useNativeDriver: true,
     });
     animation.start();
     return () => animation.stop();
-  }, [rise, index]);
-  const now = row.key === "today";
+  }, [rise, delay]);
   return (
     <Animated.View
       style={[
-        styles.timelineRow,
-        index > 0 && { marginTop: 12 },
+        style,
         {
           opacity: rise,
           transform: [{ translateY: rise.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }],
         },
       ]}
     >
-      <View style={[styles.timelineIcon, now && { backgroundColor: theme.colors.primary }]}>
-        <Icon name={TIMELINE_ICON[row.key]} size={15} color={now ? "#FFFFFF" : theme.colors.primary} />
-      </View>
-      <View style={{ flex: 1 }}>
-        <AppText variant="bodyStrong" style={{ fontSize: 12.5, fontWeight: "800" }}>
-          {row.title}
-        </AppText>
-        <AppText variant="caption" color="textSecondary" style={{ fontSize: 10.5, marginTop: 1 }}>
-          {row.sub}
-        </AppText>
-      </View>
-      <AppText variant="caption" color="textTertiary" style={styles.timelineDay}>
-        {row.day.toUpperCase()}
-      </AppText>
+      {children}
     </Animated.View>
+  );
+}
+
+/** 160ms fade for the terms-zone swap — the only motion on plan switch. */
+function FadeIn({ children }: { children: React.ReactNode }) {
+  const fade = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const animation = Animated.timing(fade, {
+      toValue: 1,
+      duration: 160,
+      easing: Easing.out(Easing.quad),
+      useNativeDriver: true,
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [fade]);
+  return <Animated.View style={{ opacity: fade }}>{children}</Animated.View>;
+}
+
+/**
+ * The one perpetual pulse on the screen besides the terms carousel: the green
+ * dot on the level tile breathes (LivingMascot's heartbeat idiom) because
+ * "live" is that benefit's literal claim. Ring scales 1→1.7 while fading,
+ * 1.8s round trip, forever.
+ */
+function LiveDot() {
+  const theme = useTheme();
+  const pulse = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, {
+          toValue: 1,
+          duration: 900,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulse, {
+          toValue: 0,
+          duration: 900,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pulse]);
+  return (
+    <View style={styles.liveDotWrap} pointerEvents="none">
+      <Animated.View
+        style={[
+          styles.liveDotRing,
+          {
+            backgroundColor: theme.colors.fiber,
+            opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.9, 0.35] }),
+            transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.7] }) }],
+          },
+        ]}
+      />
+      <View style={[styles.liveDotCore, { backgroundColor: theme.colors.fiber }]} />
+    </View>
+  );
+}
+
+/** One benefit row: gradient tile (pop-in 60ms behind its row) + outcome copy. */
+function BenefitRow({
+  benefit,
+  delay,
+}: {
+  benefit: (typeof BENEFITS)[number];
+  delay: number;
+}) {
+  const pop = useRef(new Animated.Value(0.6)).current;
+  useEffect(() => {
+    const animation = Animated.sequence([
+      Animated.delay(delay + 60),
+      Animated.spring(pop, { toValue: 1, friction: 5, tension: 180, useNativeDriver: true }),
+    ]);
+    animation.start();
+    return () => animation.stop();
+  }, [pop, delay]);
+  return (
+    <View style={styles.benefitRow}>
+      <Animated.View style={{ transform: [{ scale: pop }] }}>
+        <LinearGradient
+          colors={TILE_GRADIENTS[benefit.key]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.benefitTile}
+        >
+          <Icon name={benefit.icon} size={18} color="#FFFFFF" />
+        </LinearGradient>
+        {benefit.live ? <LiveDot /> : null}
+      </Animated.View>
+      <View style={{ flex: 1 }}>
+        <AppText variant="bodyStrong" style={{ fontSize: 13.5, fontWeight: "800" }}>
+          {benefit.title}
+        </AppText>
+        <AppText variant="caption" color="textSecondary" style={{ fontSize: 11, marginTop: 1 }}>
+          {benefit.sub}
+        </AppText>
+      </View>
+    </View>
+  );
+}
+
+// Carousel timing: 2.2s hold per term, 260ms slide-fade transition (130 out +
+// 130 in), matching design-lab/paywall-v2.html's 6.6s full cycle.
+const SLIDE_HOLD_MS = 2200;
+const SLIDE_FADE_MS = 130;
+
+/**
+ * The looping trial-terms carousel: one term per slot with sync'd dots.
+ * Reassurance layer only — the 3.1.2 disclosure lives in the always-visible
+ * CTA subline + legal footer, so any slide may be up at decision time.
+ * Reduce Motion: the loop is replaced by the static all-terms strip.
+ */
+function TrialTermsCarousel({ slides }: { slides: TrialTermSlide[] }) {
+  const theme = useTheme();
+  const [index, setIndex] = useState(0);
+  const [reduceMotion, setReduceMotion] = useState(false);
+  const indexRef = useRef(0);
+  const fade = useRef(new Animated.Value(1)).current;
+  const shift = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    let mounted = true;
+    AccessibilityInfo.isReduceMotionEnabled()
+      .then((enabled) => {
+        if (mounted) setReduceMotion(enabled);
+      })
+      .catch(() => undefined);
+    const subscription = AccessibilityInfo.addEventListener("reduceMotionChanged", setReduceMotion);
+    return () => {
+      mounted = false;
+      subscription.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (reduceMotion || slides.length < 2) return undefined;
+    let cancelled = false;
+    const tick = () => {
+      Animated.parallel([
+        Animated.timing(fade, { toValue: 0, duration: SLIDE_FADE_MS, easing: RISE_EASING, useNativeDriver: true }),
+        Animated.timing(shift, { toValue: -9, duration: SLIDE_FADE_MS, easing: RISE_EASING, useNativeDriver: true }),
+      ]).start(({ finished }) => {
+        if (!finished || cancelled) return;
+        indexRef.current = (indexRef.current + 1) % slides.length;
+        setIndex(indexRef.current);
+        shift.setValue(9);
+        Animated.parallel([
+          Animated.timing(fade, { toValue: 1, duration: SLIDE_FADE_MS, easing: RISE_EASING, useNativeDriver: true }),
+          Animated.timing(shift, { toValue: 0, duration: SLIDE_FADE_MS, easing: RISE_EASING, useNativeDriver: true }),
+        ]).start();
+      });
+    };
+    const interval = setInterval(tick, SLIDE_HOLD_MS + SLIDE_FADE_MS * 2);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [reduceMotion, slides.length, fade, shift]);
+
+  if (reduceMotion) {
+    return (
+      <View style={styles.termsStrip}>
+        <AppText variant="caption" color="textPrimary" style={styles.termsStaticText} numberOfLines={1}>
+          {slides.map((slide) => slide.label).join("  ·  ")}
+        </AppText>
+      </View>
+    );
+  }
+
+  // Slides can shrink on a plan switch (different trial length) — clamp.
+  const active = slides[Math.min(index, slides.length - 1)]!;
+  return (
+    <View style={styles.termsStrip}>
+      <Animated.View
+        style={[styles.termsSlide, { opacity: fade, transform: [{ translateY: shift }] }]}
+      >
+        <Icon name={active.icon} size={14} color={theme.colors.primary} />
+        <AppText variant="caption" color="textPrimary" style={styles.termsLabel} numberOfLines={1}>
+          {active.label}
+        </AppText>
+      </Animated.View>
+      <View style={styles.termsDots} pointerEvents="none">
+        {slides.map((slide, dotIndex) => (
+          <View
+            key={slide.key}
+            style={[
+              styles.termsDot,
+              { backgroundColor: dotIndex === index ? theme.colors.primary : "rgba(124,92,252,0.25)" },
+            ]}
+          />
+        ))}
+      </View>
+    </View>
   );
 }
 
@@ -703,55 +928,60 @@ function PlanColumn({
 }
 
 const styles = StyleSheet.create({
-  timelineCard: {
+  benefitCard: {
     marginTop: 14,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: "rgba(14,14,18,0.08)",
     paddingHorizontal: 14,
-    paddingTop: 14,
-    paddingBottom: 12,
-    position: "relative",
+    paddingVertical: 13,
   },
-  timelineRail: {
+  benefitRow: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
+  benefitTile: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#11111A",
+    shadowOpacity: 0.22,
+    shadowRadius: 7,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+  },
+  liveDotWrap: {
     position: "absolute",
-    left: 29,
-    top: 26,
-    bottom: 24,
-    width: 2,
-    backgroundColor: "#EDE9FB",
-  },
-  timelineRow: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
-  timelineIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    backgroundColor: "#F1EDFF",
+    top: -3,
+    right: -3,
+    width: 11,
+    height: 11,
     alignItems: "center",
     justifyContent: "center",
   },
-  timelineDay: {
-    fontSize: 8.5,
-    letterSpacing: 0.5,
-    fontFamily: typography.fonts.heavy,
-    paddingTop: 2,
-  },
-  featureGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    rowGap: 7,
+  liveDotRing: { position: "absolute", width: 11, height: 11, borderRadius: 999 },
+  liveDotCore: { width: 9, height: 9, borderRadius: 999, borderWidth: 1.5, borderColor: "#FFFFFF" },
+  termsStrip: {
     marginTop: 12,
-    paddingTop: 11,
-    borderTopWidth: 0.5,
-    borderTopColor: "rgba(14,14,18,0.08)",
+    height: 34,
+    borderRadius: 999,
+    backgroundColor: "#F1EDFF",
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
   },
-  featureItem: {
-    flexBasis: "50%",
+  termsSlide: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 30 },
+  termsLabel: { fontSize: 12.5, fontWeight: "800", fontFamily: typography.fonts.heavy },
+  termsStaticText: { fontSize: 10, fontWeight: "700", paddingHorizontal: 14 },
+  termsDots: {
+    position: "absolute",
+    right: 12,
+    top: 0,
+    bottom: 0,
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
-    paddingRight: 6,
+    gap: 3.5,
   },
+  termsDot: { width: 4.5, height: 4.5, borderRadius: 999 },
   reassureRow: {
     flexDirection: "row",
     justifyContent: "center",

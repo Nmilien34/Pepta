@@ -149,13 +149,38 @@ function planCta(
     // "$0.00" rather than "free": a concrete number reads as a real price the
     // user is being charged today, which converts better than the word free.
     // The duration deliberately does NOT live on the button (per Nick) — the
-    // timeline directly above the CTA carries it, and the subline repeats it
-    // for the Apple 3.1.2 disclosure trio (duration, price after, renewal).
+    // subline carries it for the Apple 3.1.2 duration disclosure.
     label: "Try today for $0.00",
+    // DELIBERATELY price-free (Nick, 2026-08-05, paywall v2 rev 5): restating
+    // the annual total at reading size beside the button creates hesitance.
+    // The price + auto-renewal half of the 3.1.2 trio moved to the legal
+    // footer (see planFooter); revert = re-append "Then ${price}/${perLabel},
+    // auto-renews. Cancel anytime in Settings." here if review pushes back.
     // The reminder promise rides along — and is kept by trialReminder.ts.
     // Unwire that and this sentence must come out too.
-    subline: `${trialDurationLabel(trial)} free — we'll remind you before it ends. Then ${price}/${perLabel}, auto-renews. Cancel anytime in Settings.`,
+    subline: `${trialDurationLabel(trial)} free — we'll remind you before it ends.`,
   };
+}
+
+/**
+ * Trial-aware legal footer: for a trial-eligible plan the price + renewal
+ * disclosure lives HERE (tertiary, always visible) rather than in the CTA
+ * subline — the demotion is deliberate (v2 rev 5), the presence is not
+ * optional: with the subline price-free, this line and the plan card's
+ * billed note are the 3.1.2 price/renewal surface. perLabel unused here on
+ * purpose — the footer spells the unit out ("year"/"month") like v1 did.
+ */
+function planFooter(
+  pkg: PricePackage,
+  price: string,
+  planNoun: 'month' | 'year',
+  trialEligible: boolean,
+): string {
+  const trial = freeTrialOf(pkg);
+  if (!trial || !trialEligible) {
+    return `${price}/${planNoun}. Cancel anytime · Terms & Privacy`;
+  }
+  return `Then ${price}/${planNoun}, auto-renews. Cancel anytime · Terms & Privacy`;
 }
 
 function priceString(pkg: PricePackage | null | undefined, fallback: string): string {
@@ -278,8 +303,8 @@ export function buildPaywallPricing(
       badgeTone: "trial",
     },
     footer: {
-      yearly: `${annualPrice}/year. Cancel anytime · Terms & Privacy`,
-      monthly: `${monthlyPrice}/month. Cancel anytime · Terms & Privacy`,
+      yearly: planFooter(yearly, annualPrice, 'year', trialEligible.yearly),
+      monthly: planFooter(monthly, monthlyPrice, 'month', trialEligible.monthly),
     },
     cta: {
       monthly: planCta(monthly, monthlyPrice, "mo", "month", trialEligible.monthly),

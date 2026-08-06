@@ -87,16 +87,25 @@ describe("buildPaywallPricing", () => {
 
     // "$0.00" rather than "free" — a concrete number reads as a real price.
     // The duration deliberately does NOT live on the button (it moved to the
-    // timeline + subline); the trial-ness of the CTA is the $0.00.
+    // subline); the trial-ness of the CTA is the $0.00.
     expect(pricing.cta.monthly.label).toBe("Try today for $0.00");
-    // Duration, price after, auto-renewal: all three are required near the
-    // CTA. The reminder promise is kept by trialReminder.ts — if that is ever
+    // v2 rev 5: the subline carries ONLY duration + the reminder promise —
+    // the price sentence was deliberately demoted (hesitance at tap). The
+    // reminder promise is kept by trialReminder.ts — if that is ever
     // unwired, this sentence has to come out with it.
     expect(pricing.cta.monthly.subline).toBe(
-      "3 days free — we'll remind you before it ends. Then $9.99/mo, auto-renews. Cancel anytime in Settings.",
+      "3 days free — we'll remind you before it ends.",
     );
-    // The annual plan is identical on both arms.
+    // …which makes the trial-aware FOOTER the price + auto-renewal surface
+    // of the 3.1.2 trio. It must always render alongside the subline.
+    expect(pricing.footer.monthly).toBe(
+      "Then $9.99/month, auto-renews. Cancel anytime · Terms & Privacy",
+    );
+    // The annual plan is identical on both arms — including its footer.
     expect(pricing.cta.yearly).toEqual({ label: "Start my year — $40.00" });
+    expect(pricing.footer.yearly).toBe(
+      "$40.00/year. Cancel anytime · Terms & Privacy",
+    );
   });
 
   it("reads the trial duration from the product, not a literal", () => {
@@ -113,7 +122,8 @@ describe("buildPaywallPricing", () => {
 
     expect(pricing.cta.monthly.label).toBe("Try today for $0.00");
     expect(pricing.cta.monthly.subline).toContain("1 week free");
-    expect(pricing.cta.monthly.subline).toContain("Then $4.99/mo, auto-renews.");
+    // Post-trial price derivation moved to the footer (v2 rev 5).
+    expect(pricing.footer.monthly).toContain("Then $4.99/month, auto-renews.");
   });
 
   it("shows no trial copy on the control arm or for paid intro offers", () => {
@@ -205,9 +215,14 @@ describe("buildPaywallPricing", () => {
       );
       expect(pricing.cta.yearly.label).toBe("Try today for $0.00");
       expect(pricing.cta.monthly.label).toBe("Try today for $0.00");
-      // Yearly's post-trial price is the YEARLY price — never monthly leaking.
+      // v2 rev 5: subline = duration + reminder only; the post-trial price
+      // lives in the footer, and yearly's is the YEARLY price — never
+      // monthly leaking.
       expect(pricing.cta.yearly.subline).toBe(
-        "3 days free — we'll remind you before it ends. Then $40.00/yr, auto-renews. Cancel anytime in Settings.",
+        "3 days free — we'll remind you before it ends.",
+      );
+      expect(pricing.footer.yearly).toBe(
+        "Then $40.00/year, auto-renews. Cancel anytime · Terms & Privacy",
       );
       // Badge collision resolution: trial claims the slot, SAVE moves to sub.
       expect(pricing.yearly.badge).toBe("3 days free");

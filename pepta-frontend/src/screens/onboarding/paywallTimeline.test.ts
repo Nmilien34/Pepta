@@ -3,7 +3,7 @@
 // Apple-side expiry and may change, so nothing may be baked in.
 
 import { describe, expect, it } from "vitest";
-import { buildTrialTimeline, freeStartHeadline, trialTotalDays } from "./paywallTimeline";
+import { buildTrialTimeline, freeStartHeadline, trialTermSlides, trialTotalDays } from "./paywallTimeline";
 
 const NOW = new Date(2026, 6, 31); // Jul 31
 
@@ -48,5 +48,35 @@ describe("trialTotalDays / freeStartHeadline", () => {
     expect(freeStartHeadline({ periodNumberOfUnits: 1, periodUnit: "WEEK" })).toBe(
       "Your free week starts now",
     );
+  });
+});
+
+describe("trialTermSlides", () => {
+  it("compresses the timeline into derived one-line slides", () => {
+    const slides = trialTermSlides(
+      { periodNumberOfUnits: 3, periodUnit: "DAY" },
+      new Date(2026, 7, 5), // Aug 5 → charge Aug 8
+    );
+    expect(slides.map((s) => s.key)).toEqual(["today", "reminder", "charge"]);
+    expect(slides[0]!.label).toBe("Free today — full access");
+    expect(slides[1]!.label).toBe("Day 2 — we remind you");
+    expect(slides[2]!.label).toBe("Day 3 — first charge, Aug 8");
+  });
+
+  it("derives the day numbers from the product, never a literal 3", () => {
+    const slides = trialTermSlides(
+      { periodNumberOfUnits: 1, periodUnit: "WEEK" },
+      new Date(2026, 7, 5), // Aug 5 → charge Aug 12
+    );
+    expect(slides[1]!.label).toBe("Day 6 — we remind you");
+    expect(slides[2]!.label).toBe("Day 7 — first charge, Aug 12");
+  });
+
+  it("omits the reminder slide for a one-day trial, same rule as the timeline", () => {
+    const slides = trialTermSlides(
+      { periodNumberOfUnits: 1, periodUnit: "DAY" },
+      new Date(2026, 7, 5),
+    );
+    expect(slides.map((s) => s.key)).toEqual(["today", "charge"]);
   });
 });

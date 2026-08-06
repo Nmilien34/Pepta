@@ -1,9 +1,11 @@
-// The trial timeline (design-lab/trial-warmup.html, screen C) as pure data.
+// Trial terms as pure data (design-lab/paywall-v2.html). The v1 timeline rows
+// remain the canonical derivation; v2 renders them compressed as a looping
+// one-slot carousel (trialTermSlides) instead of a hero timeline card.
 // DATA-DRIVEN BY CONTRACT: day numbers and the charge date derive from the
 // loaded intro offer and the clock — the Apple-side offer has an expiry and
 // the trial length may change, so nothing here may ever be a baked-in "3".
-// The reminder row's promise is kept by trialReminder.service; unwire that
-// and the reminder row must come out too.
+// The reminder promise ("we remind you") is kept by trialReminder.service;
+// unwire that and the reminder slide/row must come out too.
 
 import { formatShortDate, toDateParts } from '../../utils/dateParts';
 
@@ -69,4 +71,40 @@ export function freeStartHeadline(trial: TrialLike): string {
   const n = trial.periodNumberOfUnits;
   if (n === 1) return `Your free ${unit} starts now`;
   return `Your ${n} free ${unit}s start now`;
+}
+
+export interface TrialTermSlide {
+  key: 'today' | 'reminder' | 'charge';
+  /** Icon component name (same vocabulary the v1 timeline used). */
+  icon: string;
+  label: string;
+}
+
+/**
+ * The v2 terms carousel: the timeline compressed to one-line slides for the
+ * looping pill above the CTA. Same derivation and same one-day-trial rule as
+ * buildTrialTimeline (no room for a reminder → no reminder slide). The
+ * carousel is a reassurance layer, never the compliance surface — the 3.1.2
+ * disclosure lives in the always-visible CTA subline + legal footer.
+ */
+export function trialTermSlides(trial: TrialLike, now: Date): TrialTermSlide[] {
+  const days = trialTotalDays(trial);
+  const chargeDate = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+  const slides: TrialTermSlide[] = [
+    { key: 'today', icon: 'lock-open-outline', label: 'Free today — full access' },
+  ];
+  const reminderDay = days - 1;
+  if (reminderDay >= 1) {
+    slides.push({
+      key: 'reminder',
+      icon: 'notifications-outline',
+      label: `Day ${reminderDay} — we remind you`,
+    });
+  }
+  slides.push({
+    key: 'charge',
+    icon: 'calendar-outline',
+    label: `Day ${days} — first charge, ${formatShortDate(toDateParts(chargeDate))}`,
+  });
+  return slides;
 }

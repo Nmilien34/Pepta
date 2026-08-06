@@ -102,7 +102,16 @@ vi.mock("react-native", () => ({
   StatusBar: "StatusBar",
   StyleSheet: { create: (styles: unknown) => styles },
   Platform: { OS: "ios" },
-  Easing: { bezier: () => "bezier", inOut: (v: unknown) => v, quad: "quad" },
+  Easing: {
+    bezier: () => "bezier",
+    inOut: (v: unknown) => v,
+    out: (v: unknown) => v,
+    quad: "quad",
+  },
+  AccessibilityInfo: {
+    isReduceMotionEnabled: () => Promise.resolve(false),
+    addEventListener: () => ({ remove: () => undefined }),
+  },
   Animated: {
     Value: class {
       constructor(public value: number) {}
@@ -115,6 +124,10 @@ vi.mock("react-native", () => ({
       React.createElement("Animated.View", props, children),
     timing: () => ({ start: (cb?: (r: { finished: boolean }) => void) => cb?.({ finished: true }), stop: () => undefined }),
     spring: () => ({ start: (cb?: (r: { finished: boolean }) => void) => cb?.({ finished: true }), stop: () => undefined }),
+    parallel: () => ({ start: (cb?: (r: { finished: boolean }) => void) => cb?.({ finished: true }), stop: () => undefined }),
+    sequence: () => ({ start: (cb?: (r: { finished: boolean }) => void) => cb?.({ finished: true }), stop: () => undefined }),
+    loop: () => ({ start: () => undefined, stop: () => undefined }),
+    delay: () => ({ start: (cb?: (r: { finished: boolean }) => void) => cb?.({ finished: true }), stop: () => undefined }),
   },
   Text: ({ children, ...props }: { children?: React.ReactNode }) =>
     React.createElement("Text", props, children),
@@ -124,6 +137,11 @@ vi.mock("react-native", () => ({
 vi.mock("react-native-safe-area-context", () => ({
   SafeAreaView: ({ children, ...props }: { children?: React.ReactNode }) =>
     React.createElement("SafeAreaView", props, children),
+}));
+
+vi.mock("expo-linear-gradient", () => ({
+  LinearGradient: ({ children, ...props }: { children?: React.ReactNode }) =>
+    React.createElement("LinearGradient", props, children),
 }));
 
 vi.mock("../../config", () => ({
@@ -457,10 +475,14 @@ describe("PaywallScreen legal links", () => {
       monthlyRadio.props.onPress();
     });
 
-    // Duration and renewal price are derived from the product, not literals.
+    // Duration derives from the product; the post-trial price lives in the
+    // trial-aware footer (v2 rev 5 — the subline is deliberately price-free).
     expect(button(tree!.root, "Try today for $0.00")).toBeTruthy();
     const text = allText(tree!.root);
-    expect(text).toContain("3 days free — we'll remind you before it ends. Then $9.99/mo, auto-renews. Cancel anytime in Settings.");
+    expect(text).toContain("3 days free — we'll remind you before it ends.");
+    expect(text).toContain("Then $9.99/month, auto-renews. Cancel anytime");
+    // The terms carousel replaced the reassure row for a trial plan.
+    expect(text).toContain("Free today — full access");
   });
 
   it("fires paywall_shown once per presentation with the offering variant", async () => {
@@ -499,10 +521,9 @@ describe("PaywallScreen legal links", () => {
     // the YEARLY post-trial price (1 week / $40.00, never 3 days / $9.99).
     expect(button(tree!.root, "Try today for $0.00")).toBeTruthy();
     const text = allText(tree!.root);
-    expect(text).toContain(
-      "1 week free — we'll remind you before it ends. Then $40.00/yr, auto-renews. Cancel anytime in Settings.",
-    );
-    expect(text).not.toContain("Then $9.99/mo");
+    expect(text).toContain("1 week free — we'll remind you before it ends.");
+    expect(text).toContain("Then $40.00/year, auto-renews. Cancel anytime");
+    expect(text).not.toContain("Then $9.99/month");
     // Badge collision resolved: yearly slot carries its trial, SAVE moves to
     // the support line.
     expect(text).toContain("1 WEEK FREE");
@@ -522,9 +543,9 @@ describe("PaywallScreen legal links", () => {
     await act(async () => {
       monthlyRadio.props.onPress();
     });
-    expect(allText(tree!.root)).toContain(
-      "3 days free — we'll remind you before it ends. Then $9.99/mo, auto-renews. Cancel anytime in Settings.",
-    );
+    const monthlyText = allText(tree!.root);
+    expect(monthlyText).toContain("3 days free — we'll remind you before it ends.");
+    expect(monthlyText).toContain("Then $9.99/month, auto-renews. Cancel anytime");
   });
 
   it("fires paywall_dismissed once when the app is backgrounded without a purchase", async () => {
