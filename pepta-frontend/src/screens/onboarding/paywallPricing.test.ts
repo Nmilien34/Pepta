@@ -23,7 +23,7 @@ describe("buildPaywallPricing", () => {
     expect(pricing.yearly.price).toBe("$3.33");
     expect(pricing.yearly.per).toBe("/mo");
     expect(pricing.yearly.priceNote).toBe("$39.99/yr");
-    expect(pricing.yearly.sub).toBe("billed yearly");
+    expect(pricing.yearly.sub).toBe("once a year");
     // round(66.64) — conventional rounding, per Nick (49 "reads weaker").
     expect(pricing.yearly.badge).toBe("SAVE 67%");
     // 3.1.2(c): the billed amount stays explicit in the footer too.
@@ -57,7 +57,7 @@ describe("buildPaywallPricing", () => {
     expect(pricing.yearly.price).toBe("$5.00");
     expect(pricing.yearly.per).toBe("/mo");
     expect(pricing.yearly.priceNote).toBe("$59.99/yr");
-    expect(pricing.yearly.sub).toBe("billed yearly");
+    expect(pricing.yearly.sub).toBe("once a year");
     // Last-resort constants, aligned to the Aug 5 2026 US list prices.
     expect(pricing.yearly.badge).toBe("SAVE 50%");
     expect(pricing.footer.yearly).toBe(
@@ -227,7 +227,7 @@ describe("buildPaywallPricing", () => {
       // Badge collision resolution: trial claims the slot, SAVE moves to sub.
       expect(pricing.yearly.badge).toBe("3 days free");
       expect(pricing.yearly.badgeTone).toBe("trial");
-      expect(pricing.yearly.sub).toBe("billed yearly · save 67%");
+      expect(pricing.yearly.sub).toBe("once a year · save 67%");
       // Badge priority: yearly's eligible trial wins the badge; two identical
       // badges cancel each other out. Monthly's trial stays live and fully
       // disclosed — its CTA above proves it — the BADGE is what moves.
@@ -241,7 +241,7 @@ describe("buildPaywallPricing", () => {
       );
       expect(pricing.yearly.badge).toBe("SAVE 67%");
       expect(pricing.yearly.badgeTone).toBe("save");
-      expect(pricing.yearly.sub).toBe("billed yearly");
+      expect(pricing.yearly.sub).toBe("once a year");
       expect(pricing.monthly.badge).toBe("3 days free");
       expect(pricing.cta.yearly.label).toBe("Start my year — $40.00");
       expect(pricing.cta.monthly.label).toBe("Try today for $0.00");
@@ -283,7 +283,7 @@ describe("buildPaywallPricing", () => {
         { monthly: true, yearly: true },
       );
       expect(pricing.yearly.badge).toBe("1 week free");
-      expect(pricing.yearly.sub).toBe("billed yearly · save 67%");
+      expect(pricing.yearly.sub).toBe("once a year · save 67%");
       expect(pricing.cta.yearly.subline).toContain("1 week free");
       // yearly's badge suppresses monthly's, but monthly's CTA still
       // discloses ITS OWN trial — display choice, not disclosure choice.

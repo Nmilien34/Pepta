@@ -65,7 +65,7 @@ interface PricePackage {
 const FALLBACK_PRICING: PaywallPricingCopy = {
   yearly: {
     title: "Yearly",
-    sub: "billed yearly",
+    sub: "once a year",
     price: "$5.00",
     per: "/mo",
     priceNote: "$59.99/yr",
@@ -270,10 +270,14 @@ export function buildPaywallPricing(
   const monthlyBadge = yearlyTrialBadge ? undefined : trialBadge(monthly, trialEligible.monthly);
   const savings = savingsBadge(monthly, yearly);
   const yearlyBadge = yearlyTrialBadge ?? savings;
+  // "once a year", not "billed yearly" (rev 6, 2026-08-06): user research —
+  // yearly's pull is the pay-once RELIEF, not just the discount ("Paying once
+  // a year as an option that is also helpful IMO instead of monthly").
+  // Monthly's "billed monthly" stays flat; the contrast does the steering.
   const yearlySub =
     yearlyTrialBadge && savings
-      ? `billed yearly · ${savings.toLowerCase()}`
-      : "billed yearly";
+      ? `once a year · ${savings.toLowerCase()}`
+      : "once a year";
 
   return {
     yearly: perMonthAnchor

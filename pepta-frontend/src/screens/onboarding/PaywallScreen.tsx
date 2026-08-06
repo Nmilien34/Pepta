@@ -480,7 +480,7 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
                   <View style={styles.reassureItem}>
                     <Icon name="checkmark" size={12} color={theme.colors.fiber} />
                     <AppText variant="caption" color="textSecondary" style={{ fontSize: 10.5 }}>
-                      {plan === "yearly" ? "Billed once a year" : "Billed monthly"}
+                      {plan === "yearly" ? "One payment — done for the year" : "Billed monthly"}
                     </AppText>
                   </View>
                   <View style={styles.reassureItem}>
