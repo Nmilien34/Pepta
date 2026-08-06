@@ -1,0 +1,272 @@
+<!doctype html><html><head><meta charset="utf-8">
+<title>Pepta — "Where did you find us?" attribution ask (design)</title>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   "Where did you find us?" — self-reported attribution ask.
+   Brief (Nick, 2026-08-06): dashboard placement; options App
+   Store search · Instagram · Facebook · TikTok · YouTube ·
+   Friends, each with its logo, designed nicely.
+
+   DESIGN DECISIONS:
+   · One-time card in the Home feed, NOT an onboarding step —
+     the funnel is 37 screens and sacred. Slides in under the
+     hero after the user's first real session, one tap answers,
+     card morphs to a 1.2s thank-you, then never renders again.
+   · Quiet ✕ dismiss = "asked and declined" — never re-ask.
+   · "Somewhere else" catch-all keeps the data honest (a forced
+     six-way pick inflates every listed channel).
+   · Logos are inline SVG, brand-recognizable at 26px, on white
+     chip tiles — no icon-font/CDN dependency (paywall rev-2
+     lesson), no full-bleed brand colors screaming on the card.
+   · Friends is deliberately NOT a brand mark — app-style people
+     glyph in Pepta purple.
+   · Self-report complements AppsFlyer attribution: store it as
+     profile.discoverySource + fire discovery_source_reported —
+     the two disagree exactly where iOS ATT blinds AppsFlyer.
+   Alternative considered (frame C): bottom sheet on 2nd launch —
+   higher response rate, but it interrupts; card is the rec.
+   ============================================================ */
+:root{
+  --ink:#0E0E12; --ts:#6B6B76; --tt:#A1A1AC;
+  --primary:#7C5CFC; --appbg:#FAFAFB; --surface:#FFF;
+  --border:#ECECEF; --hair:rgba(14,14,18,.08); --fiber:#34C759;
+  --f:"Hanken Grotesk",-apple-system,system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#EDEBF2;font-family:var(--f);color:var(--ink);padding:40px}
+h1{font-size:28px;font-weight:800;letter-spacing:-.5px}
+.note{color:var(--ts);font-size:13.5px;line-height:1.55;max-width:920px;margin-top:6px}
+.note b{color:var(--ink)}
+.gallery{display:flex;flex-wrap:wrap;gap:34px;margin-top:22px}
+.fw{width:300px}
+.fl{font-weight:700;font-size:13px;color:var(--ts);margin-bottom:8px}
+.spec{font-size:11.5px;color:var(--tt);line-height:1.45;margin-top:8px}
+.spec b{color:var(--ts)}
+
+.dev{width:300px;height:650px;border-radius:44px;border:8px solid #0A0A0E;background:var(--appbg);
+     overflow:hidden;position:relative;box-shadow:0 24px 50px -20px rgba(20,16,40,.35)}
+.scr{height:100%;padding:22px 16px;display:flex;flex-direction:column;gap:10px}
+.greet{font-size:12px;color:var(--ts);font-weight:600;margin-top:6px}
+.greet b{display:block;font-size:19px;color:var(--ink);font-weight:800;letter-spacing:-.4px}
+.card{background:var(--surface);border:1px solid var(--hair);border-radius:16px;padding:13px}
+.dimmed{opacity:.45}
+.hrow{display:flex;justify-content:space-between;align-items:center}
+.hname{font-size:11.5px;font-weight:800}
+.pill{background:#E8F8EE;color:#1E8E40;font-size:9px;font-weight:800;border-radius:999px;padding:3px 8px}
+.big{font-size:24px;font-weight:800;letter-spacing:-.5px;margin-top:6px;color:var(--primary)}
+.big span{font-size:12px;color:var(--ts);font-weight:700}
+.sm{font-size:9.5px;color:var(--ts);margin-top:2px}
+.rings{display:flex;gap:8px}
+.ring{flex:1;background:var(--surface);border:1px solid var(--hair);border-radius:14px;padding:10px 8px;text-align:center}
+.ring i{display:block;width:34px;height:34px;border-radius:999px;margin:0 auto 5px;font-style:normal;
+        display:flex;align-items:center;justify-content:center;font-size:13px}
+.ring b{font-size:10px}
+.ring small{display:block;font-size:8px;color:var(--tt)}
+
+/* ---------- the ask card ---------- */
+.ask{background:var(--surface);border:1px solid var(--hair);border-radius:16px;padding:14px 13px 12px;position:relative;
+     box-shadow:0 10px 26px -16px rgba(124,92,252,.35)}
+.ask .x{position:absolute;top:10px;right:12px;color:var(--tt);font-size:13px;font-weight:700}
+.ask h3{font-size:14.5px;font-weight:800;letter-spacing:-.3px}
+.ask p{font-size:10px;color:var(--ts);margin-top:2px}
+.srcgrid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:11px}
+.src{display:flex;align-items:center;gap:8px;border:1.5px solid var(--border);border-radius:13px;
+     padding:8px 9px;background:var(--surface)}
+.src.on{border-color:var(--primary);background:#F7F4FF}
+.src b{font-size:10.5px;font-weight:700;line-height:1.15}
+.logo{width:26px;height:26px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.logo svg{width:26px;height:26px}
+.elsewrap{display:flex;justify-content:center;margin-top:9px}
+.else{font-size:10px;color:var(--ts);font-weight:700;border:1px solid var(--border);border-radius:999px;padding:5px 12px}
+/* thank-you morph */
+.thanks{display:flex;align-items:center;gap:10px;padding:6px 2px}
+.thanks .tick{width:34px;height:34px;border-radius:999px;background:#E8F8EE;display:flex;align-items:center;justify-content:center}
+.thanks b{font-size:12.5px;font-weight:800}
+.thanks small{display:block;font-size:9.5px;color:var(--ts);font-weight:600}
+
+/* sheet variant */
+.sheetdim{position:absolute;inset:0;background:rgba(14,14,18,.35)}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:var(--surface);border-radius:22px 22px 0 0;padding:14px 16px 22px}
+.grab{width:36px;height:4px;border-radius:2px;background:#E3E3EA;margin:0 auto 12px}
+
+.copy{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px 20px;max-width:920px;margin-top:14px}
+.copy h3{font-size:13px;font-weight:800;margin-bottom:6px}
+.copy p{font-size:13px;line-height:1.55;color:var(--ts);margin-bottom:10px}
+.copy p b{color:var(--ink)}
+.copy code{font-size:12px;background:#F1EDFF;border-radius:5px;padding:1px 6px;color:#6E4EF0}
+</style></head><body>
+
+<svg style="position:absolute;width:0;height:0" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="g-as" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2AC5FA"/><stop offset="1" stop-color="#1E7BF6"/></linearGradient>
+    <linearGradient id="g-ig" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#FFD600"/><stop offset=".35" stop-color="#FF0069"/><stop offset=".75" stop-color="#D300C5"/><stop offset="1" stop-color="#7638FA"/></linearGradient>
+  </defs>
+  <!-- App Store: blue gradient tile, white "A" of triangles -->
+  <symbol id="l-appstore" viewBox="0 0 26 26">
+    <rect width="26" height="26" rx="6.5" fill="url(#g-as)"/>
+    <path d="M13 6.6l4.9 8.5M13.9 8.2l-4 6.9M7.2 17h6.2M15.5 14.9h3.4M17.2 17.8l.9 1.6M9 17l-.9 1.6" stroke="#fff" stroke-width="1.7" stroke-linecap="round" fill="none"/>
+  </symbol>
+  <!-- Instagram: gradient tile, camera outline -->
+  <symbol id="l-instagram" viewBox="0 0 26 26">
+    <rect width="26" height="26" rx="6.5" fill="url(#g-ig)"/>
+    <rect x="6.5" y="6.5" width="13" height="13" rx="4" fill="none" stroke="#fff" stroke-width="1.7"/>
+    <circle cx="13" cy="13" r="3.1" fill="none" stroke="#fff" stroke-width="1.7"/>
+    <circle cx="17" cy="9" r="1.1" fill="#fff"/>
+  </symbol>
+  <!-- Facebook: blue circle, white f -->
+  <symbol id="l-facebook" viewBox="0 0 26 26">
+    <circle cx="13" cy="13" r="13" fill="#1877F2"/>
+    <path d="M14.6 21v-6.1h2.1l.4-2.5h-2.5v-1.6c0-.7.3-1.4 1.4-1.4h1.2V7.2c-.6-.1-1.3-.2-2-.2-2 0-3.3 1.2-3.3 3.4v1.9H9.7v2.5h2.2V21z" fill="#fff"/>
+  </symbol>
+  <!-- TikTok: black tile, note with cyan/pink echo -->
+  <symbol id="l-tiktok" viewBox="0 0 26 26">
+    <rect width="26" height="26" rx="6.5" fill="#010101"/>
+    <path d="M14.4 6.6v8.2a2.5 2.5 0 1 1-2.1-2.5v-2.3a4.8 4.8 0 1 0 4.4 4.8V10c.8.6 1.8 1 2.9 1.1V8.8a3.9 3.9 0 0 1-2.9-2.2z" fill="#25F4EE" transform="translate(-.7,.4)"/>
+    <path d="M14.4 6.6v8.2a2.5 2.5 0 1 1-2.1-2.5v-2.3a4.8 4.8 0 1 0 4.4 4.8V10c.8.6 1.8 1 2.9 1.1V8.8a3.9 3.9 0 0 1-2.9-2.2z" fill="#FE2C55" transform="translate(.5,-.3)"/>
+    <path d="M14.4 6.6v8.2a2.5 2.5 0 1 1-2.1-2.5v-2.3a4.8 4.8 0 1 0 4.4 4.8V10c.8.6 1.8 1 2.9 1.1V8.8a3.9 3.9 0 0 1-2.9-2.2z" fill="#fff"/>
+  </symbol>
+  <!-- YouTube: red rounded rect, white play -->
+  <symbol id="l-youtube" viewBox="0 0 26 26">
+    <rect x="1" y="4.5" width="24" height="17" rx="5" fill="#FF0000"/>
+    <path d="M10.8 9.4l6.4 3.6-6.4 3.6z" fill="#fff"/>
+  </symbol>
+  <!-- Friends: Pepta-purple tile, two-person glyph (not a brand) -->
+  <symbol id="l-friends" viewBox="0 0 26 26">
+    <rect width="26" height="26" rx="6.5" fill="#F1EDFF"/>
+    <circle cx="10.2" cy="10.4" r="2.6" fill="none" stroke="#7C5CFC" stroke-width="1.7"/>
+    <path d="M5.6 19c.5-2.6 2.3-4 4.6-4s4.1 1.4 4.6 4" fill="none" stroke="#7C5CFC" stroke-width="1.7" stroke-linecap="round"/>
+    <circle cx="17.6" cy="10.9" r="2.1" fill="none" stroke="#B5A3FD" stroke-width="1.5"/>
+    <path d="M15.9 14.7c2.6-.4 4.3 1 4.7 3.6" fill="none" stroke="#B5A3FD" stroke-width="1.5" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="l-check" viewBox="0 0 24 24">
+    <path d="M5 12.5l4 4L19 7" stroke="#34C759" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  </symbol>
+</svg>
+
+<h1>"Where did you find us?" — attribution ask</h1>
+<p class="note"><b>One-time card in the Home feed</b> (recommended, frames A1→A2) — never an onboarding step;
+the funnel stays 37 screens. One tap answers and morphs the card into a brief thank-you, ✕ counts as
+&ldquo;declined, never re-ask.&rdquo; Frame C is the bottom-sheet alternative (higher response, more
+interruptive). Logos are inline SVG on white chip tiles — recognizable, but not six brands shouting on
+your dashboard.</p>
+
+<div class="gallery">
+
+  <!-- ============ A1: the ask, in Home context ============ -->
+  <div class="fw">
+    <div class="fl">A1 · Home — the ask card</div>
+    <div class="dev"><div class="scr">
+      <div class="greet dimmed">Wednesday, Aug 6<b>Good morning, Nick</b></div>
+      <div class="card dimmed">
+        <div class="hrow"><span class="hname">💉 Medication Level</span><span class="pill">Steady</span></div>
+        <div class="big">1.42<span> mg</span></div>
+        <div class="sm">still active right now</div>
+      </div>
+
+      <div class="ask">
+        <span class="x">✕</span>
+        <h3>Where did you find us?</h3>
+        <p>One tap — it helps us reach more people like you.</p>
+        <div class="srcgrid">
+          <div class="src"><span class="logo"><svg><use href="#l-appstore"/></svg></span><b>App Store search</b></div>
+          <div class="src"><span class="logo"><svg><use href="#l-instagram"/></svg></span><b>Instagram</b></div>
+          <div class="src"><span class="logo"><svg><use href="#l-facebook"/></svg></span><b>Facebook</b></div>
+          <div class="src"><span class="logo"><svg><use href="#l-tiktok"/></svg></span><b>TikTok</b></div>
+          <div class="src"><span class="logo"><svg><use href="#l-youtube"/></svg></span><b>YouTube</b></div>
+          <div class="src"><span class="logo"><svg><use href="#l-friends"/></svg></span><b>Friends</b></div>
+        </div>
+        <div class="elsewrap"><span class="else">Somewhere else</span></div>
+      </div>
+
+      <div class="rings dimmed">
+        <div class="ring"><i style="background:#FFF3E8">🥩</i><b>112 g</b><small>protein</small></div>
+        <div class="ring"><i style="background:#E8F8EE">🌾</i><b>18 g</b><small>fiber</small></div>
+        <div class="ring"><i style="background:#E8F4FF">💧</i><b>48 oz</b><small>water</small></div>
+      </div>
+    </div></div>
+    <div class="spec"><b>Placement:</b> directly under the hero card, above the rings — seen without scrolling,
+      skippable without thought. <b>Trigger:</b> first Home visit of the user's 2nd day (give them one clean
+      session first). Card enters with the feed's stagger; no badge, no modal, no guilt.</div>
+  </div>
+
+  <!-- ============ A2: tapped → thank-you morph ============ -->
+  <div class="fw">
+    <div class="fl">A2 · Tapped — the 1.2s thank-you morph</div>
+    <div class="dev"><div class="scr">
+      <div class="greet dimmed">Wednesday, Aug 6<b>Good morning, Nick</b></div>
+      <div class="card dimmed">
+        <div class="hrow"><span class="hname">💉 Medication Level</span><span class="pill">Steady</span></div>
+        <div class="big">1.42<span> mg</span></div>
+        <div class="sm">still active right now</div>
+      </div>
+
+      <div class="ask">
+        <div class="srcgrid" style="margin-top:0">
+          <div class="src on"><span class="logo"><svg><use href="#l-tiktok"/></svg></span><b>TikTok</b></div>
+          <div class="src" style="opacity:.35"><span class="logo"><svg><use href="#l-instagram"/></svg></span><b>Instagram</b></div>
+        </div>
+        <div class="thanks" style="margin-top:9px">
+          <span class="tick"><svg style="width:16px;height:16px"><use href="#l-check"/></svg></span>
+          <span><b>Thanks — noted.</b><small>Tell your corner of TikTok we said hi.</small></span>
+        </div>
+      </div>
+
+      <div class="rings dimmed">
+        <div class="ring"><i style="background:#FFF3E8">🥩</i><b>112 g</b><small>protein</small></div>
+        <div class="ring"><i style="background:#E8F8EE">🌾</i><b>18 g</b><small>fiber</small></div>
+        <div class="ring"><i style="background:#E8F4FF">💧</i><b>48 oz</b><small>water</small></div>
+      </div>
+    </div></div>
+    <div class="spec"><b>Morph:</b> picked chip pulses (selection haptic), unpicked chips fade, thank-you row
+      slides in; whole card collapses out after ~1.2s and the feed closes the gap with a layout spring.
+      The thank-you line personalizes per source ("your corner of TikTok" / "your friend has good taste" for
+      Friends / plain "Thanks — noted." for App Store &amp; Somewhere else).</div>
+  </div>
+
+  <!-- ============ C: sheet alternative ============ -->
+  <div class="fw">
+    <div class="fl">C · Alternative — bottom sheet (2nd launch)</div>
+    <div class="dev"><div class="scr">
+      <div class="greet dimmed">Wednesday, Aug 6<b>Good morning, Nick</b></div>
+      <div class="card dimmed">
+        <div class="hrow"><span class="hname">💉 Medication Level</span><span class="pill">Steady</span></div>
+        <div class="big">1.42<span> mg</span></div>
+      </div>
+      <div class="sheetdim"></div>
+      <div class="sheet">
+        <div class="grab"></div>
+        <h3 style="font-size:15px;font-weight:800">Where did you find us?</h3>
+        <p style="font-size:10px;color:var(--ts);margin-top:2px">One tap — it helps us reach more people like you.</p>
+        <div class="srcgrid">
+          <div class="src"><span class="logo"><svg><use href="#l-appstore"/></svg></span><b>App Store search</b></div>
+          <div class="src"><span class="logo"><svg><use href="#l-instagram"/></svg></span><b>Instagram</b></div>
+          <div class="src"><span class="logo"><svg><use href="#l-facebook"/></svg></span><b>Facebook</b></div>
+          <div class="src"><span class="logo"><svg><use href="#l-tiktok"/></svg></span><b>TikTok</b></div>
+          <div class="src"><span class="logo"><svg><use href="#l-youtube"/></svg></span><b>YouTube</b></div>
+          <div class="src"><span class="logo"><svg><use href="#l-friends"/></svg></span><b>Friends</b></div>
+        </div>
+        <div class="elsewrap"><span class="else">Somewhere else</span></div>
+      </div>
+    </div></div>
+    <div class="spec"><b>Trade-off:</b> the sheet converts better (nothing else to look at) but interrupts a
+      returning user's second-ever session — the card asks politely from inside the feed instead. Recommend
+      the card; the sheet exists so the choice is deliberate.</div>
+  </div>
+
+</div>
+
+<div class="copy">
+  <h3>Data + wiring notes (for the build, after sign-off)</h3>
+  <p><b>Storage:</b> one enum on the profile — <code>discoverySource: app_store | instagram | facebook |
+  tiktok | youtube | friends | other</code> — plus <code>discoveryAskState: answered | dismissed</code> in
+  AsyncStorage so the card never re-renders once handled (server field wins if they reinstall).
+  <b>Analytics:</b> <code>discovery_source_reported {source}</code> → AppsFlyer + backend; the self-report
+  matters most exactly where ATT blinds paid attribution.
+  <b>Compat:</b> new optional profile field = additive; strict-schema rule says ship the backend field
+  before (or with) the client (same gating discipline as the tz param).
+  <b>Order randomization:</b> shuffle the six sources per user to kill position bias; "Somewhere else"
+  always last.</p>
+</div>
+
+</body></html>
