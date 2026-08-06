@@ -6,6 +6,7 @@ import TestRenderer, { act } from "react-test-renderer";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AccessDecision } from "@pepta/shared";
 import { AccessGate } from "./AccessGate";
+import { clearPurchaseGrace, markPurchaseSuccess } from "../services/purchaseGrace";
 
 const mocks = vi.hoisted(() => ({
   auth: {
@@ -149,6 +150,30 @@ describe("AccessGate", () => {
     mocks.access.decision = {
       state: "inactive",
       reason: "expired",
+      lastVerifiedAt: "2026-07-22T00:00:00.000Z",
+    };
+    expect(surface(render())).toBe("PaywallScreen");
+  });
+
+  it("inactive + onboarded WITHIN purchase grace → main app, never a second paywall", () => {
+    // The welcomeIn rating bug (2026-08-05): the device confirmed a purchase
+    // but the backend's webhook-fed decision still reads 'inactive'. The
+    // just-paid user must land in the app, not back on a paywall.
+    markPurchaseSuccess();
+    mocks.access.decision = {
+      state: "inactive",
+      reason: "never_entitled",
+      lastVerifiedAt: "2026-07-22T00:00:00.000Z",
+    };
+    expect(surface(render())).toBe("MainTabs");
+    clearPurchaseGrace();
+  });
+
+  it("inactive + onboarded with grace expired/cleared → subscription gate again", () => {
+    clearPurchaseGrace();
+    mocks.access.decision = {
+      state: "inactive",
+      reason: "never_entitled",
       lastVerifiedAt: "2026-07-22T00:00:00.000Z",
     };
     expect(surface(render())).toBe("PaywallScreen");

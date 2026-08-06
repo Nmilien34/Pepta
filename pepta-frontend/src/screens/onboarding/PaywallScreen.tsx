@@ -52,6 +52,7 @@ import {
   logPurchaseStarted,
 } from "../../services/funnelEvents";
 import { buildPaywallPricing, freeTrialOf } from "./paywallPricing";
+import { markPurchaseSuccess } from "../../services/purchaseGrace";
 import { scheduleTrialEndReminder } from "../../services/trialReminder.service";
 
 export interface PaywallScreenProps {
@@ -285,6 +286,11 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
     // Success path (purchase or restore): whatever happens to the app state
     // after this, it is not a dismissal.
     purchasedRef.current = true;
+    // The SDK just confirmed entitlement on this device; the backend's
+    // webhook-fed decision will trail it. Open the grace window BEFORE any
+    // navigation so AccessGate can never bounce this user back onto a
+    // paywall while the backend catches up.
+    markPurchaseSuccess();
     await refreshEntitlement(optimisticActive);
     await onComplete();
   };

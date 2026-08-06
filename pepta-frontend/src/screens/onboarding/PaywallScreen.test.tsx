@@ -2,6 +2,7 @@ import React from "react";
 import TestRenderer, { act, type ReactTestInstance } from "react-test-renderer";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PaywallScreen } from "./PaywallScreen";
+import { clearPurchaseGrace, hasPurchaseGrace } from "../../services/purchaseGrace";
 
 const mocks = vi.hoisted(() => ({
   getCurrentUser: vi.fn(),
@@ -450,6 +451,11 @@ describe("PaywallScreen legal links", () => {
     expect(
       mocks.updateCachedUser.mock.calls.at(-1)?.[0].entitlement.status,
     ).toBe("active");
+    // The SDK-confirmed purchase must open the access-gate grace window —
+    // without it, AccessGate's stale/webhook-lagged 'inactive' bounces the
+    // just-paid user back onto a paywall after welcomeIn (the rating bug).
+    expect(hasPurchaseGrace()).toBe(true);
+    clearPurchaseGrace();
   });
 
   it("derives trial CTA copy from the treatment offering's intro offer", async () => {

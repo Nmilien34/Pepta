@@ -12,6 +12,7 @@ import { MainTabs } from '../navigation/MainTabs';
 import { AppUpdateGate } from './AppUpdateGate';
 import { OnboardingNavigator } from '../screens/onboarding/OnboardingNavigator';
 import { PaywallScreen } from '../screens/onboarding/PaywallScreen';
+import { hasPurchaseGrace } from '../services/purchaseGrace';
 import { AccessSetupScreen } from '../screens/access/AccessSetupScreen';
 
 function Blank() {
@@ -81,6 +82,12 @@ export function AccessGate() {
       // gate directly (no onboarding repeat); new users run the funnel,
       // which ends at the same hard paywall.
       if (onboarded) {
+        // EXCEPT within the post-purchase grace window: the device just
+        // watched StoreKit confirm a purchase, and 'inactive' here is the
+        // stale/webhook-lagged backend answer. Bouncing that user onto a
+        // paywall asks them to pay twice (the welcomeIn rating bug,
+        // 2026-08-05). Bounded — an expired grace falls through to the gate.
+        if (hasPurchaseGrace()) return shell;
         return <PaywallScreen onComplete={() => access.resolve()} />;
       }
       return <OnboardingNavigator />;

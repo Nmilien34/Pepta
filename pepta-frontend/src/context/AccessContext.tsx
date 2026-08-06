@@ -18,6 +18,7 @@ import { AppState } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { AccessDecision } from "@pepta/shared";
 import { api } from "../services/api";
+import { clearPurchaseGrace } from "../services/purchaseGrace";
 import { useAuth } from "./AuthContext";
 
 const STORAGE_KEY = "pepta.accessDecision.v1";
@@ -100,6 +101,9 @@ export function AccessProvider({ children }: { children: React.ReactNode }) {
         setDecision(next);
         if (next.state === "active") {
           lastActive.current = next;
+          // The backend caught up with the device's purchase — the grace
+          // window (if any) has done its job.
+          clearPurchaseGrace();
           AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next)).catch(
             () => undefined,
           );
