@@ -254,7 +254,24 @@ export async function applyRevenueCatWebhook(input: RevenueCatWebhook): Promise<
 
   if (event.type === 'TRANSFER') {
     applyRevenueCatIdsToUser(user, event);
+    // A transfer often CARRIES a live subscription onto this user — repeat
+    // sign-ins alias one store customer across accounts — but the event
+    // names no entitlement state, so without reconciling here the user
+    // keeps a stale 'free' until some later resolveAccess happens to run
+    // (2026-08-05: a paying tester read as free while RevenueCat showed
+    // pro active). The ids were just recorded from RevenueCat's own event,
+    // so the customer definitionally exists — the reconciler's
+    // create-on-read hazard does not apply.
+    user.entitlement.verificationState = 'stale';
     await user.save();
+    try {
+      await reconcileUserEntitlement(user);
+    } catch {
+      logger.warn(
+        { eventId, type: event.type },
+        '[revenuecat] transfer ids recorded; reconciliation deferred',
+      );
+    }
     return { received: true };
   }
 

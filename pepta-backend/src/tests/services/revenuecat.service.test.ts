@@ -243,6 +243,14 @@ describe('RevenueCat webhook service', () => {
     expect(user.entitlement.revenueCatCustomerId).toBe(userId);
     expect(user.entitlement.revenueCatAppUserIds).toEqual(['prior_alias_rc_id', userId]);
     expect(user.save).toHaveBeenCalledTimes(1);
+    // A transfer can carry a live subscription onto this user, and the event
+    // itself names no entitlement state — reconciliation is what syncs it.
+    // Skipping it left paying users 'free' until a later resolveAccess
+    // (2026-08-05 tester bug).
+    const { reconcileUserEntitlement } = await import(
+      '../../services/entitlement-reconciler.service'
+    );
+    expect(vi.mocked(reconcileUserEntitlement)).toHaveBeenCalledWith(user);
   });
 
   it('treats duplicate processed-event inserts as already handled without mutating the user', async () => {
