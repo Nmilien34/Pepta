@@ -1,0 +1,332 @@
+<!doctype html><html><head><meta charset="utf-8">
+<title>Pepta — Onboarding, in user order (all 37 steps)</title>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   THE WHOLE FUNNEL IN ORDER — every step of ONBOARDING_STEPS
+   rendered as the user meets it, with the copy pulled verbatim
+   from the shipped screens (2026-08-06). One consistent persona
+   so the echoes chain the way they really do:
+   "Already dosing" · Compounded tirzepatide · 5 mg · weekly ·
+   Sundays 8 PM · 5'10" · 226 → 185 lb · worry: losing muscle ·
+   side effects: nausea + fatigue.
+   Amber SKIP badges mark conditionally-skipped steps (the rules
+   live in onboardingFlow.ts shouldSkipStep). This page is a MAP,
+   not the spec — per-screen specs stay in onboarding-v2.html,
+   trial-warmup.html and paywall-v2.html.
+   ============================================================ */
+:root{
+  --ink:#17141F; --dim:rgba(23,20,31,.5); --soft:#5A5666; --faint:#A8A5B2;
+  --primary:#7C5CFC; --ground:#FCFBFE; --hair:rgba(23,20,31,.12);
+  --orb:rgba(124,92,252,.05); --orb2:rgba(124,92,252,.075);
+  --surface:#FFF; --border:#E8E8EE; --fiber:#34C759;
+  --f:"Hanken Grotesk",-apple-system,system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#EDEBF2;font-family:var(--f);color:var(--ink);padding:40px}
+h1{font-size:28px;font-weight:800;letter-spacing:-.5px}
+h2{font-size:17px;font-weight:800;margin:46px 0 4px}
+.note{color:var(--soft);font-size:13.5px;line-height:1.55;max-width:920px;margin-top:6px}
+.note b{color:var(--ink)}
+.gallery{display:flex;flex-wrap:wrap;gap:30px;margin-top:20px}
+.fw{width:264px}
+.fl{font-weight:800;font-size:12.5px;margin-bottom:2px}
+.fl s{text-decoration:none;color:var(--faint);font-weight:700;margin-right:6px}
+.skip{display:inline-block;background:#FFF3D6;color:#8A6100;font-size:9.5px;font-weight:800;
+      border-radius:999px;padding:2px 8px;margin:3px 0 5px;letter-spacing:.2px}
+.always{display:inline-block;color:var(--faint);font-size:9.5px;font-weight:700;margin:3px 0 5px}
+
+.dev{width:264px;height:572px;border-radius:40px;border:7px solid #0A0A0E;background:var(--ground);
+     overflow:hidden;position:relative;box-shadow:0 18px 40px -18px rgba(20,16,40,.35)}
+.orbs i{position:absolute;border-radius:999px}
+.orbs i:nth-child(1){width:260px;height:260px;background:var(--orb2);top:-80px;left:-100px}
+.orbs i:nth-child(2){width:220px;height:220px;background:var(--orb);bottom:-80px;right:-90px}
+.scr{position:relative;height:100%;padding:18px 20px 18px;display:flex;flex-direction:column}
+.top{display:flex;align-items:center;gap:10px;margin-top:8px}
+.back{font-size:14px;font-weight:700}
+.prog{flex:1;height:2px;background:rgba(23,20,31,.1);border-radius:2px}
+.prog i{display:block;height:100%;background:var(--ink);border-radius:2px}
+
+.body{flex:1;padding-top:26px;overflow:hidden}
+.ctx{font-weight:700;font-size:16.5px;line-height:1.28;letter-spacing:-.4px;color:var(--dim);margin-bottom:14px}
+.q{font-weight:800;font-size:18px;line-height:1.24;letter-spacing:-.5px}
+.q b{color:var(--primary);font-size:14px}
+.sub{font-size:11px;line-height:1.45;color:var(--soft);margin-top:8px;max-width:210px}
+.chips{margin-top:16px;display:flex;flex-direction:column;gap:7px}
+.chips.grid{flex-direction:row;flex-wrap:wrap}
+.chip{border:1.5px solid var(--hair);border-radius:14px;padding:9px 12px;font-size:12px;font-weight:700;background:var(--surface)}
+.chip small{display:block;font-size:9.5px;color:var(--soft);font-weight:600;margin-top:1px}
+.chip.on{border-color:var(--primary);background:#F7F4FF}
+.chips.grid .chip{padding:7px 11px;font-size:11px}
+.field{border:1.5px solid var(--hair);border-radius:14px;padding:10px 12px;font-size:12px;color:var(--faint);
+       background:var(--surface);margin-top:14px}
+.wheel{margin-top:14px;border:1.5px solid var(--hair);border-radius:14px;background:var(--surface);
+       padding:8px 0;text-align:center}
+.wheel .row{font-size:12px;color:var(--faint);padding:3px 0}
+.wheel .row.on{font-size:14px;font-weight:800;color:var(--ink);background:#F7F4FF}
+.foot{padding-top:10px}
+.cta{height:42px;border-radius:21px;background:var(--ink);color:#fff;font-weight:800;font-size:13px;
+     display:flex;align-items:center;justify-content:center}
+.cta.primary{background:linear-gradient(90deg,#6751E8,#8C63F4)}
+.quiet{text-align:center;font-size:11px;color:var(--faint);font-weight:700;padding:9px 0 0}
+.legal{font-size:8px;color:var(--faint);text-align:center;margin-top:8px;line-height:1.4}
+
+/* stat / beat bits */
+.statcard{margin-top:14px;background:var(--surface);border:1px solid var(--hair);border-radius:14px;padding:12px}
+.statval{font-size:24px;font-weight:800;color:var(--primary);letter-spacing:-.5px}
+.statline{font-size:10.5px;line-height:1.45;color:var(--soft);margin-top:4px}
+.cite{font-size:8.5px;color:var(--faint);margin-top:6px}
+.avatars{display:flex;margin-top:12px}
+.avatars i{width:26px;height:26px;border-radius:999px;background:#EDE9FB;border:2px solid var(--ground);
+           display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:var(--primary);
+           font-style:normal;margin-left:-7px}
+.avatars i:first-child{margin-left:0}
+.avlabel{font-size:9.5px;color:var(--soft);font-weight:700;margin-top:5px}
+.sent{align-self:flex-end;background:var(--primary);color:#fff;font-size:11.5px;font-weight:700;
+      border-radius:14px 14px 3px 14px;padding:7px 11px;margin:10px 0 4px;display:inline-block}
+.bubble{background:var(--surface);border:1px solid var(--hair);border-radius:14px 14px 14px 3px;
+        padding:7px 11px;font-size:11px;font-weight:600;display:inline-block;margin-top:10px}
+.mascot{width:64px;height:64px;border-radius:999px;background:radial-gradient(circle at 35% 30%,#9F86FF,#6E4EF0);
+        margin:14px auto;position:relative}
+.mascot::after{content:"";position:absolute;top:22px;left:17px;width:8px;height:12px;border-radius:5px;background:#fff;
+        box-shadow:14px 0 0 #fff}
+.bars{display:flex;gap:22px;align-items:flex-end;height:110px;margin:16px 8px 4px}
+.bar{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:5px}
+.bar i{width:100%;border-radius:8px 8px 3px 3px}
+.bar .g{background:#D9D6E3;height:88px}
+.bar .p{background:linear-gradient(180deg,#8C63F4,#6751E8);height:16px}
+.bar b{font-size:13px}
+.bar small{font-size:8.5px;color:var(--soft);text-align:center;line-height:1.3}
+.curvecard{margin-top:14px;background:var(--surface);border:1px solid var(--hair);border-radius:14px;padding:12px}
+.curvecard svg{width:100%;height:78px}
+.axis{display:flex;justify-content:space-between;font-size:8.5px;color:var(--faint);margin-top:4px}
+.ring{width:104px;height:104px;border-radius:999px;margin:10px auto;
+      background:conic-gradient(var(--primary) 100%, #EDE9FB 0);display:flex;align-items:center;justify-content:center}
+.ring i{width:84px;height:84px;border-radius:999px;background:var(--ground);display:flex;align-items:center;
+        justify-content:center;font-style:normal;font-weight:800;font-size:17px}
+.check{display:flex;gap:7px;align-items:flex-start;font-size:10px;font-weight:600;color:var(--soft);margin-top:7px}
+.check b{color:var(--fiber);font-size:11px;line-height:1.2}
+.goalcard{margin-top:14px;background:linear-gradient(150deg,#F7F4FF,#FFF);border:1px solid var(--hair);
+          border-radius:16px;padding:12px;position:relative}
+.eyebrow{font-size:8.5px;font-weight:800;letter-spacing:.6px;color:var(--faint)}
+.goalcard svg{width:100%;height:86px;margin-top:6px}
+.proof{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap}
+.proof span{background:var(--surface);border:1px solid var(--hair);border-radius:999px;font-size:9.5px;
+            font-weight:800;padding:4px 9px}
+.halo{width:120px;height:120px;border-radius:999px;background:radial-gradient(circle,rgba(124,92,252,.16),transparent 70%);
+      margin:8px auto 0;display:flex;align-items:center;justify-content:center}
+.mini{margin:12px auto 0;width:150px;background:var(--surface);border:1px solid var(--hair);border-radius:18px;
+      padding:12px;box-shadow:0 10px 24px -14px rgba(20,16,40,.3)}
+.mini .lbl{font-size:7.5px;font-weight:800;letter-spacing:.6px;color:var(--faint)}
+.mini .big{font-size:21px;font-weight:800;letter-spacing:-.5px;margin-top:2px}
+.mini .sm{font-size:8.5px;color:var(--soft);margin-top:2px}
+.dots{display:flex;gap:4px;justify-content:center;margin-top:10px}
+.dots i{width:5px;height:5px;border-radius:999px;background:#D9D6E3}
+.dots i.on{width:14px;background:var(--primary)}
+/* compact paywall port */
+.pw .hero2{font-size:15.5px;font-weight:800;letter-spacing:-.4px;line-height:1.15;text-align:center;margin-top:2px}
+.pw .psub{font-size:9px;color:var(--soft);text-align:center;margin-top:3px}
+.brow{display:flex;gap:8px;align-items:flex-start}
+.brow+.brow{margin-top:9px}
+.btile{width:26px;height:26px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:#fff;font-size:11px;font-weight:800}
+.bt{font-size:9.5px;font-weight:800;line-height:1.2}
+.bs{font-size:7.8px;color:var(--soft);line-height:1.3}
+.plans{display:flex;gap:6px;margin-top:9px}
+.plan{flex:1;border-radius:12px;border:1.5px solid var(--border);background:var(--surface);padding:7px;position:relative}
+.plan.sel{border-color:var(--primary);background:#F7F4FF}
+.pbadge{position:absolute;top:-7px;left:0;right:0;display:flex;justify-content:center}
+.pbadge span{background:var(--fiber);color:#fff;font-weight:800;font-size:6px;letter-spacing:.3px;padding:2px 6px;border-radius:999px}
+.ptitle{font-size:9px;font-weight:700}
+.ppsub{font-size:6.8px;color:var(--soft)}
+.pprice{font-size:12px;font-weight:800;margin-top:3px}
+.ppnote{font-size:6.5px;color:var(--faint)}
+.strip2{margin-top:8px;background:#F1EDFF;border-radius:999px;padding:4px 8px;text-align:center;
+        font-size:7.5px;font-weight:800}
+</style></head><body>
+
+<h1>Onboarding — the whole flow, in order</h1>
+<p class="note">All <b>37 steps of ONBOARDING_STEPS</b>, exactly as a user meets them, copy verbatim from the
+shipped screens. Persona: <b>already dosing · compounded tirzepatide · 5&nbsp;mg weekly · Sundays 8&nbsp;PM ·
+226&nbsp;→&nbsp;185&nbsp;lb · worry: losing muscle</b> — so every echo line chains the way it really does.
+Amber badges mark steps <b>shouldSkipStep</b> can remove; a "starting soon" user drops steps 9–17, and
+"just exploring" also drops 7–8. Per-screen specs live in onboarding-v2.html, trial-warmup.html and
+paywall-v2.html — this page is the map.</p>
+
+<div id="root"></div>
+
+<script>
+const P = (i) => `<div class="top"><span class="back">‹</span><div class="prog"><i style="width:${Math.round(i/37*100)}%"></i></div></div>`;
+const DEV = (i, inner) => `<div class="dev"><div class="orbs"><i></i><i></i><i></i></div><div class="scr">${P(i)}<div class="body">${inner.body}</div>${inner.foot ?? ''}</div></div>`;
+const CTA = (l, primary) => `<div class="foot"><div class="cta${primary ? ' primary' : ''}">${l}</div></div>`;
+const chips = (a, cls) => `<div class="chips ${cls ?? ''}">${a.map(c => `<div class="chip${c.on ? ' on' : ''}">${c.l}${c.s ? `<small>${c.s}</small>` : ''}</div>`).join('')}</div>`;
+
+const steps = [
+{n:1,key:'welcome',skip:null,body:`<div class="ctx">Hi. Before anything else, one thing.</div><div class="q">You’re not doing this alone.</div>
+  <div class="statcard"><div class="statval">1 in 8</div><div class="statline">American adults has taken a GLP-1. Millions are on this exact road with you.</div><div class="cite">KFF Health Tracking Poll, May 2024</div></div>
+  <div class="avatars"><i>M</i><i>J</i><i>R</i><i>T</i><i>S</i></div><div class="avlabel">15 million+ right now</div>`,
+  foot:CTA('I’m ready') + `<div class="quiet">Already have an account? Sign in</div><div class="legal">By continuing you agree to our Terms and Privacy Policy. Your health data is encrypted, never sold, and yours to delete anytime.</div>`},
+{n:2,key:'meetPep',skip:null,body:`<div class="ctx">Glad you’re here.</div><div class="q">Now — meet Pep <b>■</b></div>
+  <div class="sub">Your guide in here. Pep turns your answers into your plan — and explains any number you ever wonder about.</div>
+  <div class="mascot"></div><div style="text-align:center"><span class="bubble">Hi — I’m Pep! 👋</span></div>`,
+  foot:CTA('Wave back 👋')},
+{n:3,key:'nameCompanion',skip:null,body:`<div class="ctx">Nice to meet you too.</div><div class="q">What should I go by <b>■</b></div>
+  <div class="sub">Totally optional — I answer to Pep just fine.</div><div class="field">Pep</div>
+  ${chips([{l:'Pep',on:1},{l:'Sushi'},{l:'Ollie'},{l:'Ivy'},{l:'Momo'},{l:'Nugget'},{l:'🎲 Surprise me'}],'grid')}`,
+  foot:CTA('Continue')},
+{n:4,key:'journeyStage',skip:null,body:`<div class="ctx">Good. Let’s get to know each other.</div><div class="q">Where are you in your GLP-1 journey?</div>
+  ${chips([{l:'Already dosing',s:'shots or oral, underway',on:1},{l:'Starting soon',s:'prescription on the way'},{l:'Just exploring',s:'no medication yet'}])}`},
+{n:5,key:'biggestWorry',skip:null,body:`<div class="ctx">Already dosing. Let’s dial it in. Now, honestly —</div><div class="q">What worries you most?</div>
+  ${chips([{l:'Losing muscle',on:1},{l:'“Ozempic face”'},{l:'Side effects'},{l:'Stalling out'},{l:'Regaining it'},{l:'Low energy'}],'grid')}`},
+{n:6,key:'fearAnswered',skip:null,body:`<div class="ctx">What worries you most?</div><div style="display:flex;flex-direction:column"><span class="sent">Losing muscle</span></div>
+  <div class="q">You’re right to watch it <b>■</b></div>
+  <div class="statcard"><div class="statval">25–39%</div><div class="statline">of the weight lost on a GLP-1 can be lean mass when nobody is watching for it. That is the number Pepta exists to keep down — protein, pace and a muscle check every week.</div><div class="cite">STEP-1 &amp; SURMOUNT-1 body-composition analyses</div></div>`,
+  foot:CTA('Build my targets')},
+{n:7,key:'medication',skip:'skips when just exploring',body:`<div class="ctx">Let’s get the specifics.</div><div class="q">Which medication?</div>
+  <div class="field">🔍 Search medications</div>
+  ${chips([{l:'Mounjaro',s:'Tirzepatide · injection'},{l:'Ozempic',s:'Semaglutide · injection'},{l:'Compounded tirzepatide',s:'Custom dose',on:1},{l:'Research peptide',s:'Other compound'}])}`},
+{n:8,key:'route',skip:'skips when exploring, or the med pins its route',body:`<div class="ctx">Compounded tirzepatide — strong pick, and you’re far from alone on it.</div><div class="q">How do you take it?</div>
+  ${chips([{l:'Injection',s:'pen, auto-injector, or syringe',on:1},{l:'Pill or oral',s:'tablets, drops, or troches'},{l:'Not sure',s:'we’ll start with injection tracking'}])}`},
+{n:9,key:'currentDose',skip:'active dosers only',body:`<div class="ctx">Compounded tirzepatide — strong pick, and you’re far from alone on it.</div><div class="q">What’s your current dose?</div>
+  ${chips([{l:'2.5 mg'},{l:'5 mg',on:1},{l:'7.5 mg'},{l:'10 mg'},{l:'12.5 mg'},{l:'15 mg'},{l:'Custom'}],'grid')}`,
+  foot:CTA('Continue')},
+{n:10,key:'deviceType',skip:'active injectors only',body:`<div class="ctx">5 mg. We’ll track every shot.</div><div class="q">What do you inject with?</div>
+  ${chips([{l:'Single-dose pen',s:'one prefilled pen per shot'},{l:'Auto-injector',s:'reusable or dial-a-dose pen'},{l:'Syringe & vial',s:'you draw each dose',on:1},{l:'Other or not sure'}])}`},
+{n:11,key:'concentration',skip:'syringe-and-vial users only',body:`<div class="ctx">Syringe and vial. The precise way.</div><div class="q">What’s the concentration?</div>
+  <div class="sub">It’s on your vial or mixing notes — this turns doses into exact draw-to units.</div>
+  ${chips([{l:'5 mg/mL'},{l:'10 mg/mL',on:1},{l:'15 mg/mL'},{l:'20 mg/mL'},{l:'25 mg/mL'},{l:'Not sure yet'}],'grid')}`,
+  foot:CTA('Continue')},
+{n:12,key:'frequency',skip:'active dosers only',body:`<div class="ctx">Syringe and vial. The precise way.</div><div class="q">How often do you dose?</div>
+  ${chips([{l:'Weekly',on:1},{l:'Every 2 weeks'},{l:'Daily'},{l:'Custom'}])}`},
+{n:13,key:'leanMass',skip:'active dosers only',body:`<div class="ctx">Tirzepatide · 5 mg · weekly.</div><div class="q">Where the weight comes from <b>■</b></div>
+  <div class="bars"><div class="bar"><b>39%</b><i class="g"></i><small>Unmanaged<br>lean mass</small></div><div class="bar"><b>&nbsp;</b><i class="p"></i><small>Protein + pace<br>tracked weekly</small></div></div>
+  <div style="text-align:center"><span class="bubble">Pep here. That second bar is my whole job.</span></div>`,
+  foot:CTA('Show me')},
+{n:14,key:'lastShot',skip:'active dosers only',body:`<div class="ctx">Back to your schedule.</div><div class="q">When was your last shot?</div>
+  <div class="sub">This date arms your level model.</div>
+  <div class="wheel"><div class="row">Sat, Aug 1</div><div class="row on">Sun, Aug 2</div><div class="row">Mon, Aug 3</div></div>`,
+  foot:CTA('Continue')},
+{n:15,key:'shotDay',skip:'weekly injectors only',body:`<div class="ctx">Last shot was a Sunday.</div><div class="q">Sundays are shot day?</div>
+  ${chips([{l:'Sundays it is',on:1},{l:'Pick another day'}])}`},
+{n:16,key:'shotTime',skip:'weekly injectors only',body:`<div class="ctx">Sundays it is.</div><div class="q">What time, usually?</div>
+  <div class="sub">Your reminders land at this hour.</div>
+  ${chips([{l:'Morning',s:'around 8 AM'},{l:'Midday'},{l:'Evening',s:'around 8 PM',on:1},{l:'Pick exact time'}])}`},
+{n:17,key:'instrument',skip:'active dosers only',body:`<div class="ctx">Tirzepatide · 5 mg · Sundays.</div><div class="q">Your level model is armed <b>■</b></div>
+  <div class="sub">Every dose you log feeds this curve — you'll always know what's still active in you.</div>
+  <div class="curvecard"><svg viewBox="0 0 200 70"><defs><linearGradient id="cg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="rgba(124,92,252,.25)"/><stop offset="1" stop-color="rgba(124,92,252,0)"/></linearGradient></defs><path d="M4 62 C30 8 50 6 70 20 C110 46 150 56 196 60 L196 70 L4 70 Z" fill="url(#cg)"/><path d="M4 62 C30 8 50 6 70 20 C110 46 150 56 196 60" fill="none" stroke="#7C5CFC" stroke-width="2.5" stroke-linecap="round"/><circle cx="52" cy="10" r="3.5" fill="#7C5CFC"/></svg><div class="axis"><span>shot</span><span>day 7</span></div></div>`,
+  foot:CTA('Good to know')},
+{n:18,key:'goalType',skip:null,body:`<div class="ctx">Level model armed. Now you.</div><div class="q">What’s the goal?</div>
+  ${chips([{l:'Lose fat',s:'and keep the muscle',on:1},{l:'Build & recomp',s:'trade fat for lean mass'},{l:'Maintain',s:'hold the line'},{l:'Something else',s:'tell me in your words'}])}`},
+{n:19,key:'sexGender',skip:null,body:`<div class="ctx">Lose fat, keep muscle. Clear.</div><div class="q">Calorie math needs this <b>■</b></div>
+  <div class="sub">Sex is only used to estimate your calorie needs.</div>
+  ${chips([{l:'Woman'},{l:'Man',on:1},{l:'Non-binary'},{l:'Prefer not to say'}])}`},
+{n:20,key:'birthday',skip:null,body:`<div class="ctx">Perfect — that sharpens your targets.</div><div class="q">When were you born?</div>
+  <div class="sub">Age tunes your calorie and protein targets.</div>
+  <div class="wheel"><div class="row">Feb · 13 · 1991</div><div class="row on">Mar · 14 · 1992</div><div class="row">Apr · 15 · 1993</div></div>`,
+  foot:CTA('Continue')},
+{n:21,key:'heightWeight',skip:null,body:`<div class="ctx">Almost there on the numbers.</div><div class="q">Height and weight, today?</div>
+  ${chips([{l:'Imperial',on:1},{l:'Metric'}],'grid')}
+  <div class="wheel"><div class="row">HEIGHT</div><div class="row on">5'10"</div></div>
+  <div class="wheel"><div class="row">WEIGHT</div><div class="row on">226 lb</div></div>`,
+  foot:CTA('Continue')},
+{n:22,key:'startWeight',skip:null,body:`<div class="ctx">5'10", 226 today.</div><div class="q">Where did you start?</div>
+  <div class="sub">8 lb down already — that's real. Every step gets charted from here.</div>
+  <div class="field">⚖️ STARTING WEIGHT — 234 lb</div><div class="field">📅 START DATE — June 2, 2026</div>`,
+  foot:CTA('Continue')},
+{n:23,key:'goalWeight',skip:null,body:`<div class="ctx">226 today. Thanks for trusting me with that.</div><div class="q">Where are we headed?</div>
+  <div style="text-align:center;margin-top:22px"><span style="font-size:44px;font-weight:800;letter-spacing:-1px">185</span><span style="font-size:15px;color:var(--soft);font-weight:700"> lb</span></div>
+  <div style="display:flex;gap:3px;justify-content:center;margin-top:12px">${'<i style="width:2px;height:14px;background:#D9D6E3;border-radius:2px"></i>'.repeat(10)}<i style="width:3px;height:22px;background:#7C5CFC;border-radius:2px"></i>${'<i style="width:2px;height:14px;background:#D9D6E3;border-radius:2px"></i>'.repeat(10)}</div>
+  ${chips([{l:'lb',on:1},{l:'kg'}],'grid')}`,
+  foot:CTA('Continue')},
+{n:24,key:'goalPace',skip:null,body:`<div class="ctx">185. I like it.</div><div class="q">Pick your pace.</div>
+  ${chips([{l:'Gentle',s:'~0.8 lb a week · 185 by May 30'},{l:'Steady — recommended',s:'~1.4 lb a week · 185 by Jan 17',on:1},{l:'Ambitious',s:'~2.0 lb a week · harder to hold muscle'}])}`,
+  foot:CTA('Continue')},
+{n:25,key:'company',skip:null,body:`<div class="ctx">Steady pace. 185 by Jan 17.</div><div class="q">You’re in good company <b>■</b></div>
+  <div class="statcard" style="border:0;background:transparent;padding-left:0"><div class="statval">~15%</div><div class="statline">Average body-weight reduction at 68 weeks for adults on once-weekly semaglutide — the largest trial of its kind. Steady, tracked progress is the proven road.</div><div class="cite">STEP-1 trial, New England Journal of Medicine, 2021</div></div>`,
+  foot:CTA('Good to know')},
+{n:26,key:'dailyRoutine',skip:null,body:`<div class="ctx">Now, your days.</div><div class="q">Most days look like…</div>
+  ${chips([{l:'Mostly sitting',s:'desk, car, couch'},{l:'Lightly active',s:'on your feet a fair bit',on:1},{l:'Active',s:'moving most of the day'},{l:'Very active',s:'physical job or daily training'}])}`},
+{n:27,key:'training',skip:null,body:`<div class="ctx">Lightly active. Good.</div><div class="q">Lifting these days?</div>
+  ${chips([{l:'Regularly',s:'2+ sessions a week'},{l:'Getting back into it',on:1},{l:'Just starting'},{l:'Not yet',s:'that’s fine — protein still protects'}])}`},
+{n:28,key:'sideEffects',skip:null,body:`<div class="ctx">Getting back into it. Respect.</div><div class="q">Any side effects so far?</div>
+  <div class="sub">The log ties them to doses, so you can see what triggers what.</div>
+  ${chips([{l:'None yet'},{l:'Nausea',on:1},{l:'Constipation'},{l:'Fatigue',on:1},{l:'Headache'},{l:'Appetite loss'},{l:'Other'}],'grid')}`,
+  foot:CTA('Continue')},
+{n:29,key:'symptomWeek',skip:'skips when no picked symptom follows a post-dose arc',body:`<div class="ctx">Nausea and fatigue. Noted.</div><div class="q">Your week has a shape <b>■</b></div>
+  <div class="curvecard"><div style="font-size:9.5px;font-weight:800">Nausea after a dose change</div>
+  <svg viewBox="0 0 200 64"><path d="M4 56 C40 54 55 14 84 12 C120 10 150 40 196 52" fill="none" stroke="#7C5CFC" stroke-width="2.5" stroke-linecap="round"/><text x="72" y="8" font-size="7" fill="#A8A5B2" font-weight="800">PEAK</text><text x="150" y="34" font-size="7" fill="#A8A5B2" font-weight="800">EASING</text></svg>
+  <div class="axis"><span>Shot day</span><span>Day 7</span></div><div class="cite">STEP-1 &amp; SURMOUNT-1 safety analyses</div></div>
+  <div style="text-align:center"><span class="bubble">I can’t flatten it. But I’ll show you yours.</span></div>`,
+  foot:CTA('Show me mine')},
+{n:30,key:'needs',skip:null,body:`<div class="ctx">Last thing.</div><div class="q">What would help most?</div>
+  <div class="sub">Pick as many as you like.</div>
+  ${chips([{l:'Knowing what’s working',on:1},{l:'Logging consistently'},{l:'My schedule'},{l:'Multiple compounds'},{l:'Dose & mixing math',on:1},{l:'Reports for my doctor'}],'grid')}`,
+  foot:CTA('Continue')},
+{n:31,key:'notifications',skip:null,body:`<div class="ctx">You’ve given me everything I need.</div><div class="q">Want shot-day pings?</div>
+  <div class="sub">Sundays around 8 PM — plus water and protein.</div>
+  <div class="statcard" style="text-align:center;padding:16px"><div style="font-size:22px">🔔</div><div class="statline" style="margin-top:6px">iOS asks once — we only ping when it helps.</div></div>`,
+  foot:CTA('Continue')},
+{n:32,key:'crafting',skip:null,body:`<div style="text-align:center;margin-top:4px"><span style="font-size:26px;font-weight:800">100%</span></div>
+  <div class="q" style="text-align:center">Crafting your plan…</div>
+  <div class="ring"><i>🤖</i></div>
+  <div class="check"><b>✓</b> Progress signals — what’s actually working</div>
+  <div class="check"><b>✓</b> Dose &amp; mixing math — calculator armed</div>
+  <div class="check"><b>✓</b> Muscle guard — 145 g protein a day</div>
+  <div class="check"><b>✓</b> Goal path — 226 → 185 by Jan 17</div>
+  <div class="check"><b>✓</b> Shot-day reminders — Sundays</div>`},
+{n:33,key:'reveal',skip:null,body:`<div class="ctx">Dialed in.</div><div class="q">Your tracker is ready <b>■</b></div>
+  <div class="goalcard"><div class="eyebrow">GOAL PATH · 185 LB BY JAN 17</div>
+  <svg viewBox="0 0 200 76"><path d="M6 12 C50 20 90 34 130 50 C158 60 176 64 190 66" fill="none" stroke="url(#gg)" stroke-width="3" stroke-linecap="round"/><defs><linearGradient id="gg" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#6751E8"/><stop offset="1" stop-color="#8C63F4"/></linearGradient></defs><circle cx="6" cy="12" r="3.5" fill="#17141F"/><text x="12" y="9" font-size="7.5" fill="#5A5666" font-weight="700">226 lb today</text><text x="150" y="58" font-size="8" fill="#7C5CFC" font-weight="800">⚑ 185 lb</text></svg>
+  <div class="proof"><span>145 g protein</span><span>80 oz water</span><span>Jan 17</span></div></div>`,
+  foot:CTA('Start today', true) + `<div class="quiet">Signed-out tap → “Save your plan” sheet: Google + Apple, “Your plan is private to you.”</div>`},
+{n:34,key:'trialOffer',skip:'skips for active-access users, or when no eligible trial',body:`<div class="eyebrow" style="text-align:center;margin-top:6px;font-size:10px">ONE LAST THING…</div>
+  <div class="q" style="text-align:center;margin-top:10px">We'd love you<br>to try Pepta —<br><span style="color:var(--primary)">3 days on us</span></div>
+  <div class="halo"><div class="mascot" style="margin:0">🎁</div></div>
+  <div class="sub" style="margin:10px auto 0;text-align:center">Your plan is built. The first 3 days are our gift.</div>`,
+  foot:CTA('See my free offer', true)},
+{n:35,key:'trialCarousel',skip:'skips for active-access users',body:`<div class="q" style="text-align:center">Here's what you're<br>getting free</div>
+  <div class="mini"><div class="lbl">MEDICATION LEVEL · STEADY</div><div class="big">1.42 mg</div><div class="sm">In your body right now</div><div class="sm" style="color:var(--faint)">Peak 2.1 mg · Trough 0.9 mg</div></div>
+  <div class="dots"><i></i><i class="on"></i><i></i><i></i></div>
+  <div class="sub" style="margin:12px auto 0;text-align:center;font-weight:700">See the medicine working<br>in your body, every day</div>`,
+  foot:CTA('See my free offer', true)},
+{n:36,key:'paywall',skip:'skips for active-access users',body:`<div class="pw">
+  <div style="text-align:right;font-size:8px;color:var(--soft)">Restore</div>
+  <div class="hero2">Never wonder what's<br>in your body again</div>
+  <div class="psub">The only tracker your protocol will ever need.</div>
+  <div class="statcard" style="padding:9px;margin-top:9px">
+    <div class="brow"><div class="btile" style="background:linear-gradient(135deg,#6751E8,#8C63F4)">〰</div><div><div class="bt">Know what's still working — right now</div><div class="bs">Your live medication level between shots: covered, or in a trough.</div></div></div>
+    <div class="brow"><div class="btile" style="background:linear-gradient(135deg,#1E96EF,#54BAFF)">💉</div><div><div class="bt">Never do vial math again</div><div class="bs">Exact units from your vial and dose. No spreadsheets, no second-guessing.</div></div></div>
+    <div class="brow"><div class="btile" style="background:linear-gradient(135deg,#F0761F,#FF9E52)">🏋</div><div><div class="bt">Lose the fat. Keep the muscle.</div><div class="bs">Protein and muscle-protection tracking, tuned to your dose.</div></div></div>
+  </div>
+  <div class="plans">
+    <div class="plan sel"><div class="pbadge"><span>3 DAYS FREE</span></div><div class="ptitle">Yearly</div><div class="ppsub">billed yearly · save 50%</div><div class="pprice">$5.00<span style="font-size:7px;color:var(--soft)">/mo</span></div><div class="ppnote">$59.99/yr</div></div>
+    <div class="plan"><div class="ptitle">Monthly</div><div class="ppsub">billed monthly</div><div class="pprice">$9.99<span style="font-size:7px;color:var(--soft)">/mo</span></div><div class="ppnote">&nbsp;</div></div>
+  </div>
+  <div class="strip2">🔓 Free today · 🔔 Day 2 reminder · 📅 Day 3 first charge</div></div>`,
+  foot:CTA('Try today for $0.00', true) + `<div class="quiet" style="font-size:8px;padding-top:5px">3 days free — we'll remind you before it ends.</div><div class="legal" style="margin-top:3px">Then $59.99/year, auto-renews. Cancel anytime · Terms &amp; Privacy</div>`},
+{n:37,key:'welcomeIn',skip:null,body:`<div class="ctx">That’s everything.</div><div class="q">Welcome in <b>■</b></div>
+  <div class="sub">Your tracker is live. If the setup felt right, a rating helps other people on this road find it.</div>
+  <div class="mascot" style="margin-top:34px">👋</div>`,
+  foot:CTA('Leave a rating', true) + `<div class="quiet">Not now</div>`},
+];
+
+const PHASES = [
+  [1, 'Arrival & rapport — steps 1–6', 'Welcome proof → meet Pep → the user’s worry, answered with a citation. Nothing asked that isn’t immediately paid back.'],
+  [7, 'The regimen — steps 7–17', 'Medication specifics, ending in the level-curve payoff. The whole block drops for non-active users (the amber badges).'],
+  [18, 'Goal & body — steps 18–25', 'Goal, body numbers, pace — closed by the STEP-1 company beat.'],
+  [26, 'Lifestyle & needs — steps 26–31', 'Activity, training, side effects (+ the symptom-week beat), needs, notifications.'],
+  [32, 'The payoff — steps 32–33', 'Crafting ring ticks the user’s own words, then the reveal draws their goal path. Auth lives INSIDE the reveal (payoff-first: everyone sees the plan; the save sheet is the claim).'],
+  [34, 'The offer — steps 34–37', 'Gift framing → value carousel → paywall v2 → welcome. All four skip for users who already have access.'],
+];
+
+const root = document.getElementById('root');
+let html = '';
+for (const s of steps) {
+  const phase = PHASES.find((p) => p[0] === s.n);
+  if (phase) html += `</div><h2>${phase[1]}</h2><p class="note">${phase[2]}</p><div class="gallery">`;
+  html += `<div class="fw"><div class="fl"><s>${String(s.n).padStart(2, '0')}</s>${s.key}</div>` +
+    (s.skip ? `<span class="skip">SKIPS — ${s.skip}</span>` : `<span class="always">every user sees this</span>`) +
+    DEV(s.n, { body: s.body, foot: s.foot }) + `</div>`;
+}
+root.innerHTML = html.slice('</div>'.length) + '</div>';
+</script>
+</body></html>
