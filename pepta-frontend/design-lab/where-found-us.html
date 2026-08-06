@@ -115,10 +115,12 @@ h1{font-size:28px;font-weight:800;letter-spacing:-.5px}
   </symbol>
 </svg>
 
-<h1>"Where did you find us?" — onboarding turn <span style="font-size:14px;color:var(--soft);font-weight:700">· rev 2</span></h1>
-<p class="note"><b>Step 2 of the funnel</b> — right after the welcome's &ldquo;I'm ready&rdquo;, before meeting Pep
-(rev 2: moved off the dashboard into onboarding, per Nick). One tap in, motivation is at its peak and the
-question reads as an icebreaker, not a survey. Chips <b>auto-advance</b> like every convo pick; the next
+<h1>"Where did you find us?" — onboarding turn <span style="font-size:14px;color:var(--soft);font-weight:700">· rev 3</span></h1>
+<p class="note"><b>Step 7 of the funnel</b> — right after <b>fearAnswered</b>, before the medication block
+(rev 3, Nick's placement; rev 2 moved it off the dashboard). The user just RECEIVED something — their worry
+answered with a citation — so trust sits at a local peak, and because the ask lands BEFORE the skip-gated
+medication block, exploring and starting-soon users still get asked. Chips <b>auto-advance</b> like every
+convo pick; the next
 turn's context line echoes the answer, so the conversation itself is the thank-you. Apple + Instagram marks
 are the supplied assets from <code style="background:#F1EDFF;border-radius:5px;padding:1px 6px;color:#6E4EF0">pepta-frontend/assets/</code>;
 Facebook, TikTok, YouTube and Friends are drawn inline.</p>
@@ -127,11 +129,11 @@ Facebook, TikTok, YouTube and Friends are drawn inline.</p>
 
   <!-- ============ A1: the turn ============ -->
   <div class="fw">
-    <div class="fl">A1 · Step 2 — the ask (convo turn)</div>
+    <div class="fl">A1 · Step 7 — the ask (convo turn, after fearAnswered)</div>
     <div class="dev"><div class="orbs"><i></i><i></i></div><div class="scr">
-      <div class="top"><span class="back">‹</span><div class="prog"><i style="width:5%"></i></div></div>
+      <div class="top"><span class="back">‹</span><div class="prog"><i style="width:18%"></i></div></div>
       <div class="body">
-        <div class="ctx">Glad you’re here. Quick one —</div>
+        <div class="ctx">On it. Quick one while I set up —</div>
         <div class="q">Where did you find us? <b>■</b></div>
         <div class="sub">Helps us reach more people like you.</div>
         <div class="srcgrid">
@@ -155,9 +157,9 @@ Facebook, TikTok, YouTube and Friends are drawn inline.</p>
   <div class="fw">
     <div class="fl">A2 · Tap beat — the answer &ldquo;speaks&rdquo;</div>
     <div class="dev"><div class="orbs"><i></i><i></i></div><div class="scr">
-      <div class="top"><span class="back">‹</span><div class="prog"><i style="width:5%"></i></div></div>
+      <div class="top"><span class="back">‹</span><div class="prog"><i style="width:18%"></i></div></div>
       <div class="body">
-        <div class="ctx">Glad you’re here. Quick one —</div>
+        <div class="ctx">On it. Quick one while I set up —</div>
         <div class="q">Where did you find us? <b>■</b></div>
         <div style="display:flex;flex-direction:column">
           <span class="sent"><span class="logo"><svg viewBox="0 0 26 26" style="width:16px;height:16px"><use href="#l-tiktok"/></svg></span>TikTok</span>
@@ -171,31 +173,37 @@ Facebook, TikTok, YouTube and Friends are drawn inline.</p>
 
   <!-- ============ A3: the echo into meetPep ============ -->
   <div class="fw">
-    <div class="fl">A3 · Step 3 — the echo answers back</div>
+    <div class="fl">A3 · Step 8 — the echo answers back (medication)</div>
     <div class="dev"><div class="orbs"><i></i><i></i></div><div class="scr">
-      <div class="top"><span class="back">‹</span><div class="prog"><i style="width:8%"></i></div></div>
+      <div class="top"><span class="back">‹</span><div class="prog"><i style="width:21%"></i></div></div>
       <div class="body">
-        <div class="ctx">TikTok — good corner of the internet.</div>
-        <div class="q">Now — meet Pep <b>■</b></div>
-        <div class="sub">Your guide in here. Pep turns your answers into your plan — and explains any number you ever wonder about.</div>
-        <div class="mascot"></div>
-        <div style="text-align:center"><span class="bubble">Hi — I’m Pep! 👋</span></div>
+        <div class="ctx">TikTok — good corner of the internet. Now, the specifics.</div>
+        <div class="q">Which medication?</div>
+        <div class="src" style="margin-top:16px;color:var(--faint);font-weight:600;font-size:12px">🔍 Search medications</div>
+        <div class="srcgrid" style="grid-template-columns:1fr;gap:7px;margin-top:10px">
+          <div class="src"><b>Mounjaro<br><span style="font-weight:600;color:var(--soft);font-size:10px">Tirzepatide · injection</span></b></div>
+          <div class="src"><b>Ozempic<br><span style="font-weight:600;color:var(--soft);font-size:10px">Semaglutide · injection</span></b></div>
+          <div class="src"><b>Compounded tirzepatide<br><span style="font-weight:600;color:var(--soft);font-size:10px">Custom dose</span></b></div>
+          <div class="src"><b>Research peptide<br><span style="font-weight:600;color:var(--soft);font-size:10px">Other compound</span></b></div>
+        </div>
       </div>
-      <div class="foot"><div class="cta">Wave back 👋</div></div>
     </div></div>
-    <div class="spec"><b>Per-source echo lines</b> replace meetPep's static &ldquo;Glad you're here.&rdquo;:
-      App Store → <i>Found us yourself — respect.</i> · Instagram/TikTok/YouTube/Facebook → <i>&lt;Source&gt; —
-      good corner of the internet.</i> · Friends → <i>Your friend has good taste.</i> · Somewhere else →
-      <i>However you got here — glad you did.</i></div>
+    <div class="spec"><b>Per-source echo lines</b> prefix the NEXT RENDERED turn's context (medication's
+      &ldquo;Let's get the specifics.&rdquo; for most users; whatever follows for explorers, since the
+      medication block skips for them): App Store → <i>Found us yourself — respect.</i> ·
+      Instagram/TikTok/YouTube/Facebook → <i>&lt;Source&gt; — good corner of the internet.</i> · Friends →
+      <i>Your friend has good taste.</i> · Somewhere else → <i>However you got here — glad you did.</i></div>
   </div>
 
 </div>
 
 <div class="copy">
   <h3>Wiring notes (for the build, after sign-off)</h3>
-  <p><b>Flow:</b> insert <code>discoverySource</code> into ONBOARDING_STEPS between <code>welcome</code> and
-  <code>meetPep</code> — a pure insertion, so the draft key stays <code>pepta.onboarding.v2</code> and the
-  progress bar denominator auto-adjusts to 38. Never skipped (shouldSkipStep untouched).
+  <p><b>Flow:</b> insert <code>discoverySource</code> into ONBOARDING_STEPS between <code>fearAnswered</code>
+  and <code>medication</code> — a pure insertion, so the draft key stays <code>pepta.onboarding.v2</code> and
+  the progress bar denominator auto-adjusts to 38. Never skipped itself (shouldSkipStep untouched), and its
+  echo attaches to whichever turn actually renders next — medication for most users, the post-block step for
+  exploring users whose medication block skips.
   <b>Storage:</b> answer rides the onboarding payload → <code>profile.discoverySource: app_store | instagram |
   facebook | tiktok | youtube | friends | other</code> — backend field ships first or together (strict-schema
   gating discipline). <b>Analytics:</b> <code>discovery_source_reported {source}</code> alongside the standard
