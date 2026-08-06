@@ -60,6 +60,7 @@ import type {
   medicationFrequencySchema,
   medicationLevelResponseSchema,
   medicationRouteSchema,
+  discoverySourceSchema,
   medicationStatusSchema,
   measurementInputSchema,
   measurementResponseSchema,
@@ -177,6 +178,7 @@ export type MedicationLevelResponse = z.infer<
 >;
 export type MedicationRoute = z.infer<typeof medicationRouteSchema>;
 export type MedicationStatus = z.infer<typeof medicationStatusSchema>;
+export type DiscoverySource = z.infer<typeof discoverySourceSchema>;
 export type MeasurementInput = z.infer<typeof measurementInputSchema>;
 export type MeasurementResponse = z.infer<typeof measurementResponseSchema>;
 export type NotificationPreferencesPatch = z.infer<

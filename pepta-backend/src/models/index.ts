@@ -11,3 +11,4 @@ export * from './complimentary-access.model';
 export * from './referral.model';
 export * from './user-profile.model';
 export * from './user.model';
+export * from './discovery-source.model';

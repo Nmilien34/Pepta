@@ -13,6 +13,12 @@ declare module '*.wav' {
   export default asset;
 }
 
+// Static image assets (discovery logos) — same Metro asset-module treatment.
+declare module '*.png' {
+  const asset: number;
+  export default asset;
+}
+
 // Injected by the React Native bundler (true in development).
 declare const __DEV__: boolean;
 

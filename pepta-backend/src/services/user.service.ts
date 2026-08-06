@@ -8,6 +8,7 @@ import {
   type UserProfileSettingsPatch,
   type User,
 } from "@pepta/shared";
+import type { DiscoverySource } from "@pepta/shared";
 import type { ProviderIdentity } from "../auth/google";
 import { AppError, NotFoundError } from "../lib/errors";
 import { prepareComplimentaryCleanupForDeletion } from "./complimentary-access-cleanup.service";
@@ -15,6 +16,7 @@ import { computeProfileTargets } from "../lib/profile-targets";
 import {
   ActivityLogModel,
   CompoundModel,
+  DiscoverySourceModel,
   CycleModel,
   DoseLogModel,
   FiberLogModel,
@@ -521,4 +523,21 @@ export async function updateProfileSettings(
   }
 
   return serializeWithSchema(userProfileResponseSchema, updatedProfile);
+}
+
+/**
+ * "Where did you find us?" (onboarding step 7). Upsert — replays from the
+ * onboarding draft or a handleComplete retry are idempotent. Lives in its
+ * own collection, never serialized into any client-facing response (the
+ * user/profile response schemas are strict and bundled into shipped builds).
+ */
+export async function recordDiscoverySource(
+  userId: string,
+  source: DiscoverySource,
+): Promise<void> {
+  await DiscoverySourceModel.findOneAndUpdate(
+    { userId },
+    { $set: { source } },
+    { upsert: true, runValidators: true },
+  );
 }

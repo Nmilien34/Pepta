@@ -148,6 +148,13 @@ export function logRevealClaimTapped(): void {
   void appsFlyer.logAnalyticsEvent("reveal_claim_tapped", {});
 }
 
+// "Where did you find us?" — fires at answer time (device-level, pre-auth;
+// the backend copy is written best-effort after sign-in). The self-report
+// matters most exactly where ATT blinds AppsFlyer's own attribution.
+export function logDiscoverySourceReported(source: string): void {
+  void appsFlyer.logAnalyticsEvent("discovery_source_reported", { source });
+}
+
 // Update-prompt engagement: shown fires once per displayed prompt, action
 // fires per button press, so shown-without-action measures ignored prompts.
 export function logUpdatePromptShown(payload: {

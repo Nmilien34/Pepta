@@ -109,7 +109,10 @@ describe('onboarding flow', () => {
     // it never heard one reason to want this.
     expect(nextStep('journeyStage')).toBe('biggestWorry');
     expect(nextStep('biggestWorry')).toBe('fearAnswered');
-    expect(nextStep('fearAnswered')).toBe('medication');
+    // The discovery ask (2026-08-06, Nick's placement) rides the trust peak
+    // right after the answered worry, before the medication block.
+    expect(nextStep('fearAnswered')).toBe('discoverySource');
+    expect(nextStep('discoverySource')).toBe('medication');
     expect(stepIndex('fearAnswered')).toBeLessThan(stepIndex('currentDose'));
     expect(stepIndex('fearAnswered')).toBeLessThanOrEqual(5);
   });
@@ -133,17 +136,18 @@ describe('onboarding flow', () => {
     };
 
     // 12 before the 2026-07-27 restructure, 9 after it, 7 once the lean-mass
-    // beat split the dosing block. Tighten this whenever it improves — a bound
-    // left loose stops catching the regression it was written for.
+    // beat split the dosing block. The discovery ask (2026-08-06) kept this
+    // at 7 for the dosing path — the beats still break every stretch.
     expect(runLength(ONBOARDING_STEPS)).toBeLessThanOrEqual(7);
 
-    // The longest run is now the same for everyone: the skip rules shorten the
-    // dosing block to nothing, so what a non-dosing user walks is the stretch
-    // nobody can escape. Both must stay under the bound.
+    // The non-dosing path is one longer since the discovery ask: its skip
+    // rules erase the dosing block, so discoverySource joins the goal stretch
+    // (8 inputs before the company beat). Deliberate — the ask sits at Nick's
+    // chosen slot, after the answered worry. Tighten if a beat ever splits it.
     const unskippable = ONBOARDING_STEPS.filter(
       (s) => !shouldSkipStep(s, { journeyStage: 'none' }),
     );
-    expect(runLength(unskippable)).toBeLessThanOrEqual(7);
+    expect(runLength(unskippable)).toBeLessThanOrEqual(8);
   });
 
   it('offers the naming turn to everyone and never gates on it', () => {

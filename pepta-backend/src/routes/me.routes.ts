@@ -1,6 +1,7 @@
 import {
   avatarConfirmRequestSchema,
   avatarUploadIntentRequestSchema,
+  discoverySourceInputSchema,
   notificationPreferencesPatchSchema,
   pushTokenRegistrationRequestSchema,
   userAccountPatchSchema,
@@ -19,6 +20,7 @@ import {
 import {
   deleteCurrentUser,
   getCurrentUser,
+  recordDiscoverySource,
   updateCurrentUser,
   updateProfileSettings,
 } from "../services/user.service";
@@ -84,6 +86,18 @@ router.patch(
   validateBody(notificationPreferencesPatchSchema),
   asyncHandler(async (req, res) => {
     sendData(res, await updateNotificationPreferences(req.user!.id, req.body));
+  }),
+);
+
+// "Where did you find us?" (onboarding step 7) — its own endpoint + collection
+// so no strict client-facing response schema ever has to learn the field.
+// Upsert semantics: safe to retry from handleComplete.
+router.post(
+  "/discovery-source",
+  validateBody(discoverySourceInputSchema),
+  asyncHandler(async (req, res) => {
+    await recordDiscoverySource(req.user!.id, req.body.source);
+    sendData(res, { received: true });
   }),
 );
 

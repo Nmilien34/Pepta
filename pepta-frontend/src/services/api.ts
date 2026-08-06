@@ -9,6 +9,7 @@ import {
   googleAuthSchema,
   homeResponseSchema,
   userAccountPatchSchema,
+  discoverySourceInputSchema,
   userProfileSettingsPatchSchema,
   userResponseSchema,
   activityLogInputSchema,
@@ -80,6 +81,7 @@ import {
   type GoogleAuth,
   type HomeRangeKey,
   type HomeResponse,
+  type DiscoverySource,
   type UserProfileSettingsPatch,
   type MealLogInput,
   type MealLogResponse,
@@ -401,6 +403,16 @@ class PeptaApi {
     return this.request("/me", z.unknown(), {
       method: "PATCH",
       body: JSON.stringify(userProfileSettingsPatchSchema.parse(body)),
+    });
+  }
+
+  // "Where did you find us?" — its own endpoint (never a profile field: the
+  // strict, client-bundled response schemas must never learn it). Upsert
+  // server-side, so best-effort retries are safe.
+  public recordDiscoverySource(source: DiscoverySource): Promise<unknown> {
+    return this.request("/me/discovery-source", z.unknown(), {
+      method: "POST",
+      body: JSON.stringify(discoverySourceInputSchema.parse({ source })),
     });
   }
 

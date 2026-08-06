@@ -46,6 +46,11 @@ export interface ConvoOption<T> {
   label: string;
   /** Optional second line; the chip stretches into a card row to hold it. */
   sub?: string;
+  /**
+   * Optional leading visual (logo tile, icon) rendered before the label —
+   * in the chip AND riding along in the sent bubble when the answer speaks.
+   */
+  leading?: React.ReactNode;
   value: T;
   /**
    * In auto-advance mode, a holding option selects without advancing (via
@@ -130,6 +135,7 @@ function TypingDots() {
 interface ChipItemProps {
   label: string;
   sub?: string;
+  leading?: React.ReactNode;
   index: number;
   revealed: boolean;
   animate: boolean;
@@ -138,7 +144,7 @@ interface ChipItemProps {
 }
 
 /** One answer chip, staggering into view once the question has finished typing. */
-function ChipItem({ label, sub, index, revealed, animate, selected, onPress }: ChipItemProps) {
+function ChipItem({ label, sub, leading, index, revealed, animate, selected, onPress }: ChipItemProps) {
   const rise = useRef(new Animated.Value(animate ? 0 : 1)).current;
   useEffect(() => {
     if (!revealed || !animate) return;
@@ -169,8 +175,20 @@ function ChipItem({ label, sub, index, revealed, animate, selected, onPress }: C
           pressed && styles.chipPressed,
         ]}
       >
-        <Text style={styles.chipText}>{label}</Text>
-        {sub ? <Text style={styles.chipSub}>{sub}</Text> : null}
+        {leading ? (
+          <View style={styles.chipLeadRow}>
+            {leading}
+            <View style={{ flexShrink: 1 }}>
+              <Text style={styles.chipText}>{label}</Text>
+              {sub ? <Text style={styles.chipSub}>{sub}</Text> : null}
+            </View>
+          </View>
+        ) : (
+          <>
+            <Text style={styles.chipText}>{label}</Text>
+            {sub ? <Text style={styles.chipSub}>{sub}</Text> : null}
+          </>
+        )}
       </Pressable>
     </Animated.View>
   );
@@ -387,6 +405,7 @@ export function ConvoScreen<T>({
                   key={option.label}
                   label={option.label}
                   sub={option.sub}
+                  leading={option.leading}
                   index={i}
                   revealed={typed}
                   animate={animate}
@@ -419,6 +438,7 @@ export function ConvoScreen<T>({
                   },
                 ]}
               >
+                {picked.leading ? <View style={styles.sentLead}>{picked.leading}</View> : null}
                 <Text style={styles.sentText}>{picked.label}</Text>
               </Animated.View>
               <TypingDots />
@@ -492,6 +512,9 @@ const styles = StyleSheet.create({
   answered: { alignItems: "flex-start", paddingTop: 26 },
   sent: {
     alignSelf: "flex-end",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
     backgroundColor: convo.primary,
     paddingVertical: 12,
     paddingHorizontal: 18,
@@ -504,6 +527,17 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   sentText: { fontFamily: typography.fonts.bold, fontSize: 16, color: convo.onPrimary },
+  // White backing so brand marks stay legible on the purple bubble.
+  sentLead: {
+    width: 22,
+    height: 22,
+    borderRadius: 7,
+    backgroundColor: convo.onPrimary,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+  chipLeadRow: { flexDirection: "row", alignItems: "center", gap: 9 },
   typing: {
     alignSelf: "flex-start",
     marginTop: 18,

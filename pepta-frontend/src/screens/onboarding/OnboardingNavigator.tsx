@@ -54,6 +54,7 @@ import { TrainingScreen } from './TrainingScreen';
 import { SideEffectsScreen, type SideEffectType } from './SideEffectsScreen';
 import { BiggestWorryScreen } from './BiggestWorryScreen';
 import { FearAnsweredScreen } from './FearAnsweredScreen';
+import { DiscoverySourceScreen } from './DiscoverySourceScreen';
 import { NotificationsScreen } from './NotificationsScreen';
 import { CraftingScreen } from './CraftingScreen';
 import { RevealScreen } from './RevealScreen';
@@ -61,7 +62,7 @@ import { TrialOfferScreen } from './TrialOfferScreen';
 import { TrialCarouselScreen } from './TrialCarouselScreen';
 import { PaywallScreen } from './PaywallScreen';
 import { WelcomeInScreen } from './WelcomeInScreen';
-import type { ActivityLevel, BiggestWorry, InjectionDeviceType, TrainingStatus } from '@pepta/shared';
+import type { ActivityLevel, BiggestWorry, DiscoverySource, InjectionDeviceType, TrainingStatus } from '@pepta/shared';
 import type { MedicationOption } from '../../data/medicationCatalog';
 import type { MedicationRoute } from './RouteScreen';
 import { RouteScreen } from './RouteScreen';
@@ -77,7 +78,7 @@ import { useAccess } from '../../context/AccessContext';
 import { useOnboarding } from '../../context/OnboardingContext';
 import { deriveReminderGroups, defaultReminderState } from '../app/reminderSettings';
 import { saveReminderState, syncReminderNotifications } from '../../services/reminderNotification.service';
-import { logOnboardingCompleted, logOnboardingStarted, logOnboardingStep } from '../../services/funnelEvents';
+import { logDiscoverySourceReported, logOnboardingCompleted, logOnboardingStarted, logOnboardingStep } from '../../services/funnelEvents';
 
 const DEFAULT_BODY: BodyMeasure = { units: 'imperial', height: 66, weight: 184 };
 const DAY_PLURAL = ['Sundays', 'Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays', 'Saturdays'];
@@ -88,6 +89,7 @@ function defaultBirthday(): DateParts {
 
 interface FlowAnswers {
   journeyStage?: JourneyStage;
+  discoverySource?: DiscoverySource;
   companionName?: string;
   needs?: NeedType[];
   medication?: MedicationOption;
@@ -396,6 +398,12 @@ export function OnboardingNavigator() {
         .updateProfileSettings({ companionName: answers.companionName })
         .then(() => writeCompanionName(answers.companionName!, true))
         .catch(() => undefined);
+    }
+    // "Where did you find us?" — its own endpoint, best-effort: an old
+    // backend 404s only this call, and the server upserts so a replayed
+    // draft can never double-record. Never blocks completion.
+    if (answers.discoverySource) {
+      await api.recordDiscoverySource(answers.discoverySource).catch(() => undefined);
     }
     // Draft is done — clear it (and the in-memory cache) so a future run starts fresh.
     await AsyncStorage.removeItem(ONBOARDING_DRAFT_KEY).catch(() => undefined);
@@ -731,6 +739,19 @@ export function OnboardingNavigator() {
       );
     case 'fearAnswered':
       return <FearAnsweredScreen progress={progress} onBack={goBack} worry={answers.biggestWorry} onContinue={goNext} />;
+    case 'discoverySource':
+      return (
+        <DiscoverySourceScreen
+          progress={progress}
+          onBack={goBack}
+          onAnswer={(discoverySource) => {
+            // Device-level event fires NOW (pre-auth); the backend copy is
+            // written best-effort in handleComplete, once a user exists.
+            logDiscoverySourceReported(discoverySource);
+            commit({ discoverySource });
+          }}
+        />
+      );
     case 'notifications': {
       const sub =
         answers.journeyStage === 'active' && (answers.shotDays?.length ?? 0) > 0

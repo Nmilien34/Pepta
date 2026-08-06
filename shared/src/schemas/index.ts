@@ -54,6 +54,22 @@ export const medicationRouteSchema = z.enum(MEDICATION_ROUTES);
 export const injectionDeviceTypeSchema = z.enum(INJECTION_DEVICE_TYPES);
 export const medicationFrequencySchema = z.enum(MEDICATION_FREQUENCIES);
 export const medicationStatusSchema = z.enum(MEDICATION_STATUSES);
+// Self-reported acquisition channel ("Where did you find us?", onboarding
+// step 7). Deliberately NOT a profile/user field: those response schemas are
+// strict AND bundled into shipped builds, so a new response key would blank
+// old clients. It lives in its own collection behind its own endpoint.
+export const discoverySourceSchema = z.enum([
+  "app_store",
+  "instagram",
+  "facebook",
+  "tiktok",
+  "youtube",
+  "friends",
+  "other",
+]);
+export const discoverySourceInputSchema = z
+  .object({ source: discoverySourceSchema })
+  .strict();
 export const genderIdentitySchema = z.enum(GENDER_IDENTITIES);
 export const compoundStatusSchema = z.enum(COMPOUND_STATUSES);
 export const injectionSiteSchema = z.enum(INJECTION_SITES);

@@ -56,6 +56,13 @@ export const ONBOARDING_STEPS = [
   'journeyStage',
   'biggestWorry',
   'fearAnswered',
+  // "Where did you find us?" (design-lab/where-found-us.html, 2026-08-06).
+  // HERE by explicit placement (Nick): right after the user RECEIVED their
+  // worry-answered payoff — a local trust peak — and BEFORE the skip-gated
+  // medication block, so exploring/starting-soon users still get asked.
+  // Never skipped; "Somewhere else" is the out. Pure insertion — draft key
+  // stays pepta.onboarding.v2.
+  'discoverySource',
   'medication',
   'route',
   'currentDose',
