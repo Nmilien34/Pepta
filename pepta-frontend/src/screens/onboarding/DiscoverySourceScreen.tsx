@@ -6,13 +6,16 @@
 // The next screen (medication) is UNTOUCHED: no echo lines, the sent-bubble
 // beat is the whole acknowledgment (Nick, rev 4).
 //
-// The six sources shuffle per mount to kill position bias; "Somewhere else"
-// always renders last as the honest catch-all (a forced six-way pick inflates
-// every listed channel). Apple + Instagram are the supplied brand assets;
-// Facebook/TikTok/YouTube are drawn with react-native-svg; Friends is
-// deliberately an app-style glyph, not a brand mark.
+// FIXED order by explicit call (Nick, 2026-08-06 — replaces the shuffled v1):
+// App Store search + Friends lead because they're where users actually come
+// from today; Facebook/Instagram next; TikTok/YouTube last among brands (no
+// ads or posting there yet — leading with a channel we're not on reads
+// wrong). "Somewhere else" stays pinned last as the honest catch-all (a
+// forced six-way pick inflates every listed channel). Apple + Instagram are
+// the supplied brand assets; Facebook/TikTok/YouTube are drawn with
+// react-native-svg; Friends is deliberately an app-style glyph, not a brand.
 
-import React, { useRef } from 'react';
+import React from 'react';
 import { Image, View } from 'react-native';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import type { DiscoverySource } from '@pepta/shared';
@@ -114,30 +117,18 @@ function Tile({ children }: { children: React.ReactNode }) {
   );
 }
 
-const BRAND_OPTIONS: ConvoOption<DiscoverySource>[] = [
+/** Row pairs: [App Store, Friends] · [Facebook, Instagram] · [TikTok, YouTube] · catch-all. */
+export const DISCOVERY_OPTIONS: ConvoOption<DiscoverySource>[] = [
   { label: 'App Store search', value: 'app_store', leading: <Tile><AppStoreLogo /></Tile> },
-  { label: 'Instagram', value: 'instagram', leading: <Tile><InstagramLogo /></Tile> },
+  { label: 'Friends', value: 'friends', leading: <Tile><FriendsGlyph /></Tile> },
   { label: 'Facebook', value: 'facebook', leading: <Tile><FacebookLogo /></Tile> },
+  { label: 'Instagram', value: 'instagram', leading: <Tile><InstagramLogo /></Tile> },
   { label: 'TikTok', value: 'tiktok', leading: <Tile><TikTokLogo /></Tile> },
   { label: 'YouTube', value: 'youtube', leading: <Tile><YouTubeLogo /></Tile> },
-  { label: 'Friends', value: 'friends', leading: <Tile><FriendsGlyph /></Tile> },
+  { label: 'Somewhere else', value: 'other' },
 ];
 
-/** The six brands shuffled (position bias), "Somewhere else" always last. */
-export function buildDiscoveryOptions(
-  random: () => number = Math.random,
-): ConvoOption<DiscoverySource>[] {
-  const shuffled = [...BRAND_OPTIONS];
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(random() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j]!, shuffled[i]!];
-  }
-  return [...shuffled, { label: 'Somewhere else', value: 'other' }];
-}
-
 export function DiscoverySourceScreen({ progress, onBack, onAnswer }: DiscoverySourceScreenProps) {
-  // Shuffle once per mount — chips must not reorder on re-render.
-  const options = useRef(buildDiscoveryOptions()).current;
   return (
     <ConvoScreen<DiscoverySource>
       progress={progress}
@@ -146,7 +137,7 @@ export function DiscoverySourceScreen({ progress, onBack, onAnswer }: DiscoveryS
       question="Where did you find us?"
       questionAccent
       sub="Helps us reach more people like you."
-      options={options}
+      options={DISCOVERY_OPTIONS}
       onAnswer={onAnswer}
     />
   );

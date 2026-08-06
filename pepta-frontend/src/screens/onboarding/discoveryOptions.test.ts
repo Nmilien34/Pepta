@@ -1,6 +1,7 @@
-// The discovery ask's option list: all seven sources present, the six brands
-// shuffled per mount (position bias), "Somewhere else" ALWAYS last — the
-// honest catch-all must never migrate into the grid.
+// The discovery ask's option list: FIXED order by explicit call (Nick,
+// 2026-08-06) — organic channels first because that's where users actually
+// come from today, channels we're not on yet last among brands, and the
+// "Somewhere else" catch-all always pinned to the end.
 
 import { describe, expect, it, vi } from "vitest";
 
@@ -13,34 +14,25 @@ vi.mock("react-native-svg", () => ({
 }));
 vi.mock("../../components", () => ({ ConvoScreen: "ConvoScreen" }));
 
-import { buildDiscoveryOptions } from "./DiscoverySourceScreen";
+import { DISCOVERY_OPTIONS } from "./DiscoverySourceScreen";
 
-describe("buildDiscoveryOptions", () => {
-  it("contains all seven sources exactly once, Somewhere else last", () => {
-    const options = buildDiscoveryOptions();
-    expect(options).toHaveLength(7);
-    expect(options[6]!.value).toBe("other");
-    expect(options[6]!.label).toBe("Somewhere else");
-    expect(new Set(options.map((o) => o.value))).toEqual(
-      new Set(["app_store", "instagram", "facebook", "tiktok", "youtube", "friends", "other"]),
-    );
-  });
-
-  it("shuffles the six brands but never the catch-all", () => {
-    // A deterministic "random" that reverses the list: proves order derives
-    // from the RNG while `other` stays pinned.
-    const reversed = buildDiscoveryOptions(() => 0);
-    expect(reversed[6]!.value).toBe("other");
-    const forward = buildDiscoveryOptions(() => 0.999);
-    expect(forward[6]!.value).toBe("other");
-    expect(reversed.slice(0, 6).map((o) => o.value)).not.toEqual(
-      forward.slice(0, 6).map((o) => o.value),
-    );
+describe("DISCOVERY_OPTIONS", () => {
+  it("keeps Nick's exact order: organic → FB/IG → TikTok/YouTube → catch-all", () => {
+    expect(DISCOVERY_OPTIONS.map((o) => o.value)).toEqual([
+      "app_store",
+      "friends",
+      "facebook",
+      "instagram",
+      "tiktok",
+      "youtube",
+      "other",
+    ]);
+    expect(DISCOVERY_OPTIONS[0]!.label).toBe("App Store search");
+    expect(DISCOVERY_OPTIONS[6]!.label).toBe("Somewhere else");
   });
 
   it("gives every brand a leading logo and the catch-all none", () => {
-    const options = buildDiscoveryOptions();
-    for (const option of options.slice(0, 6)) expect(option.leading).toBeTruthy();
-    expect(options[6]!.leading).toBeUndefined();
+    for (const option of DISCOVERY_OPTIONS.slice(0, 6)) expect(option.leading).toBeTruthy();
+    expect(DISCOVERY_OPTIONS[6]!.leading).toBeUndefined();
   });
 });
