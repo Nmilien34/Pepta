@@ -110,12 +110,29 @@ h2{font-size:18px;font-weight:800;margin:44px 0 6px}
 .pper{font-size:10px;color:var(--ts)}
 .pnote{font-size:8.5px;color:var(--tt);margin-top:1px;min-height:10px}
 
-/* compressed terms strip */
-.strip{margin-top:11px;display:flex;justify-content:center;align-items:center;gap:6px;
-       background:#F1EDFF;border-radius:999px;padding:6px 10px}
-.strip svg{width:11px;height:11px;flex-shrink:0}
-.strip b{font-size:9px;font-weight:700;color:var(--ink);white-space:nowrap}
-.strip s{text-decoration:none;font-size:9px;color:var(--tt);padding:0 1px}
+/* compressed terms strip → LOOPED CAROUSEL (rev 4, Nick):
+   one term at a time in the pill, cycling. 2.2s hold + 260ms
+   slide-fade per item, 6.6s full cycle, infinite. */
+.strip{margin-top:11px;position:relative;height:26px;background:#F1EDFF;border-radius:999px;
+       display:flex;align-items:center;justify-content:center;overflow:hidden}
+.sitem{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:5px;opacity:0}
+.sitem svg{width:12px;height:12px;flex-shrink:0}
+.sitem b{font-size:10.5px;font-weight:800;color:var(--ink);white-space:nowrap}
+@keyframes scycle{
+  0%{opacity:0;transform:translateY(9px)}
+  4%,29%{opacity:1;transform:translateY(0)}
+  33%,100%{opacity:0;transform:translateY(-9px)}
+}
+.sitem:nth-child(1){animation:scycle 6.6s cubic-bezier(.2,.7,.2,1) 0s infinite}
+.sitem:nth-child(2){animation:scycle 6.6s cubic-bezier(.2,.7,.2,1) 2.2s infinite}
+.sitem:nth-child(3){animation:scycle 6.6s cubic-bezier(.2,.7,.2,1) 4.4s infinite}
+/* sync'd dots, right edge of the pill */
+.sdots{position:absolute;right:9px;top:50%;transform:translateY(-50%);display:flex;gap:3px}
+.sdots i{width:4px;height:4px;border-radius:999px;background:rgba(124,92,252,.25)}
+@keyframes sdot{0%,3%{background:rgba(124,92,252,.25)}4%,29%{background:var(--primary)}33%,100%{background:rgba(124,92,252,.25)}}
+.sdots i:nth-child(1){animation:sdot 6.6s linear 0s infinite}
+.sdots i:nth-child(2){animation:sdot 6.6s linear 2.2s infinite}
+.sdots i:nth-child(3){animation:sdot 6.6s linear 4.4s infinite}
 .reassure{margin-top:11px;display:flex;justify-content:center;gap:12px}
 .ritem{display:flex;align-items:center;gap:3px;font-size:9.5px;color:var(--ts)}
 .ritem svg{width:11px;height:11px}
@@ -230,9 +247,10 @@ with the motion layer specified below. Hit <b>Replay motion</b> to watch the ent
       </div>
 
       <div class="strip a5">
-        <svg><use href="#i-lock"/></svg><b>Free today</b><s>·</s>
-        <svg><use href="#i-bell"/></svg><b>Reminder day 2</b><s>·</s>
-        <svg><use href="#i-cal"/></svg><b>First charge Aug 8</b>
+        <div class="sitem"><svg><use href="#i-lock"/></svg><b>Free today — full access</b></div>
+        <div class="sitem"><svg><use href="#i-bell"/></svg><b>Day 2 — we remind you</b></div>
+        <div class="sitem"><svg><use href="#i-cal"/></svg><b>Day 3 — first charge, Aug 8</b></div>
+        <div class="sdots"><i></i><i></i><i></i></div>
       </div>
 
       <div class="foot a6">
@@ -246,7 +264,9 @@ with the motion layer specified below. Hit <b>Replay motion</b> to watch the ent
       <b>Live dot</b> on benefit 1 pulses forever (LivingMascot heartbeat idiom) — the single looping
       element, because &ldquo;live&rdquo; is that row's literal claim. <b>Entrance:</b> rows fade+rise with
       110ms stagger (TimelineRow's exact curve), tiles pop 60ms behind their row, then cards → strip → CTA
-      continue the chain. Terms strip = paywallTimeline compressed; 3.1.2 trio intact in subline + legal.</div>
+      continue the chain. <b>Terms carousel</b> (rev 4): the old 3-step timeline as a looping one-slot pill —
+      each term holds 2.2s then slide-fades to the next, dots sync on the right. Values from paywallTimeline;
+      3.1.2 trio intact in subline + legal regardless of which slide is showing.</div>
   </div>
 
   <!-- ============ STATE 2: NO TRIAL (monthly selected / ineligible) ============ -->
@@ -318,10 +338,13 @@ with the motion layer specified below. Hit <b>Replay motion</b> to watch the ent
   <code>Animated.timing 360ms, Easing.bezier(0.2, 0.7, 0.2, 1)</code>, opacity 0→1 + translateY 8→0 —
   this is TimelineRow's exact shipped curve, reused. Icon tiles add a
   <code>spring scale .6→1</code> 60ms behind their row (QuickLog chip pop).</p>
-  <p><b>The one loop:</b> benefit 1's green dot breathes (scale 1→1.7, opacity fade, 1.8s ease-in-out,
-  infinite) — LivingMascot's heartbeat idiom. One looping element maximum on a paywall: it draws the eye
-  to the &ldquo;live level&rdquo; claim without turning the screen into a carnival. Everything else settles
-  and stays still so the CTA reads calm.</p>
+  <p><b>Two loops, each earning its motion:</b> (1) benefit 1's green dot breathes (scale 1→1.7, opacity
+  fade, 1.8s ease-in-out, infinite — LivingMascot's heartbeat idiom) because &ldquo;live&rdquo; is that row's
+  literal claim. (2) the terms carousel (rev 4, Nick): one term per slot, 2.2s hold + 260ms slide-fade on
+  the entrance bezier, 6.6s full cycle, sync'd dots — RN mapping: <code>Animated.loop</code> over a 3-phase
+  sequence, or interval + crossfade; respects Reduce Motion by falling back to the static
+  three-across strip. The carousel is information delivery (three terms sharing one slot), not decoration —
+  nothing else on the screen moves after settle, so the CTA still reads calm.</p>
   <p><b>Selection change:</b> benefits do NOT re-animate on plan switch (they didn't change);
   only the terms strip ↔ reassure row cross-fades (160ms). Prevents the v1 problem of the
   whole screen replaying when a user compares plans.</p>
@@ -344,9 +367,12 @@ with the motion layer specified below. Hit <b>Replay motion</b> to watch the ent
      3. <b>Lose the fat. Keep the muscle.</b> · <i>Protein and muscle-protection tracking, tuned to your dose.</i></p>
   <p>Competitor test: each bold line is an outcome in the user's words; the subs carry the mechanism.
   &ldquo;Medication level &amp; curve&rdquo; could sit on anyone's screen — &ldquo;covered, or in a trough&rdquo; can't.</p>
-  <h3>Compressed trial terms (trial state only)</h3>
-  <p><b>Free today · Reminder day 2 · First charge Aug 8</b> — one pill strip directly above the CTA;
-  every value derived (<code>paywallTimeline.ts</code>). The full 3.1.2 disclosure stays verbatim in the CTA subline.</p>
+  <h3>Compressed trial terms (trial state only) — looped carousel</h3>
+  <p><b>Free today — full access</b> → <b>Day 2 — we remind you</b> → <b>Day 3 — first charge, Aug 8</b> —
+  one pill slot directly above the CTA, cycling with sync'd dots; every value derived
+  (<code>paywallTimeline.ts</code>). Because any single slide may be on screen at decision time, the full
+  3.1.2 disclosure stays verbatim in the always-visible CTA subline — the carousel is a reassurance layer,
+  never the compliance surface.</p>
 </div>
 
 <h2>What was cut, kept, and the Screen B overlap</h2>
