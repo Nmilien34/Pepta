@@ -1,0 +1,277 @@
+<!doctype html><html><head><meta charset="utf-8">
+<title>Pepta — Paywall v2: a reason to say yes (design)</title>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3/dist/tabler-icons.min.css" rel="stylesheet">
+<style>
+/* ============================================================
+   Pepta paywall v2 — DESIGN ONLY (2026-08-05 brief: "give the
+   paywall a reason to say yes"). Screen C redesign, both states.
+
+   THE FLIP: v1 sold the terms of the offer (timeline as hero,
+   feature grid as consolation). v2 sells the outcome and demotes
+   the terms to a compact strip. Benefits render on BOTH states —
+   the value doesn't change with the selected plan, only the terms.
+
+   Fidelity sources (design-from-shipped-components rule):
+   · plan cards   = PaywallScreen.tsx PlanColumn — UNCHANGED by
+                    this design (radius 16, 2px border, selected
+                    #F7F4FF, centered float badge top:-9, green
+                    trial badge #34C759, save relocated to sub)
+   · benefit rows = PaywallScreen.tsx timelineRow idiom (32px icon
+                    tile #F1EDFF radius 10, 12.5/800 title,
+                    10.5 sub) — same vocabulary, new content
+   · terms strip  = timeline data from paywallTimeline.ts,
+                    compressed to one line
+   · type/tokens  = theme/colors.ts, Hanken Grotesk throughout
+   Every price, duration, % and date shown here is a PLACEHOLDER
+   for the live StoreKit derivation (c1d8141) — no literals ship.
+   ============================================================ */
+:root{
+  --ink:#17141F; --ts:#6B6B76; --tt:#A8A5B2;
+  --primary:#7C5CFC; --accent:#6E4EF0;
+  --appbg:#FAFAFB; --surface:#FFF; --border:#E8E8EE;
+  --hair:rgba(14,14,18,.08); --selbg:#F7F4FF; --tile:#F1EDFF;
+  --fiber:#34C759;
+  --f:"Hanken Grotesk",-apple-system,system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#EDEBF2;font-family:var(--f);color:var(--ink);padding:40px}
+h1{font-size:28px;font-weight:800;letter-spacing:-.5px}
+h2{font-size:18px;font-weight:800;margin:44px 0 6px}
+.note{color:var(--ts);font-size:13.5px;line-height:1.55;max-width:900px;margin-top:6px}
+.note b{color:var(--ink)}
+.gallery{display:flex;flex-wrap:wrap;gap:34px;margin-top:22px}
+.fw{width:300px}
+.fl{font-weight:700;font-size:13px;color:var(--ts);margin-bottom:8px}
+.spec{font-size:11.5px;color:var(--tt);line-height:1.45;margin-top:8px}
+.spec b{color:var(--ts)}
+
+.dev{width:300px;height:650px;border-radius:44px;border:8px solid #0A0A0E;background:var(--appbg);overflow:hidden;position:relative;box-shadow:0 24px 50px -20px rgba(20,16,40,.35)}
+.scr{position:relative;height:100%;padding:20px 18px 16px;display:flex;flex-direction:column}
+.restore{text-align:right;font-size:10px;color:var(--ts);margin-top:8px}
+
+.hero{font-size:21px;font-weight:800;letter-spacing:-.5px;line-height:1.15;text-align:center;margin-top:8px}
+.sub{font-size:10.5px;color:var(--ts);text-align:center;margin-top:4px}
+
+/* benefit card — timelineRow idiom repurposed */
+.bcard{margin-top:12px;background:var(--surface);border:1px solid var(--hair);border-radius:16px;padding:12px 12px 11px}
+.brow{display:flex;gap:10px;align-items:flex-start}
+.brow+.brow{margin-top:11px}
+.btile{width:30px;height:30px;border-radius:10px;background:var(--tile);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.btile i{font-size:15px;color:var(--primary)}
+.bt{font-size:12px;font-weight:800;line-height:1.2}
+.bs{font-size:9.5px;color:var(--ts);margin-top:1px;line-height:1.3}
+
+/* plan cards — UNCHANGED from shipped PlanColumn */
+.plans{display:flex;gap:8px;margin-top:12px}
+.plan{flex:1;border-radius:16px;border:2px solid var(--border);background:var(--surface);padding:10px 10px 9px;position:relative}
+.plan.sel{border-color:var(--primary);background:var(--selbg)}
+.badge{position:absolute;top:-8px;left:0;right:0;display:flex;justify-content:center}
+.badge span{background:var(--fiber);color:#fff;font-weight:800;font-size:7.5px;letter-spacing:.4px;padding:2.5px 8px;border-radius:999px}
+.radio{position:absolute;top:9px;right:8px;font-size:14px}
+.radio.on{color:var(--primary)}
+.radio.off{color:var(--tt)}
+.ptitle{font-weight:700;font-size:12px}
+.psub{font-size:9px;color:var(--ts)}
+.prow{display:flex;align-items:baseline;margin-top:6px;gap:2px}
+.pprice{font-size:16px;font-weight:800}
+.pper{font-size:10px;color:var(--ts)}
+.pnote{font-size:8.5px;color:var(--tt);margin-top:1px;min-height:10px}
+
+/* compressed terms strip */
+.strip{margin-top:11px;display:flex;justify-content:center;align-items:center;gap:6px;
+       background:var(--tile);border-radius:999px;padding:6px 10px}
+.strip i{font-size:11px;color:var(--primary)}
+.strip b{font-size:9px;font-weight:700;color:var(--ink);white-space:nowrap}
+.strip s{text-decoration:none;font-size:9px;color:var(--tt);padding:0 1px}
+/* no-trial reassure row (shipped idiom) */
+.reassure{margin-top:11px;display:flex;justify-content:center;gap:14px}
+.ritem{display:flex;align-items:center;gap:3px;font-size:9.5px;color:var(--ts)}
+.ritem i{font-size:11px;color:var(--fiber)}
+
+.foot{margin-top:auto}
+.cta{height:46px;border-radius:23px;display:flex;align-items:center;justify-content:center;color:#fff;
+     font-weight:800;font-size:14px;background:linear-gradient(90deg,#6751E8,#8C63F4);
+     box-shadow:0 8px 18px rgba(124,92,252,.35)}
+.ctasub{font-size:8.8px;color:var(--ts);text-align:center;margin-top:6px;line-height:1.35}
+.legal{font-size:8.2px;color:var(--tt);text-align:center;margin-top:6px}
+.legal b{color:var(--primary);font-weight:800}
+
+.copy{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px 20px;max-width:900px;margin-top:14px}
+.copy h3{font-size:13px;font-weight:800;margin-bottom:6px}
+.copy p{font-size:13px;line-height:1.55;color:var(--ts);margin-bottom:10px}
+.copy p b{color:var(--ink)}
+.copy code{font-size:12px;background:var(--tile);border-radius:5px;padding:1px 6px;color:var(--accent)}
+</style></head><body>
+
+<h1>Paywall v2 — a reason to say yes</h1>
+<p class="note"><b>The flip:</b> v1's hero was the offer's mechanics (trial timeline) while the value hid in a
+six-item feature grid shown only to non-trialists — backwards, because the trial user is the one deciding.
+v2 leads with three outcomes on <b>both</b> states, pays off the store listing's promise
+(&ldquo;Know exactly what's in your body.&rdquo;), and compresses the terms into one strip the eye
+catches just before the CTA. Plan cards, preselection, and all purchase paths are untouched.</p>
+
+<div class="gallery">
+
+  <!-- ============ STATE 1: TRIAL (yearly preselected) ============ -->
+  <div class="fw">
+    <div class="fl">C v2 · trial state (yearly preselected)</div>
+    <div class="dev"><div class="scr">
+      <div class="restore">Restore</div>
+      <div class="hero">Never wonder what's<br>in your body again</div>
+      <div class="sub">Your plan is ready. Here's what changes.</div>
+
+      <div class="bcard">
+        <div class="brow">
+          <div class="btile"><i class="ti ti-activity-heartbeat"></i></div>
+          <div><div class="bt">Know what's still working — right now</div>
+            <div class="bs">Your live medication level between shots: covered, or in a trough.</div></div>
+        </div>
+        <div class="brow">
+          <div class="btile"><i class="ti ti-vaccine"></i></div>
+          <div><div class="bt">Never do vial math again</div>
+            <div class="bs">Exact units from your vial and dose. No spreadsheets, no second-guessing.</div></div>
+        </div>
+        <div class="brow">
+          <div class="btile"><i class="ti ti-barbell"></i></div>
+          <div><div class="bt">Lose the fat. Keep the muscle.</div>
+            <div class="bs">Protein and muscle-protection tracking, tuned to your dose.</div></div>
+        </div>
+      </div>
+
+      <div class="plans">
+        <div class="plan sel">
+          <div class="badge"><span>3 DAYS FREE</span></div>
+          <i class="ti ti-circle-check-filled radio on"></i>
+          <div class="ptitle">Yearly</div>
+          <div class="psub">billed yearly · save 50%</div>
+          <div class="prow"><span class="pprice">$5.00</span><span class="pper">/mo</span></div>
+          <div class="pnote">$59.99/yr</div>
+        </div>
+        <div class="plan">
+          <i class="ti ti-circle radio off"></i>
+          <div class="ptitle">Monthly</div>
+          <div class="psub">billed monthly</div>
+          <div class="prow"><span class="pprice">$9.99</span><span class="pper">/mo</span></div>
+          <div class="pnote">&nbsp;</div>
+        </div>
+      </div>
+
+      <div class="strip">
+        <i class="ti ti-lock-open"></i><b>Free today</b><s>·</s>
+        <i class="ti ti-bell"></i><b>Reminder day 2</b><s>·</s>
+        <i class="ti ti-calendar"></i><b>First charge Aug 8</b>
+      </div>
+
+      <div class="foot">
+        <div class="cta">Try today for $0.00</div>
+        <div class="ctasub">3 days free — we'll remind you before it ends. Then $59.99/yr, auto-renews. Cancel anytime in Settings.</div>
+        <div class="legal">$59.99/year. Cancel anytime · <b>Terms</b> &amp; <b>Privacy</b></div>
+      </div>
+    </div></div>
+    <div class="spec"><b>Headline</b> pays off the store promise without copy-pasting it — outcome, not offer.
+      <b>Benefit rows</b> reuse the shipped timelineRow idiom (tile 30px, #F1EDFF, 800-weight line + quiet sub).
+      <b>Terms strip</b> = paywallTimeline compressed to one pill; date + duration stay derived.
+      CTA + subline + legal unchanged (3.1.2 trio intact).</div>
+  </div>
+
+  <!-- ============ STATE 2: NO TRIAL (monthly selected / ineligible) ============ -->
+  <div class="fw">
+    <div class="fl">C v2 · no-trial state (monthly selected)</div>
+    <div class="dev"><div class="scr">
+      <div class="restore">Restore</div>
+      <div class="hero">Never wonder what's<br>in your body again</div>
+      <div class="sub">Your plan is ready. Here's what changes.</div>
+
+      <div class="bcard">
+        <div class="brow">
+          <div class="btile"><i class="ti ti-activity-heartbeat"></i></div>
+          <div><div class="bt">Know what's still working — right now</div>
+            <div class="bs">Your live medication level between shots: covered, or in a trough.</div></div>
+        </div>
+        <div class="brow">
+          <div class="btile"><i class="ti ti-vaccine"></i></div>
+          <div><div class="bt">Never do vial math again</div>
+            <div class="bs">Exact units from your vial and dose. No spreadsheets, no second-guessing.</div></div>
+        </div>
+        <div class="brow">
+          <div class="btile"><i class="ti ti-barbell"></i></div>
+          <div><div class="bt">Lose the fat. Keep the muscle.</div>
+            <div class="bs">Protein and muscle-protection tracking, tuned to your dose.</div></div>
+        </div>
+      </div>
+
+      <div class="plans">
+        <div class="plan">
+          <div class="badge"><span>3 DAYS FREE</span></div>
+          <i class="ti ti-circle radio off"></i>
+          <div class="ptitle">Yearly</div>
+          <div class="psub">billed yearly · save 50%</div>
+          <div class="prow"><span class="pprice">$5.00</span><span class="pper">/mo</span></div>
+          <div class="pnote">$59.99/yr</div>
+        </div>
+        <div class="plan sel">
+          <i class="ti ti-circle-check-filled radio on"></i>
+          <div class="ptitle">Monthly</div>
+          <div class="psub">billed monthly</div>
+          <div class="prow"><span class="pprice">$9.99</span><span class="pper">/mo</span></div>
+          <div class="pnote">&nbsp;</div>
+        </div>
+      </div>
+
+      <div class="reassure">
+        <div class="ritem"><i class="ti ti-check"></i>Cancel anytime</div>
+        <div class="ritem"><i class="ti ti-check"></i>Billed monthly</div>
+        <div class="ritem"><i class="ti ti-check"></i>Full access today</div>
+      </div>
+
+      <div class="foot">
+        <div class="cta">Start my month — $9.99</div>
+        <div class="legal">$9.99/month. Cancel anytime · <b>Terms</b> &amp; <b>Privacy</b></div>
+      </div>
+    </div></div>
+    <div class="spec"><b>Same benefits, same order</b> — only the terms change with the selection.
+      Terms strip is replaced by the shipped reassure row (+ &ldquo;Full access today&rdquo; reclaiming the
+      old timeline's instant-access promise). No feature grid anywhere — it's gone, not relocated.</div>
+  </div>
+
+</div>
+
+<h2>Final copy</h2>
+<div class="copy">
+  <h3>Headline (both states)</h3>
+  <p><b>&ldquo;Never wonder what's in your body again&rdquo;</b> — recognisably the store listing's
+  &ldquo;Know exactly what's in your body.&rdquo; turned into the user's outcome at the moment of closing.
+  Support line: <b>&ldquo;Your plan is ready. Here's what changes.&rdquo;</b> bridges the reveal they just left.</p>
+  <h3>Benefits (in order, both states)</h3>
+  <p>1. <b>Know what's still working — right now</b> · <i>Your live medication level between shots: covered, or in a trough.</i><br>
+     2. <b>Never do vial math again</b> · <i>Exact units from your vial and dose. No spreadsheets, no second-guessing.</i><br>
+     3. <b>Lose the fat. Keep the muscle.</b> · <i>Protein and muscle-protection tracking, tuned to your dose.</i></p>
+  <p>Competitor test: each bold line is an outcome in the user's words; the subs carry the mechanism.
+  &ldquo;Medication level &amp; curve&rdquo; could sit on anyone's screen — &ldquo;covered, or in a trough&rdquo; can't.</p>
+  <h3>Compressed trial terms (trial state only)</h3>
+  <p><b>Free today · Reminder day 2 · First charge Aug 8</b> — one pill strip directly above the CTA;
+  every value derived (<code>paywallTimeline.ts</code>). The full 3.1.2 disclosure stays verbatim in the CTA subline.</p>
+</div>
+
+<h2>What was cut, kept, and the Screen B overlap</h2>
+<div class="copy">
+  <p><b>Cut:</b> the six-item feature grid (all six were feature names; three become wallpaper as predicted);
+  the timeline as hero; the offer-led headline (&ldquo;Your 3 free days start now&rdquo;); and the optional 4th
+  benefit (&ldquo;Not sure if that's normal? Ask Pep&rdquo;) — Screen B's slide 4 (&ldquo;Notice patterns in how you
+  feel&rdquo;) just made that argument visually one screen earlier, and a 4th row broke the 5-second scan on the
+  650px frame. If we later drop Screen B for any cohort, Ask Pep is the first row to add back.</p>
+  <p><b>Kept:</b> the plan cards pixel-for-pixel (constraint), the reminder promise and named charge date
+  (the &ldquo;silently billed&rdquo; fear-killer — now one strip instead of half the screen), the full Apple
+  3.1.2 subline, and the reassure row on the no-trial path.</p>
+  <p><b>Screen B overlap, resolved:</b> benefit 1 overlaps slide 2 (&ldquo;See the medicine working in your
+  body, every day&rdquo;) and benefit 3 overlaps slide 3 (&ldquo;Watch the scale drop — without losing your
+  muscle&rdquo;). B shows the demo; C states the verdict — same argument, different altitude, deliberately
+  shared vocabulary (&ldquo;muscle&rdquo;, &ldquo;working&rdquo;) so C reads as the conclusion of B rather than a
+  repeat. Neither line is restated word-for-word. Benefit 2 (vial math) appears nowhere in Screen B — it's
+  the fresh argument on this screen, and it echoes store screenshot 07's headline, which a store-page arrival
+  has already seen. Slide 1 (&ldquo;Never wonder when your next shot is&rdquo;) stays B-only: logistics, not a
+  paying-moment argument.</p>
+</div>
+
+</body></html>
