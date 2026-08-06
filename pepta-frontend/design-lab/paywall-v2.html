@@ -1,11 +1,13 @@
 <!doctype html><html><head><meta charset="utf-8">
 <title>Pepta — Paywall v2: a reason to say yes (design)</title>
 <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@500;600;700;800&display=swap" rel="stylesheet">
-<link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3/dist/tabler-icons.min.css" rel="stylesheet">
 <style>
 /* ============================================================
    Pepta paywall v2 — DESIGN ONLY (2026-08-05 brief: "give the
    paywall a reason to say yes"). Screen C redesign, both states.
+   REV 2: benefit tiles now bold + color-coded (inline SVG, no
+   icon webfont — the CDN font rendered as empty bubbles in
+   sandboxed review), and the motion layer is specified.
 
    THE FLIP: v1 sold the terms of the offer (timeline as hero,
    feature grid as consolation). v2 sells the outcome and demotes
@@ -13,25 +15,32 @@
    the value doesn't change with the selected plan, only the terms.
 
    Fidelity sources (design-from-shipped-components rule):
-   · plan cards   = PaywallScreen.tsx PlanColumn — UNCHANGED by
-                    this design (radius 16, 2px border, selected
-                    #F7F4FF, centered float badge top:-9, green
-                    trial badge #34C759, save relocated to sub)
-   · benefit rows = PaywallScreen.tsx timelineRow idiom (32px icon
-                    tile #F1EDFF radius 10, 12.5/800 title,
-                    10.5 sub) — same vocabulary, new content
-   · terms strip  = timeline data from paywallTimeline.ts,
-                    compressed to one line
+   · plan cards   = PaywallScreen.tsx PlanColumn — UNCHANGED
+   · benefit rows = timelineRow idiom, tiles upsized 30→34 and
+                    color-coded from theme accents:
+                    level #7C5CFC · vial #2FA8FF · muscle #FF8A3D
+   · terms strip  = paywallTimeline.ts compressed to one line
    · type/tokens  = theme/colors.ts, Hanken Grotesk throughout
-   Every price, duration, % and date shown here is a PLACEHOLDER
-   for the live StoreKit derivation (c1d8141) — no literals ship.
+
+   MOTION SPEC (maps 1:1 to shipped RN idioms):
+   · rows stagger in: fade + rise 8px, 360ms,
+     Easing.bezier(.2,.7,.2,1), delays 0/110/220ms
+     — exactly TimelineRow's entrance (PaywallScreen.tsx:563)
+   · icon tiles pop: scale .6→1 spring, 60ms after their row
+     — QuickLog chip pop idiom
+   · row 1's level dot: continuous soft pulse (1.8s loop)
+     — LivingMascot heartbeat idiom (TrialOfferScreen 32fb5fb);
+     the ONE looping element on screen: "live" is benefit 1's claim
+   · plan cards + strip + CTA: after the rows, same stagger chain
+   Every price, duration, % and date is a PLACEHOLDER for the live
+   StoreKit derivation (c1d8141) — no literals ship.
    ============================================================ */
 :root{
   --ink:#17141F; --ts:#6B6B76; --tt:#A8A5B2;
   --primary:#7C5CFC; --accent:#6E4EF0;
   --appbg:#FAFAFB; --surface:#FFF; --border:#E8E8EE;
-  --hair:rgba(14,14,18,.08); --selbg:#F7F4FF; --tile:#F1EDFF;
-  --fiber:#34C759;
+  --hair:rgba(14,14,18,.08); --selbg:#F7F4FF;
+  --fiber:#34C759; --water:#2FA8FF; --protein:#FF8A3D;
   --f:"Hanken Grotesk",-apple-system,system-ui,sans-serif;
 }
 *{box-sizing:border-box;margin:0;padding:0}
@@ -45,6 +54,8 @@ h2{font-size:18px;font-weight:800;margin:44px 0 6px}
 .fl{font-weight:700;font-size:13px;color:var(--ts);margin-bottom:8px}
 .spec{font-size:11.5px;color:var(--tt);line-height:1.45;margin-top:8px}
 .spec b{color:var(--ts)}
+.replay{margin-top:14px;border:0;background:var(--primary);color:#fff;font-family:var(--f);font-weight:800;
+        font-size:13px;padding:9px 18px;border-radius:999px;cursor:pointer}
 
 .dev{width:300px;height:650px;border-radius:44px;border:8px solid #0A0A0E;background:var(--appbg);overflow:hidden;position:relative;box-shadow:0 24px 50px -20px rgba(20,16,40,.35)}
 .scr{position:relative;height:100%;padding:20px 18px 16px;display:flex;flex-direction:column}
@@ -53,12 +64,35 @@ h2{font-size:18px;font-weight:800;margin:44px 0 6px}
 .hero{font-size:21px;font-weight:800;letter-spacing:-.5px;line-height:1.15;text-align:center;margin-top:8px}
 .sub{font-size:10.5px;color:var(--ts);text-align:center;margin-top:4px}
 
-/* benefit card — timelineRow idiom repurposed */
+/* ---------- entrance stagger (TimelineRow idiom) ---------- */
+@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pop{0%{transform:scale(.6)}70%{transform:scale(1.08)}100%{transform:scale(1)}}
+.play .a1{animation:rise .36s cubic-bezier(.2,.7,.2,1) 0s both}
+.play .a2{animation:rise .36s cubic-bezier(.2,.7,.2,1) .11s both}
+.play .a3{animation:rise .36s cubic-bezier(.2,.7,.2,1) .22s both}
+.play .a4{animation:rise .36s cubic-bezier(.2,.7,.2,1) .33s both}
+.play .a5{animation:rise .36s cubic-bezier(.2,.7,.2,1) .44s both}
+.play .a6{animation:rise .36s cubic-bezier(.2,.7,.2,1) .55s both}
+.play .a1 .btile{animation:pop .38s cubic-bezier(.2,.7,.2,1) .06s both}
+.play .a2 .btile{animation:pop .38s cubic-bezier(.2,.7,.2,1) .17s both}
+.play .a3 .btile{animation:pop .38s cubic-bezier(.2,.7,.2,1) .28s both}
+
+/* benefit card — timelineRow idiom, tiles upsized + color-coded */
 .bcard{margin-top:12px;background:var(--surface);border:1px solid var(--hair);border-radius:16px;padding:12px 12px 11px}
 .brow{display:flex;gap:10px;align-items:flex-start}
-.brow+.brow{margin-top:11px}
-.btile{width:30px;height:30px;border-radius:10px;background:var(--tile);display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.btile i{font-size:15px;color:var(--primary)}
+.brow+.brow{margin-top:12px}
+.btile{width:34px;height:34px;border-radius:11px;display:flex;align-items:center;justify-content:center;
+       flex-shrink:0;position:relative;box-shadow:0 4px 10px -3px rgba(20,16,40,.25)}
+.btile svg{width:19px;height:19px}
+.btile.level{background:linear-gradient(135deg,#6751E8,#8C63F4)}
+.btile.vial{background:linear-gradient(135deg,#1E96EF,#54BAFF)}
+.btile.muscle{background:linear-gradient(135deg,#F0761F,#FF9E52)}
+/* the ONE looping element: benefit 1 is "live", so its dot breathes */
+@keyframes pulse{0%,100%{transform:scale(1);opacity:.9}50%{transform:scale(1.7);opacity:.35}}
+.livedot{position:absolute;top:-2px;right:-2px;width:9px;height:9px;border-radius:999px;background:var(--fiber);
+         border:1.5px solid #fff}
+.livedot::after{content:"";position:absolute;inset:-1.5px;border-radius:999px;background:var(--fiber);
+                animation:pulse 1.8s ease-in-out infinite;z-index:-1}
 .bt{font-size:12px;font-weight:800;line-height:1.2}
 .bs{font-size:9.5px;color:var(--ts);margin-top:1px;line-height:1.3}
 
@@ -68,9 +102,7 @@ h2{font-size:18px;font-weight:800;margin:44px 0 6px}
 .plan.sel{border-color:var(--primary);background:var(--selbg)}
 .badge{position:absolute;top:-8px;left:0;right:0;display:flex;justify-content:center}
 .badge span{background:var(--fiber);color:#fff;font-weight:800;font-size:7.5px;letter-spacing:.4px;padding:2.5px 8px;border-radius:999px}
-.radio{position:absolute;top:9px;right:8px;font-size:14px}
-.radio.on{color:var(--primary)}
-.radio.off{color:var(--tt)}
+.radio{position:absolute;top:9px;right:8px;width:15px;height:15px}
 .ptitle{font-weight:700;font-size:12px}
 .psub{font-size:9px;color:var(--ts)}
 .prow{display:flex;align-items:baseline;margin-top:6px;gap:2px}
@@ -80,14 +112,13 @@ h2{font-size:18px;font-weight:800;margin:44px 0 6px}
 
 /* compressed terms strip */
 .strip{margin-top:11px;display:flex;justify-content:center;align-items:center;gap:6px;
-       background:var(--tile);border-radius:999px;padding:6px 10px}
-.strip i{font-size:11px;color:var(--primary)}
+       background:#F1EDFF;border-radius:999px;padding:6px 10px}
+.strip svg{width:11px;height:11px;flex-shrink:0}
 .strip b{font-size:9px;font-weight:700;color:var(--ink);white-space:nowrap}
 .strip s{text-decoration:none;font-size:9px;color:var(--tt);padding:0 1px}
-/* no-trial reassure row (shipped idiom) */
-.reassure{margin-top:11px;display:flex;justify-content:center;gap:14px}
+.reassure{margin-top:11px;display:flex;justify-content:center;gap:12px}
 .ritem{display:flex;align-items:center;gap:3px;font-size:9.5px;color:var(--ts)}
-.ritem i{font-size:11px;color:var(--fiber)}
+.ritem svg{width:11px;height:11px}
 
 .foot{margin-top:auto}
 .cta{height:46px;border-radius:23px;display:flex;align-items:center;justify-content:center;color:#fff;
@@ -101,55 +132,96 @@ h2{font-size:18px;font-weight:800;margin:44px 0 6px}
 .copy h3{font-size:13px;font-weight:800;margin-bottom:6px}
 .copy p{font-size:13px;line-height:1.55;color:var(--ts);margin-bottom:10px}
 .copy p b{color:var(--ink)}
-.copy code{font-size:12px;background:var(--tile);border-radius:5px;padding:1px 6px;color:var(--accent)}
+.copy code{font-size:12px;background:#F1EDFF;border-radius:5px;padding:1px 6px;color:var(--accent)}
 </style></head><body>
 
-<h1>Paywall v2 — a reason to say yes</h1>
+<svg style="display:none" xmlns="http://www.w3.org/2000/svg">
+  <!-- level curve with live dot -->
+  <symbol id="i-level" viewBox="0 0 24 24">
+    <path d="M2 17c3 0 3.5-9 6.5-9s3 7 5.5 7 3-4 8-4" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/>
+    <circle cx="14" cy="15" r="2.4" fill="#fff"/>
+  </symbol>
+  <!-- syringe -->
+  <symbol id="i-vial" viewBox="0 0 24 24">
+    <path d="M19 5l-1.5-1.5M21 7l-4-4M14 6l4 4M8 12l4-4 4 4-6 6H6v-4z" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M4 20l2.5-2.5" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+  </symbol>
+  <!-- barbell -->
+  <symbol id="i-muscle" viewBox="0 0 24 24">
+    <path d="M7 8v8M4 10v4M17 8v8M20 10v4M7 12h10" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="i-radio-on" viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="10" fill="#7C5CFC"/>
+    <path d="M8 12.5l2.6 2.6L16 9.5" stroke="#fff" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  </symbol>
+  <symbol id="i-radio-off" viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="9" fill="none" stroke="#A8A5B2" stroke-width="2"/>
+  </symbol>
+  <symbol id="i-check" viewBox="0 0 24 24">
+    <path d="M5 12.5l4 4L19 7" stroke="#34C759" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  </symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24">
+    <path d="M8 11V8a4 4 0 0 1 7.5-1.8M6 11h12v9H6z" fill="none" stroke="#7C5CFC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  </symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24">
+    <path d="M18 16v-5a6 6 0 1 0-12 0v5l-1.5 2h15zM10 20a2 2 0 0 0 4 0" fill="none" stroke="#7C5CFC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  </symbol>
+  <symbol id="i-cal" viewBox="0 0 24 24">
+    <rect x="4" y="6" width="16" height="14" rx="2" fill="none" stroke="#7C5CFC" stroke-width="2"/>
+    <path d="M4 10h16M8 4v4M16 4v4" stroke="#7C5CFC" stroke-width="2" stroke-linecap="round"/>
+  </symbol>
+</svg>
+
+<h1>Paywall v2 — a reason to say yes <span style="font-size:14px;color:var(--ts);font-weight:700">· rev 2</span></h1>
 <p class="note"><b>The flip:</b> v1's hero was the offer's mechanics (trial timeline) while the value hid in a
 six-item feature grid shown only to non-trialists — backwards, because the trial user is the one deciding.
 v2 leads with three outcomes on <b>both</b> states, pays off the store listing's promise
-(&ldquo;Know exactly what's in your body.&rdquo;), and compresses the terms into one strip the eye
-catches just before the CTA. Plan cards, preselection, and all purchase paths are untouched.</p>
+(&ldquo;Know exactly what's in your body.&rdquo;), and compresses the terms into one strip before the CTA.
+Plan cards, preselection, and all purchase paths are untouched.
+<b>Rev 2:</b> benefit tiles are now bold gradient chips color-coded from the app's accent tokens
+(level&nbsp;purple · vial&nbsp;water-blue · muscle&nbsp;protein-orange), drawn inline (no icon-font dependency),
+with the motion layer specified below. Hit <b>Replay motion</b> to watch the entrance again.</p>
+<button class="replay" onclick="replay()">▶ Replay motion</button>
 
 <div class="gallery">
 
   <!-- ============ STATE 1: TRIAL (yearly preselected) ============ -->
   <div class="fw">
     <div class="fl">C v2 · trial state (yearly preselected)</div>
-    <div class="dev"><div class="scr">
+    <div class="dev"><div class="scr play">
       <div class="restore">Restore</div>
-      <div class="hero">Never wonder what's<br>in your body again</div>
-      <div class="sub">Your plan is ready. Here's what changes.</div>
+      <div class="hero a1">Never wonder what's<br>in your body again</div>
+      <div class="sub a1">Your plan is ready. Here's what changes.</div>
 
       <div class="bcard">
-        <div class="brow">
-          <div class="btile"><i class="ti ti-activity-heartbeat"></i></div>
+        <div class="brow a1">
+          <div class="btile level"><svg><use href="#i-level"/></svg><span class="livedot"></span></div>
           <div><div class="bt">Know what's still working — right now</div>
             <div class="bs">Your live medication level between shots: covered, or in a trough.</div></div>
         </div>
-        <div class="brow">
-          <div class="btile"><i class="ti ti-vaccine"></i></div>
+        <div class="brow a2">
+          <div class="btile vial"><svg><use href="#i-vial"/></svg></div>
           <div><div class="bt">Never do vial math again</div>
             <div class="bs">Exact units from your vial and dose. No spreadsheets, no second-guessing.</div></div>
         </div>
-        <div class="brow">
-          <div class="btile"><i class="ti ti-barbell"></i></div>
+        <div class="brow a3">
+          <div class="btile muscle"><svg><use href="#i-muscle"/></svg></div>
           <div><div class="bt">Lose the fat. Keep the muscle.</div>
             <div class="bs">Protein and muscle-protection tracking, tuned to your dose.</div></div>
         </div>
       </div>
 
-      <div class="plans">
+      <div class="plans a4">
         <div class="plan sel">
           <div class="badge"><span>3 DAYS FREE</span></div>
-          <i class="ti ti-circle-check-filled radio on"></i>
+          <svg class="radio"><use href="#i-radio-on"/></svg>
           <div class="ptitle">Yearly</div>
           <div class="psub">billed yearly · save 50%</div>
           <div class="prow"><span class="pprice">$5.00</span><span class="pper">/mo</span></div>
           <div class="pnote">$59.99/yr</div>
         </div>
         <div class="plan">
-          <i class="ti ti-circle radio off"></i>
+          <svg class="radio"><use href="#i-radio-off"/></svg>
           <div class="ptitle">Monthly</div>
           <div class="psub">billed monthly</div>
           <div class="prow"><span class="pprice">$9.99</span><span class="pper">/mo</span></div>
@@ -157,61 +229,63 @@ catches just before the CTA. Plan cards, preselection, and all purchase paths ar
         </div>
       </div>
 
-      <div class="strip">
-        <i class="ti ti-lock-open"></i><b>Free today</b><s>·</s>
-        <i class="ti ti-bell"></i><b>Reminder day 2</b><s>·</s>
-        <i class="ti ti-calendar"></i><b>First charge Aug 8</b>
+      <div class="strip a5">
+        <svg><use href="#i-lock"/></svg><b>Free today</b><s>·</s>
+        <svg><use href="#i-bell"/></svg><b>Reminder day 2</b><s>·</s>
+        <svg><use href="#i-cal"/></svg><b>First charge Aug 8</b>
       </div>
 
-      <div class="foot">
+      <div class="foot a6">
         <div class="cta">Try today for $0.00</div>
         <div class="ctasub">3 days free — we'll remind you before it ends. Then $59.99/yr, auto-renews. Cancel anytime in Settings.</div>
         <div class="legal">$59.99/year. Cancel anytime · <b>Terms</b> &amp; <b>Privacy</b></div>
       </div>
     </div></div>
-    <div class="spec"><b>Headline</b> pays off the store promise without copy-pasting it — outcome, not offer.
-      <b>Benefit rows</b> reuse the shipped timelineRow idiom (tile 30px, #F1EDFF, 800-weight line + quiet sub).
-      <b>Terms strip</b> = paywallTimeline compressed to one pill; date + duration stay derived.
-      CTA + subline + legal unchanged (3.1.2 trio intact).</div>
+    <div class="spec"><b>Tiles:</b> 34px gradient chips, one accent each (level purple / vial water / muscle protein) —
+      the only saturated color block on the screen, so the eye lands on the benefits first.
+      <b>Live dot</b> on benefit 1 pulses forever (LivingMascot heartbeat idiom) — the single looping
+      element, because &ldquo;live&rdquo; is that row's literal claim. <b>Entrance:</b> rows fade+rise with
+      110ms stagger (TimelineRow's exact curve), tiles pop 60ms behind their row, then cards → strip → CTA
+      continue the chain. Terms strip = paywallTimeline compressed; 3.1.2 trio intact in subline + legal.</div>
   </div>
 
   <!-- ============ STATE 2: NO TRIAL (monthly selected / ineligible) ============ -->
   <div class="fw">
     <div class="fl">C v2 · no-trial state (monthly selected)</div>
-    <div class="dev"><div class="scr">
+    <div class="dev"><div class="scr play">
       <div class="restore">Restore</div>
-      <div class="hero">Never wonder what's<br>in your body again</div>
-      <div class="sub">Your plan is ready. Here's what changes.</div>
+      <div class="hero a1">Never wonder what's<br>in your body again</div>
+      <div class="sub a1">Your plan is ready. Here's what changes.</div>
 
       <div class="bcard">
-        <div class="brow">
-          <div class="btile"><i class="ti ti-activity-heartbeat"></i></div>
+        <div class="brow a1">
+          <div class="btile level"><svg><use href="#i-level"/></svg><span class="livedot"></span></div>
           <div><div class="bt">Know what's still working — right now</div>
             <div class="bs">Your live medication level between shots: covered, or in a trough.</div></div>
         </div>
-        <div class="brow">
-          <div class="btile"><i class="ti ti-vaccine"></i></div>
+        <div class="brow a2">
+          <div class="btile vial"><svg><use href="#i-vial"/></svg></div>
           <div><div class="bt">Never do vial math again</div>
             <div class="bs">Exact units from your vial and dose. No spreadsheets, no second-guessing.</div></div>
         </div>
-        <div class="brow">
-          <div class="btile"><i class="ti ti-barbell"></i></div>
+        <div class="brow a3">
+          <div class="btile muscle"><svg><use href="#i-muscle"/></svg></div>
           <div><div class="bt">Lose the fat. Keep the muscle.</div>
             <div class="bs">Protein and muscle-protection tracking, tuned to your dose.</div></div>
         </div>
       </div>
 
-      <div class="plans">
+      <div class="plans a4">
         <div class="plan">
           <div class="badge"><span>3 DAYS FREE</span></div>
-          <i class="ti ti-circle radio off"></i>
+          <svg class="radio"><use href="#i-radio-off"/></svg>
           <div class="ptitle">Yearly</div>
           <div class="psub">billed yearly · save 50%</div>
           <div class="prow"><span class="pprice">$5.00</span><span class="pper">/mo</span></div>
           <div class="pnote">$59.99/yr</div>
         </div>
         <div class="plan sel">
-          <i class="ti ti-circle-check-filled radio on"></i>
+          <svg class="radio"><use href="#i-radio-on"/></svg>
           <div class="ptitle">Monthly</div>
           <div class="psub">billed monthly</div>
           <div class="prow"><span class="pprice">$9.99</span><span class="pper">/mo</span></div>
@@ -219,22 +293,38 @@ catches just before the CTA. Plan cards, preselection, and all purchase paths ar
         </div>
       </div>
 
-      <div class="reassure">
-        <div class="ritem"><i class="ti ti-check"></i>Cancel anytime</div>
-        <div class="ritem"><i class="ti ti-check"></i>Billed monthly</div>
-        <div class="ritem"><i class="ti ti-check"></i>Full access today</div>
+      <div class="reassure a5">
+        <div class="ritem"><svg><use href="#i-check"/></svg>Cancel anytime</div>
+        <div class="ritem"><svg><use href="#i-check"/></svg>Billed monthly</div>
+        <div class="ritem"><svg><use href="#i-check"/></svg>Full access today</div>
       </div>
 
-      <div class="foot">
+      <div class="foot a6">
         <div class="cta">Start my month — $9.99</div>
         <div class="legal">$9.99/month. Cancel anytime · <b>Terms</b> &amp; <b>Privacy</b></div>
       </div>
     </div></div>
-    <div class="spec"><b>Same benefits, same order</b> — only the terms change with the selection.
-      Terms strip is replaced by the shipped reassure row (+ &ldquo;Full access today&rdquo; reclaiming the
-      old timeline's instant-access promise). No feature grid anywhere — it's gone, not relocated.</div>
+    <div class="spec"><b>Same benefits, same order, same motion</b> — only the terms change with the selection.
+      Terms strip becomes the shipped reassure row (+ &ldquo;Full access today&rdquo; reclaiming the old
+      timeline's instant-access promise). The feature grid is gone, not relocated.</div>
   </div>
 
+</div>
+
+<h2>Motion spec — RN mapping</h2>
+<div class="copy">
+  <p><b>Entrance chain</b> (runs once per mount, keyed by selected plan like today's timeline):
+  headline+sub → benefit rows (110ms apart) → plan cards → terms strip → CTA. Each step:
+  <code>Animated.timing 360ms, Easing.bezier(0.2, 0.7, 0.2, 1)</code>, opacity 0→1 + translateY 8→0 —
+  this is TimelineRow's exact shipped curve, reused. Icon tiles add a
+  <code>spring scale .6→1</code> 60ms behind their row (QuickLog chip pop).</p>
+  <p><b>The one loop:</b> benefit 1's green dot breathes (scale 1→1.7, opacity fade, 1.8s ease-in-out,
+  infinite) — LivingMascot's heartbeat idiom. One looping element maximum on a paywall: it draws the eye
+  to the &ldquo;live level&rdquo; claim without turning the screen into a carnival. Everything else settles
+  and stays still so the CTA reads calm.</p>
+  <p><b>Selection change:</b> benefits do NOT re-animate on plan switch (they didn't change);
+  only the terms strip ↔ reassure row cross-fades (160ms). Prevents the v1 problem of the
+  whole screen replaying when a user compares plans.</p>
 </div>
 
 <h2>Final copy</h2>
@@ -274,4 +364,13 @@ catches just before the CTA. Plan cards, preselection, and all purchase paths ar
   paying-moment argument.</p>
 </div>
 
+<script>
+function replay(){
+  document.querySelectorAll('.scr').forEach(function(s){
+    s.classList.remove('play');
+    void s.offsetWidth;
+    s.classList.add('play');
+  });
+}
+</script>
 </body></html>
