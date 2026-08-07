@@ -39,6 +39,23 @@ export function migrateLegacyStep(step: string): string {
   return LEGACY_STEP_MAP[step] ?? step;
 }
 
+/**
+ * The offer tail. A draft saved here rewinds to the reveal on a FRESH-SESSION
+ * resume (2026-08-07): relaunching straight onto the paywall is the most
+ * aggressive possible re-entry — the user left because they weren't ready.
+ * Resuming at "Your tracker is ready" replays the payoff (their own goal path
+ * drawing itself), reminds them why they wanted this, and walks them back to
+ * the wall in two taps of their own. welcomeIn is deliberately NOT here: that
+ * step is post-purchase — never rewind a paying user to a sales screen.
+ * In-session navigator remounts restore from flowCache and skip hydration,
+ * so this only fires when the app actually restarted.
+ */
+const OFFER_TAIL = new Set(['trialOffer', 'trialCarousel', 'paywall']);
+
+export function rewindResumeStep(step: string): string {
+  return OFFER_TAIL.has(step) ? 'reveal' : step;
+}
+
 export function parseDraft(raw: string | null | undefined): StoredDraft | null {
   if (!raw) return null;
   try {

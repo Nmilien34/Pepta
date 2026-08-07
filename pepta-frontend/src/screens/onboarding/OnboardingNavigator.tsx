@@ -21,7 +21,7 @@ import {
 } from './onboardingFlow';
 import { OnboardingMotionContext, convo } from '../../components';
 import { StepFade } from './StepFade';
-import { ONBOARDING_DRAFT_KEY, migrateLegacyStep, parseDraft, serializeDraft } from './onboardingDraft';
+import { ONBOARDING_DRAFT_KEY, migrateLegacyStep, parseDraft, rewindResumeStep, serializeDraft } from './onboardingDraft';
 import { echoFor, instrumentContext, companyContext, leanMassContext } from './onboardingEcho';
 import { symptomForWeekBeat } from './symptomWeek';
 import { MeetPepScreen } from './MeetPepScreen';
@@ -264,8 +264,10 @@ export function OnboardingNavigator() {
         if (!active || !draft) return;
         // A draft can name a step that no longer exists ('auth' → 'reveal');
         // migrate before the membership check so those users resume instead
-        // of restarting the whole quiz.
-        const step = migrateLegacyStep(draft.step);
+        // of restarting the whole quiz. Then rewind offer-tail drafts to the
+        // reveal: a fresh session must reopen on the payoff, never straight
+        // onto the paywall they just walked away from (2026-08-07).
+        const step = rewindResumeStep(migrateLegacyStep(draft.step));
         if ((ONBOARDING_STEPS as readonly string[]).includes(step)) {
           setStep(step as OnboardingStep);
           setAnswers(draft.answers as FlowAnswers);
