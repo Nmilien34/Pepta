@@ -92,6 +92,12 @@ vi.mock("../theme", () => ({
   }),
 }));
 
+const dataMocks = vi.hoisted(() => ({
+  // Per-test route for the single active compound. undefined = legacy record
+  // with no route — which must behave exactly like injection.
+  compoundRoute: undefined as "oral" | "injection" | undefined,
+}));
+
 vi.mock("../context/PeptaDataContext", () => ({
   usePeptaData: () => ({
     saveLog: vi.fn(async () => "saved" as const),
@@ -108,6 +114,7 @@ vi.mock("../context/PeptaDataContext", () => ({
           name: "Mounjaro",
           plannedDose: 2.5,
           doseUnit: "mg",
+          route: dataMocks.compoundRoute,
         },
       ],
       latestWeight: { value: 180, unit: "lb" },
@@ -154,7 +161,7 @@ vi.mock("./LivingMascot", () => ({
 }));
 
 vi.mock("./BodyMap", () => ({
-  BodyMap: () => null,
+  BodyMap: (props: object) => React.createElement("BodyMap", props),
 }));
 
 vi.mock("./ProgressBar", () => ({
@@ -271,5 +278,35 @@ describe("QuickLogSheet", () => {
       title: "Shot saved",
       detail: "Mounjaro · 2.5 mg logged for today",
     });
+  });
+
+  it("renders the injection-site picker for injection and route-unknown compounds", async () => {
+    for (const route of ["injection", undefined] as const) {
+      dataMocks.compoundRoute = route;
+      let tree: TestRenderer.ReactTestRenderer | undefined;
+      await act(async () => {
+        tree = TestRenderer.create(
+          <QuickLogSheet visible={true} initialMode="dose" onClose={vi.fn()} onMeal={vi.fn()} />,
+        );
+      });
+      expect(
+        tree!.root.findAll((node) => String(node.type) === "BodyMap"),
+      ).toHaveLength(1);
+    }
+    dataMocks.compoundRoute = undefined;
+  });
+
+  it("renders NO injection-site picker for an oral compound — a pill has no site", async () => {
+    dataMocks.compoundRoute = "oral";
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+    await act(async () => {
+      tree = TestRenderer.create(
+        <QuickLogSheet visible={true} initialMode="dose" onClose={vi.fn()} onMeal={vi.fn()} />,
+      );
+    });
+    expect(
+      tree!.root.findAll((node) => String(node.type) === "BodyMap"),
+    ).toHaveLength(0);
+    dataMocks.compoundRoute = undefined;
   });
 });

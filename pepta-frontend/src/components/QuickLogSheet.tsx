@@ -37,6 +37,7 @@ import {
   sideEffectTypeLabel,
   rotationReason,
   siteLabel,
+  suggestNextSite,
   usedSites,
   type InjectionSite,
 } from "../screens/app/trackView";
@@ -45,6 +46,7 @@ import { AddCompoundSheet } from "./AddCompoundSheet";
 import { measurementLabel } from "../screens/app/progressView";
 import {
   defaultDoseDraft,
+  doseRequiresSite,
   isActivityValid,
   isDoseValid,
   toActivityInput,
@@ -501,6 +503,7 @@ export function QuickLogSheet({
                     compounds={home?.activeCompounds ?? []}
                     loading={homeLoading}
                     used={usedSites(track?.doseLogs ?? [])}
+                    nextSite={suggestNextSite(track?.doseLogs ?? [])}
                     offsetH={doseOffsetH}
                     setOffsetH={setDoseOffsetH}
                     onAddMedication={() => setAddMedicationOpen(true)}
@@ -919,6 +922,8 @@ interface DoseCompound {
   name: string;
   doseUnit: DoseDraft["unit"];
   plannedDose?: number;
+  // Absent route = legacy/unknown → treated as injection (doseRequiresSite).
+  route?: DoseDraft["route"];
 }
 
 const TIME_PRESETS: { label: string; h: number }[] = [
@@ -941,6 +946,7 @@ function DoseForm({
   compounds,
   loading,
   used,
+  nextSite,
   offsetH,
   setOffsetH,
   onAddMedication,
@@ -951,6 +957,8 @@ function DoseForm({
   compounds: DoseCompound[];
   loading: boolean;
   used: Set<InjectionSite>;
+  /** Rotation suggestion — seeds the site when switching onto an injectable. */
+  nextSite: InjectionSite;
   offsetH: number;
   setOffsetH: (n: number) => void;
   onAddMedication: () => void;
@@ -1020,12 +1028,17 @@ function DoseForm({
               selected={c.id === dose.compoundId}
               onPress={() => {
                 Haptics.selectionAsync().catch(() => undefined);
+                // The site follows the SELECTED compound's route: switching to
+                // an oral clears it (nothing to persist); switching onto an
+                // injectable keeps the picked site or seeds the rotation.
                 setDose({
                   ...dose,
                   compoundId: c.id,
                   compoundName: c.name,
                   unit: c.doseUnit,
                   amount: c.plannedDose ?? dose.amount,
+                  route: c.route,
+                  site: doseRequiresSite(c.route) ? (dose.site ?? nextSite) : null,
                 });
               }}
             />
@@ -1067,7 +1080,10 @@ function DoseForm({
         <RoundBtn theme={theme} icon="add" onPress={step(0.5)} />
       </View>
 
-      {/* injection site — tap a dot to change */}
+      {/* injection site — tap a dot to change. Rendered ONLY when the draft
+          carries a site: oral compounds have none (a pill has no injection
+          site), and their logs persist without the field entirely. */}
+      {dose.site != null ? (
       <View
         style={{
           borderRadius: theme.radii.card,
@@ -1118,6 +1134,7 @@ function DoseForm({
           </View>
         </View>
       </View>
+      ) : null}
 
       {/* time */}
       <View

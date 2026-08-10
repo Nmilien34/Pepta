@@ -38,6 +38,38 @@ describe('isDoseValid', () => {
   });
 });
 
+// The three route cases (2026-08-07): a pill has no injection site — oral logs
+// must persist WITHOUT the field, while injection and route-unknown compounds
+// keep today's exact behavior (site required, seeded, and saved).
+describe('dose site by route', () => {
+  const home = (route?: string) =>
+    ({ activeCompounds: [{ id: 'c1', name: 'X', plannedDose: 5, doseUnit: 'mg', route }] } as unknown as HomeResponse);
+
+  it('injection compound: site seeded, required, and saved', () => {
+    const draft = defaultDoseDraft(home('injection'), null)!;
+    expect(draft.site).not.toBeNull();
+    expect(isDoseValid(draft)).toBe(true);
+    expect(isDoseValid({ ...draft, site: null })).toBe(false);
+    expect(toDoseInput(draft, NOW).injectionSite).toBe(draft.site);
+  });
+
+  it('oral compound: no site seeded, valid without one, and the key is ABSENT from the payload', () => {
+    const draft = defaultDoseDraft(home('oral'), null)!;
+    expect(draft.site).toBeNull();
+    expect(isDoseValid(draft)).toBe(true);
+    const input = toDoseInput(draft, NOW);
+    expect('injectionSite' in input).toBe(false);
+    expect(input).toEqual({ compoundId: 'c1', amount: 5, unit: 'mg', datetime: NOW });
+  });
+
+  it('route-unknown compound behaves exactly like injection (never guess oral)', () => {
+    const draft = defaultDoseDraft(home(undefined), null)!;
+    expect(draft.site).not.toBeNull();
+    expect(isDoseValid({ ...draft, site: null })).toBe(false);
+    expect(toDoseInput(draft, NOW).injectionSite).toBe(draft.site);
+  });
+});
+
 describe('payload builders', () => {
   it('inject datetime and keep the typed shape', () => {
     const draft: DoseDraft = { compoundId: 'c1', compoundName: 'T', amount: 5, unit: 'mg', site: 'thigh_left', sideEffects: [] };

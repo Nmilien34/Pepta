@@ -21,18 +21,33 @@ export type WeightUnit = WeightLogInput['unit'];
 export type SideEffectType = SideEffectLogInput['types'][number];
 export type MeasurementType = MeasurementInput['type'];
 
+export type DoseRoute = 'injection' | 'oral';
+
+/**
+ * A site belongs on a dose iff the compound is injected. Route missing/unknown
+ * (legacy records, partial data) keeps today's behavior — injection — because
+ * a wrongly-hidden picker loses real rotation data, while a wrongly-shown one
+ * only asks an extra tap. Never guess oral.
+ */
+export function doseRequiresSite(route: DoseRoute | undefined): boolean {
+  return route !== 'oral';
+}
+
 export interface DoseDraft {
   compoundId: string;
   compoundName: string;
   amount: number;
   unit: DoseUnit;
-  site: InjectionSite;
+  /** null ONLY for oral-route compounds — omitted from the persisted log. */
+  site: InjectionSite | null;
+  route?: DoseRoute;
   // Side effects felt around this shot (optional chips on the dose form).
   sideEffects: SideEffectType[];
 }
 
 // Smart default for "Log a shot": the first active compound at its planned dose,
-// with the auto-rotated next injection site.
+// with the auto-rotated next injection site — or no site at all for an oral
+// compound (a pill has no injection site; fabricating one corrupts the log).
 export function defaultDoseDraft(home: HomeResponse | null, track: TrackResponse | null): DoseDraft | null {
   const compound = home?.activeCompounds[0];
   if (!compound) return null;
@@ -41,13 +56,19 @@ export function defaultDoseDraft(home: HomeResponse | null, track: TrackResponse
     compoundName: compound.name,
     amount: compound.plannedDose ?? 0,
     unit: compound.doseUnit,
-    site: suggestNextSite(track?.doseLogs ?? []),
+    site: doseRequiresSite(compound.route) ? suggestNextSite(track?.doseLogs ?? []) : null,
+    route: compound.route,
     sideEffects: [],
   };
 }
 
 export function isDoseValid(draft: DoseDraft | null): draft is DoseDraft {
-  return !!draft && draft.compoundId.length > 0 && draft.amount > 0;
+  return (
+    !!draft &&
+    draft.compoundId.length > 0 &&
+    draft.amount > 0 &&
+    (!doseRequiresSite(draft.route) || draft.site != null)
+  );
 }
 
 export function toDoseInput(draft: DoseDraft, nowIso: string): DoseLogInput {
@@ -55,7 +76,9 @@ export function toDoseInput(draft: DoseDraft, nowIso: string): DoseLogInput {
     compoundId: draft.compoundId,
     amount: draft.amount,
     unit: draft.unit,
-    injectionSite: draft.site,
+    // Absent means absent: an oral dose log carries NO injectionSite key —
+    // never null, never a sentinel (the shared schema marks it optional).
+    ...(draft.site != null ? { injectionSite: draft.site } : {}),
     datetime: nowIso,
     ...(draft.sideEffects.length > 0 ? { sideEffects: draft.sideEffects } : {}),
   };
