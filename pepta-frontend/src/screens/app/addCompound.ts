@@ -22,6 +22,24 @@ export function buildCompoundInput(option: MedicationOption, plannedDose: number
   };
 }
 
+/**
+ * Parse a number the user is still typing. Returns null for anything not yet
+ * a positive number — including the in-progress states ("", "0", "2.", ".").
+ *
+ * CRITICAL: the FIELD must keep rendering the user's raw text, never
+ * String(parse(text)). Rendering the parsed value ate every keystroke that
+ * wasn't already a valid number: "2." re-rendered as "2" (decimal point gone,
+ * so no decimals could ever be typed) and a leading "0" re-rendered as ""
+ * (so "0.5" was impossible). Reported by a live user, 2026-08-10.
+ * Accepts comma decimal separators for non-US keyboards.
+ */
+export function parseDecimalInput(text: string): number | null {
+  const normalized = text.trim().replace(',', '.');
+  if (normalized === '') return null;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
 /** What the custom-entry form collects. Route and frequency are EXPLICIT
  *  choices (null until the user picks — never defaulted); halfLifeDays null
  *  = "not sure", which suppresses the level curve rather than fabricating a

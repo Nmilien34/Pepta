@@ -27,6 +27,7 @@ import {
   buildCustomCompoundInput,
   buildCustomScheduleInput,
   isCustomCompoundValid,
+  parseDecimalInput,
   todayDateOnly,
   type CustomCompoundDraft,
 } from '../screens/app/addCompound';
@@ -67,6 +68,10 @@ export function AddCompoundSheet({ visible, onClose, initialQuery, onBrowseLibra
   const [selected, setSelected] = useState<MedicationOption | null>(null);
   const [dose, setDose] = useState<number | null>(null);
   const [custom, setCustom] = useState<CustomCompoundDraft | null>(null);
+  // RAW text for the two numeric fields — the inputs render these, never the
+  // parsed number, or every in-progress keystroke ("2.", "0") gets erased.
+  const [amountText, setAmountText] = useState('');
+  const [halfLifeText, setHalfLifeText] = useState('');
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState(false);
 
@@ -76,6 +81,8 @@ export function AddCompoundSheet({ visible, onClose, initialQuery, onBrowseLibra
       setSelected(null);
       setDose(null);
       setCustom(null);
+      setAmountText('');
+      setHalfLifeText('');
       setSaving(false);
       setFailed(false);
     }
@@ -87,6 +94,8 @@ export function AddCompoundSheet({ visible, onClose, initialQuery, onBrowseLibra
     Haptics.selectionAsync().catch(() => undefined);
     // A no-match search is almost always the medication's name — carry it in.
     setCustom({ ...EMPTY_CUSTOM, name: query.trim() });
+    setAmountText('');
+    setHalfLifeText('');
     setFailed(false);
   };
 
@@ -288,10 +297,10 @@ export function AddCompoundSheet({ visible, onClose, initialQuery, onBrowseLibra
             </AppText>
             <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
               <TextInput
-                value={custom.amount != null ? String(custom.amount) : ''}
+                value={amountText}
                 onChangeText={(text) => {
-                  const parsed = Number(text.replace(',', '.'));
-                  setCustom({ ...custom, amount: Number.isFinite(parsed) && parsed > 0 ? parsed : null });
+                  setAmountText(text);
+                  setCustom({ ...custom, amount: parseDecimalInput(text) });
                 }}
                 placeholder="0"
                 placeholderTextColor={theme.colors.textTertiary}
@@ -343,10 +352,10 @@ export function AddCompoundSheet({ visible, onClose, initialQuery, onBrowseLibra
               Half-life in days — optional
             </AppText>
             <TextInput
-              value={custom.halfLifeDays != null ? String(custom.halfLifeDays) : ''}
+              value={halfLifeText}
               onChangeText={(text) => {
-                const parsed = Number(text.replace(',', '.'));
-                setCustom({ ...custom, halfLifeDays: Number.isFinite(parsed) && parsed > 0 ? parsed : null });
+                setHalfLifeText(text);
+                setCustom({ ...custom, halfLifeDays: parseDecimalInput(text) });
               }}
               placeholder="Not sure? Skip this."
               placeholderTextColor={theme.colors.textTertiary}

@@ -175,4 +175,41 @@ describe("AddCompoundSheet", () => {
       ),
     ).toHaveLength(1);
   });
+
+  it("keeps decimal keystrokes on screen — typing 2.5 into the dose field", async () => {
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+    await act(async () => {
+      tree = TestRenderer.create(<AddCompoundSheet visible={true} onClose={vi.fn()} />);
+    });
+    await act(async () => {
+      tree!.root
+        .findAll((n) => n.props?.accessibilityLabel === "Add your own medication")
+        .at(-1)!
+        .props.onPress();
+    });
+
+    const doseField = () =>
+      tree!.root.findAll(
+        (n) => String(n.type) === "TextInput" && n.props?.keyboardType === "decimal-pad",
+      )[0]!;
+
+    // The exact sequence a user types. Before the fix "2." re-rendered as "2"
+    // (decimal erased) and a leading "0" re-rendered as "" — so 0.5 and 2.5
+    // were both impossible to enter.
+    for (const keystroke of ["2", "2.", "2.5"]) {
+      await act(async () => {
+        doseField().props.onChangeText(keystroke);
+      });
+      expect(doseField().props.value).toBe(keystroke);
+    }
+
+    await act(async () => {
+      doseField().props.onChangeText("0");
+    });
+    expect(doseField().props.value).toBe("0");
+    await act(async () => {
+      doseField().props.onChangeText("0.5");
+    });
+    expect(doseField().props.value).toBe("0.5");
+  });
 });

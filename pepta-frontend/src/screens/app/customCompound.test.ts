@@ -11,6 +11,7 @@ import {
   buildCustomCompoundInput,
   buildCustomScheduleInput,
   isCustomCompoundValid,
+  parseDecimalInput,
   type CustomCompoundDraft,
 } from './addCompound';
 import { defaultDoseDraft, toDoseInput } from './quickLog';
@@ -131,5 +132,48 @@ describe('custom oral daily medication — end to end', () => {
     expect(isCustomCompoundValid({ ...FOUNDAYO, amount: null })).toBe(false);
     // Skipping the half-life is explicitly valid.
     expect(isCustomCompoundValid({ ...FOUNDAYO, halfLifeDays: null })).toBe(true);
+  });
+});
+
+// Live-user bug, 2026-08-10: "the decimal isn't working to be able to enter
+// the dose." The field rendered String(parsedNumber), so any keystroke that
+// wasn't already a valid positive number was erased as you typed it. These
+// pin the parser AND the invariant that the field keeps the user's raw text.
+describe('decimal dose entry', () => {
+  it('accepts decimals, including the in-progress states that used to be erased', () => {
+    expect(parseDecimalInput('2.5')).toBe(2.5);
+    expect(parseDecimalInput('0.5')).toBe(0.5);
+    expect(parseDecimalInput('.5')).toBe(0.5);
+    expect(parseDecimalInput('12.25')).toBe(12.25);
+  });
+
+  it('returns null for not-yet-a-number instead of clobbering the field', () => {
+    // The FIELD keeps showing these; only the parsed value is null, which
+    // simply leaves the save button disabled until the number is complete.
+    expect(parseDecimalInput('')).toBeNull();
+    expect(parseDecimalInput('0')).toBeNull();
+    expect(parseDecimalInput('.')).toBeNull();
+    expect(parseDecimalInput('2.')).toBe(2); // "2." parses, and "2." stays on screen
+    expect(parseDecimalInput('abc')).toBeNull();
+  });
+
+  it('accepts comma decimal separators (non-US keyboards)', () => {
+    expect(parseDecimalInput('2,5')).toBe(2.5);
+  });
+
+  it('rejects zero and negatives — a dose must be positive', () => {
+    expect(parseDecimalInput('0')).toBeNull();
+    expect(parseDecimalInput('-3')).toBeNull();
+  });
+
+  it('a decimal dose survives into the compound payload', () => {
+    const draft = { ...FOUNDAYO, amount: parseDecimalInput('2.5')! };
+    expect(isCustomCompoundValid(draft)).toBe(true);
+    expect(buildCustomCompoundInput(draft, '2026-08-10').plannedDose).toBe(2.5);
+  });
+
+  it('a decimal half-life survives too (same defect, same fix)', () => {
+    const draft = { ...FOUNDAYO, halfLifeDays: parseDecimalInput('0.5') };
+    expect(buildCustomCompoundInput(draft, '2026-08-10').halfLifeDays).toBe(0.5);
   });
 });
