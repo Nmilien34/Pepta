@@ -123,14 +123,55 @@ export const MEDICATION_CATALOG: readonly MedicationOption[] = [
   {
     id: 'rybelsus',
     name: 'Rybelsus',
-    subtitle: 'Oral · daily pill',
+    // Molecule names live in the subtitle because search matches name+subtitle
+    // — someone who only knows "semaglutide" still finds their brand.
+    subtitle: 'Semaglutide · daily pill',
     drugClass: 'glp_1',
     doseUnit: 'mg',
-    halfLifeDays: 1,
+    halfLifeDays: 7,
     route: 'oral',
     commonDoses: [3, 7, 14],
     kind: 'oral',
     tintColor: '#A8327D',
+  },
+  // The oral shelf. Three names people actually type, two molecules:
+  // Rybelsus (diabetes brand) and Wegovy Pill (weight-loss brand) are both
+  // semaglutide; Foundayo is orforglipron, a different molecule entirely.
+  {
+    id: 'wegovy_pill',
+    name: 'Wegovy Pill',
+    subtitle: 'Semaglutide · daily pill',
+    drugClass: 'glp_1',
+    doseUnit: 'mg',
+    halfLifeDays: 7,
+    route: 'oral',
+    commonDoses: [1.5, 4, 9, 25],
+    kind: 'oral',
+    tintColor: '#7B4BC9',
+  },
+  {
+    id: 'foundayo',
+    name: 'Foundayo',
+    subtitle: 'Orforglipron · daily pill',
+    drugClass: 'glp_1',
+    doseUnit: 'mg',
+    halfLifeDays: 1.6,
+    route: 'oral',
+    commonDoses: [0.8, 2.5, 5.5, 9, 14.5, 17.2],
+    kind: 'oral',
+    tintColor: '#2F7DBF',
+  },
+  {
+    id: 'oral_semaglutide',
+    name: 'Oral semaglutide',
+    subtitle: 'Semaglutide · generic oral',
+    drugClass: 'glp_1',
+    doseUnit: 'mg',
+    halfLifeDays: 7,
+    route: 'oral',
+    commonDoses: [3, 7, 14],
+    kind: 'oral',
+    tintColor: '#9A4FB5',
   },
   {
     id: 'compounded_tirzepatide',

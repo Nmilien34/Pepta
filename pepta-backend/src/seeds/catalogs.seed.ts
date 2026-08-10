@@ -167,6 +167,23 @@ const medicationCatalogSeed = [
     doseUnit: "mg",
     active: true,
   },
+  // Orforglipron — a NON-peptide small-molecule GLP-1 agonist, so none of the
+  // semaglutide/tirzepatide values apply to it. Label: elimination half-life
+  // 29–49 hours; 1.6 d is the midpoint of that range. A real molecule with a
+  // known range earns a real number (unlike the research-peptide catch-all).
+  {
+    slug: "foundayo",
+    name: "Foundayo",
+    brand: "Foundayo",
+    drugClass: "glp_1",
+    route: "oral",
+    defaultFrequency: "daily",
+    commonDoses: [0.8, 2.5, 5.5, 9, 14.5, 17.2],
+    halfLifeDays: 1.6,
+    doseUnit: "mg",
+    defaultDose: 0.8,
+    active: true,
+  },
   // Liraglutide was missing entirely, leaving the two daily injectables with
   // no server-side values. Label: elimination half-life ~13 hours (0.54 d) —
   // an order of magnitude off the weekly agonists, so it matters.

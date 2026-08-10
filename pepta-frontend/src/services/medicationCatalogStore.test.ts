@@ -17,7 +17,7 @@ vi.mock("@react-native-async-storage/async-storage", () => ({
 }));
 vi.mock("./api", () => ({ api: { listMedicationCatalog: mocks.list } }));
 
-import { MEDICATION_CATALOG } from "../data/medicationCatalog";
+import { MEDICATION_CATALOG, searchMedications } from "../data/medicationCatalog";
 import {
   CATALOG_TTL_MS,
   currentMedicationCatalog,
@@ -48,17 +48,43 @@ function serverItem(slug: string, over: Partial<MedicationCatalogItem> = {}): Me
 
 describe("mergeCatalog", () => {
   it("takes clinical values from the server and keeps bundled presentation", () => {
+    // A deliberately different value proves the server wins — the bundle is
+    // no longer wrong about Rybelsus (it ships 7d now so the OFFLINE fallback
+    // is correct too), so overriding it with 7 would prove nothing.
     const merged = mergeCatalog(MEDICATION_CATALOG, [
-      serverItem("rybelsus", { route: "oral", halfLifeDays: 7, commonDoses: [3, 7, 14] }),
+      serverItem("rybelsus", { route: "oral", halfLifeDays: 6.5, commonDoses: [3, 7, 14] }),
     ]);
     const rybelsus = merged.find((m) => m.id === "rybelsus")!;
     const bundled = MEDICATION_CATALOG.find((m) => m.id === "rybelsus")!;
-    expect(bundled.halfLifeDays).toBe(1); // the wrong bundled value…
-    expect(rybelsus.halfLifeDays).toBe(7); // …corrected by the server
+    expect(bundled.halfLifeDays).toBe(7);
+    expect(rybelsus.halfLifeDays).toBe(6.5); // server overrode the bundle
     // Presentation the server doesn't carry survives untouched.
     expect(rybelsus.subtitle).toBe(bundled.subtitle);
     expect(rybelsus.kind).toBe(bundled.kind);
     expect(rybelsus.tintColor).toBe(bundled.tintColor);
+  });
+
+  it("ships the oral shelf and Foundayo with label-correct values in the FALLBACK too", () => {
+    // These matter offline and before the seed lands — a Foundayo-group user
+    // must find their pill even with no network.
+    const byId = (id: string) => MEDICATION_CATALOG.find((m) => m.id === id)!;
+    expect(byId("foundayo").halfLifeDays).toBe(1.6); // orforglipron, 29–49h
+    expect(byId("foundayo").route).toBe("oral");
+    expect(byId("wegovy_pill").halfLifeDays).toBe(7); // semaglutide
+    expect(byId("oral_semaglutide").halfLifeDays).toBe(7);
+    expect(byId("rybelsus").halfLifeDays).toBe(7);
+    for (const id of ["foundayo", "wegovy_pill", "oral_semaglutide", "rybelsus"]) {
+      expect(byId(id).kind).toBe("oral");
+    }
+  });
+
+  it("finds the orals by MOLECULE, not just brand — the group types either", () => {
+    const names = (q: string) => searchMedications(MEDICATION_CATALOG, q).map((m) => m.name);
+    expect(names("foundayo")).toContain("Foundayo");
+    expect(names("orforglipron")).toContain("Foundayo");
+    expect(names("semaglutide")).toEqual(
+      expect.arrayContaining(["Rybelsus", "Wegovy Pill", "Oral semaglutide"]),
+    );
   });
 
   it("carries a null half-life through as not-modelled", () => {
