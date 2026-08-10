@@ -226,3 +226,33 @@ describe('computeMedicationLevel', () => {
     });
   });
 });
+
+// Daily cadence (2026-08-07): the service now maps frequency 'daily' to a
+// 1-day interval, so a daily schedule WITHOUT explicit dose times still
+// projects tomorrow's dose — and with times, the engine's existing daily
+// branch (tested above) uses the chosen wall-clock time.
+describe('daily interval projection', () => {
+  it('a daily schedule with no timesOfDay projects last dose + 1 day', () => {
+    const result = computeMedicationLevel({
+      compoundId: 'compound-1',
+      compoundName: 'oral-daily',
+      halfLifeDays: 1,
+      doses: [{ amount: 3, datetime: '2026-08-06T14:00:00.000Z' }],
+      now: new Date('2026-08-06T20:00:00.000Z'),
+      scheduleIntervalDays: 1,
+    });
+    expect(result.nextDoseAt).toBe('2026-08-07T14:00:00.000Z');
+  });
+
+  it('weekly interval behavior is unchanged', () => {
+    const result = computeMedicationLevel({
+      compoundId: 'compound-1',
+      compoundName: 'semaglutide',
+      halfLifeDays: 7,
+      doses: [{ amount: 10, datetime: '2026-08-02T14:00:00.000Z' }],
+      now: new Date('2026-08-06T20:00:00.000Z'),
+      scheduleIntervalDays: 7,
+    });
+    expect(result.nextDoseAt).toBe('2026-08-09T14:00:00.000Z');
+  });
+});

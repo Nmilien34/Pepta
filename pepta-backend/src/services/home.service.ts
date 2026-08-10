@@ -47,9 +47,17 @@ async function getProfile(userId: string) {
   return profile ? serializeWithSchema(userProfileResponseSchema, profile) : null;
 }
 
-async function getActiveCompounds(userId: string) {
+async function getActiveCompounds(userId: string, includeUnmodeled: boolean) {
   const compounds = await CompoundModel.find({ userId, status: 'active' }).sort({ createdAt: -1 });
-  return compounds.map((compound) => serializeWithSchema(compoundResponseSchema, compound));
+  // COMPAT (2026-08-07, tz-param precedent): old shipped clients bundle a
+  // strict compound schema where halfLifeDays is REQUIRED — serving them an
+  // unmodelled compound fails their whole /home parse. Callers that can
+  // handle null send ?unmodeled=1; everyone else simply doesn't receive
+  // those compounds (degraded-but-never-broken).
+  const visible = includeUnmodeled
+    ? compounds
+    : compounds.filter((compound) => compound.halfLifeDays != null);
+  return visible.map((compound) => serializeWithSchema(compoundResponseSchema, compound));
 }
 
 interface RangeTotals {
@@ -179,7 +187,7 @@ export async function getHome(
   userId: string,
   now = new Date(),
   rangeInput: unknown = 'today',
-  options: { allowAIInsightProse?: boolean; tz?: unknown } = {},
+  options: { allowAIInsightProse?: boolean; tz?: unknown; includeUnmodeledCompounds?: boolean } = {},
 ) {
   const selectedRange = parseHomeRange(rangeInput);
   const tz = parseHomeTimezone(options.tz);
@@ -196,7 +204,7 @@ export async function getHome(
     streakResult,
   ] = await Promise.allSettled([
     getProfile(userId),
-    getActiveCompounds(userId),
+    getActiveCompounds(userId, options.includeUnmodeledCompounds === true),
     getMedicationLevels(userId, now),
     getRangeTotals(userId, now, selectedRange, tz),
     getRangeTotals(userId, now, 'today', tz),

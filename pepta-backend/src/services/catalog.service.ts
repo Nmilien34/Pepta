@@ -55,8 +55,12 @@ export async function listCompounds(userId: string) {
 }
 
 export async function createCompound(userId: string, input: CompoundInput) {
+  // null half-life normalizes to ABSENT — "not modelled" is the absence of a
+  // value, never a stored null and never a fabricated default.
+  const { halfLifeDays, ...rest } = input;
   const compound = await CompoundModel.create({
-    ...input,
+    ...rest,
+    ...(halfLifeDays != null ? { halfLifeDays } : {}),
     userId,
     deletedAt: null,
   });

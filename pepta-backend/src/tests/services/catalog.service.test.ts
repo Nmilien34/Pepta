@@ -2,12 +2,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   compoundFindOneAndUpdate: vi.fn(),
+  compoundCreate: vi.fn(),
   scheduleFindOneAndUpdate: vi.fn(),
 }));
 
 vi.mock("../../models", () => ({
   CompoundModel: {
     findOneAndUpdate: mocks.compoundFindOneAndUpdate,
+    create: mocks.compoundCreate,
   },
   CycleModel: {},
   MedicationCatalogModel: {},
@@ -17,7 +19,7 @@ vi.mock("../../models", () => ({
   },
 }));
 
-import { updateCompound, updateSchedule } from "../../services/catalog.service";
+import { createCompound, updateCompound, updateSchedule } from "../../services/catalog.service";
 
 type ModelUpdate = {
   $set?: Record<string, unknown>;
@@ -112,5 +114,69 @@ describe("catalog edit services", () => {
       nextDoseAt: new Date("2026-07-05T13:00:00.000Z"),
     });
     expect(result.frequency).toBe("biweekly");
+  });
+});
+
+describe("createCompound half-life normalization", () => {
+  it("stores NO halfLifeDays field when the user skipped it — absence, not null, never a default", async () => {
+    mocks.compoundCreate.mockResolvedValue(
+      document({
+        id: "compound-2",
+        userId: "user-1",
+        name: "Foundayo",
+        drugClass: "other",
+        route: "oral",
+        doseUnit: "mg",
+        startDate: "2026-08-07",
+        status: "active",
+        deletedAt: null,
+        createdAt: "2026-08-07T00:00:00.000Z",
+        updatedAt: "2026-08-07T00:00:00.000Z",
+      }),
+    );
+
+    await createCompound("user-1", {
+      name: "Foundayo",
+      drugClass: "other",
+      route: "oral",
+      halfLifeDays: null,
+      doseUnit: "mg",
+      startDate: "2026-08-07",
+      status: "active",
+    });
+
+    const created = mocks.compoundCreate.mock.calls.at(-1)![0] as Record<string, unknown>;
+    expect("halfLifeDays" in created).toBe(false);
+  });
+
+  it("passes a provided half-life through untouched", async () => {
+    mocks.compoundCreate.mockResolvedValue(
+      document({
+        id: "compound-3",
+        userId: "user-1",
+        name: "Custom peptide",
+        drugClass: "other",
+        route: "injection",
+        halfLifeDays: 2.5,
+        doseUnit: "mcg",
+        startDate: "2026-08-07",
+        status: "active",
+        deletedAt: null,
+        createdAt: "2026-08-07T00:00:00.000Z",
+        updatedAt: "2026-08-07T00:00:00.000Z",
+      }),
+    );
+
+    await createCompound("user-1", {
+      name: "Custom peptide",
+      drugClass: "other",
+      route: "injection",
+      halfLifeDays: 2.5,
+      doseUnit: "mcg",
+      startDate: "2026-08-07",
+      status: "active",
+    });
+
+    expect(mocks.compoundCreate.mock.calls.at(-1)![0]).toMatchObject({ halfLifeDays: 2.5 });
   });
 });

@@ -16,6 +16,9 @@ router.get(
       await getHome(req.user!.id, new Date(), req.query.range, {
         allowAIInsightProse: req.get("x-pepta-ai-consent") === "true",
         tz: req.query.tz,
+        // Capability param: only clients whose bundled schema tolerates a
+        // null halfLifeDays may receive unmodelled compounds.
+        includeUnmodeledCompounds: req.query.unmodeled === "1",
       }),
     );
   }),

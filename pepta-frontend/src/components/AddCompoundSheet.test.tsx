@@ -22,6 +22,7 @@ vi.mock("react-native", () => ({
       props,
       typeof children === "function" ? children({ pressed: false }) : children,
     ),
+  TextInput: (props: Record<string, unknown>) => React.createElement("TextInput", props),
   View: "View",
 }));
 
@@ -120,5 +121,58 @@ describe("AddCompoundSheet", () => {
     });
 
     expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it('routes "Something else" into the custom form — never a junk compound named "Something else"', async () => {
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+    await act(async () => {
+      tree = TestRenderer.create(<AddCompoundSheet visible={true} onClose={vi.fn()} />);
+    });
+
+    // "Something else" sits past the 6-row search cap — reach it the way a
+    // user does, by searching for it.
+    const search = tree!.root.findAll((node) => String(node.type) === "SearchField").at(-1)!;
+    await act(async () => {
+      search.props.onChangeText("something");
+    });
+
+    const text = (node: TestRenderer.ReactTestInstance): string =>
+      node.children
+        .map((child) => (typeof child === "string" ? child : text(child as TestRenderer.ReactTestInstance)))
+        .join("");
+    const row = tree!.root
+      .findAll(
+        (node) =>
+          String(node.type) === "Pressable" &&
+          node.props?.onPress != null &&
+          text(node).includes("Something else"),
+      )
+      .at(-1)!;
+
+    await act(async () => {
+      row.props.onPress();
+    });
+
+    // The custom form opened (name field present) and nothing was created.
+    expect(
+      tree!.root.findAll(
+        (node) => String(node.type) === "TextInput" && node.props?.placeholder === "e.g. Foundayo",
+      ),
+    ).toHaveLength(1);
+    expect(mocks.addCompound).not.toHaveBeenCalled();
+  });
+
+  it('always offers "Add your own" without needing a failed search', async () => {
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+    await act(async () => {
+      tree = TestRenderer.create(<AddCompoundSheet visible={true} onClose={vi.fn()} />);
+    });
+    expect(
+      tree!.root.findAll(
+        (node) =>
+          String(node.type) === "Pressable" &&
+          node.props?.accessibilityLabel === "Add your own medication",
+      ),
+    ).toHaveLength(1);
   });
 });

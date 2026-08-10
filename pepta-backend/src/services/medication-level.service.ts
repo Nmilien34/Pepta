@@ -20,6 +20,9 @@ export async function getMedicationLevels(userId: string, now = new Date()) {
   ]);
   const levels = await Promise.all(
     compounds.map(async (compound) => {
+      // Unmodelled compound (user skipped half-life): no curve, no next-dose
+      // projection from levels — suppression, never a fabricated default.
+      if (compound.halfLifeDays == null) return null;
       const [doseLogs, schedule] = await Promise.all([
         DoseLogModel.find({ userId, compoundId: compound._id }).sort({
           datetime: 1,
@@ -38,7 +41,9 @@ export async function getMedicationLevels(userId: string, now = new Date()) {
           ? 7
           : schedule?.frequency === "biweekly"
             ? 14
-            : undefined);
+            : schedule?.frequency === "daily"
+              ? 1
+              : undefined);
 
       const cycle = cycles.find(
         (candidate) =>
@@ -82,5 +87,5 @@ export async function getMedicationLevels(userId: string, now = new Date()) {
     }),
   );
 
-  return levels;
+  return levels.filter((level) => level != null);
 }

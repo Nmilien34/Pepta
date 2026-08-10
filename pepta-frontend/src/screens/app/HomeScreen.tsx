@@ -367,7 +367,7 @@ export function HomeScreen() {
                   </View>
                   <View style={{ backgroundColor: theme.colors.surfaceAlt, paddingVertical: 5, paddingHorizontal: 11, borderRadius: theme.radii.pill }}>
                     <AppText variant="caption" color="textTertiary" style={{ fontWeight: '600' }}>
-                      No doses yet
+                      {view.medicationUnmodeled ? 'Not modelled' : 'No doses yet'}
                     </AppText>
                   </View>
                 </View>
@@ -394,7 +394,9 @@ export function HomeScreen() {
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: theme.spacing.md, paddingTop: theme.spacing.sm, borderTopWidth: 0.5, borderTopColor: theme.colors.border }}>
                   <Icon name="time-outline" size={14} color={theme.colors.textSecondary} />
                   <AppText variant="caption" color="textSecondary">
-                    Log your first shot to start tracking levels.
+                    {view.medicationUnmodeled
+                      ? 'Level tracking isn’t available for this medication.'
+                      : 'Log your first shot to start tracking levels.'}
                   </AppText>
                 </View>
               </Card>

@@ -74,9 +74,12 @@ const compoundSchema = new Schema<CompoundDocument>(
       type: String,
       enum: ["single_dose_pen", "auto_injector", "syringe_vial", "other"],
     },
+    // Optional since 2026-08-07: null/absent = "not modelled" (custom meds
+    // where the user skipped it). The level curve is suppressed for such
+    // compounds — no fabricated default, ever.
     halfLifeDays: {
       type: Number,
-      required: true,
+      required: false,
       min: 0,
     },
     doseUnit: {

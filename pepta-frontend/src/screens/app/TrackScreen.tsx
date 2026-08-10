@@ -283,6 +283,7 @@ export function TrackScreen() {
                 <MedicationLevelCardContent
                   ml={ml}
                   compoundName={ml?.compoundName ?? compounds[0]?.name ?? 'Medication'}
+                  unmodeled={ml == null && compounds[0]?.halfLifeDays == null && compounds.length > 0}
                   onLogDose={() => openQuickLog('dose')}
                   onOpenSettings={() => navigation.navigate('DoseSettings')}
                 />
@@ -460,11 +461,14 @@ function LevelChart({ levels, color }: { levels: number[]; color: string }) {
 function MedicationLevelCardContent({
   ml,
   compoundName,
+  unmodeled,
   onLogDose,
   onOpenSettings,
 }: {
   ml: NonNullable<ReturnType<typeof usePeptaData>['home']>['medicationLevels'][number] | null;
   compoundName: string;
+  /** No half-life on the compound: the curve is suppressed, not pending. */
+  unmodeled: boolean;
   onLogDose: () => void;
   onOpenSettings: () => void;
 }) {
@@ -532,8 +536,11 @@ function MedicationLevelCardContent({
             {compoundName}
           </AppText>
           <AppText variant="body" color="textSecondary">
-            Log your first shot to start building your medication level curve.
+            {unmodeled
+              ? 'Level tracking isn’t available for this medication.'
+              : 'Log your first shot to start building your medication level curve.'}
           </AppText>
+          {unmodeled ? null : (
           <Pressable
             onPress={() => {
               Haptics.selectionAsync().catch(() => undefined);
@@ -559,6 +566,7 @@ function MedicationLevelCardContent({
               Log shot
             </AppText>
           </Pressable>
+          )}
         </View>
       )}
     </>

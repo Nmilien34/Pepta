@@ -377,7 +377,12 @@ export const compoundInputSchema = z
     route: medicationRouteSchema.default("injection"),
     // How the user injects (pen vs vial etc.) — optional; oral compounds omit it.
     deviceType: injectionDeviceTypeSchema.optional(),
-    halfLifeDays: z.number().positive(),
+    // null/absent = "not modelled" (custom meds where the user skipped it):
+    // the level curve is SUPPRESSED for such compounds — never fabricated
+    // from a default. COMPAT (2026-08-07): old shipped clients bundle a
+    // schema where this is required, so /home omits unmodelled compounds
+    // for callers that don't send the capability param (tz-param precedent).
+    halfLifeDays: z.number().positive().nullish(),
     doseUnit: doseUnitSchema,
     plannedDose: z.number().positive().optional(),
     concentration: z.number().positive().optional(),

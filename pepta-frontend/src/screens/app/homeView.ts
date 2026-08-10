@@ -47,6 +47,12 @@ export interface HomeView {
   rangeLabel: string;
   rangeDayCount: number;
   medication: MedicationView | null;
+  /**
+   * True when the active compound has no half-life ("not modelled" custom
+   * med): the level card must say tracking isn't available — suppression,
+   * never a fabricated curve and never the misleading "log your first shot".
+   */
+  medicationUnmodeled: boolean;
   calories: RingStat;
   protein: RingStat;
   fiber: RingStat;
@@ -134,6 +140,8 @@ export function buildHomeView(home: HomeResponse): HomeView {
   return {
     rangeLabel,
     rangeDayCount,
+    medicationUnmodeled:
+      ml == null && home.activeCompounds.length > 0 && home.activeCompounds[0]!.halfLifeDays == null,
     medication: ml
       ? {
           name: ml.compoundName,

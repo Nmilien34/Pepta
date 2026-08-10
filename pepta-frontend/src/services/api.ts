@@ -19,6 +19,7 @@ import {
   compoundResponseSchema,
   cycleInputSchema,
   cycleResponseSchema,
+  scheduleInputSchema,
   schedulePatchSchema,
   scheduleResponseSchema,
   doseLogInputSchema,
@@ -74,6 +75,7 @@ import {
   type CompoundResponse,
   type CycleInput,
   type CycleResponse,
+  type ScheduleInput,
   type SchedulePatch,
   type ScheduleResponse,
   type DoseLogInput,
@@ -387,6 +389,10 @@ class PeptaApi {
     // legacy UTC calendar windows shipped builds expect.
     const tz = deviceTimeZone();
     if (tz) params.set("tz", tz);
+    // Capability: this bundle's compound schema tolerates a null halfLifeDays
+    // ("not modelled" custom meds). Old bundles never send this and never
+    // receive unmodelled compounds — their strict parse stays safe.
+    params.set("unmodeled", "1");
     const query = params.toString();
     return this.request(`/home${query ? `?${query}` : ""}`, homeResponseSchema, {
       headers: options.aiDataSharingConsent
@@ -505,6 +511,16 @@ class PeptaApi {
   // week strip and month calendar derive planned days from these.
   public listSchedules(): Promise<ScheduleResponse[]> {
     return this.request("/schedules", z.array(scheduleResponseSchema));
+  }
+
+  // POST /schedules → ScheduleResponse. Until 2026-08-07 only onboarding
+  // could create schedules — compounds added in-app had no cadence, so
+  // nextDoseAt (and dose reminders) never armed for them.
+  public createSchedule(input: ScheduleInput): Promise<ScheduleResponse> {
+    return this.request("/schedules", scheduleResponseSchema, {
+      method: "POST",
+      body: JSON.stringify(scheduleInputSchema.parse(input)),
+    });
   }
 
   // PATCH /schedules/:id → ScheduleResponse. The timing editor writes
