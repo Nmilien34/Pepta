@@ -28,6 +28,10 @@ vi.mock("react-native", () => ({ View: "View" }));
 vi.mock("./AppUpdateGate", () => ({
   AppUpdateGate: () => React.createElement("AppUpdateGate"),
 }));
+// Headless and provider-dependent — the gate's own suite covers its behavior.
+vi.mock("./ReminderRefreshGate", () => ({
+  ReminderRefreshGate: () => React.createElement("ReminderRefreshGate"),
+}));
 vi.mock("@react-navigation/native", () => ({
   NavigationContainer: ({ children }: { children?: React.ReactNode }) =>
     React.createElement("NavigationContainer", null, children),

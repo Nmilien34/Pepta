@@ -10,6 +10,7 @@ import { useAccess } from '../context/AccessContext';
 import { useTheme } from '../theme';
 import { MainTabs } from '../navigation/MainTabs';
 import { AppUpdateGate } from './AppUpdateGate';
+import { ReminderRefreshGate } from './ReminderRefreshGate';
 import { OnboardingNavigator } from '../screens/onboarding/OnboardingNavigator';
 import { PaywallScreen } from '../screens/onboarding/PaywallScreen';
 import { hasPurchaseGrace } from '../services/purchaseGrace';
@@ -42,6 +43,9 @@ export function AccessGate() {
     <NavigationContainer>
       <MainTabs />
       <AppUpdateGate />
+      {/* Same placement rule as AppUpdateGate: onboarded shell only, so a
+          mid-funnel user's notifications are never touched. */}
+      <ReminderRefreshGate />
     </NavigationContainer>
   ) : (
     <OnboardingNavigator />

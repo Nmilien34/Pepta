@@ -56,6 +56,10 @@ vi.mock("../theme", () => ({
 vi.mock("../theme/typography", () => ({
   typography: { fonts: { medium: "m", semiBold: "sb", bold: "b" } },
 }));
+// Headless sibling in the same shell; covered by ReminderRefreshGate.test.
+vi.mock("./ReminderRefreshGate", () => ({
+  ReminderRefreshGate: () => React.createElement("ReminderRefreshGate"),
+}));
 vi.mock("../navigation/MainTabs", () => ({ MainTabs: () => React.createElement("MainTabs") }));
 vi.mock("../screens/onboarding/OnboardingNavigator", () => ({
   OnboardingNavigator: () => React.createElement("OnboardingNavigator"),

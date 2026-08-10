@@ -270,6 +270,21 @@ async function cancelPeptaReminderNotifications(adapter: ReminderNotificationAda
   return peptaReminders.length;
 }
 
+/**
+ * Read the permission WITHOUT prompting. A background re-sync must never
+ * raise the system dialog on its own, and syncReminderNotifications cancels
+ * before it checks permission — so a caller that isn't already granted has to
+ * bail BEFORE calling it, or it wipes the user's scheduled reminders and
+ * schedules nothing back.
+ */
+export async function readReminderPermissionStatus(
+  adapter: ReminderNotificationAdapter = expoReminderNotificationAdapter,
+): Promise<ReminderPermissionStatus> {
+  const existing = await adapter.getPermissionsAsync();
+  if (existing.granted || existing.status === "granted") return "granted";
+  return normalizePermissionStatus(existing.status, existing.granted);
+}
+
 async function ensurePermission(adapter: ReminderNotificationAdapter): Promise<ReminderPermissionStatus> {
   const existing = await adapter.getPermissionsAsync();
   if (existing.granted || existing.status === "granted") return "granted";
