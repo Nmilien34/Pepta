@@ -7,11 +7,13 @@ import { describe, expect, it } from 'vitest';
 import type { HomeResponse, MedicationLevelResponse } from '@pepta/shared';
 import {
   LEVEL_SUPPRESSION_COPY,
+  doseNoun,
   levelSuppressionFor,
   resolveLevelView,
 } from './levelSuppression';
 import { buildHomeView } from './homeView';
 import { buildPepMood, moodNoteFor } from './pepMood';
+import { buildPepReminderNotificationCopy } from './pepPriorities';
 
 const ORAL = { id: 'oral-1', name: 'Rybelsus', route: 'oral', doseUnit: 'mg', halfLifeDays: 7 };
 const INJECTION = { id: 'inj-1', name: 'Tirzepatide', route: 'injection', doseUnit: 'mg', halfLifeDays: 5 };
@@ -153,5 +155,69 @@ describe('Pep mood', () => {
       milestone: false,
     });
     expect(mood.line).toBeTruthy();
+  });
+});
+
+// Route-aware dose wording (2026-08-10). The helper is dumb on purpose so the
+// later full sweep extends it rather than inventing a second pattern.
+describe('doseNoun', () => {
+  it('oral says dose, injection says shot', () => {
+    expect(doseNoun('oral')).toBe('dose');
+    expect(doseNoun('injection')).toBe('shot');
+  });
+
+  it('missing/undefined route reads as injection — never guess oral', () => {
+    expect(doseNoun(undefined)).toBe('shot');
+    expect(doseNoun(null)).toBe('shot');
+    expect(doseNoun('')).toBe('shot');
+  });
+});
+
+describe('reminder titles', () => {
+  const homeFor = (compound: object) =>
+    ({
+      activeCompounds: [compound],
+      medicationLevels: [],
+      nextDose: { compoundId: 'c1', compoundName: 'X', nextDoseAt: '2026-08-11T13:00:00.000Z', hoursUntilNextDose: 5 },
+      profile: null,
+      insights: [],
+      streakDays: 0,
+      todayCalories: 0,
+      todayProteinGrams: 0,
+      todayFiberGrams: 0,
+      todayWaterOz: 0,
+      latestWeight: null,
+    }) as unknown as HomeResponse;
+
+  it('an ORAL compound gets dose wording in both reminder titles', () => {
+    const home = homeFor({ id: 'c1', name: 'Foundayo', route: 'oral', doseUnit: 'mg', halfLifeDays: 1 });
+    expect(buildPepReminderNotificationCopy('dose_due', home)!.title).toBe('Pep: dose time');
+    const checkin = buildPepReminderNotificationCopy('post_dose_checkin', home)!;
+    expect(checkin.title).toBe('Pep: post-dose check-in');
+    // The body must agree with its own title.
+    expect(checkin.body).toContain('after a dose');
+    expect(checkin.body).not.toContain('shot');
+  });
+
+  it('an INJECTION compound keeps today’s titles byte-identical', () => {
+    const home = homeFor({ id: 'c1', name: 'Tirzepatide', route: 'injection', doseUnit: 'mg', halfLifeDays: 5 });
+    expect(buildPepReminderNotificationCopy('dose_due', home)!.title).toBe('Pep: shot time');
+    const checkin = buildPepReminderNotificationCopy('post_dose_checkin', home)!;
+    expect(checkin.title).toBe('Pep: post-shot check-in');
+    expect(checkin.body).toBe(
+      "Quick read for me: appetite, side effects, water, and protein. The first day after a shot is useful data.",
+    );
+  });
+
+  it('route-undefined is identical to injection', () => {
+    const home = homeFor({ id: 'c1', name: 'Legacy', doseUnit: 'mg', halfLifeDays: 5 });
+    expect(buildPepReminderNotificationCopy('dose_due', home)!.title).toBe('Pep: shot time');
+    expect(buildPepReminderNotificationCopy('post_dose_checkin', home)!.title).toBe('Pep: post-shot check-in');
+  });
+
+  it('non-dose reminders are untouched', () => {
+    const home = homeFor({ id: 'c1', name: 'Foundayo', route: 'oral', doseUnit: 'mg', halfLifeDays: 1 });
+    expect(buildPepReminderNotificationCopy('protein_anchor', home)!.title).toBe('Pep: protein checkpoint');
+    expect(buildPepReminderNotificationCopy('weekly_weigh_in', home)!.title).toBe('Pep: scale check');
   });
 });

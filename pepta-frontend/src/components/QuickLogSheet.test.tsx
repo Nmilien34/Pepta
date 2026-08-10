@@ -309,4 +309,63 @@ describe("QuickLogSheet", () => {
     ).toHaveLength(0);
     dataMocks.compoundRoute = undefined;
   });
+
+  it("uses DOSE wording throughout the sheet for an oral compound", async () => {
+    dataMocks.compoundRoute = "oral";
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+    await act(async () => {
+      tree = TestRenderer.create(
+        <QuickLogSheet visible={true} initialMode="dose" onClose={vi.fn()} onMeal={vi.fn()} />,
+      );
+    });
+    const text = textContent(tree!.root);
+    expect(text).toContain("Log a dose");
+    expect(text).toContain("Log dose");
+    expect(text).not.toContain("Log a shot");
+    expect(text).not.toContain("Log shot");
+    dataMocks.compoundRoute = undefined;
+  });
+
+  it("keeps SHOT wording byte-identical for injection and route-undefined", async () => {
+    for (const route of ["injection", undefined] as const) {
+      dataMocks.compoundRoute = route;
+      let tree: TestRenderer.ReactTestRenderer | undefined;
+      await act(async () => {
+        tree = TestRenderer.create(
+          <QuickLogSheet visible={true} initialMode="dose" onClose={vi.fn()} onMeal={vi.fn()} />,
+        );
+      });
+      const text = textContent(tree!.root);
+      expect(text).toContain("Log a shot");
+      expect(text).toContain("Log shot");
+      expect(text).not.toContain("Log a dose");
+    }
+    dataMocks.compoundRoute = undefined;
+  });
+
+  it("names the saved toast by route", async () => {
+    for (const [route, expected] of [["oral", "Dose saved"], ["injection", "Shot saved"]] as const) {
+      dataMocks.compoundRoute = route;
+      const onQuickShotSaved = vi.fn();
+      let tree: TestRenderer.ReactTestRenderer | undefined;
+      await act(async () => {
+        tree = TestRenderer.create(
+          <QuickLogSheet
+            visible={true}
+            onClose={vi.fn()}
+            onMeal={vi.fn()}
+            onQuickShotSaved={onQuickShotSaved}
+          />,
+        );
+      });
+      const label = route === "oral" ? "Save dose now" : "Save shot now";
+      await act(async () => {
+        tree!.root.findByProps({ label }).props.onPress();
+      });
+      expect(onQuickShotSaved).toHaveBeenCalledWith(
+        expect.objectContaining({ title: expected }),
+      );
+    }
+    dataMocks.compoundRoute = undefined;
+  });
 });

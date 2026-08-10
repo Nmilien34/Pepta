@@ -39,6 +39,10 @@ export interface ReminderNotificationAdapter {
   cancelScheduledNotificationAsync: (identifier: string) => Promise<void>;
 }
 
+// FALLBACK ONLY — scheduleReminders prefers item.notification, which
+// buildPepReminderNotificationCopy supplies route-aware. This map is reached
+// when a reminder has no composed copy, where no compound (and so no route)
+// is in hand, so it keeps the injection wording by design.
 const reminderCopy: Record<string, { title: string; body: string }> = {
   dose_due: {
     title: "Pep: shot time",

@@ -1,3 +1,4 @@
+import { doseNoun } from './levelSuppression';
 import type { HomeResponse, TrackResponse } from "@pepta/shared";
 import { buildHomeView } from "./homeView";
 import { buildGettingStarted, type LogAction } from "./planView";
@@ -58,19 +59,28 @@ export function buildPepReminderNotificationCopy(
     home?.nextDose?.compoundName ??
     home?.activeCompounds[0]?.name ??
     "your medication";
+  // Route of the compound this notification is ABOUT — the one whose dose is
+  // next, falling back to the first active compound. Missing route reads as
+  // injection, so today's wording is byte-identical for everyone else.
+  const noun = doseNoun(
+    home?.activeCompounds.find((compound) => compound.id === home?.nextDose?.compoundId)?.route ??
+      home?.activeCompounds[0]?.route,
+  );
   const proteinGoal = home?.profile?.dailyProteinTargetGrams ?? null;
   const waterGoal = home?.profile?.dailyWaterTargetOz ?? null;
 
   switch (reminderId) {
     case "dose_due":
       return {
-        title: "Pep: shot time",
+        title: `Pep: ${noun} time`,
         body: `I have ${compoundName} due on the board. Log it when it's done, and I'll keep the cycle lined up with you.`,
       };
     case "post_dose_checkin":
       return {
-        title: "Pep: post-shot check-in",
-        body: "Quick read for me: appetite, side effects, water, and protein. The first day after a shot is useful data.",
+        title: `Pep: post-${noun} check-in`,
+        // The body says it too — a notification that contradicts its own
+        // title reads worse than either half being wrong (Nick, 2026-08-10).
+        body: `Quick read for me: appetite, side effects, water, and protein. The first day after a ${noun} is useful data.`,
       };
     case "protein_anchor":
       return {

@@ -20,6 +20,16 @@
 
 import type { HomeResponse, MedicationLevelResponse } from '@pepta/shared';
 
+/**
+ * What the user calls taking their medication. Route in, noun out — no
+ * per-screen logic, so the later full copy sweep extends THIS instead of
+ * inventing a second pattern. Route missing/undefined reads as injection,
+ * matching the injection-site fallback: never guess oral.
+ */
+export function doseNoun(route: string | null | undefined): 'shot' | 'dose' {
+  return route === 'oral' ? 'dose' : 'shot';
+}
+
 export type LevelSuppressionReason = 'oral' | 'unmodeled';
 
 export const LEVEL_SUPPRESSION_COPY: Record<LevelSuppressionReason, string> = {

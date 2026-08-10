@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import type { HomeResponse, TrackResponse } from "@pepta/shared";
 import { env } from "../config/env";
 import { logger } from "../lib/logger";
+import { doseNoun } from "../lib/dose-noun";
 import { getHome } from "./home.service";
 import { buildPepSideEffectTip } from "./pepSideEffectTips.service";
 import { getTrack } from "./track.service";
@@ -39,6 +40,13 @@ export interface PepPushContext {
     compoundName: string;
     nextDoseAt: string;
     hoursUntilNextDose: number;
+    /**
+     * Route of the compound this dose belongs to — threaded ONLY so the
+     * notification title can say "dose" instead of "shot" for a pill user
+     * (2026-08-10). Deliberately not added to the AI chat context or Pep's
+     * persona prompt; that is a separate task.
+     */
+    route?: string | null;
   } | null;
   nutrition: {
     proteinGrams: number;
@@ -65,6 +73,8 @@ export interface PepPushContext {
     amount: number;
     unit: string;
     when: string;
+    /** Same narrow purpose as nextDose.route — the check-in title's noun. */
+    route?: string | null;
   }>;
   recentMeals: Array<{
     foodName: string;
@@ -238,6 +248,9 @@ export function buildPepPushContextFromResponses(
           compoundName: home.nextDose.compoundName,
           nextDoseAt: home.nextDose.nextDoseAt,
           hoursUntilNextDose: home.nextDose.hoursUntilNextDose,
+          route: home.activeCompounds.find(
+            (compound) => compound.id === home.nextDose!.compoundId,
+          )?.route,
         }
       : null,
     nutrition: {
@@ -267,6 +280,8 @@ export function buildPepPushContextFromResponses(
       amount: dose.amount,
       unit: dose.unit,
       when: dose.datetime,
+      route: home.activeCompounds.find((compound) => compound.id === dose.compoundId)
+        ?.route,
     })),
     recentMeals: recentFirst(track.mealLogs, 4).map((meal) => ({
       foodName: meal.foodName,
@@ -317,7 +332,7 @@ export function selectPepPushCandidate(
       pushEligible: true,
       windowKey: `dose_due:${windowDate(context.nextDose.nextDoseAt)}`,
       fallback: {
-        title: "Pep: shot time",
+        title: `Pep: ${doseNoun(context.nextDose.route)} time`,
         body: `I have ${context.nextDose.compoundName} on the board. Log it when it's done and I'll keep the cycle lined up.`,
       },
       reason: "The user's next scheduled dose is within four hours.",
@@ -334,7 +349,7 @@ export function selectPepPushCandidate(
         pushEligible: true,
         windowKey: `post_dose_checkin:${windowDate(lastDose.when)}`,
         fallback: {
-          title: "Pep: post-shot check-in",
+          title: `Pep: post-${doseNoun(lastDose.route)} check-in`,
           body: "Quick check for me: appetite, side effects, water, and protein while this dose settles in.",
         },
         reason: "The user is in the day-after-dose check-in window.",

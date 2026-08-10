@@ -42,6 +42,7 @@ import {
   type InjectionSite,
 } from "../screens/app/trackView";
 import { BodyMap } from "./BodyMap";
+import { doseNoun } from "../screens/app/levelSuppression";
 import { AddCompoundSheet } from "./AddCompoundSheet";
 import { measurementLabel } from "../screens/app/progressView";
 import {
@@ -341,7 +342,7 @@ export function QuickLogSheet({
     const doseLabel = formatDoseLabel(quickShot);
     const input = toDoseInput(quickShot, now());
     onQuickShotSaved?.({
-      title: "Shot saved",
+      title: `${capitalizedNoun(quickShot?.route)} saved`,
       detail: `${doseLabel} logged for today`,
     });
     commit(
@@ -451,10 +452,10 @@ export function QuickLogSheet({
                 ) : null}
                 <View style={{ flex: 1 }}>
                   <AppText variant="cardTitle" style={{ fontSize: 17 }}>
-                    {HEADINGS[mode].title}
+                    {headingFor(mode, dose?.route).title}
                   </AppText>
                   <AppText variant="caption" color="textSecondary">
-                    {HEADINGS[mode].sub}
+                    {headingFor(mode, dose?.route).sub}
                   </AppText>
                 </View>
                 <Pressable
@@ -611,7 +612,7 @@ export function QuickLogSheet({
                 <View style={{ marginTop: 10, flexShrink: 0 }}>
                   <QuickShotExplainer theme={theme} dose={quickShot} />
                   <Button
-                    label="Save shot now"
+                    label={`Save ${doseNoun(quickShot?.route)} now`}
                     leading={
                       <Icon
                         name="needle"
@@ -627,7 +628,7 @@ export function QuickLogSheet({
                 <View style={{ marginTop: 14, flexShrink: 0 }}>
                   {mode === "weight" ? (
                     <SheetSaveButton
-                      label={CTA[mode]}
+                      label={ctaFor(mode, dose?.route)}
                       disabled={
                         !canSave(mode, {
                           dose,
@@ -641,7 +642,7 @@ export function QuickLogSheet({
                     />
                   ) : (
                     <Button
-                      label={CTA[mode]}
+                      label={ctaFor(mode, dose?.route)}
                       disabled={
                         !canSave(mode, {
                           dose,
@@ -716,14 +717,34 @@ function QuickShotExplainer({
       <View style={{ flex: 1 }}>
         <AppText variant="bodyStrong" color="textPrimary">
           Tap below to save {dose.amount} {dose.unit} of {dose.compoundName} as
-          today’s shot.
+          today’s {doseNoun(dose.route)}.
         </AppText>
         <AppText variant="caption" color="textSecondary">
-          Need to change dose or site? Use Log a shot above.
+          {/* Oral drops the site mention — that form has no site picker. */}
+          {doseNoun(dose.route) === "dose"
+            ? "Need to change the dose? Use Log a dose above."
+            : "Need to change dose or site? Use Log a shot above."}
         </AppText>
       </View>
     </View>
   );
+}
+
+/** "shot" → "Shot". The noun leads a sentence in the toast and headings. */
+function capitalizedNoun(route: string | null | undefined): string {
+  const noun = doseNoun(route);
+  return noun.charAt(0).toUpperCase() + noun.slice(1);
+}
+
+// Only the DOSE entries are route-aware; every other mode reads its map value
+// untouched, so nothing outside this sheet's dose wording changes.
+function headingFor(mode: Mode, route: string | null | undefined): { title: string; sub: string } {
+  if (mode === "dose") return { title: `Log a ${doseNoun(route)}`, sub: HEADINGS.dose.sub };
+  return HEADINGS[mode];
+}
+
+function ctaFor(mode: Mode, route: string | null | undefined): string {
+  return mode === "dose" ? `Log ${doseNoun(route)}` : CTA[mode];
 }
 
 const HEADINGS: Record<Mode, { title: string; sub: string }> = {
@@ -812,7 +833,7 @@ function Chooser({
     {
       key: "dose",
       icon: <Icon name="needle" size={22} color={theme.colors.primary} />,
-      label: "Log a shot",
+      label: `Log a ${doseNoun(dose?.route)}`,
       hint: dose
         ? `${dose.compoundName} · ${dose.amount} ${dose.unit}`
         : "Add a medication",
