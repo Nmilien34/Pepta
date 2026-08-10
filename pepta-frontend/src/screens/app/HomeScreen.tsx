@@ -21,6 +21,7 @@ import { useSeenTeachCards } from './useSeenTeachCards';
 import { usePeptaData } from '../../context/PeptaDataContext';
 import { useLogSheets } from '../../context/LogSheetsContext';
 import { buildHomeView, type GoalView, type HomeWeightPulseView, type RingStat } from './homeView';
+import { LEVEL_SUPPRESSION_COPY } from './levelSuppression';
 import { buildActivity, buildTodaysLog, type ActivitySummary, type LogChip, type LogKind } from './homeExtras';
 import { buildGettingStarted, buildPlanSummary, type GettingStarted, type LogAction, type PlanSummary } from './planView';
 import { buildPepTeachCard, type PepTeachCard } from './pepTeach';
@@ -367,7 +368,7 @@ export function HomeScreen() {
                   </View>
                   <View style={{ backgroundColor: theme.colors.surfaceAlt, paddingVertical: 5, paddingHorizontal: 11, borderRadius: theme.radii.pill }}>
                     <AppText variant="caption" color="textTertiary" style={{ fontWeight: '600' }}>
-                      {view.medicationUnmodeled ? 'Not modelled' : 'No doses yet'}
+                      {view.levelSuppressed ? 'Not tracked' : 'No doses yet'}
                     </AppText>
                   </View>
                 </View>
@@ -394,8 +395,8 @@ export function HomeScreen() {
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: theme.spacing.md, paddingTop: theme.spacing.sm, borderTopWidth: 0.5, borderTopColor: theme.colors.border }}>
                   <Icon name="time-outline" size={14} color={theme.colors.textSecondary} />
                   <AppText variant="caption" color="textSecondary">
-                    {view.medicationUnmodeled
-                      ? 'Level tracking isn’t available for this medication.'
+                    {view.levelSuppressed
+                      ? LEVEL_SUPPRESSION_COPY[view.levelSuppressed]
                       : 'Log your first shot to start tracking levels.'}
                   </AppText>
                 </View>

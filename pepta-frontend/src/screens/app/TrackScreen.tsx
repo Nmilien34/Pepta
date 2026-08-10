@@ -30,6 +30,11 @@ import {
   suggestNextSite,
   usedSites,
 } from './trackView';
+import {
+  LEVEL_SUPPRESSION_COPY,
+  resolveLevelView,
+  type LevelSuppressionReason,
+} from './levelSuppression';
 
 const RANGES = ['7d', '30d', '90d', '1y'];
 
@@ -95,7 +100,9 @@ export function TrackScreen() {
     );
   }
 
-  const ml = home?.medicationLevels[0] ?? null;
+  // Suppressed compounds (oral / no half-life) never supply a level: the
+  // ring, the chart and the Current/Peak/Trough row all read this.
+  const { level: ml, suppressed: levelSuppressed } = resolveLevelView(home);
   const compounds = home?.activeCompounds ?? [];
   const doses = sortDoses(track?.doseLogs ?? []);
   const sideEffects = sortSideEffects(track?.sideEffectLogs ?? []);
@@ -283,7 +290,7 @@ export function TrackScreen() {
                 <MedicationLevelCardContent
                   ml={ml}
                   compoundName={ml?.compoundName ?? compounds[0]?.name ?? 'Medication'}
-                  unmodeled={ml == null && compounds[0]?.halfLifeDays == null && compounds.length > 0}
+                  suppressed={levelSuppressed}
                   onLogDose={() => openQuickLog('dose')}
                   onOpenSettings={() => navigation.navigate('DoseSettings')}
                 />
@@ -461,14 +468,14 @@ function LevelChart({ levels, color }: { levels: number[]; color: string }) {
 function MedicationLevelCardContent({
   ml,
   compoundName,
-  unmodeled,
+  suppressed,
   onLogDose,
   onOpenSettings,
 }: {
   ml: NonNullable<ReturnType<typeof usePeptaData>['home']>['medicationLevels'][number] | null;
   compoundName: string;
-  /** No half-life on the compound: the curve is suppressed, not pending. */
-  unmodeled: boolean;
+  /** Oral route or no half-life: the curve is suppressed, not pending. */
+  suppressed: LevelSuppressionReason | null;
   onLogDose: () => void;
   onOpenSettings: () => void;
 }) {
@@ -536,11 +543,11 @@ function MedicationLevelCardContent({
             {compoundName}
           </AppText>
           <AppText variant="body" color="textSecondary">
-            {unmodeled
-              ? 'Level tracking isn’t available for this medication.'
+            {suppressed
+              ? LEVEL_SUPPRESSION_COPY[suppressed]
               : 'Log your first shot to start building your medication level curve.'}
           </AppText>
-          {unmodeled ? null : (
+          {suppressed ? null : (
           <Pressable
             onPress={() => {
               Haptics.selectionAsync().catch(() => undefined);

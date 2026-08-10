@@ -88,12 +88,14 @@ describe('custom oral daily medication — end to end', () => {
     expect('injectionSite' in input).toBe(false);
   });
 
-  it('the level card resolves to the honest unmodelled state, never a curve or "log your first shot"', () => {
+  it('the level card resolves to an honest suppressed state, never a curve or "log your first shot"', () => {
     const view = buildHomeView(
       homeWith({ id: 'compound-1', name: 'Foundayo', route: 'oral', doseUnit: 'mg', halfLifeDays: null }),
     );
     expect(view.medication).toBeNull();
-    expect(view.medicationUnmodeled).toBe(true);
+    // Foundayo is BOTH oral and half-life-less; 'oral' wins because it is the
+    // more specific explanation (and the one the user cannot fix by editing).
+    expect(view.levelSuppressed).toBe('oral');
   });
 
   it('a custom INJECTION compound with a half-life keeps the full pipeline: site + curve eligibility', () => {
@@ -119,7 +121,7 @@ describe('custom oral daily medication — end to end', () => {
     const doseDraft = defaultDoseDraft(home, { doseLogs: [] } as unknown as TrackResponse)!;
     expect(doseDraft.site).not.toBeNull();
     expect(toDoseInput(doseDraft, '2026-08-07T13:00:00.000Z').injectionSite).toBe(doseDraft.site);
-    expect(buildHomeView(home).medicationUnmodeled).toBe(false);
+    expect(buildHomeView(home).levelSuppressed).toBeNull();
   });
 
   it('route and frequency are explicit choices — no default sneaks through validity', () => {

@@ -12,6 +12,7 @@ import { AppText } from './AppText';
 import { LivingMascot } from './LivingMascot';
 import { useSpeechHaptic } from './useSpeechHaptic';
 import { buildPepMood, moodNoteFor } from '../screens/app/pepMood';
+import { resolveLevelView } from '../screens/app/levelSuppression';
 import { dueMilestone, milestoneFactsFrom, type PepMilestone } from '../screens/app/pepMilestones';
 import { markMilestoneSeen, readSeenMilestones } from '../services/pepMilestoneStore';
 import { resolveCompanionName } from '../utils/companion';
@@ -106,11 +107,15 @@ export function PepCompanion() {
   const mood = useMemo(
     () =>
       buildPepMood({
-        level: home?.medicationLevels?.[0] ?? null,
+        // A suppressed compound (oral / no half-life) supplies NO level, so
+        // no level-derived mood or line — notably "Shot day is close.",
+        // which rides the Low state a meaningless oral curve produces at
+        // random. Absent, never swapped for another fabricated mood.
+        level: resolveLevelView(home).level,
         resting: restingToday,
         milestone: activeMilestone != null,
       }),
-    [home?.medicationLevels, restingToday, activeMilestone],
+    [home, restingToday, activeMilestone],
   );
 
   // Deck order is deliberate: the milestone leads (the auto-greet should open

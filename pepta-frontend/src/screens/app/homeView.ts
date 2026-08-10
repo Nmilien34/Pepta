@@ -6,6 +6,7 @@
 
 import type { HomeResponse, Insight, MedicationLevelResponse } from '@pepta/shared';
 import { formatShortDate } from './progressView';
+import { resolveLevelView, type LevelSuppressionReason } from './levelSuppression';
 
 export interface MedicationView {
   name: string;
@@ -48,11 +49,12 @@ export interface HomeView {
   rangeDayCount: number;
   medication: MedicationView | null;
   /**
-   * True when the active compound has no half-life ("not modelled" custom
-   * med): the level card must say tracking isn't available — suppression,
-   * never a fabricated curve and never the misleading "log your first shot".
+   * Set when NO active compound can carry a level curve — an oral route, or
+   * a custom med with no half-life. The card shows the matching honest
+   * sentence instead of a fabricated curve or the misleading
+   * "log your first shot". Null means the normal empty state applies.
    */
-  medicationUnmodeled: boolean;
+  levelSuppressed: LevelSuppressionReason | null;
   calories: RingStat;
   protein: RingStat;
   fiber: RingStat;
@@ -98,7 +100,9 @@ function ring(current: number, target: number | null | undefined): RingStat {
 }
 
 export function buildHomeView(home: HomeResponse): HomeView {
-  const ml = home.medicationLevels[0] ?? null;
+  // Suppressed compounds (oral / no half-life) never reach the card: for a
+  // mixed user this picks the INJECTABLE's curve rather than the oral's.
+  const { level: ml, suppressed } = resolveLevelView(home);
   const compound = ml ? home.activeCompounds.find((c) => c.id === ml.compoundId) : undefined;
   const profile = home.profile;
   // Prefer the dedicated nextDose block; fall back to the level engine's value.
@@ -140,8 +144,7 @@ export function buildHomeView(home: HomeResponse): HomeView {
   return {
     rangeLabel,
     rangeDayCount,
-    medicationUnmodeled:
-      ml == null && home.activeCompounds.length > 0 && home.activeCompounds[0]!.halfLifeDays == null,
+    levelSuppressed: suppressed,
     medication: ml
       ? {
           name: ml.compoundName,
