@@ -19,6 +19,7 @@ import {
   compoundResponseSchema,
   cycleInputSchema,
   cycleResponseSchema,
+  medicationCatalogItemSchema,
   scheduleInputSchema,
   schedulePatchSchema,
   scheduleResponseSchema,
@@ -75,6 +76,7 @@ import {
   type CompoundResponse,
   type CycleInput,
   type CycleResponse,
+  type MedicationCatalogItem,
   type ScheduleInput,
   type SchedulePatch,
   type ScheduleResponse,
@@ -505,6 +507,13 @@ class PeptaApi {
       method: "PATCH",
       body: JSON.stringify(compoundPatchSchema.parse(body)),
     });
+  }
+
+  // GET /medication-catalog → MedicationCatalogItem[]. PUBLIC (no auth): the
+  // onboarding picker reads it before sign-in. Clinical values only; the
+  // bundled list supplies presentation.
+  public listMedicationCatalog(): Promise<MedicationCatalogItem[]> {
+    return this.request("/medication-catalog", z.array(medicationCatalogItemSchema));
   }
 
   // GET /schedules → ScheduleResponse[]. Dose timing per compound; the Track

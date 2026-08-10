@@ -16,7 +16,7 @@ export interface MedicationCatalogDocument extends Document<Types.ObjectId> {
   route: MedicationRoute;
   defaultFrequency: MedicationFrequency;
   commonDoses: number[];
-  halfLifeDays: number;
+  halfLifeDays?: number | null;
   doseUnit: DoseUnit;
   defaultDose?: number;
   active: boolean;
@@ -67,7 +67,7 @@ const medicationCatalogSchema = new Schema<MedicationCatalogDocument>(
     },
     halfLifeDays: {
       type: Number,
-      required: true,
+      required: false,
       min: 0,
     },
     doseUnit: {

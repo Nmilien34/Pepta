@@ -21,7 +21,8 @@ import { Chip } from './onboarding/Chip';
 import { SearchField } from './SearchField';
 import { usePeptaData } from '../context/PeptaDataContext';
 import { api } from '../services/api';
-import { MEDICATION_CATALOG, searchMedications, type MedicationOption } from '../data/medicationCatalog';
+import { searchMedications, type MedicationOption } from '../data/medicationCatalog';
+import { currentMedicationCatalog } from '../services/medicationCatalogStore';
 import {
   buildCompoundInput,
   buildCustomCompoundInput,
@@ -88,7 +89,7 @@ export function AddCompoundSheet({ visible, onClose, initialQuery, onBrowseLibra
     }
   }, [visible, initialQuery]);
 
-  const results = searchMedications(MEDICATION_CATALOG, query).slice(0, 6);
+  const results = searchMedications(currentMedicationCatalog(), query).slice(0, 6);
 
   const openCustom = () => {
     Haptics.selectionAsync().catch(() => undefined);
@@ -401,7 +402,7 @@ export function AddCompoundSheet({ visible, onClose, initialQuery, onBrowseLibra
                 {selected.name}
               </AppText>
               <AppText variant="caption" color="textSecondary">
-                {selected.subtitle} · half-life {selected.halfLifeDays}d
+                {selected.subtitle}{selected.halfLifeDays != null ? ` · half-life ${selected.halfLifeDays}d` : ''}
               </AppText>
             </View>
           </View>

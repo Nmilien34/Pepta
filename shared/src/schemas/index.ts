@@ -360,7 +360,11 @@ export const medicationCatalogItemSchema = z
     route: medicationRouteSchema.default("injection"),
     defaultFrequency: medicationFrequencySchema.default("weekly"),
     commonDoses: z.array(z.number().positive()).default([]),
-    halfLifeDays: z.number().positive(),
+    // null = deliberately not modelled. "Research peptide" is a catch-all
+    // covering molecules whose half-lives span minutes to days, so any single
+    // number there is a fabrication — clients suppress the curve instead
+    // (2026-08-11). Safe to widen: nothing shipped calls this endpoint.
+    halfLifeDays: z.number().positive().nullish(),
     doseUnit: doseUnitSchema,
     defaultDose: z.number().positive().optional(),
     active: z.boolean(),

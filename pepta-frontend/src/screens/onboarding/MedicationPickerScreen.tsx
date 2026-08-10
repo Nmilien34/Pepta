@@ -8,7 +8,8 @@ import { Platform, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Icon } from '../../components/Icon';
 import { AppText, ConvoScreen, OptionCard, SearchField } from '../../components';
-import { MEDICATION_CATALOG, searchMedications, type MedicationOption } from '../../data/medicationCatalog';
+import { searchMedications, type MedicationOption } from '../../data/medicationCatalog';
+import { currentMedicationCatalog } from '../../services/medicationCatalogStore';
 
 export interface MedicationPickerScreenProps {
   progress: number;
@@ -22,7 +23,7 @@ export function MedicationPickerScreen({ progress, onBack, context, value, onAns
   const [query, setQuery] = useState('');
   const [picked, setPicked] = useState<MedicationOption | undefined>(value);
   const advanced = useRef(false);
-  const results = useMemo(() => searchMedications(MEDICATION_CATALOG, query), [query]);
+  const results = useMemo(() => searchMedications(currentMedicationCatalog(), query), [query]);
 
   const handlePick = (item: MedicationOption) => {
     if (advanced.current) return;

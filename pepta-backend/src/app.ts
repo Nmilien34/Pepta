@@ -34,6 +34,7 @@ import {
 import {
   createCompoundsRouter,
   createCyclesRouter,
+  createMedicationCatalogRouter,
   createResearchLibraryRouter,
   createSchedulesRouter,
 } from "./routes/catalog.routes";
@@ -219,6 +220,9 @@ export function createApp(options: CreateAppOptions = {}): Express {
     createLogRouter(measurementInputSchema, trackedMeasurementService),
   );
   app.use("/progress-photos", ...premium, progressPhotosRoutes);
+  // Public reference data — mounted beside the other unauthenticated
+  // surfaces so the onboarding medication picker (pre-sign-in) can read it.
+  app.use("/medication-catalog", createMedicationCatalogRouter());
   app.use("/research-library", ...premium, createResearchLibraryRouter());
   app.use("/webhooks", webhookRoutes);
   app.use(notFoundHandler);

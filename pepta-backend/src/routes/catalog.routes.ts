@@ -9,6 +9,7 @@ import { Router } from "express";
 import { requireAuth } from "../auth/middleware";
 import { asyncHandler } from "../lib/async-handler";
 import { sendData } from "../lib/responses";
+import { createInMemoryRateLimiter } from "../middleware/rate-limit.middleware";
 import { validateBody } from "../middleware/validate.middleware";
 import {
   createCompound,
@@ -140,9 +141,24 @@ export function createCyclesRouter() {
   return router;
 }
 
+/**
+ * PUBLIC (2026-08-11). Drug names and pharmacological constants are reference
+ * data — the same class as /app-config and /legal — and it has to be reachable
+ * before sign-in, because onboarding picks a medication at step 7 while the
+ * user is still anonymous. Requiring auth here would mean server-controlled
+ * half-lives never reach the majority of medication choices. No user data is
+ * exposed; rate-limited by IP like the other unauthenticated surfaces.
+ */
 export function createMedicationCatalogRouter() {
   const router = Router();
-  router.use(requireAuth);
+  router.use(
+    createInMemoryRateLimiter({
+      windowMs: 15 * 60 * 1000,
+      maxRequests: 60,
+      message: "Too many catalog requests",
+      keyBy: "userOrIp",
+    }),
+  );
   router.get(
     "/",
     asyncHandler(async (_req, res) => {

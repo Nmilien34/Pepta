@@ -16,7 +16,8 @@ export interface MedicationOption {
   subtitle: string;
   drugClass: DrugClass;
   doseUnit: DoseUnit;
-  halfLifeDays: number;
+  /** null = not modelled (server may say so); clients suppress the curve. */
+  halfLifeDays: number | null;
   route: 'injection' | 'oral';
   // True when this pick doesn't pin the route (compounded/other meds come as
   // injections OR oral drops/troches) — onboarding then asks the user directly.

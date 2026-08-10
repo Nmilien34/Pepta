@@ -9,6 +9,7 @@ import { AccessProvider } from './src/context/AccessContext';
 import { OnboardingProvider } from './src/context/OnboardingContext';
 import { PeptaDataProvider } from './src/context/PeptaDataContext';
 import { AccessGate } from './src/components/AccessGate';
+import { loadMedicationCatalog } from './src/services/medicationCatalogStore';
 import { attLaunchPrompt } from './src/services/attPrompt';
 
 // Holds the first paint until the Hanken faces are ready, so text never flashes
@@ -27,6 +28,10 @@ export default function App() {
   // fresh, never authenticates, and must still see the dialog (2.1 rejection).
   React.useEffect(() => {
     attLaunchPrompt.start();
+    // Medication catalog: hydrate from cache, refresh if older than 24h.
+    // Fire-and-forget — the picker renders from the bundled list meanwhile
+    // and never blocks on this (see medicationCatalogStore).
+    void loadMedicationCatalog();
   }, []);
 
   // Routing lives in AccessGate (access-state switch) fed by AccessContext —

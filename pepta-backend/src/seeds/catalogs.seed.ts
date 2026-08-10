@@ -159,8 +159,41 @@ const medicationCatalogSeed = [
     route: "injection",
     defaultFrequency: "weekly",
     commonDoses: [],
-    halfLifeDays: 3,
+    // NOT MODELLED (was a fabricated 3 days). This row is a catch-all for
+    // any unlisted peptide — BPC-157 clears in hours, TB-500 in days,
+    // ipamorelin in ~2 hours — so no single half-life describes it. Null
+    // suppresses the curve honestly instead of drawing a wrong one.
+    halfLifeDays: null,
     doseUnit: "mg",
+    active: true,
+  },
+  // Liraglutide was missing entirely, leaving the two daily injectables with
+  // no server-side values. Label: elimination half-life ~13 hours (0.54 d) —
+  // an order of magnitude off the weekly agonists, so it matters.
+  {
+    slug: "saxenda",
+    name: "Saxenda",
+    brand: "Saxenda",
+    drugClass: "glp_1",
+    route: "injection",
+    defaultFrequency: "daily",
+    commonDoses: [0.6, 1.2, 1.8, 2.4, 3],
+    halfLifeDays: 0.54,
+    doseUnit: "mg",
+    defaultDose: 3,
+    active: true,
+  },
+  {
+    slug: "victoza",
+    name: "Victoza",
+    brand: "Victoza",
+    drugClass: "glp_1",
+    route: "injection",
+    defaultFrequency: "daily",
+    commonDoses: [0.6, 1.2, 1.8],
+    halfLifeDays: 0.54,
+    doseUnit: "mg",
+    defaultDose: 1.8,
     active: true,
   },
 ] as const;
