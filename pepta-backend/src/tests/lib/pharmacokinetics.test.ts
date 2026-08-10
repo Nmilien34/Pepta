@@ -256,3 +256,98 @@ describe('daily interval projection', () => {
     expect(result.nextDoseAt).toBe('2026-08-09T14:00:00.000Z');
   });
 });
+
+// Daily default time (2026-08-07): a daily schedule with NO stored time is
+// the wild's common case — onboarding never collected one, so the old
+// projection dragged the last dose's logged hour (noon, from the seeded
+// lastDose) instead of a real dose time. It now projects 9:00 AM LOCAL,
+// computed at read time and never written to the schedule.
+describe('daily schedules with no stored time', () => {
+  it('projects 9:00 AM local, not the logged hour', () => {
+    // Noon-UTC seeded dose (08:00 EDT); next is 09:00 EDT = 13:00Z same day.
+    const result = computeMedicationLevel({
+      compoundId: 'compound-1',
+      compoundName: 'Rybelsus',
+      halfLifeDays: 1,
+      doses: [{ amount: 7, datetime: '2026-08-06T12:00:00.000Z' }],
+      now: new Date('2026-08-06T12:30:00.000Z'),
+      schedule: { frequency: 'daily' },
+      timeZone: 'America/New_York',
+    });
+
+    expect(result.nextDoseAt).toBe('2026-08-06T13:00:00.000Z');
+  });
+
+  it('rolls to tomorrow once today’s 9:00 AM has passed', () => {
+    const result = computeMedicationLevel({
+      compoundId: 'compound-1',
+      compoundName: 'Rybelsus',
+      halfLifeDays: 1,
+      doses: [{ amount: 7, datetime: '2026-08-06T13:00:00.000Z' }],
+      now: new Date('2026-08-06T18:00:00.000Z'),
+      schedule: { frequency: 'daily' },
+      timeZone: 'America/New_York',
+    });
+
+    expect(result.nextDoseAt).toBe('2026-08-07T13:00:00.000Z');
+  });
+
+  it('an explicitly chosen time always wins over the default', () => {
+    const result = computeMedicationLevel({
+      compoundId: 'compound-1',
+      compoundName: 'Rybelsus',
+      halfLifeDays: 1,
+      doses: [{ amount: 7, datetime: '2026-08-06T12:00:00.000Z' }],
+      now: new Date('2026-08-06T12:30:00.000Z'),
+      schedule: { frequency: 'daily', timesOfDay: ['21:00'] },
+      timeZone: 'America/New_York',
+    });
+
+    // 21:00 EDT = 01:00Z next day — the default never applies.
+    expect(result.nextDoseAt).toBe('2026-08-07T01:00:00.000Z');
+  });
+
+  it('without a usable timezone it degrades to the legacy interval echo', () => {
+    const result = computeMedicationLevel({
+      compoundId: 'compound-1',
+      compoundName: 'Rybelsus',
+      halfLifeDays: 1,
+      doses: [{ amount: 7, datetime: '2026-08-06T12:00:00.000Z' }],
+      now: new Date('2026-08-06T12:30:00.000Z'),
+      schedule: { frequency: 'daily' },
+      scheduleIntervalDays: 1,
+    });
+
+    expect(result.nextDoseAt).toBe('2026-08-07T12:00:00.000Z');
+  });
+
+  it('WEEKLY with no stored time is untouched — still the logged hour', () => {
+    const result = computeMedicationLevel({
+      compoundId: 'compound-1',
+      compoundName: 'semaglutide',
+      halfLifeDays: 7,
+      doses: [{ amount: 10, datetime: '2026-08-02T14:00:00.000Z' }],
+      now: new Date('2026-08-06T20:00:00.000Z'),
+      schedule: { frequency: 'weekly' },
+      scheduleIntervalDays: 7,
+      timeZone: 'America/New_York',
+    });
+
+    expect(result.nextDoseAt).toBe('2026-08-09T14:00:00.000Z');
+  });
+
+  it('BIWEEKLY with no stored time is untouched', () => {
+    const result = computeMedicationLevel({
+      compoundId: 'compound-1',
+      compoundName: 'semaglutide',
+      halfLifeDays: 7,
+      doses: [{ amount: 10, datetime: '2026-08-02T14:00:00.000Z' }],
+      now: new Date('2026-08-06T20:00:00.000Z'),
+      schedule: { frequency: 'biweekly' },
+      scheduleIntervalDays: 14,
+      timeZone: 'America/New_York',
+    });
+
+    expect(result.nextDoseAt).toBe('2026-08-16T14:00:00.000Z');
+  });
+});

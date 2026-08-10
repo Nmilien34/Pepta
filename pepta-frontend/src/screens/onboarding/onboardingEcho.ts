@@ -201,7 +201,9 @@ export function echoFor(step: OnboardingStep, a: EchoAnswers, now: Date = new Da
     case 'shotDay':
       return a.lastShot ? `Last shot was a ${DAY_SINGULAR[weekdayOf(a.lastShot)]}.` : undefined;
     case 'shotTime':
-      return shotDaysEcho(a.shotDays);
+      // Daily users reach this turn without ever picking a weekday, so the
+      // shot-day echo has nothing to say — their cadence IS the echo.
+      return a.frequency === 'daily' ? 'Every day, then.' : shotDaysEcho(a.shotDays);
     case 'instrument':
       return instrumentContext(a);
     case 'goalType':

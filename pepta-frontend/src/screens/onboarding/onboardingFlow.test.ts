@@ -232,7 +232,12 @@ describe('shouldSkipStep', () => {
     expect(shouldSkipStep('shotDay', { journeyStage: 'active', route: 'oral' })).toBe(true);
     expect(shouldSkipStep('shotTime', { journeyStage: 'active', route: 'oral' })).toBe(true);
     expect(shouldSkipStep('shotDay', { journeyStage: 'active', route: 'injection', frequency: 'biweekly' })).toBe(true);
-    expect(shouldSkipStep('shotTime', { journeyStage: 'active', route: 'injection', frequency: 'daily' })).toBe(true);
+    // Daily is the ONE case that changed (2026-08-07): the time question now
+    // reaches daily schedules, because without it nothing projects a next
+    // dose. The weekday question still doesn't.
+    expect(shouldSkipStep('shotTime', { journeyStage: 'active', route: 'injection', frequency: 'daily' })).toBe(false);
+    expect(shouldSkipStep('shotDay', { journeyStage: 'active', route: 'injection', frequency: 'daily' })).toBe(true);
+    expect(shouldSkipStep('shotTime', { journeyStage: 'active', route: 'oral', frequency: 'weekly' })).toBe(true);
     expect(shouldSkipStep('shotDay', { journeyStage: 'active', route: 'injection', frequency: 'weekly' })).toBe(false);
     expect(shouldSkipStep('shotTime', { journeyStage: 'active', route: 'injection', frequency: 'weekly' })).toBe(false);
   });
@@ -287,5 +292,37 @@ describe('route + deviceType gating', () => {
     expect(shouldSkipStep('symptomWeek', { sideEffects: ['hair_loss', 'other'] })).toBe(true);
     expect(shouldSkipStep('symptomWeek', { sideEffects: ['nausea'] })).toBe(false);
     expect(shouldSkipStep('symptomWeek', { sideEffects: ['other', 'fatigue'] })).toBe(false);
+  });
+});
+
+// Daily cadence needs a dose time or nothing can project a next dose
+// (2026-08-07). The TIME question now reaches every daily user, any route;
+// the WEEKDAY question stays weekly-injection-only.
+describe('shotTime for daily schedules', () => {
+  it('asks the time for an oral daily user, without re-opening the injection steps', () => {
+    const ctx = { journeyStage: 'active', route: 'oral', frequency: 'daily' } as const;
+    expect(shouldSkipStep('shotTime', ctx)).toBe(false);
+    // The steps oral users are meant to skip stay skipped.
+    expect(shouldSkipStep('deviceType', ctx)).toBe(true);
+    expect(shouldSkipStep('concentration', ctx)).toBe(true);
+    expect(shouldSkipStep('shotDay', ctx)).toBe(true);
+  });
+
+  it('asks the time for a daily INJECTABLE too (Saxenda/Victoza had the same broken projection)', () => {
+    const ctx = { journeyStage: 'active', route: 'injection', frequency: 'daily' } as const;
+    expect(shouldSkipStep('shotTime', ctx)).toBe(false);
+    expect(shouldSkipStep('shotDay', ctx)).toBe(true);
+  });
+
+  it('weekly is unchanged: both weekday and time', () => {
+    const ctx = { journeyStage: 'active', route: 'injection', frequency: 'weekly' } as const;
+    expect(shouldSkipStep('shotDay', ctx)).toBe(false);
+    expect(shouldSkipStep('shotTime', ctx)).toBe(false);
+  });
+
+  it('biweekly still skips both — unchanged', () => {
+    const ctx = { journeyStage: 'active', route: 'injection', frequency: 'biweekly' } as const;
+    expect(shouldSkipStep('shotDay', ctx)).toBe(true);
+    expect(shouldSkipStep('shotTime', ctx)).toBe(true);
   });
 });

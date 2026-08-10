@@ -147,3 +147,38 @@ describe('nextDoseAt with multiple weekly shot days', () => {
     expect(payload.schedule?.daysOfWeek).toEqual([2, 3, 6]);
   });
 });
+
+// Daily cadence carries its dose time (2026-08-07). Without timesOfDay the
+// backend falls back to the 9:00 AM default instead of the hour the user
+// just chose one screen earlier.
+describe('daily schedules carry the chosen time', () => {
+  it('sends timesOfDay for a daily schedule', () => {
+    const payload = buildOnboardingPayload(
+      { ...fullAnswers, frequency: 'daily', shotDays: [], shotHour: 9 },
+      new Date(2026, 7, 7, 10, 0),
+    );
+    expect(payload.schedule?.frequency).toBe('daily');
+    expect(payload.schedule?.timesOfDay).toEqual(['09:00']);
+  });
+
+  it('pads the hour and handles evening times', () => {
+    const payload = buildOnboardingPayload(
+      { ...fullAnswers, frequency: 'daily', shotDays: [], shotHour: 21 },
+      new Date(2026, 7, 7, 10, 0),
+    );
+    expect(payload.schedule?.timesOfDay).toEqual(['21:00']);
+  });
+
+  it('weekly and biweekly send NO timesOfDay — unchanged', () => {
+    const weekly = buildOnboardingPayload(
+      { ...fullAnswers, frequency: 'weekly', shotHour: 8 },
+      new Date(2026, 7, 7, 10, 0),
+    );
+    expect(weekly.schedule?.timesOfDay).toBeUndefined();
+    const biweekly = buildOnboardingPayload(
+      { ...fullAnswers, frequency: 'biweekly', shotHour: 8 },
+      new Date(2026, 7, 7, 10, 0),
+    );
+    expect(biweekly.schedule?.timesOfDay).toBeUndefined();
+  });
+});

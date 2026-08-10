@@ -211,12 +211,24 @@ export function shouldSkipStep(step: OnboardingStep, ctx: FlowContext): boolean 
   if (step === 'deviceType' && ctx.route === 'oral') return true;
   // Concentration only matters when the user draws doses from a vial.
   if (step === 'concentration' && ctx.deviceType !== 'syringe_vial') return true;
-  // Shot day + time are for weekly injections only.
+  // WHICH weekday is a weekly-injection question only.
   if (
-    (step === 'shotDay' || step === 'shotTime') &&
+    step === 'shotDay' &&
     (ctx.route === 'oral' || (ctx.frequency != null && ctx.frequency !== 'weekly'))
   ) {
     return true;
+  }
+  // WHAT TIME: weekly injections as before, PLUS every daily schedule
+  // regardless of route (2026-08-07) — a daily cadence with no time of day
+  // projects no next dose at all, which broke oral dailies and daily
+  // injectables (Saxenda/Victoza) alike. Strictly additive: the daily case
+  // is the only one whose answer changed. Oral users gain this ONE question
+  // and no other injection step.
+  if (step === 'shotTime') {
+    const isDaily = ctx.frequency === 'daily';
+    const isWeeklyInjection =
+      ctx.route !== 'oral' && (ctx.frequency == null || ctx.frequency === 'weekly');
+    if (!isDaily && !isWeeklyInjection) return true;
   }
   return false;
 }

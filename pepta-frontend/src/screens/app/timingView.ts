@@ -48,6 +48,13 @@ export function defaultTimesFor(schedule: ScheduleResponse | null): string[] {
   if (schedule?.timesOfDay && schedule.timesOfDay.length > 0) {
     return [...schedule.timesOfDay].sort();
   }
+  // Daily with nothing stored: show the same 9:00 AM the projection assumes,
+  // so the editor reflects reality and saving turns it into an explicit
+  // choice. (Deliberately ahead of the nextDoseAt echo below — that value IS
+  // the 9:00 default for these schedules, but only once a dose exists.)
+  if (schedule?.frequency === 'daily') {
+    return ['09:00'];
+  }
   if (schedule?.nextDoseAt) {
     const at = new Date(schedule.nextDoseAt);
     if (!Number.isNaN(at.getTime())) {

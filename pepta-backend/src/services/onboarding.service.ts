@@ -177,6 +177,10 @@ export async function completeOnboarding(
       daysOfWeek: input.schedule?.daysOfWeek ?? [],
       nextDoseAt: input.schedule?.nextDoseAt,
       active: input.schedule?.active ?? true,
+      // Carried through since 2026-08-07: onboarding now asks daily users
+      // what time they take it, and dropping it here meant every daily
+      // schedule fell back to the projection default.
+      ...(input.schedule?.timesOfDay ? { timesOfDay: input.schedule.timesOfDay } : {}),
     };
 
     await ScheduleModel.findOneAndUpdate(

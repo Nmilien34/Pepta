@@ -47,9 +47,17 @@ interface ReminderSettingsScreenProps {
 export function ReminderSettingsScreen({ visible, onClose }: ReminderSettingsScreenProps) {
   const theme = useTheme();
   const { user, updateCachedUser } = useAuth();
-  const { home, track, refreshHome, refreshTrack } = usePeptaData();
+  const { home, track, schedules, refreshHome, refreshTrack, refreshScheduling } = usePeptaData();
   const companionName = useCompanionName();
-  const groups = useMemo(() => deriveReminderGroups({ home, track }), [home, track]);
+  // Schedules are loaded lazily by Track — pull them here too so a daily
+  // cadence can arm a REPEATING dose reminder instead of a one-shot.
+  useEffect(() => {
+    if (schedules == null) void refreshScheduling();
+  }, [schedules, refreshScheduling]);
+  const groups = useMemo(
+    () => deriveReminderGroups({ home, track, schedules }),
+    [home, track, schedules],
+  );
   const [state, setState] = useState<Record<string, boolean>>(() => defaultReminderState(groups));
   const [permissionStatus, setPermissionStatus] = useState<ReminderPermissionStatus>("undetermined");
   const [aiPushCopyConsent, setAiPushCopyConsent] = useState(

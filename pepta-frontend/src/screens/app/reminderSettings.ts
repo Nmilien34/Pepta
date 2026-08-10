@@ -1,4 +1,4 @@
-import type { HomeResponse, TrackResponse } from "@pepta/shared";
+import type { HomeResponse, ScheduleResponse, TrackResponse } from "@pepta/shared";
 import { buildPepReminderNotificationCopy, type PepNotificationCopy } from "./pepPriorities";
 
 export type ReminderIcon =
@@ -71,9 +71,31 @@ function dateSchedule(datetime: string | null): ReminderScheduleRule {
   return datetime ? { kind: "date", datetime } : { kind: "none" };
 }
 
+/**
+ * A one-shot date rule only re-arms when the app syncs — fine for a weekly
+ * dose (the user opens Pepta long before the next one), broken for a daily
+ * one: miss a few days and the reminders stop. When the next dose belongs to
+ * a DAILY schedule, use the repeating daily trigger the notification layer
+ * already supports, anchored on that dose's local time (2026-08-07).
+ * Weekly/biweekly keep the date rule exactly as before.
+ */
+function doseSchedule(
+  datetime: string | null,
+  isDaily: boolean,
+): ReminderScheduleRule {
+  if (!datetime) return { kind: "none" };
+  if (!isDaily) return { kind: "date", datetime };
+  const at = new Date(datetime);
+  if (Number.isNaN(at.getTime())) return { kind: "date", datetime };
+  return { kind: "daily", hour: at.getHours(), minute: at.getMinutes() };
+}
+
 export function deriveReminderGroups(args: {
   home: HomeResponse | null;
   track: TrackResponse | null;
+  /** Optional: when the next dose's schedule is daily, its reminder repeats
+   *  daily instead of firing once. Absent → today's date-rule behavior. */
+  schedules?: ScheduleResponse[] | null;
 }): ReminderGroup[] {
   const nextDoseAt = validIso(args.home?.nextDose?.nextDoseAt);
   const compoundName =
@@ -83,6 +105,14 @@ export function deriveReminderGroups(args: {
   const timezone = args.home?.profile?.timezone ?? null;
   const proteinTarget = args.home?.profile?.dailyProteinTargetGrams;
   const postDoseAt = nextDoseAt ? addDaysIso(nextDoseAt, 1) : null;
+  const nextDoseCompoundId = args.home?.nextDose?.compoundId ?? null;
+  const doseIsDaily =
+    (args.schedules ?? []).some(
+      (schedule) =>
+        schedule.active &&
+        schedule.frequency === "daily" &&
+        (nextDoseCompoundId == null || schedule.compoundId === nextDoseCompoundId),
+    ) === true;
   const notification = (id: string): PepNotificationCopy | undefined =>
     buildPepReminderNotificationCopy(id, args.home) ?? undefined;
 
@@ -98,7 +128,7 @@ export function deriveReminderGroups(args: {
             ? `${compoundName} · ${formatDoseDateTime(nextDoseAt, timezone)}`
             : "Set your dose schedule to enable",
           defaultOn: Boolean(nextDoseAt),
-          schedule: dateSchedule(nextDoseAt),
+          schedule: doseSchedule(nextDoseAt, doseIsDaily),
           notification: notification("dose_due"),
         },
         {

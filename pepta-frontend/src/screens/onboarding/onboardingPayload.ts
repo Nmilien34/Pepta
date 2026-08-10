@@ -216,6 +216,13 @@ export function buildOnboardingPayload(answers: OnboardingAnswers, now: Date): O
           frequency: answers.frequency,
           daysOfWeek: answers.shotDays ?? [],
           active: true,
+          // Daily cadence carries its time explicitly: without it the
+          // backend projects the 9:00 AM default rather than the hour the
+          // user just told us (2026-08-07). Weekly/biweekly are unchanged —
+          // their time still rides the logged dose.
+          ...(answers.frequency === 'daily' && answers.shotHour != null
+            ? { timesOfDay: [`${String(answers.shotHour).padStart(2, '0')}:00`] }
+            : {}),
           ...(answers.lastShot
             ? (() => {
                 const next = nextDoseAt(answers.lastShot!, answers.frequency!, answers.shotHour, now, answers.shotDays);

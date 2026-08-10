@@ -16,6 +16,14 @@ const CURVE_SAMPLE_HOURS = 6;
 // Widest search for the next on-cycle dose day: past the longest allowed rest
 // window (52 weeks) plus a schedule period.
 const MAX_NEXT_DOSE_LOOKAHEAD_DAYS = 400;
+/**
+ * A daily schedule with no stored time still needs an hour to project to.
+ * 9:00 AM LOCAL, computed here and never written to the schedule — nothing
+ * is backfilled, and the first time a user edits their dose time an explicit
+ * value replaces this. Daily only: weekly/biweekly projections keep deriving
+ * their time-of-day from the last logged dose, exactly as before.
+ */
+const DEFAULT_DAILY_TIME_OF_DAY = "09:00";
 
 export interface MedicationSchedule {
   frequency: "daily" | "weekly" | "biweekly" | "custom";
@@ -219,7 +227,14 @@ function nextDoseFromSchedule(input: {
 
   const latestAt = new Date(input.latest.datetime);
 
-  const times = input.schedule?.timesOfDay ?? [];
+  // A daily schedule without an explicit time falls back to the 9:00 AM
+  // default so it projects a real next dose instead of dragging whatever
+  // hour the last dose happened to be logged at (onboarding seeds noon).
+  const storedTimes = input.schedule?.timesOfDay ?? [];
+  const times =
+    storedTimes.length === 0 && input.schedule?.frequency === "daily"
+      ? [DEFAULT_DAILY_TIME_OF_DAY]
+      : storedTimes;
   if (
     input.schedule &&
     times.length > 0 &&

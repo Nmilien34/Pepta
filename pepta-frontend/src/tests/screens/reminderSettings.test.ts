@@ -153,3 +153,54 @@ describe("deriveReminderGroups", () => {
     expect(state.progress_photo).toBe(false);
   });
 });
+
+// Daily dose reminders (2026-08-07): a one-shot date rule only re-arms when
+// the app syncs, so a daily user who doesn't open Pepta stops being
+// reminded. A daily schedule now produces the REPEATING daily trigger the
+// notification layer already supports. Titles/copy are untouched.
+describe("daily dose reminders", () => {
+  const dailySchedule = {
+    id: "schedule-1",
+    userId: "user-1",
+    compoundId: "compound-1",
+    frequency: "daily" as const,
+    daysOfWeek: [],
+    active: true,
+    createdAt: "2026-06-01T00:00:00.000Z",
+    updatedAt: "2026-06-01T00:00:00.000Z",
+  };
+
+  it("repeats daily at the next dose's local time", () => {
+    const groups = deriveReminderGroups({
+      home: homeWithNextDose(),
+      track: track(),
+      schedules: [dailySchedule] as never,
+    });
+    const doseDue = groups.flatMap((g) => g.items).find((i) => i.id === "dose_due")!;
+    const at = new Date("2026-07-04T18:00:00.000Z");
+    expect(doseDue.schedule).toEqual({
+      kind: "daily",
+      hour: at.getHours(),
+      minute: at.getMinutes(),
+    });
+    expect(doseDue.defaultOn).toBe(true);
+  });
+
+  it("weekly schedules keep the one-shot date rule — unchanged", () => {
+    const groups = deriveReminderGroups({
+      home: homeWithNextDose(),
+      track: track(),
+      schedules: [{ ...dailySchedule, frequency: "weekly" }] as never,
+    });
+    expect(
+      groups.flatMap((g) => g.items).find((i) => i.id === "dose_due")!.schedule,
+    ).toEqual({ kind: "date", datetime: "2026-07-04T18:00:00.000Z" });
+  });
+
+  it("without schedules loaded it degrades to today's date rule", () => {
+    const groups = deriveReminderGroups({ home: homeWithNextDose(), track: track() });
+    expect(
+      groups.flatMap((g) => g.items).find((i) => i.id === "dose_due")!.schedule,
+    ).toEqual({ kind: "date", datetime: "2026-07-04T18:00:00.000Z" });
+  });
+});
