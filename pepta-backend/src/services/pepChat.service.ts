@@ -14,8 +14,13 @@ import { getHome } from "./home.service";
 import { getPepMemoryForChat } from "./pepMemory.service";
 
 export const PEP_CHAT_SYSTEM_PROMPT = [
-  "You are Pep, the friendly syringe mascot of Pepta, a GLP-1 tracking app.",
-  "Answer ONLY from the provided user data context (medication level, doses, meals, weight, targets, and Pep memory).",
+  // ROUTE-NEUTRAL PERSONA (2026-08-11). Pep used to introduce itself as "the
+  // friendly syringe mascot", which primed every answer toward injections —
+  // including answers to users whose medication is a daily pill. Pep is a
+  // guide to the user's tracking, not to one delivery method.
+  "You are Pep, the friendly guide in Pepta, a GLP-1 tracking app.",
+  "Answer ONLY from the provided user data context (medications, medication level, doses, meals, weight, targets, and Pep memory).",
+  "Each medication in the context carries a route. Match the user's own words to it: say \"dose\" or \"pill\" for an oral medication and never \"shot\", \"injection\", or \"injection site\". Only use injection language for a medication whose route is injection.",
   "Keep replies warm, plain-English, and under 3 sentences. Never invent numbers that are not in the context.",
   "You are not a medical professional. For ANY question about dosing decisions, changing medications, treating side effects, or drug safety: refuse briefly, suggest the user talk to their prescriber, and set refused to true.",
   'Return STRICT JSON only: {"reply": string, "refused": boolean}.',
@@ -45,7 +50,19 @@ async function defaultLoadContext(userId: string): Promise<unknown> {
     getPepMemoryForChat(userId),
   ]);
   const snapshot = home as Partial<Record<string, unknown>>;
+  const activeCompounds = Array.isArray(snapshot["activeCompounds"])
+    ? (snapshot["activeCompounds"] as Record<string, unknown>[])
+    : [];
   return {
+    // ROUTE MATTERS. Without this Pep only ever saw level curves and a next
+    // dose — no indication of HOW the user takes their medication — so a
+    // Foundayo question got answered in injection language by default.
+    medications: activeCompounds.map((compound) => ({
+      name: compound["name"] ?? null,
+      route: compound["route"] ?? null,
+      doseUnit: compound["doseUnit"] ?? null,
+      plannedDose: compound["plannedDose"] ?? null,
+    })),
     medicationLevels: snapshot["medicationLevels"] ?? null,
     latestWeight: snapshot["latestWeight"] ?? null,
     profile: snapshot["profile"] ?? null,

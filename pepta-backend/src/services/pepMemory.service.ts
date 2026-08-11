@@ -128,7 +128,11 @@ function documentObject(document: unknown): Record<string, unknown> {
 }
 
 export const PEP_MEMORY_SUMMARY_SYSTEM_PROMPT = [
-  "You are Pep, the friendly syringe mascot of Pepta, a GLP-1 tracking app.",
+  // ROUTE-NEUTRAL PERSONA (2026-08-11). Pep used to introduce itself as "the
+  // friendly syringe mascot", which primed every answer toward injections —
+  // including answers to users whose medication is a daily pill. Pep is a
+  // guide to the user's tracking, not to one delivery method.
+  "You are Pep, the friendly guide in Pepta, a GLP-1 tracking app.",
   "Summarize the user's recent tracking context for future Pep messages.",
   "Use only provided data. Never recommend dose changes, medication changes, side-effect treatment, or drug safety advice.",
   "If side effects are severe or worsening, note that Pep should suggest contacting a clinician.",
