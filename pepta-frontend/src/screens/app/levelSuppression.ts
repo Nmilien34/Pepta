@@ -30,6 +30,29 @@ export function doseNoun(route: string | null | undefined): 'shot' | 'dose' {
   return route === 'oral' ? 'dose' : 'shot';
 }
 
+/**
+ * The noun for a string that belongs to NO single compound — a Home empty
+ * state, a schedule day summary, "hours since your last …".
+ *
+ * "shot" survives only when EVERY active compound is injectable. That keeps an
+ * all-injectable user byte-identical while a user on both an injectable and a
+ * pill reads neutral language, instead of being told to log a "shot" on the day
+ * their oral dose is due. An empty list reads as injection, matching doseNoun's
+ * fallback: never guess oral.
+ */
+export function globalDoseNoun(
+  compounds: readonly { route?: string | null }[] | null | undefined,
+): 'shot' | 'dose' {
+  const active = compounds ?? [];
+  if (active.length === 0) return 'shot';
+  return active.every((compound) => compound.route !== 'oral') ? 'shot' : 'dose';
+}
+
+/** Capitalized for sentence starts and labels ("Shot day" / "Dose day"). */
+export function capitalize(noun: string): string {
+  return noun.charAt(0).toUpperCase() + noun.slice(1);
+}
+
 export type LevelSuppressionReason = 'oral' | 'unmodeled';
 
 export const LEVEL_SUPPRESSION_COPY: Record<LevelSuppressionReason, string> = {

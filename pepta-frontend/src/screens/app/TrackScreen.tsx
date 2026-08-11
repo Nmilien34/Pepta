@@ -31,6 +31,8 @@ import {
   usedSites,
 } from './trackView';
 import {
+  doseNoun,
+  globalDoseNoun,
   LEVEL_SUPPRESSION_COPY,
   resolveLevelView,
   type LevelSuppressionReason,
@@ -106,6 +108,10 @@ export function TrackScreen() {
   const compounds = home?.activeCompounds ?? [];
   const doses = sortDoses(track?.doseLogs ?? []);
   const sideEffects = sortSideEffects(track?.sideEffectLogs ?? []);
+  // Any injectable at all keeps the body map: a mixed user still rotates sites
+  // for their injection, and hiding it would lose that. All-oral hides it.
+  const hasInjectable = compounds.length === 0 || compounds.some((c) => c.route !== 'oral');
+  const doseWord = globalDoseNoun(compounds);
   const used = usedSites(track?.doseLogs ?? []);
   const next = suggestNextSite(track?.doseLogs ?? []);
   const compoundName = (id: string) => compounds.find((c) => c.id === id)?.name ?? 'Dose';
@@ -192,8 +198,8 @@ export function TrackScreen() {
               </Pressable>
             ) : (
               <EmptyCard
-                line="Log your first shot — I’ll track your next dose."
-                actionLabel="Log first shot"
+                line={`Log your first ${doseWord} — I’ll track your next dose.`}
+                actionLabel={`Log first ${doseWord}`}
                 onAction={() => openQuickLog('dose')}
               />
             )}
@@ -257,7 +263,10 @@ export function TrackScreen() {
             </Card>
           </Reveal>
 
-          {/* injection sites */}
+          {/* Injection sites — hidden entirely for a user whose medications are
+              all oral. Present unchanged the moment any compound is
+              injectable, including a mixed user who still needs the map. */}
+          {hasInjectable ? (
           <Reveal delay={220} style={{ marginTop: 12 }}>
             <Card>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -282,6 +291,7 @@ export function TrackScreen() {
               </View>
             </Card>
           </Reveal>
+          ) : null}
 
           {/* medication level chart */}
           {ml || compounds.length > 0 ? (
@@ -290,6 +300,9 @@ export function TrackScreen() {
                 <MedicationLevelCardContent
                   ml={ml}
                   compoundName={ml?.compoundName ?? compounds[0]?.name ?? 'Medication'}
+                  doseWord={doseNoun(
+                    compounds.find((c) => c.id === ml?.compoundId)?.route ?? compounds[0]?.route,
+                  )}
                   suppressed={levelSuppressed}
                   onLogDose={() => openQuickLog('dose')}
                   onOpenSettings={() => navigation.navigate('DoseSettings')}
@@ -338,7 +351,9 @@ export function TrackScreen() {
           </Reveal>
           </View>
 
-          {/* mix calculator — visible front door (row card in the dose-history idiom) */}
+          {/* Mix calculator — reconstitution is a vial-and-syringe task, so the
+              front door is hidden entirely for an all-oral user. */}
+          {hasInjectable ? (
           <Reveal delay={390} style={{ marginTop: 12 }}>
             <Pressable
               onPress={() => { Haptics.selectionAsync().catch(() => undefined); navigation.navigate('MixCalculator'); }}
@@ -359,6 +374,7 @@ export function TrackScreen() {
               </Card>
             </Pressable>
           </Reveal>
+          ) : null}
 
           {/* peptide library — visible front door (row card in the dose-history idiom) */}
           <Reveal delay={405} style={{ marginTop: 12 }}>
@@ -468,12 +484,15 @@ function LevelChart({ levels, color }: { levels: number[]; color: string }) {
 function MedicationLevelCardContent({
   ml,
   compoundName,
+  doseWord,
   suppressed,
   onLogDose,
   onOpenSettings,
 }: {
   ml: NonNullable<ReturnType<typeof usePeptaData>['home']>['medicationLevels'][number] | null;
   compoundName: string;
+  /** This compound's own noun — the card is about one medication. */
+  doseWord: string;
   /** Oral route or no half-life: the curve is suppressed, not pending. */
   suppressed: LevelSuppressionReason | null;
   onLogDose: () => void;
@@ -545,7 +564,7 @@ function MedicationLevelCardContent({
           <AppText variant="body" color="textSecondary">
             {suppressed
               ? LEVEL_SUPPRESSION_COPY[suppressed]
-              : 'Log your first shot to start building your medication level curve.'}
+              : `Log your first ${doseWord} to start building your medication level curve.`}
           </AppText>
           {suppressed ? null : (
           <Pressable

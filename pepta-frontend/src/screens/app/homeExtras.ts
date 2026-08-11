@@ -3,6 +3,7 @@
 
 import type { HomeRangeKey, HomeResponse, TrackResponse, UserProfileResponse } from '@pepta/shared';
 import { measurementLabel } from './progressView';
+import { capitalize, globalDoseNoun } from './levelSuppression';
 
 function startOfLocalDay(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
@@ -84,7 +85,9 @@ export function buildTodaysLog(
   const add = (kind: LogKind, label: string, iso: string) => {
     if (inLocalRange(iso, now, range)) out.push({ chip: { kind, label }, t: new Date(iso).getTime() });
   };
-  const compoundName = (id: string) => home?.activeCompounds.find((c) => c.id === id)?.name ?? 'Shot';
+  const compoundName = (id: string) =>
+    home?.activeCompounds.find((c) => c.id === id)?.name ??
+    capitalize(globalDoseNoun(home?.activeCompounds));
 
   if (track) {
     for (const d of track.doseLogs) if (d.deletedAt == null) add('shot', compoundName(d.compoundId), d.datetime);

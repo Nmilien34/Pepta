@@ -6,12 +6,23 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppText, Button, Card, SectionErrorBanner } from '../../components';
 import { Icon } from '../../components/Icon';
 import { TimingSheet } from '../../components/TimingSheet';
+import { DoseTimeSheet } from '../../components/DoseTimeSheet';
+import { api } from '../../services/api';
 import { useLogSheets } from '../../context/LogSheetsContext';
+import { doseNoun } from './levelSuppression';
 import { usePeptaData } from '../../context/PeptaDataContext';
 import { useTheme } from '../../theme';
 import { formatNextDoseAt, siteLabel, sortDoses } from './trackView';
 import { activeCycleOf, patternOf } from './scheduleView';
 import { formatTimesOfDay, primarySchedule, timingLabel } from './timingView';
+
+/** "09:00" → "9:00 AM". The stored value is 24h; the row is not. */
+function formatClock(hhmm: string): string {
+  const [h, m] = hhmm.split(':').map((part) => Number(part));
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return hhmm;
+  const hour12 = h! % 12 === 0 ? 12 : h! % 12;
+  return `${hour12}:${String(m).padStart(2, '0')} ${h! < 12 ? 'AM' : 'PM'}`;
+}
 
 export function DoseSettingsScreen() {
   const theme = useTheme();
@@ -28,6 +39,8 @@ export function DoseSettingsScreen() {
 
   const cyclePattern = useMemo(() => patternOf(activeCycleOf(cycles)), [cycles]);
   const schedule = useMemo(() => primarySchedule(schedules), [schedules]);
+  const [reminderTimeOpen, setReminderTimeOpen] = useState(false);
+  const [savingTime, setSavingTime] = useState(false);
   const timingValue = useMemo(() => {
     if (schedule?.timesOfDay && schedule.timesOfDay.length > 0) {
       const context = timingLabel(schedule.timing);
@@ -77,7 +90,7 @@ export function DoseSettingsScreen() {
                 <SettingRow
                   icon="calendar-week"
                   label="Schedule"
-                  value={nextDose?.nextDoseAt ? formatNextDoseAt(nextDose.nextDoseAt) : compound ? 'No upcoming dose' : 'Set with first shot'}
+                  value={nextDose?.nextDoseAt ? formatNextDoseAt(nextDose.nextDoseAt) : compound ? 'No upcoming dose' : `Set with first ${doseNoun(null)}`}
                   onPress={() => openQuickLog('dose')}
                 />
                 <SettingRow
@@ -86,12 +99,24 @@ export function DoseSettingsScreen() {
                   value={compound?.plannedDose ? `${compound.plannedDose} ${compound.doseUnit}` : lastDose ? `${lastDose.amount} ${lastDose.unit}` : 'Not set'}
                   onPress={() => openQuickLog('dose')}
                 />
-                <SettingRow
-                  icon="current-location"
-                  label="Location"
-                  value={lastDose?.injectionSite ? siteLabel(lastDose.injectionSite) : 'Choose when logging'}
-                  onPress={() => openQuickLog('dose')}
-                />
+                {compound?.route === 'oral' ? null : (
+                  <SettingRow
+                    icon="current-location"
+                    label="Location"
+                    value={lastDose?.injectionSite ? siteLabel(lastDose.injectionSite) : 'Choose when logging'}
+                    onPress={() => openQuickLog('dose')}
+                  />
+                )}
+                {/* Reminder time — the same picker the data-health card opens,
+                    so a daily user can set it without waiting for a card. */}
+                {schedule?.frequency === 'daily' ? (
+                  <SettingRow
+                    icon="notifications"
+                    label="Reminder time"
+                    value={schedule.timesOfDay?.[0] ? formatClock(schedule.timesOfDay[0]) : 'Not set'}
+                    onPress={() => setReminderTimeOpen(true)}
+                  />
+                ) : null}
                 <SettingRow
                   icon="time-outline"
                   label="Dose timing"
@@ -107,13 +132,15 @@ export function DoseSettingsScreen() {
                   value={cyclePattern ? `${cyclePattern.weeksOn} wk on, ${cyclePattern.weeksOff} off` : 'Not set'}
                   onPress={() => navigation.navigate('CycleSetup')}
                 />
-                <SettingRow
-                  icon="flask"
-                  label="Mix calculator"
-                  value="Vial + water → units"
-                  last
-                  onPress={() => navigation.navigate('MixCalculator')}
-                />
+                {compound?.route === 'oral' ? null : (
+                  <SettingRow
+                    icon="flask"
+                    label="Mix calculator"
+                    value="Vial + water → units"
+                    last
+                    onPress={() => navigation.navigate('MixCalculator')}
+                  />
+                )}
               </Card>
 
               <Card style={{ marginTop: 12, backgroundColor: '#EFEBFF' }} flat>
@@ -139,6 +166,27 @@ export function DoseSettingsScreen() {
         </ScrollView>
       </SafeAreaView>
       <TimingSheet visible={timingOpen} onClose={() => setTimingOpen(false)} />
+      <DoseTimeSheet
+        visible={reminderTimeOpen}
+        compoundName={compound?.name ?? 'your medication'}
+        selected={schedule?.timesOfDay?.[0] ?? null}
+        busy={savingTime}
+        onClose={() => setReminderTimeOpen(false)}
+        onPick={async (time) => {
+          if (!schedule) return;
+          setSavingTime(true);
+          try {
+            await api.updateSchedule(schedule.id, { timesOfDay: [time] });
+            await refreshScheduling();
+            await refreshHome();
+            setReminderTimeOpen(false);
+          } catch {
+            // Silent: the row still shows the old value and can be retried.
+          } finally {
+            setSavingTime(false);
+          }
+        }}
+      />
     </View>
   );
 }

@@ -39,6 +39,11 @@ export function LibraryEntryScreen() {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
   const route = useRoute<LibraryEntryRoute>();
   const { home } = usePeptaData();
+  // A library entry can describe a reconstituted peptide, but an all-oral user
+  // has nothing to mix — the CTA goes away rather than opening vial math.
+  const hasInjectable =
+    (home?.activeCompounds ?? []).length === 0 ||
+    (home?.activeCompounds ?? []).some((c) => c.route !== 'oral');
   const { askPep } = usePepChat();
   const companionName = useCompanionName();
   const [addOpen, setAddOpen] = useState(false);
@@ -217,7 +222,7 @@ export function LibraryEntryScreen() {
               disabled={tracked}
               fullWidth
             />
-            {entry.reconstituted ? (
+            {entry.reconstituted && hasInjectable ? (
               <Pressable
                 onPress={() => {
                   Haptics.selectionAsync().catch(() => undefined);

@@ -27,6 +27,9 @@ export interface EchoAnswers {
   journeyStage?: JourneyStage;
   medication?: MedicationOption;
   dose?: DoseValue;
+  /** Drives the echo's noun — an oral user is never told "every shot".
+   *  'unsure' reads as injection, matching doseNoun's never-guess-oral rule. */
+  route?: 'injection' | 'oral' | 'unsure';
   deviceType?: InjectionDeviceType;
   concentration?: ConcentrationValue;
   frequency?: DoseFrequency;
@@ -92,9 +95,10 @@ function medEcho(med?: MedicationOption): string {
   return med ? `${med.name} — strong pick, and you’re far from alone on it.` : 'Got it.';
 }
 
-function doseEcho(dose?: DoseValue, unit = 'mg'): string {
-  if (typeof dose === 'number') return `${dose} ${unit}. We’ll track every shot.`;
-  return 'Custom dose. We’ll track every shot.';
+function doseEcho(dose?: DoseValue, unit = 'mg', route?: string | null): string {
+  const noun = route === 'oral' ? 'dose' : 'shot';
+  if (typeof dose === 'number') return `${dose} ${unit}. We’ll track every ${noun}.`;
+  return `Custom dose. We’ll track every ${noun}.`;
 }
 
 function deviceEcho(device?: InjectionDeviceType): string {
@@ -186,11 +190,11 @@ export function echoFor(step: OnboardingStep, a: EchoAnswers, now: Date = new Da
     case 'currentDose':
       return medEcho(a.medication);
     case 'deviceType':
-      return doseEcho(a.dose, unit);
+      return doseEcho(a.dose, unit, a.route);
     case 'concentration':
       return deviceEcho(a.deviceType);
     case 'frequency':
-      return a.deviceType ? deviceEcho(a.deviceType) : doseEcho(a.dose, unit);
+      return a.deviceType ? deviceEcho(a.deviceType) : doseEcho(a.dose, unit, a.route);
     case 'leanMass':
       return leanMassContext(a);
     case 'lastShot':

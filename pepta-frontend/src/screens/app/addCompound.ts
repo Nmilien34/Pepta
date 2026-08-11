@@ -128,3 +128,28 @@ export function buildCustomScheduleInput(
     ...(draft.frequency === 'daily' ? { timesOfDay: [draft.timeOfDay] } : {}),
   };
 }
+
+/**
+ * Same normalization the D1 duplicate detector uses on the backend — trim,
+ * lowercase, collapse whitespace — so the inline warning fires on exactly what
+ * would otherwise become a duplicate-compounds card later.
+ */
+export function normalizeCompoundName(name: string): string {
+  return name.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+export function findDuplicateCompound(
+  compounds: readonly { name: string; route?: string | null }[],
+  name: string,
+  route: string | null | undefined,
+): { name: string } | null {
+  const target = normalizeCompoundName(name);
+  if (target === '') return null;
+  return (
+    compounds.find(
+      (compound) =>
+        normalizeCompoundName(compound.name) === target &&
+        (compound.route ?? null) === (route ?? null),
+    ) ?? null
+  );
+}

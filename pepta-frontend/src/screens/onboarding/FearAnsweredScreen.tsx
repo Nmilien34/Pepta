@@ -42,7 +42,7 @@ const FEAR_COPY: Record<BiggestWorry, FearCopy> = {
   },
   side_effects: {
     spoken: 'Side effects',
-    line: 'Most GI effects cluster around dose changes and ease with time. Pepta ties every symptom to the shot that came before it, so you and your doctor can see the pattern instead of guessing at it.',
+    line: 'Most GI effects cluster around dose changes and ease with time. Pepta ties every symptom to the dose that came before it, so you and your doctor can see the pattern instead of guessing at it.',
   },
   stalling: {
     spoken: 'Stalling out',
@@ -54,7 +54,7 @@ const FEAR_COPY: Record<BiggestWorry, FearCopy> = {
   },
   energy: {
     spoken: 'Low energy',
-    line: 'Protein, hydration and shot-day timing are the three levers that move energy on a GLP-1. Pepta tracks all three against targets set for your dose.',
+    line: 'Protein, hydration and dose timing are the three levers that move energy on a GLP-1. Pepta tracks all three against targets set for your dose.',
   },
 };
 

@@ -9,6 +9,8 @@ import { ConvoButton, ConvoScreen, type ConvoOption } from '../../components';
 export type SideEffectType = OnboardingCompleteInput['sideEffectBaseline'][number];
 
 export interface SideEffectsScreenProps {
+  /** Oral route: an injection-site reaction is not a symptom they can have. */
+  oral?: boolean;
   progress: number;
   onBack?(): void;
   context?: string;
@@ -37,13 +39,18 @@ export function SideEffectsScreen({
   onBack,
   context,
   value,
+  oral,
   onToggle,
   onClear,
   onContinue,
 }: SideEffectsScreenProps) {
   const options: ConvoOption<SideEffectChoice>[] = [
     { label: 'None yet', value: 'none' },
-    ...EFFECTS.map((effect) => ({ label: effect.label, value: effect.value as SideEffectChoice })),
+    // An oral user cannot have an injection-site reaction; offering it invites
+    // a log that means nothing and skews their own symptom history.
+    ...EFFECTS.filter(
+      (effect) => !(oral && effect.value === 'injection_site_reaction'),
+    ).map((effect) => ({ label: effect.label, value: effect.value as SideEffectChoice })),
   ];
 
   return (

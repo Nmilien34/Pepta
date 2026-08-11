@@ -233,13 +233,26 @@ describe("D2 missing dose time", () => {
     ).toBeNull();
   });
 
-  it("stays silent with no logged dose — a time cannot arm a projection yet", () => {
-    // projectNextDoseAt returns null without a latest dose, so setting a time
-    // here would change nothing the user can see.
+  it("FIRES with no logged dose — the schedule anchor made a time meaningful", () => {
+    // Was the opposite assertion until 2026-08-11. projectNextDoseAt used to
+    // return null without a latest dose, so a time armed nothing; it now
+    // anchors on the schedule, so an active daily schedule is reason enough.
+    // This is the a10499 shape exactly.
+    const hit = missingDoseTime.detect(
+      context([compound("c1", "Something else")], [schedule("s1", "c1")], { c1: 0 }),
+    );
+    expect(hit?.subjectId).toBe("s1");
+  });
+
+  it("stays silent for a compound with no active schedule at all", () => {
     expect(
-      missingDoseTime.detect(
-        context([compound("c1", "Something else")], [schedule("s1", "c1")], { c1: 0 }),
-      ),
+      missingDoseTime.detect(context([compound("c1", "Foundayo")], [], { c1: 3 })),
+    ).toBeNull();
+  });
+
+  it("stays silent for a schedule whose compound is gone", () => {
+    expect(
+      missingDoseTime.detect(context([], [schedule("s1", "missing")], {})),
     ).toBeNull();
   });
 

@@ -21,7 +21,7 @@ import { useSeenTeachCards } from './useSeenTeachCards';
 import { usePeptaData } from '../../context/PeptaDataContext';
 import { useLogSheets } from '../../context/LogSheetsContext';
 import { buildHomeView, type GoalView, type HomeWeightPulseView, type RingStat } from './homeView';
-import { LEVEL_SUPPRESSION_COPY } from './levelSuppression';
+import { globalDoseNoun, LEVEL_SUPPRESSION_COPY } from './levelSuppression';
 import { buildActivity, buildTodaysLog, type ActivitySummary, type LogChip, type LogKind } from './homeExtras';
 import { buildGettingStarted, buildPlanSummary, type GettingStarted, type LogAction, type PlanSummary } from './planView';
 import { buildPepTeachCard, type PepTeachCard } from './pepTeach';
@@ -402,7 +402,7 @@ export function HomeScreen() {
                   <AppText variant="caption" color="textSecondary">
                     {view.levelSuppressed
                       ? LEVEL_SUPPRESSION_COPY[view.levelSuppressed]
-                      : 'Log your first shot to start tracking levels.'}
+                      : `Log your first ${globalDoseNoun(home.activeCompounds)} to start tracking levels.`}
                   </AppText>
                 </View>
               </Card>

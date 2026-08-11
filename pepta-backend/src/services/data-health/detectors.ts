@@ -104,8 +104,11 @@ export const duplicateCompounds: Detector = {
  * a 9:00 AM default that is computed at projection time and never stored, so
  * the user is silently on an hour nobody chose.
  *
- * Requires a logged dose, because projectNextDoseAt returns null with no latest
- * dose — asking someone to set a time that cannot arm anything is a no-op card.
+ * NO LONGER requires a logged dose (2026-08-11). That gate existed because
+ * projectNextDoseAt returned null without one, so a time armed nothing and the
+ * card was a no-op. The schedule anchor removed that premise: a stored time now
+ * arms a reminder from the moment the schedule exists, so an active schedule is
+ * reason enough to ask.
  */
 export const missingDoseTime: Detector = {
   name: "missing-dose-time",
@@ -118,7 +121,6 @@ export const missingDoseTime: Detector = {
         (candidate) => candidate.id === schedule.compoundId,
       );
       if (!compound) continue;
-      if (liveDoseCount(context, compound.id) === 0) continue;
 
       return {
         subjectId: schedule.id,

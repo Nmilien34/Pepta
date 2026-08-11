@@ -9,13 +9,15 @@ export interface NotificationsScreenProps {
   progress: number;
   onBack?(): void;
   context?: string;
+  /** Oral route: the question drops shot-day framing. */
+  oral?: boolean;
   /** e.g. "Sundays around 8 PM." */
   sub?: string;
   onAllow?(): Promise<void> | void;
   onContinue(): void;
 }
 
-export function NotificationsScreen({ progress, onBack, context, sub, onAllow, onContinue }: NotificationsScreenProps) {
+export function NotificationsScreen({ progress, onBack, context, sub, oral, onAllow, onContinue }: NotificationsScreenProps) {
   const [busy, setBusy] = useState(false);
 
   const handleAllow = async () => {
@@ -34,7 +36,7 @@ export function NotificationsScreen({ progress, onBack, context, sub, onAllow, o
       progress={progress}
       onBack={onBack}
       context={context}
-      question="Want shot-day pings?"
+      question={oral ? "Want dose-time pings?" : "Want shot-day pings?"}
       sub={sub ?? 'Dose, water and protein reminders — only when they help.'}
       footer={<ConvoButton label="Continue" disabled={busy} onPress={handleAllow} />}
     />

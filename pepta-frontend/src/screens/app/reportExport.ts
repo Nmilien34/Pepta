@@ -5,6 +5,7 @@ import type {
   ProgressResponse,
   TrackResponse,
 } from "@pepta/shared";
+import { levelSuppressionFor } from "./levelSuppression";
 
 export interface PeptaReportExportInput {
   home: HomeResponse | null;
@@ -85,7 +86,17 @@ export function buildPeptaReportExportPayload(
     profile: input.home?.profile ?? null,
     summary: {
       activeCompounds: input.home?.activeCompounds ?? [],
-      medicationLevels: input.home?.medicationLevels ?? [],
+      // #12 SUPPRESSION APPLIES HERE TOO. The backend still computes a curve
+      // for an oral compound that happens to carry a half-life; the screens
+      // refuse to draw it, because a single-compartment instant-absorption
+      // model means nothing for a tablet. An export the user hands their
+      // prescriber must not launder that number into a document.
+      medicationLevels: (input.home?.medicationLevels ?? []).filter(
+        (level) =>
+          levelSuppressionFor(
+            (input.home?.activeCompounds ?? []).find((c) => c.id === level.compoundId),
+          ) !== "oral",
+      ),
       selectedRange: input.home?.selectedRange ?? null,
       rangeTotals: input.home?.rangeTotals ?? null,
       today: input.home

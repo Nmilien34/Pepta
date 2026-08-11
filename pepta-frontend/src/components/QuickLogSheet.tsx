@@ -995,7 +995,7 @@ function DoseForm({
         >
           {loading
             ? "Checking your medication setup…"
-            : "Set up your medication to log shots"}
+            : "Set up your medication to start logging doses"}
         </AppText>
         <AppText
           variant="caption"
@@ -1005,7 +1005,7 @@ function DoseForm({
         >
           {loading
             ? "Pepta is looking for the medication you added during onboarding."
-            : "If onboarding did not finish saving it, add it here once and your shot log will be ready."}
+            : "If onboarding did not finish saving it, add it here once and your dose log will be ready."}
         </AppText>
         {!loading ? (
           <View style={{ width: 220, marginTop: 6 }}>

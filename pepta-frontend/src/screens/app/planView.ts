@@ -3,6 +3,7 @@
 // (profile goal/pace/targets + setupProgress + today's signals). No RN imports.
 
 import type { HomeResponse, TrackResponse } from '@pepta/shared';
+import { doseNoun, globalDoseNoun } from './levelSuppression';
 import { formatShortDate } from './progressView';
 
 export interface PlanSummary {
@@ -61,7 +62,11 @@ export function buildGettingStarted(
   if (onMed) {
     tasks.push({
       key: 'shot',
-      label: med ? `Log your first ${med} shot` : 'Log your first shot',
+      // Named medication → that compound's own route. Unnamed → the global
+      // rule (injection wording only when everything they take is injectable).
+      label: med
+        ? `Log your first ${med} ${doseNoun(home.activeCompounds[0]?.route)}`
+        : `Log your first ${globalDoseNoun(home.activeCompounds)}`,
       // Dose logs, NOT medicationLevels (2026-08-11 audit): the level list
       // excludes unmodelled compounds, so a custom-medication user could log
       // doses forever and never tick this off. Falls back to the old signal

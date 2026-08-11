@@ -159,11 +159,16 @@ function resolveWeights(answers: FlowAnswers) {
 
 // Crafting rows lead with the user's own T3c needs picks (verbatim, checked off
 // one by one), then the standard proof rows built from their numbers.
+/** Crafting-list noun. Oral users are not promised shot-day anything. */
+function craftNoun(answers: FlowAnswers): 'Shot' | 'Dose' {
+  return answers.route === 'oral' ? 'Dose' : 'Shot';
+}
+
 function buildCraftingSteps(answers: FlowAnswers): string[] {
   const NEED_ROW: Record<NeedType, string> = {
     whats_working: 'Progress signals — what’s actually working',
     logging: 'One-tap logging — so it gets done',
-    schedule: 'Shot-day reminders — timed to you',
+    schedule: `${craftNoun(answers)}-day reminders — timed to you`,
     multiple_compounds: 'Multi-compound tracking — side by side',
     dose_math: 'Dose & mixing math — calculator armed',
     doctor_reports: 'Doctor-ready reports — export anytime',
@@ -189,7 +194,7 @@ function buildCraftingSteps(answers: FlowAnswers): string[] {
     : `Goal path — holding at ${goalInBodyUnit} ${bodyUnit}`;
   rows.push(goalPath);
   if (answers.journeyStage === 'active' && (answers.shotDays?.length ?? 0) > 0) {
-    rows.push(`Shot-day reminders — ${DAY_PLURAL[answers.shotDays![0]!]}`);
+    rows.push(`${craftNoun(answers)}-day reminders — ${DAY_PLURAL[answers.shotDays![0]!]}`);
   }
   return rows;
 }
@@ -755,6 +760,7 @@ export function OnboardingNavigator() {
     case 'sideEffects':
       return (
         <SideEffectsScreen
+          oral={ctx.route === 'oral'}
           progress={progress}
           onBack={goBack}
           context={context}
@@ -795,6 +801,7 @@ export function OnboardingNavigator() {
           : undefined;
       return (
         <NotificationsScreen
+          oral={ctx.route === 'oral'}
           progress={progress}
           onBack={goBack}
           context={context}

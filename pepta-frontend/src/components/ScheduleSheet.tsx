@@ -9,6 +9,7 @@
 // functions the Track strip uses — the two surfaces can never disagree.
 
 import React, { useEffect, useMemo, useState } from 'react';
+import { capitalize, globalDoseNoun } from '../screens/app/levelSuppression';
 import { Pressable, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { AppText } from './AppText';
@@ -161,6 +162,7 @@ export function ScheduleSheet({ visible, onClose, onEditCycle, onDismissed }: Sc
   };
 
   // ---- selected-day detail ----------------------------------------------
+  const doseWord = globalDoseNoun(home?.activeCompounds);
   const detail = useMemo(() => {
     const logsForDay = (track?.doseLogs ?? []).filter(
       (log) => localDateOnly(new Date(log.datetime)) === selected,
@@ -176,7 +178,7 @@ export function ScheduleSheet({ visible, onClose, onEditCycle, onDismissed }: Sc
         title: `Logged — ${formatDoseAmount(log)} ${name}, ${timeLabel(log.datetime)}.`,
         line:
           logsForDay.length > 1
-            ? `${logsForDay.length} shots logged this day.`
+            ? `${logsForDay.length} ${doseWord}s logged this day.`
             : status?.phase === 'rest'
               ? 'Logged during a rest window.'
               : 'Nice — on schedule.',
@@ -209,15 +211,15 @@ export function ScheduleSheet({ visible, onClose, onEditCycle, onDismissed }: Sc
         pattern && status?.phase === 'on' && status.nextPhaseStart && isRestDay(pattern, status.nextPhaseStart)
           ? `${lastOfCycle ? 'Last dose of this cycle. ' : ''}Rest starts ${shortDate(status.nextPhaseStart)} — reminders pause automatically.`
           : 'Right on cadence.';
-      return { title: `Shot day — ${dose}${at}.`, line: restNext };
+      return { title: `${capitalize(doseWord)} day — ${dose}${at}.`, line: restNext };
     }
     return {
       title: 'Nothing scheduled.',
       line: pattern && status?.phase === 'on'
         ? `Week ${status.weekInPhase} of ${status.weeksInPhase} — on cycle.`
-        : 'Log a shot any time from +.',
+        : `Log a ${doseWord} any time from +.`,
     };
-  }, [selected, track?.doseLogs, home?.activeCompounds, pattern, grid, schedules]);
+  }, [selected, track?.doseLogs, home?.activeCompounds, pattern, grid, schedules, doseWord]);
 
   const cycleRowLabel = cycle && pattern
     ? `Cycle · ${pattern.weeksOn} wk on, ${pattern.weeksOff} off`

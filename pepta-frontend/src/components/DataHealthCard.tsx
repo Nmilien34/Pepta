@@ -20,6 +20,7 @@ import { Icon } from './Icon';
 import { BottomSheet } from './BottomSheet';
 import { Button } from './Button';
 import { Chip } from './onboarding/Chip';
+import { DoseTimeSheet } from './DoseTimeSheet';
 import { AddCompoundSheet } from './AddCompoundSheet';
 import { useTheme } from '../theme';
 import { usePeptaData } from '../context/PeptaDataContext';
@@ -29,15 +30,6 @@ import {
   describeDuplicateCandidate,
   suggestedKeeper,
 } from '../screens/app/dataHealth';
-
-const TIME_CHIPS: { label: string; value: string }[] = [
-  { label: '7:00 AM', value: '07:00' },
-  { label: '8:00 AM', value: '08:00' },
-  { label: '9:00 AM', value: '09:00' },
-  { label: '12:00 PM', value: '12:00' },
-  { label: '6:00 PM', value: '18:00' },
-  { label: '9:00 PM', value: '21:00' },
-];
 
 /**
  * ONE ASK PER SESSION, module-level on purpose: it must survive Home
@@ -233,44 +225,6 @@ export function DataHealthCardView() {
   );
 }
 
-function DoseTimeSheet({
-  visible,
-  compoundName,
-  busy,
-  onClose,
-  onPick,
-}: {
-  visible: boolean;
-  compoundName: string;
-  busy: boolean;
-  onClose(): void;
-  onPick(time: string): void;
-}) {
-  return (
-    <BottomSheet visible={visible} onClose={onClose} avoidKeyboard={false}>
-      <AppText variant="cardTitle" style={{ fontSize: 17 }}>
-        When do you take {compoundName}?
-      </AppText>
-      <AppText variant="caption" color="textSecondary" style={{ marginTop: 4 }}>
-        You can change this any time in the medication's timing settings.
-      </AppText>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 14 }}>
-        {TIME_CHIPS.map((chip) => (
-          <Chip
-            key={chip.value}
-            label={chip.label}
-            selected={false}
-            onPress={() => {
-              if (busy) return;
-              Haptics.selectionAsync().catch(() => undefined);
-              onPick(chip.value);
-            }}
-          />
-        ))}
-      </View>
-    </BottomSheet>
-  );
-}
 
 function DuplicateChooserSheet({
   visible,

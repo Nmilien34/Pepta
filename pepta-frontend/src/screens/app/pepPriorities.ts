@@ -1,4 +1,4 @@
-import { doseNoun } from './levelSuppression';
+import { doseNoun, globalDoseNoun } from './levelSuppression';
 import type { HomeResponse, TrackResponse } from "@pepta/shared";
 import { buildHomeView } from "./homeView";
 import { buildGettingStarted, type LogAction } from "./planView";
@@ -157,7 +157,7 @@ export function buildPepPriorities({ home, track = null, now = new Date() }: Pep
         reminderId: "post_dose_checkin",
         note: {
           id: "post-dose-checkin",
-          text: `${hoursLabel(hoursSince)} since your last shot — log appetite, side effects, water, or protein while this dose settles in.`,
+          text: `${hoursLabel(hoursSince)} since your last ${globalDoseNoun(home?.activeCompounds)} — log appetite, side effects, water, or protein while this dose settles in.`,
           emoji: "🩺",
           cta: "Quick log",
           action: "water",

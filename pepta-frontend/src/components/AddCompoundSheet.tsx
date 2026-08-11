@@ -29,6 +29,7 @@ import {
   buildCustomIdentityPatch,
   buildCustomScheduleInput,
   buildIdentityPatch,
+  findDuplicateCompound,
   isCustomCompoundValid,
   parseDecimalInput,
   todayDateOnly,
@@ -93,6 +94,9 @@ export function AddCompoundSheet({ visible, onClose, initialQuery, onBrowseLibra
   const theme = useTheme();
   const { addCompound, refreshHome, refreshTrack } = usePeptaData();
   const renaming = renameCompoundId != null;
+  const { home } = usePeptaData();
+  const matchesExistingCompound = (name: string, route: string | null | undefined) =>
+    findDuplicateCompound(home?.activeCompounds ?? [], name, route) != null;
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<MedicationOption | null>(null);
   const [dose, setDose] = useState<number | null>(null);
@@ -102,6 +106,8 @@ export function AddCompoundSheet({ visible, onClose, initialQuery, onBrowseLibra
   const [amountText, setAmountText] = useState('');
   const [halfLifeText, setHalfLifeText] = useState('');
   const [saving, setSaving] = useState(false);
+  /** Name we already track — set once, so a second tap goes through. */
+  const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
@@ -114,6 +120,7 @@ export function AddCompoundSheet({ visible, onClose, initialQuery, onBrowseLibra
       setHalfLifeText('');
       setSaving(false);
       setFailed(false);
+      setDuplicateWarning(null);
     }
   }, [visible, initialQuery]);
 
@@ -141,6 +148,13 @@ export function AddCompoundSheet({ visible, onClose, initialQuery, onBrowseLibra
 
   const save = async () => {
     if (!selected) return;
+    // D1 PREVENTION. Same normalization the duplicate detector uses, so the
+    // warning fires on exactly what would later become a data-health card.
+    // A warning, never a block — titration is a real reason to add a second.
+    if (!renaming && duplicateWarning == null && matchesExistingCompound(selected.name, selected.route)) {
+      setDuplicateWarning(selected.name);
+      return;
+    }
     setSaving(true);
     setFailed(false);
     try {
@@ -163,6 +177,10 @@ export function AddCompoundSheet({ visible, onClose, initialQuery, onBrowseLibra
 
   const saveCustom = async () => {
     if (!custom || !isCustomCompoundValid(custom)) return;
+    if (!renaming && duplicateWarning == null && matchesExistingCompound(custom.name, custom.route)) {
+      setDuplicateWarning(custom.name.trim());
+      return;
+    }
     setSaving(true);
     setFailed(false);
     try {
@@ -423,6 +441,24 @@ export function AddCompoundSheet({ visible, onClose, initialQuery, onBrowseLibra
             </AppText>
           </View>
 
+          {duplicateWarning ? (
+            <View
+              style={{
+                backgroundColor: '#FFF4E8',
+                borderRadius: theme.radii.md,
+                padding: 11,
+                gap: 3,
+              }}
+            >
+              <AppText variant="caption" style={{ fontWeight: '700' }}>
+                You already track {duplicateWarning} — add anyway?
+              </AppText>
+              <AppText variant="caption" color="textSecondary" style={{ lineHeight: 17 }}>
+                Tap save again to add a second one. That's normal mid-titration.
+              </AppText>
+            </View>
+          ) : null}
+
           {failed ? (
             <AppText variant="caption" color="danger" align="center">
               Couldn’t add that medication. Please try again.
@@ -463,6 +499,24 @@ export function AddCompoundSheet({ visible, onClose, initialQuery, onBrowseLibra
               ))}
             </View>
           </View>
+
+          {duplicateWarning ? (
+            <View
+              style={{
+                backgroundColor: '#FFF4E8',
+                borderRadius: theme.radii.md,
+                padding: 11,
+                gap: 3,
+              }}
+            >
+              <AppText variant="caption" style={{ fontWeight: '700' }}>
+                You already track {duplicateWarning} — add anyway?
+              </AppText>
+              <AppText variant="caption" color="textSecondary" style={{ lineHeight: 17 }}>
+                Tap save again to add a second one. That's normal mid-titration.
+              </AppText>
+            </View>
+          ) : null}
 
           {failed ? (
             <AppText variant="caption" color="danger" align="center">

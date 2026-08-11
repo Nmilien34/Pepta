@@ -76,6 +76,10 @@ export function AccountScreen() {
     useNavigation<NavigationProp<AccountNavigationParamList>>();
   const { user, logout } = useAuth();
   const { home, track, progress, refreshHome } = usePeptaData();
+  // Any injectable keeps vial tooling; all-oral (or not set up yet) hides it.
+  const hasInjectable =
+    (home?.activeCompounds ?? []).length === 0 ||
+    (home?.activeCompounds ?? []).some((c) => c.route !== "oral");
   const [settingsSheet, setSettingsSheet] = useState<SettingsSheet>(null);
   const [remindersOpen, setRemindersOpen] = useState(false);
   const [paywallOpen, setPaywallOpen] = useState(false);
@@ -224,12 +228,18 @@ export function AccountScreen() {
       sub: "Schedule · timing · cycles",
       onPress: () => navigation.navigate("DoseSettings"),
     },
-    {
-      icon: "flask",
-      label: "Mix calculator",
-      sub: "Vial + water → units",
-      onPress: () => navigation.navigate("MixCalculator"),
-    },
+    // Reconstitution is a vial task. An all-oral user does not get the row at
+    // all; a mixed user keeps it, because they still draw their injectable.
+    ...(hasInjectable
+      ? [
+          {
+            icon: "flask",
+            label: "Mix calculator",
+            sub: "Vial + water → units",
+            onPress: () => navigation.navigate("MixCalculator"),
+          },
+        ]
+      : []),
     {
       icon: "books",
       label: "Peptide library",
