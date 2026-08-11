@@ -48,6 +48,8 @@ export interface MedicationLevelInput {
   schedule?: MedicationSchedule;
   /** On/off cycle: next-dose projection skips rest days so reminders pause. */
   cyclePattern?: CyclePattern;
+  /** Fallback anchor when nothing has been logged — see projectNextDoseAt. */
+  scheduleAnchor?: Date;
   /** IANA zone the schedule's timesOfDay are expressed in (profile timezone). */
   timeZone?: string;
   curveDaysBefore?: number;
@@ -228,19 +230,47 @@ export function projectNextDoseAt(input: {
   fallbackIntervalDays?: number;
   cyclePattern?: CyclePattern;
   timeZone?: string;
+  /**
+   * FALLBACK ANCHOR (2026-08-11) — when the schedule was created.
+   *
+   * Used ONLY when no dose has ever been logged. Until now a perfect schedule
+   * armed nothing: the projection anchored on the last dose and returned null
+   * without one, so a new user got no countdown and no dose reminder until they
+   * happened to log manually. A schedule is a statement of intent; it should
+   * project from the moment it exists.
+   *
+   * Note there is no separate "seeded onboarding dose" anchor: when the user
+   * answers the last-shot turn, onboarding writes a REAL dose log, so that case
+   * is already the primary anchor and naturally wins over this one.
+   */
+  scheduleAnchor?: Date;
 }): Date | null {
-  if (input.latest === null) {
+  // The dose anchor is preferred whenever one exists, so every user who has
+  // logged a dose projects EXACTLY as before — this whole feature is invisible
+  // to them by construction, not by careful arithmetic.
+  const anchorIsSchedule = input.latest === null;
+  const anchorAt = anchorIsSchedule
+    ? (input.scheduleAnchor ?? null)
+    : new Date(input.latest!.datetime);
+
+  if (anchorAt === null || Number.isNaN(anchorAt.getTime())) {
     return null;
   }
 
-  const latestAt = new Date(input.latest.datetime);
+  const latestAt = anchorAt;
 
   // A daily schedule without an explicit time falls back to the 9:00 AM
   // default so it projects a real next dose instead of dragging whatever
   // hour the last dose happened to be logged at (onboarding seeds noon).
   const storedTimes = input.schedule?.timesOfDay ?? [];
+  // The 9:00 default also covers EVERY schedule-anchored projection, not just
+  // daily. Without it a weekly schedule with no stored time inherits the hour
+  // it was created at — one real user's schedule was created at 11:26 PM, so
+  // their first-ever dose reminder would have fired at 11:26 PM. A dose-anchored
+  // projection still derives its hour from the actual dose, unchanged.
   const times =
-    storedTimes.length === 0 && input.schedule?.frequency === "daily"
+    storedTimes.length === 0 &&
+    (input.schedule?.frequency === "daily" || anchorIsSchedule)
       ? [DEFAULT_DAILY_TIME_OF_DAY]
       : storedTimes;
   if (
@@ -299,6 +329,21 @@ export function projectNextDoseAt(input: {
   }
 
   let candidate = new Date(latestAt.getTime() + msForDays(intervalDays));
+
+  // Schedule-anchored only: a schedule created weeks ago that never saw a dose
+  // would otherwise project creation+interval, which is already in the past —
+  // an immediately-overdue reminder the moment it arms. Roll forward to the
+  // next real occurrence.
+  //
+  // Deliberately NOT applied to the dose-anchored path: a user who stopped
+  // logging keeps their existing (possibly overdue) projection, because
+  // changing it would move a value shipped clients already display.
+  if (anchorIsSchedule) {
+    while (candidate.getTime() <= input.now.getTime()) {
+      candidate = new Date(candidate.getTime() + msForDays(intervalDays));
+    }
+  }
+
   for (
     let advanced = 0;
     advanced <= MAX_NEXT_DOSE_LOOKAHEAD_DAYS;
@@ -359,6 +404,7 @@ export function computeMedicationLevel(
     now,
     schedule: input.schedule,
     fallbackIntervalDays: input.scheduleIntervalDays,
+    scheduleAnchor: input.scheduleAnchor,
     cyclePattern: input.cyclePattern,
     timeZone: input.timeZone,
   });

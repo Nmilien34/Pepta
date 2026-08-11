@@ -239,6 +239,110 @@ export async function saveReminderState(state: Record<string, boolean>): Promise
   await AsyncStorage.setItem(REMINDER_STORAGE_KEY, JSON.stringify(state));
 }
 
+/**
+ * INTENT LEDGER — the reminder ids the user has personally toggled.
+ *
+ * saveReminderState writes the WHOLE record, defaults included, so the stored
+ * blob has never distinguished "the user chose this" from "this was the default
+ * when we last saved". That ambiguity is what made the dose_due repair below
+ * unverifiable. From here on, a real choice is recorded as one, so a future
+ * default change can propagate to untouched reminders without ever overriding
+ * someone's decision.
+ */
+export const REMINDER_EXPLICIT_KEY = "pepta.reminders.explicit";
+/** Set once the one-time dose_due repair has run — it must never run twice. */
+const REMINDER_REPAIR_KEY = "pepta.reminders.repair.v1";
+/** Set when the repair actually switched dose reminders on, so we can say so. */
+export const REMINDER_REPAIR_NOTICE_KEY = "pepta.reminders.repair.notice";
+
+export async function loadExplicitReminderIds(): Promise<Set<string>> {
+  const raw = await AsyncStorage.getItem(REMINDER_EXPLICIT_KEY);
+  if (!raw) return new Set();
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed)
+      ? new Set(parsed.filter((id): id is string => typeof id === "string"))
+      : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+export async function markReminderExplicit(id: string): Promise<void> {
+  const ids = await loadExplicitReminderIds();
+  if (ids.has(id)) return;
+  ids.add(id);
+  await AsyncStorage.setItem(REMINDER_EXPLICIT_KEY, JSON.stringify([...ids]));
+}
+
+/**
+ * ONE-TIME REPAIR of dose reminders disabled by a bug, not by a user.
+ *
+ * Onboarding's notifications step called deriveReminderGroups({home: null,
+ * track: null}) — before any schedule existed — so dose_due came back
+ * defaultOn:false for literally everyone, and that false was PERSISTED. Every
+ * onboarded user therefore had dose reminders off, including the users whose
+ * schedule projected a perfectly good nextDoseAt, and loadReminderState made it
+ * permanent by merging stored over defaults.
+ *
+ * DELIBERATELY NARROW: only dose_due and post_dose_checkin, only when the stored
+ * value is false, and never for an id in the intent ledger. Every other
+ * preference is left exactly as the user left it. Removing the keys lets the
+ * corrected default apply rather than forcing them on.
+ *
+ * Runs once, guarded by a version marker.
+ */
+const REPAIRABLE_REMINDER_IDS = ["dose_due", "post_dose_checkin"] as const;
+
+export async function repairBuggedDoseReminderState(): Promise<{
+  repaired: string[];
+}> {
+  if (await AsyncStorage.getItem(REMINDER_REPAIR_KEY)) return { repaired: [] };
+
+  const raw = await AsyncStorage.getItem(REMINDER_STORAGE_KEY);
+  await AsyncStorage.setItem(REMINDER_REPAIR_KEY, "1");
+  if (!raw) return { repaired: [] };
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { repaired: [] };
+  }
+  if (!isRecord(parsed)) return { repaired: [] };
+
+  const explicit = await loadExplicitReminderIds();
+  const next = { ...parsed };
+  const repaired: string[] = [];
+  for (const id of REPAIRABLE_REMINDER_IDS) {
+    if (explicit.has(id)) continue; // a real choice — never touched
+    if (next[id] !== false) continue;
+    delete next[id];
+    repaired.push(id);
+  }
+
+  if (repaired.length === 0) return { repaired: [] };
+  await AsyncStorage.setItem(REMINDER_STORAGE_KEY, JSON.stringify(next));
+  // The user sees this stated plainly in Reminder Settings — a reminder that
+  // switches itself on without explanation is the thing we are avoiding.
+  await AsyncStorage.setItem(REMINDER_REPAIR_NOTICE_KEY, "1");
+  return { repaired };
+}
+
+/**
+ * Ask for notification permission WITHOUT touching the schedule queue.
+ *
+ * The onboarding notifications step used to prompt by calling a full sync,
+ * which meant it also persisted a reminder state derived from data that did not
+ * exist yet. This separates the two: prompt here, arm once the schedule is real.
+ */
+export async function requestReminderPermission(
+  adapter: ReminderNotificationAdapter = expoReminderNotificationAdapter,
+): Promise<ReminderPermissionStatus> {
+  await adapter.prepareAsync?.();
+  return ensurePermission(adapter);
+}
+
 export interface SyncReminderNotificationsOptions {
   registerBackendPushToken?: (input: PushTokenRegistrationRequest) => Promise<unknown>;
 }

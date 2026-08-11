@@ -16,7 +16,9 @@
 //     cancels first and only then calls ensurePermission (which PROMPTS), so
 //     an ungranted caller both raises a surprise dialog and wipes the queue.
 //  3. Never fight the user's toggles: re-sync uses their SAVED state, so a
-//     reminder they switched off stays off.
+//     reminder they switched off stays off. The one-time dose_due repair runs
+//     BEFORE that read, because rule 3 would otherwise faithfully re-apply the
+//     `dose_due: false` that onboarding wrote on everyone's behalf.
 // It also no-ops unless the composed output actually changed, so foregrounding
 // the app repeatedly costs one cheap comparison.
 
@@ -27,6 +29,7 @@ import { deriveReminderGroups, type ReminderGroup } from '../screens/app/reminde
 import {
   loadReminderState,
   readReminderPermissionStatus,
+  repairBuggedDoseReminderState,
   syncReminderNotifications,
 } from '../services/reminderNotification.service';
 
@@ -51,6 +54,10 @@ export function ReminderRefreshGate() {
 
   const resync = useCallback(async () => {
     if (!home || running.current) return; // rule 1
+    // One-time repair of dose reminders that a bug switched off, not the user.
+    // MUST land before loadReminderState below, or rule 3 faithfully re-applies
+    // the bugged `dose_due: false` and the reminder never comes back.
+    await repairBuggedDoseReminderState().catch(() => undefined);
     const groups = deriveReminderGroups({ home, track, schedules });
     const signature = reminderSignature(groups);
     if (signature === lastSynced.current) return;

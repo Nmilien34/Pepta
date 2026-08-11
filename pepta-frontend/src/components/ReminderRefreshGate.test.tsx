@@ -8,6 +8,7 @@ import TestRenderer, { act } from "react-test-renderer";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  repair: vi.fn(async () => ({ repaired: [] as string[] })),
   home: null as unknown,
   schedules: null as unknown,
   permission: "granted" as "granted" | "denied" | "undetermined",
@@ -39,6 +40,7 @@ vi.mock("../context/PeptaDataContext", () => ({
 vi.mock("../services/reminderNotification.service", () => ({
   loadReminderState: mocks.loadState,
   readReminderPermissionStatus: mocks.readPermission,
+  repairBuggedDoseReminderState: mocks.repair,
   syncReminderNotifications: mocks.sync,
 }));
 
@@ -134,5 +136,29 @@ describe("ReminderRefreshGate", () => {
       mocks.appStateListeners.forEach((listener) => listener("background"));
     });
     expect(mocks.sync).not.toHaveBeenCalled();
+  });
+
+  it("repairs the bugged dose_due BEFORE reading saved state", async () => {
+    // Ordering is load-bearing. Rule 3 reads the user's saved toggles, and the
+    // saved toggles are exactly what the bug corrupted — read first and the
+    // gate faithfully re-applies `dose_due: false` and the reminder never
+    // returns for anyone.
+    const order: string[] = [];
+    mocks.repair.mockImplementation(async () => {
+      order.push("repair");
+      return { repaired: ["dose_due"] };
+    });
+    mocks.loadState.mockImplementation(async () => {
+      order.push("loadState");
+      return { dose_due: true };
+    });
+    mocks.permission = "granted";
+    mocks.home = HOME;
+
+    await act(async () => {
+      TestRenderer.create(<ReminderRefreshGate />);
+    });
+
+    expect(order).toEqual(["repair", "loadState"]);
   });
 });

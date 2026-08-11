@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   ActivityIndicator,
   Modal,
@@ -23,6 +24,8 @@ import {
 } from "./reminderSettings";
 import {
   loadReminderState,
+  markReminderExplicit,
+  REMINDER_REPAIR_NOTICE_KEY,
   saveReminderState,
   syncReminderNotifications,
   type ReminderPermissionStatus,
@@ -66,6 +69,7 @@ export function ReminderSettingsScreen({ visible, onClose }: ReminderSettingsScr
   const [aiConsentSaving, setAiConsentSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [repairNotice, setRepairNotice] = useState(false);
 
   useEffect(() => {
     if (!visible) return;
@@ -96,6 +100,27 @@ export function ReminderSettingsScreen({ visible, onClose }: ReminderSettingsScr
     },
     [groups],
   );
+
+  // Shown once, after the one-time repair switched dose reminders back on. A
+  // reminder that turns itself on without saying so is the failure mode this
+  // whole migration was trying to avoid.
+  useEffect(() => {
+    if (!visible) return;
+    let active = true;
+    void AsyncStorage.getItem(REMINDER_REPAIR_NOTICE_KEY)
+      .then((flag) => {
+        if (active && flag) setRepairNotice(true);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [visible]);
+
+  const dismissRepairNotice = () => {
+    setRepairNotice(false);
+    void AsyncStorage.removeItem(REMINDER_REPAIR_NOTICE_KEY).catch(() => undefined);
+  };
 
   useEffect(() => {
     if (!visible) return;
@@ -136,7 +161,12 @@ export function ReminderSettingsScreen({ visible, onClose }: ReminderSettingsScr
           ? "Updating reminders..."
           : "Reminders are scheduled on this phone.");
 
+  // Record the CHOICE, not just the value. The stored state blob has never
+  // distinguished a deliberate off from a default that happened to be off,
+  // which is exactly why the dose_due repair needed a one-time migration
+  // instead of a rule. From here a real preference is identifiable forever.
   const toggle = (id: string, value: boolean) => {
+    void markReminderExplicit(id).catch(() => undefined);
     Haptics.selectionAsync().catch(() => undefined);
     void applyReminderState({ ...state, [id]: value }, state);
   };
@@ -227,6 +257,37 @@ export function ReminderSettingsScreen({ visible, onClose }: ReminderSettingsScr
                 </View>
               </View>
             </Card>
+
+            {repairNotice ? (
+              <Card style={{ marginTop: 12, backgroundColor: "#FFF4E8", borderWidth: 0 }}>
+                <AppText variant="caption" style={{ fontWeight: "700" }}>
+                  We turned your dose reminder back on
+                </AppText>
+                <AppText
+                  variant="caption"
+                  color="textSecondary"
+                  style={{ marginTop: 4, lineHeight: 17 }}
+                >
+                  A bug in setup switched it off before you ever saw this screen.
+                  If you'd rather keep it off, switch it off below and it will
+                  stay that way.
+                </AppText>
+                <Pressable
+                  onPress={dismissRepairNotice}
+                  accessibilityRole="button"
+                  accessibilityLabel="Got it"
+                  style={({ pressed }) => ({
+                    marginTop: 9,
+                    alignSelf: "flex-start",
+                    opacity: pressed ? 0.6 : 1,
+                  })}
+                >
+                  <AppText variant="caption" color="primary" style={{ fontWeight: "800" }}>
+                    Got it
+                  </AppText>
+                </Pressable>
+              </Card>
+            ) : null}
 
             <Card style={{ marginTop: 12 }}>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>

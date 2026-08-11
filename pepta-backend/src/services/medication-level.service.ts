@@ -92,6 +92,9 @@ export async function getNextDoseCandidates(
             }
           : undefined,
         fallbackIntervalDays: intervalDays,
+        // No dose logged yet → anchor on the schedule itself, so a brand-new
+        // user's reminder arms from setup instead of waiting for a manual log.
+        scheduleAnchor: schedule?.createdAt,
         timeZone: profile?.timezone ?? undefined,
         cyclePattern:
           cycle && hasPattern(cycle)
@@ -177,6 +180,8 @@ export async function getMedicationLevels(userId: string, now = new Date()) {
           })),
           now,
           scheduleIntervalDays: intervalDays,
+          // Same anchor the candidate path uses — these two must not disagree.
+          scheduleAnchor: schedule?.createdAt,
           schedule: schedule
             ? {
                 frequency: schedule.frequency,

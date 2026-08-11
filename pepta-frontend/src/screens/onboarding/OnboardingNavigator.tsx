@@ -77,7 +77,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useAccess } from '../../context/AccessContext';
 import { useOnboarding } from '../../context/OnboardingContext';
 import { deriveReminderGroups, defaultReminderState } from '../app/reminderSettings';
-import { saveReminderState, syncReminderNotifications } from '../../services/reminderNotification.service';
+import { requestReminderPermission, saveReminderState, syncReminderNotifications } from '../../services/reminderNotification.service';
 import { logDiscoverySourceReported, logOnboardingCompleted, logOnboardingStarted, logOnboardingStep } from '../../services/funnelEvents';
 
 const DEFAULT_BODY: BodyMeasure = { units: 'imperial', height: 66, weight: 184 };
@@ -413,15 +413,49 @@ export function OnboardingNavigator() {
     flowCache.answers = {};
     flowCache.hydrated = false;
     flowCache.wasAuthenticated = false;
+    // Reminders are armed BEFORE entering the app, so a brand-new user's first
+    // dose reminder is already queued rather than waiting on a later sync.
+    await armRemindersAfterOnboarding();
     // Only enter the app after profile + medication setup have persisted.
     auth.markOnboardingComplete();
   };
 
+  // PERMISSION ONLY. This step runs BEFORE the medication schedule exists, so
+  // it used to derive reminder groups from {home: null, track: null} — which
+  // yields dose_due defaultOn:false — and PERSIST that. Every onboarded user
+  // ended up with dose reminders switched off by a bug rather than a choice.
+  // The prompt belongs here, framed by this screen; the arming waits until
+  // handleComplete, when there is a real schedule to arm against.
   const handleNotificationAllow = async () => {
-    const groups = deriveReminderGroups({ home: null, track: null });
-    const state = defaultReminderState(groups);
-    await saveReminderState(state);
-    await syncReminderNotifications(groups, state);
+    await requestReminderPermission().catch(() => undefined);
+  };
+
+  /**
+   * Arm reminders once the schedule is REAL.
+   *
+   * Runs after completeOnboarding, so /home now carries the nextDose the
+   * backend projects from the schedule we just created (which needs no logged
+   * dose — see projectNextDoseAt's schedule anchor). Best-effort throughout:
+   * reminders must never block someone from entering the app.
+   *
+   * Does not prompt: requestReminderPermission already asked at the
+   * notifications step, and syncReminderNotifications no-ops when permission
+   * was refused. A denied user computes everything and fires nothing.
+   */
+  const armRemindersAfterOnboarding = async () => {
+    try {
+      const [home, schedules] = await Promise.all([
+        api.getHome(),
+        api.listSchedules().catch(() => []),
+      ]);
+      const groups = deriveReminderGroups({ home, track: null, schedules });
+      const state = defaultReminderState(groups);
+      await saveReminderState(state);
+      await syncReminderNotifications(groups, state);
+    } catch {
+      // ReminderRefreshGate re-derives on the first Home load and on every
+      // foreground, so a failure here costs timing, never the reminder.
+    }
   };
 
   // Hold the first frame until the saved draft (if any) has been restored. Use
