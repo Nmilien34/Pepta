@@ -16,7 +16,6 @@ import type {
   TrainingStatus,
 } from '@pepta/shared';
 import type { MedicationOption } from '../../data/medicationCatalog';
-import { isUnidentifiedCompound } from '../app/identifyMedicationNudge';
 import { toIsoDate, type DateParts } from '../../utils/dateParts';
 import { kgToLb, lbToKg, type BodyMeasure } from '../../utils/units';
 import { goalTypeFromWeights } from './goalIntent';
@@ -58,6 +57,16 @@ export interface OnboardingAnswers {
   trainingStatus?: TrainingStatus;
   biggestWorry?: BiggestWorry;
   sideEffects?: SideEffectType[];
+}
+
+/** The picker's escape hatch — a doorway, not a medication. Its catalog row
+ *  carries a 7-day half-life that belongs to no drug. The data-health D3
+ *  detector finds what this leaves behind and asks the user to name it. */
+function isEscapeHatchMedication(option: MedicationOption): boolean {
+  return (
+    option.id === 'other' ||
+    option.name.trim().toLowerCase() === 'something else'
+  );
 }
 
 const DEFAULT_BODY: BodyMeasure = { units: 'imperial', height: 66, weight: 184 };
@@ -204,7 +213,7 @@ export function buildOnboardingPayload(answers: OnboardingAnswers, now: Date): O
         // a made-up number rendered as a real chart. Send null instead: no
         // curve, honest suppression, and the Home nudge asks what it actually
         // is. The name still comes through so the nudge can find it.
-        halfLifeDays: (answers.medication!.id === 'other' || isUnidentifiedCompound(answers.medication!))
+        halfLifeDays: isEscapeHatchMedication(answers.medication!)
           ? null
           : answers.medication!.halfLifeDays,
         doseUnit: answers.medication!.doseUnit,

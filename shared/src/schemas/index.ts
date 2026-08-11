@@ -70,20 +70,88 @@ export const discoverySourceSchema = z.enum([
 export const discoverySourceInputSchema = z
   .object({ source: discoverySourceSchema })
   .strict();
-// One-time nudge dismissals. Same reasoning as discoverySource: this rides in
-// its own collection behind its own endpoint rather than as a new key on
-// HomeResponse, because homeResponseSchema is strict and bundled into every
-// shipped build — a new key would hard-fail Home on 1.0.4/1.0.5 clients.
-// Keys are namespaced "<nudge>:<subjectId>" so a dismissal binds to the
-// specific record it was shown for, not to the account.
+// DATA HEALTH — the app noticing the user's own records are incomplete or
+// contradictory, and asking them to fix it once.
+//
+// Rides in its own collection behind its own endpoint rather than on
+// HomeResponse, because that schema is strict and bundled into every shipped
+// build — a new key there would hard-fail Home on 1.0.4/1.0.5 clients.
+//
+// KEY SHAPE: "<detector>:<subjectId>:<factHash>". Three segments, and the third
+// is what makes "dismissed until the facts change" free: the hash covers the
+// facts the card was shown for, so a new duplicate (or a changed schedule)
+// produces a DIFFERENT key that no dismissal row matches, and the card returns
+// on its own. Nothing has to expire or be invalidated.
 export const nudgeKeySchema = z
   .string()
   .min(1)
   .max(128)
-  .regex(/^[a-z0-9-]+:[A-Za-z0-9]+$/, "Expected <nudge>:<subjectId>");
+  .regex(
+    /^[a-z0-9-]+:[A-Za-z0-9]+:[a-f0-9]{12}$/,
+    "Expected <detector>:<subjectId>:<factHash>",
+  );
 export const nudgeDismissInputSchema = z.object({ key: nudgeKeySchema }).strict();
 export const dismissedNudgesResponseSchema = z
   .object({ dismissed: z.array(nudgeKeySchema) })
+  .strict();
+
+export const dataHealthDetectorSchema = z.enum([
+  "duplicate-compounds",
+  "missing-dose-time",
+  "unidentified-medication",
+]);
+
+/**
+ * One card's FACTS. Deliberately no title/body/cta: copy lives in the client so
+ * a wording change is an OTA, not a deploy, and the server never becomes a
+ * templating engine. A new detector adds one variant here and one copy block
+ * in the app.
+ */
+export const dataHealthCardSchema = z.discriminatedUnion("detector", [
+  z.object({
+    detector: z.literal("duplicate-compounds"),
+    key: nudgeKeySchema,
+    // Two or more compounds that normalize to the same name + route. The
+    // chooser renders these side by side; the differences ARE the decision.
+    candidates: z.array(
+      z.object({
+        compoundId: z.string(),
+        name: z.string(),
+        route: z.string().nullable(),
+        plannedDose: z.number().nullable(),
+        doseUnit: z.string(),
+        doseCount: z.number().int(),
+        scheduleSummary: z.string().nullable(),
+        createdAt: z.string(),
+      }),
+    ),
+  }),
+  z.object({
+    detector: z.literal("missing-dose-time"),
+    key: nudgeKeySchema,
+    scheduleId: z.string(),
+    compoundId: z.string(),
+    compoundName: z.string(),
+    frequency: z.string(),
+  }),
+  z.object({
+    detector: z.literal("unidentified-medication"),
+    key: nudgeKeySchema,
+    compoundId: z.string(),
+    doseCount: z.number().int(),
+  }),
+]);
+
+export const dataHealthResponseSchema = z
+  .object({ card: dataHealthCardSchema.nullable() })
+  .strict();
+
+/** Merge losers INTO keeper. Explicit ids on both sides — never inferred. */
+export const mergeCompoundsInputSchema = z
+  .object({
+    keepCompoundId: z.string().min(1),
+    mergeCompoundIds: z.array(z.string().min(1)).min(1),
+  })
   .strict();
 
 export const genderIdentitySchema = z.enum(GENDER_IDENTITIES);

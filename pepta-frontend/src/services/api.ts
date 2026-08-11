@@ -11,7 +11,11 @@ import {
   userAccountPatchSchema,
   discoverySourceInputSchema,
   dismissedNudgesResponseSchema,
+  dataHealthResponseSchema,
+  mergeCompoundsInputSchema,
   nudgeDismissInputSchema,
+  type DataHealthCard,
+  type MergeCompoundsInput,
   userProfileSettingsPatchSchema,
   userResponseSchema,
   activityLogInputSchema,
@@ -423,6 +427,22 @@ class PeptaApi {
     return this.request("/me/discovery-source", z.unknown(), {
       method: "POST",
       body: JSON.stringify(discoverySourceInputSchema.parse({ source })),
+    });
+  }
+
+  // DATA HEALTH — at most one card, chosen server-side by detector priority.
+  // Detectors run against real records rather than client heuristics, so the
+  // logic that finds a problem in an audit query is the logic that renders it.
+  public getDataHealthCard(): Promise<DataHealthCard | null> {
+    return this.request("/me/data-health", dataHealthResponseSchema).then(
+      (response) => response.card,
+    );
+  }
+
+  public mergeCompounds(input: MergeCompoundsInput): Promise<unknown> {
+    return this.request("/me/data-health/merge-compounds", z.unknown(), {
+      method: "POST",
+      body: JSON.stringify(mergeCompoundsInputSchema.parse(input)),
     });
   }
 

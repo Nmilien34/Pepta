@@ -2,6 +2,7 @@ import {
   avatarConfirmRequestSchema,
   avatarUploadIntentRequestSchema,
   discoverySourceInputSchema,
+  mergeCompoundsInputSchema,
   nudgeDismissInputSchema,
   notificationPreferencesPatchSchema,
   pushTokenRegistrationRequestSchema,
@@ -33,6 +34,8 @@ import {
   updateNotificationPreferences,
 } from "../services/pushToken.service";
 import { exportDoseLogsCsv } from "../services/export.service";
+import { getDataHealthCard } from "../services/data-health";
+import { mergeCompounds } from "../services/compound-merge.service";
 
 const router = Router();
 
@@ -120,6 +123,31 @@ router.post(
   asyncHandler(async (req, res) => {
     await dismissNudge(req.user!.id, req.body.key);
     sendData(res, { received: true });
+  }),
+);
+
+// Data health: at most ONE card, the highest-priority unresolved detector.
+// Detectors run here, against real records, so the logic that finds a problem
+// in an audit query is the same logic that renders the user's card.
+router.get(
+  "/data-health",
+  asyncHandler(async (req, res) => {
+    sendData(res, { card: await getDataHealthCard(req.user!.id) });
+  }),
+);
+
+router.post(
+  "/data-health/merge-compounds",
+  validateBody(mergeCompoundsInputSchema),
+  asyncHandler(async (req, res) => {
+    sendData(
+      res,
+      await mergeCompounds(
+        req.user!.id,
+        req.body.keepCompoundId,
+        req.body.mergeCompoundIds,
+      ),
+    );
   }),
 );
 

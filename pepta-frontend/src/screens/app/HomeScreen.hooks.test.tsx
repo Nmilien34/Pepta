@@ -107,10 +107,10 @@ vi.mock("../../components", () => {
     Button: passthrough("Button"),
     Card: passthrough("Card"),
     CountUp: passthrough("CountUp"),
-    // Renders null for users with no unidentified compound, which is this
-    // fixture — but it owns hooks, so it must exist as a real component or the
-    // hook-order assertion below is measuring a crash instead of the order.
-    IdentifyMedicationNudge: passthrough("IdentifyMedicationNudge"),
+    // Renders null for users whose data is healthy, which is this fixture —
+    // but it owns hooks, so it must exist as a real component or the hook-order
+    // assertion below is measuring a crash instead of the order.
+    DataHealthCardView: passthrough("DataHealthCardView"),
     Mascot: passthrough("Mascot"),
     ProgressBar: passthrough("ProgressBar"),
     ProgressRing: passthrough("ProgressRing"),

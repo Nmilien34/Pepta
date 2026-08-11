@@ -540,31 +540,40 @@ describe("revenueCatWebhookSchema", () => {
 });
 
 describe("nudgeKeySchema", () => {
-  // The key is "<nudge>:<subjectId>" and the subject is a Mongo ObjectId in
-  // production. If the regex rejected hex ids, every dismissal would 400 and
-  // the nudge would re-nag forever.
+  // "<detector>:<subjectId>:<factHash>". The subject is a Mongo ObjectId in
+  // production; if the regex rejected hex ids every dismissal would 400 and the
+  // card would re-nag forever.
+  const key = "duplicate-compounds:66b1f2c4e9a1b2c3d4e5f607:a1b2c3d4e5f6";
+
   it("accepts a real ObjectId-shaped key", () => {
-    expect(
-      nudgeKeySchema.safeParse("identify-medication:66b1f2c4e9a1b2c3d4e5f607")
-        .success,
-    ).toBe(true);
+    expect(nudgeKeySchema.safeParse(key).success).toBe(true);
   });
 
-  it("rejects keys with no subject id", () => {
-    expect(nudgeKeySchema.safeParse("identify-medication").success).toBe(false);
-    expect(nudgeKeySchema.safeParse("identify-medication:").success).toBe(false);
+  it("requires the fact hash — it is what makes a dismissal expire on new facts", () => {
+    expect(
+      nudgeKeySchema.safeParse("duplicate-compounds:66b1f2c4e9a1b2c3d4e5f607")
+        .success,
+    ).toBe(false);
+    expect(nudgeKeySchema.safeParse("duplicate-compounds").success).toBe(false);
+    expect(
+      nudgeKeySchema.safeParse("duplicate-compounds:66b1f2c4e9a1b2c3d4e5f607:")
+        .success,
+    ).toBe(false);
   });
 
   it("rejects a subject id carrying path or query characters", () => {
-    expect(nudgeKeySchema.safeParse("identify-medication:../admin").success).toBe(
-      false,
-    );
-    expect(nudgeKeySchema.safeParse("identify-medication:a b").success).toBe(false);
+    expect(
+      nudgeKeySchema.safeParse("duplicate-compounds:../admin:a1b2c3d4e5f6")
+        .success,
+    ).toBe(false);
+    expect(
+      nudgeKeySchema.safeParse("duplicate-compounds:a b:a1b2c3d4e5f6").success,
+    ).toBe(false);
   });
 
   it("bounds the key length", () => {
     expect(
-      nudgeKeySchema.safeParse(`identify-medication:${"a".repeat(200)}`).success,
+      nudgeKeySchema.safeParse(`d:${"a".repeat(200)}:a1b2c3d4e5f6`).success,
     ).toBe(false);
   });
 });
@@ -573,7 +582,7 @@ describe("dismissedNudgesResponseSchema", () => {
   it("parses a list of keys", () => {
     expect(
       dismissedNudgesResponseSchema.parse({
-        dismissed: ["identify-medication:66b1f2c4e9a1b2c3d4e5f607"],
+        dismissed: ["unidentified-medication:66b1f2c4e9a1b2c3d4e5f607:a1b2c3d4e5f6"],
       }).dismissed,
     ).toHaveLength(1);
   });

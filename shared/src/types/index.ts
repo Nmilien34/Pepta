@@ -61,6 +61,12 @@ import type {
   medicationLevelResponseSchema,
   medicationRouteSchema,
   discoverySourceSchema,
+  dataHealthCardSchema,
+  dataHealthDetectorSchema,
+  dataHealthResponseSchema,
+  dismissedNudgesResponseSchema,
+  mergeCompoundsInputSchema,
+  nudgeKeySchema,
   medicationStatusSchema,
   measurementInputSchema,
   measurementResponseSchema,
@@ -179,6 +185,14 @@ export type MedicationLevelResponse = z.infer<
 export type MedicationRoute = z.infer<typeof medicationRouteSchema>;
 export type MedicationStatus = z.infer<typeof medicationStatusSchema>;
 export type DiscoverySource = z.infer<typeof discoverySourceSchema>;
+export type NudgeKey = z.infer<typeof nudgeKeySchema>;
+export type DismissedNudgesResponse = z.infer<
+  typeof dismissedNudgesResponseSchema
+>;
+export type DataHealthDetector = z.infer<typeof dataHealthDetectorSchema>;
+export type DataHealthCard = z.infer<typeof dataHealthCardSchema>;
+export type DataHealthResponse = z.infer<typeof dataHealthResponseSchema>;
+export type MergeCompoundsInput = z.infer<typeof mergeCompoundsInputSchema>;
 export type MeasurementInput = z.infer<typeof measurementInputSchema>;
 export type MeasurementResponse = z.infer<typeof measurementResponseSchema>;
 export type NotificationPreferencesPatch = z.infer<

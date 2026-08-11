@@ -79,4 +79,4 @@ export {
   AddCompoundSheet,
   type AddCompoundSheetProps,
 } from "./AddCompoundSheet";
-export { IdentifyMedicationNudge } from "./IdentifyMedicationNudge";
+export { DataHealthCardView } from "./DataHealthCard";
