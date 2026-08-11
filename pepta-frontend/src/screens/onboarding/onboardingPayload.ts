@@ -16,6 +16,7 @@ import type {
   TrainingStatus,
 } from '@pepta/shared';
 import type { MedicationOption } from '../../data/medicationCatalog';
+import { isUnidentifiedCompound } from '../app/identifyMedicationNudge';
 import { toIsoDate, type DateParts } from '../../utils/dateParts';
 import { kgToLb, lbToKg, type BodyMeasure } from '../../utils/units';
 import { goalTypeFromWeights } from './goalIntent';
@@ -197,7 +198,15 @@ export function buildOnboardingPayload(answers: OnboardingAnswers, now: Date): O
             ? answers.route
             : answers.medication!.route,
         ...(answers.deviceType && answers.route !== 'oral' ? { deviceType: answers.deviceType } : {}),
-        halfLifeDays: answers.medication!.halfLifeDays,
+        // "Something else" is an escape hatch, not a medication, and its
+        // catalog row carries a 7-day half-life that belongs to nothing. Writing
+        // it through fabricated a pharmacokinetic curve for an unknown drug —
+        // a made-up number rendered as a real chart. Send null instead: no
+        // curve, honest suppression, and the Home nudge asks what it actually
+        // is. The name still comes through so the nudge can find it.
+        halfLifeDays: (answers.medication!.id === 'other' || isUnidentifiedCompound(answers.medication!))
+          ? null
+          : answers.medication!.halfLifeDays,
         doseUnit: answers.medication!.doseUnit,
         ...(typeof answers.dose === 'number' ? { plannedDose: answers.dose } : {}),
         // Vial users told us their mg/mL — powers the draw-to-units math.

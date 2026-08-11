@@ -70,6 +70,22 @@ export const discoverySourceSchema = z.enum([
 export const discoverySourceInputSchema = z
   .object({ source: discoverySourceSchema })
   .strict();
+// One-time nudge dismissals. Same reasoning as discoverySource: this rides in
+// its own collection behind its own endpoint rather than as a new key on
+// HomeResponse, because homeResponseSchema is strict and bundled into every
+// shipped build — a new key would hard-fail Home on 1.0.4/1.0.5 clients.
+// Keys are namespaced "<nudge>:<subjectId>" so a dismissal binds to the
+// specific record it was shown for, not to the account.
+export const nudgeKeySchema = z
+  .string()
+  .min(1)
+  .max(128)
+  .regex(/^[a-z0-9-]+:[A-Za-z0-9]+$/, "Expected <nudge>:<subjectId>");
+export const nudgeDismissInputSchema = z.object({ key: nudgeKeySchema }).strict();
+export const dismissedNudgesResponseSchema = z
+  .object({ dismissed: z.array(nudgeKeySchema) })
+  .strict();
+
 export const genderIdentitySchema = z.enum(GENDER_IDENTITIES);
 export const compoundStatusSchema = z.enum(COMPOUND_STATUSES);
 export const injectionSiteSchema = z.enum(INJECTION_SITES);

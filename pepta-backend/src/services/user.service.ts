@@ -22,6 +22,7 @@ import {
   FiberLogModel,
   InsightModel,
   MealLogModel,
+  DismissedNudgeModel,
   MealScanModel,
   MeasurementModel,
   PepMemoryModel,
@@ -450,6 +451,7 @@ export async function deleteCurrentUser(userId: string): Promise<void> {
     ReferralClaimModel.deleteMany({ userId }),
     PepMemoryModel.deleteMany({ userId }),
     PepPushDeliveryModel.deleteMany({ userId }),
+    DismissedNudgeModel.deleteMany({ userId }),
     ProcessedWebhookEventModel.deleteMany({ appUserId: userId }),
   ]);
 
@@ -540,4 +542,22 @@ export async function recordDiscoverySource(
     { $set: { source } },
     { upsert: true, runValidators: true },
   );
+}
+
+/**
+ * Record a one-time nudge dismissal ("Not now"). Upsert, so the client can
+ * retry the call — or fire it again after an offline queue flush — without
+ * a duplicate-key error surfacing as a failed dismissal.
+ */
+export async function dismissNudge(userId: string, key: string): Promise<void> {
+  await DismissedNudgeModel.findOneAndUpdate(
+    { userId, key },
+    { $setOnInsert: { userId, key } },
+    { upsert: true, runValidators: true },
+  );
+}
+
+export async function listDismissedNudges(userId: string): Promise<string[]> {
+  const rows = await DismissedNudgeModel.find({ userId }).select({ key: 1 });
+  return rows.map((row) => row.key);
 }

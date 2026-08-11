@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
     ActivityLogModel: vi.fn(),
     CompoundModel: vi.fn(),
     CycleModel: vi.fn(),
+    DismissedNudgeModel: vi.fn(),
     DoseLogModel: vi.fn(),
     FiberLogModel: vi.fn(),
     InsightModel: vi.fn(),
@@ -58,6 +59,9 @@ vi.mock("../../models", () => ({
   },
   PepPushDeliveryModel: {
     deleteMany: mocks.modelDeleteMany.PepPushDeliveryModel,
+  },
+  DismissedNudgeModel: {
+    deleteMany: mocks.modelDeleteMany.DismissedNudgeModel,
   },
   ProcessedWebhookEventModel: {
     deleteMany: mocks.modelDeleteMany.ProcessedWebhookEventModel,
@@ -311,6 +315,9 @@ describe("user service account settings", () => {
       appUserId: userId,
     });
     expect(mocks.modelDeleteMany.ReferralClaimModel).toHaveBeenCalledWith({
+      userId,
+    });
+    expect(mocks.modelDeleteMany.DismissedNudgeModel).toHaveBeenCalledWith({
       userId,
     });
     expect(

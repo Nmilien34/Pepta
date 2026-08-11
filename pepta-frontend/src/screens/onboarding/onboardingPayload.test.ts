@@ -182,3 +182,44 @@ describe('daily schedules carry the chosen time', () => {
     expect(biweekly.schedule?.timesOfDay).toBeUndefined();
   });
 });
+
+describe('the "Something else" escape hatch', () => {
+  // The catalog row carries halfLifeDays: 7, which belongs to no drug. Writing
+  // it through gave an unknown medication a real-looking pharmacokinetic curve.
+  const somethingElse: MedicationOption = {
+    id: 'other',
+    name: 'Something else',
+    subtitle: 'Not listed here',
+    drugClass: 'other',
+    doseUnit: 'mg',
+    halfLifeDays: 7,
+    route: 'injection',
+    routeAmbiguous: true,
+    commonDoses: [],
+    kind: 'other',
+    tintColor: '#5F5E5A',
+  };
+
+  it('never fabricates a half-life for an unidentified medication', () => {
+    const p = buildOnboardingPayload({ ...fullAnswers, medication: somethingElse }, now);
+    expect(p.compound?.halfLifeDays).toBeNull();
+  });
+
+  it('keeps the name so the Home nudge can find the compound later', () => {
+    const p = buildOnboardingPayload({ ...fullAnswers, medication: somethingElse }, now);
+    expect(p.compound?.name).toBe('Something else');
+  });
+
+  it('still honours the explicit route answer', () => {
+    const p = buildOnboardingPayload(
+      { ...fullAnswers, medication: somethingElse, route: 'oral' },
+      now,
+    );
+    expect(p.compound?.route).toBe('oral');
+  });
+
+  it('leaves a real medication’s half-life untouched', () => {
+    const p = buildOnboardingPayload(fullAnswers, now);
+    expect(p.compound?.halfLifeDays).toBe(5);
+  });
+});

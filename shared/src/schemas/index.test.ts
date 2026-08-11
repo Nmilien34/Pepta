@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  dismissedNudgesResponseSchema,
+  nudgeKeySchema,
   avatarConfirmRequestSchema,
   avatarUploadIntentRequestSchema,
   avatarUploadIntentResponseSchema,
@@ -534,5 +536,45 @@ describe("revenueCatWebhookSchema", () => {
     expect(
       revenueCatWebhookSchema.safeParse({ event: { type: null, app_user_id: "u1" } }).success,
     ).toBe(false);
+  });
+});
+
+describe("nudgeKeySchema", () => {
+  // The key is "<nudge>:<subjectId>" and the subject is a Mongo ObjectId in
+  // production. If the regex rejected hex ids, every dismissal would 400 and
+  // the nudge would re-nag forever.
+  it("accepts a real ObjectId-shaped key", () => {
+    expect(
+      nudgeKeySchema.safeParse("identify-medication:66b1f2c4e9a1b2c3d4e5f607")
+        .success,
+    ).toBe(true);
+  });
+
+  it("rejects keys with no subject id", () => {
+    expect(nudgeKeySchema.safeParse("identify-medication").success).toBe(false);
+    expect(nudgeKeySchema.safeParse("identify-medication:").success).toBe(false);
+  });
+
+  it("rejects a subject id carrying path or query characters", () => {
+    expect(nudgeKeySchema.safeParse("identify-medication:../admin").success).toBe(
+      false,
+    );
+    expect(nudgeKeySchema.safeParse("identify-medication:a b").success).toBe(false);
+  });
+
+  it("bounds the key length", () => {
+    expect(
+      nudgeKeySchema.safeParse(`identify-medication:${"a".repeat(200)}`).success,
+    ).toBe(false);
+  });
+});
+
+describe("dismissedNudgesResponseSchema", () => {
+  it("parses a list of keys", () => {
+    expect(
+      dismissedNudgesResponseSchema.parse({
+        dismissed: ["identify-medication:66b1f2c4e9a1b2c3d4e5f607"],
+      }).dismissed,
+    ).toHaveLength(1);
   });
 });

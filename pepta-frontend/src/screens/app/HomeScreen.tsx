@@ -14,7 +14,7 @@ import { useNavigation, type NavigationProp } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { HomeRangeKey } from '@pepta/shared';
 import { useTheme } from '../../theme';
-import { AppText, Button, Card, CountUp, Mascot, ProgressBar, ProgressRing, Reveal, SectionErrorBanner, WaterCup } from '../../components';
+import { AppText, Button, Card, CountUp, IdentifyMedicationNudge, Mascot, ProgressBar, ProgressRing, Reveal, SectionErrorBanner, WaterCup } from '../../components';
 import { useCompanionName } from '../../components/useCompanionName';
 import { LivingMascot } from '../../components/LivingMascot';
 import { useSeenTeachCards } from './useSeenTeachCards';
@@ -285,6 +285,14 @@ export function HomeScreen() {
               <GettingStartedCard data={gettingStarted} onTask={onTask} />
             </Reveal>
           ) : null}
+
+          {/* "Something else" cleanup. Above the lesson because it is about the
+              user's own data being wrong, not something new to read — and it
+              renders nothing at all for the ~everyone who has no such compound. */}
+          <IdentifyMedicationNudge
+            compounds={home.activeCompounds}
+            doseLogs={track?.doseLogs ?? []}
+          />
 
           {/* Pep's daily lesson. Sits BELOW the day-one checklist and only
               appears once that checklist is gone, so a brand-new user is never

@@ -2,6 +2,7 @@ import {
   avatarConfirmRequestSchema,
   avatarUploadIntentRequestSchema,
   discoverySourceInputSchema,
+  nudgeDismissInputSchema,
   notificationPreferencesPatchSchema,
   pushTokenRegistrationRequestSchema,
   userAccountPatchSchema,
@@ -19,7 +20,9 @@ import {
 } from "../services/avatar.service";
 import {
   deleteCurrentUser,
+  dismissNudge,
   getCurrentUser,
+  listDismissedNudges,
   recordDiscoverySource,
   updateCurrentUser,
   updateProfileSettings,
@@ -97,6 +100,25 @@ router.post(
   validateBody(discoverySourceInputSchema),
   asyncHandler(async (req, res) => {
     await recordDiscoverySource(req.user!.id, req.body.source);
+    sendData(res, { received: true });
+  }),
+);
+
+// One-time nudge dismissals. Own endpoint + collection, same reason as
+// discovery-source: homeResponseSchema is strict and bundled into shipped
+// builds, so this state cannot ride along on /home without breaking them.
+router.get(
+  "/nudges",
+  asyncHandler(async (req, res) => {
+    sendData(res, { dismissed: await listDismissedNudges(req.user!.id) });
+  }),
+);
+
+router.post(
+  "/nudges/dismiss",
+  validateBody(nudgeDismissInputSchema),
+  asyncHandler(async (req, res) => {
+    await dismissNudge(req.user!.id, req.body.key);
     sendData(res, { received: true });
   }),
 );

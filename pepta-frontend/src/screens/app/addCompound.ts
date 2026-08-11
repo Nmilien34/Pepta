@@ -2,7 +2,7 @@
 // No RN imports → testable. Maps a MedicationOption + chosen dose into the typed
 // CompoundInput the api expects.
 
-import type { CompoundInput } from '@pepta/shared';
+import type { CompoundInput, CompoundPatch } from '@pepta/shared';
 import type { MedicationOption } from '../../data/medicationCatalog';
 
 export function todayDateOnly(now: Date): string {
@@ -78,6 +78,38 @@ export function buildCustomCompoundInput(draft: CustomCompoundDraft, startDate: 
     ...(draft.amount && draft.amount > 0 ? { plannedDose: draft.amount } : {}),
     startDate,
     status: 'active',
+  };
+}
+
+/**
+ * Identity-only patches, for renaming an existing compound in place (the
+ * "Something else" nudge). Same field mapping as the builders above with
+ * startDate and status deliberately ABSENT: the compound already carries dose
+ * history, and correcting its name must not restart or reopen it. Every dose
+ * log, schedule and cycle keeps pointing at the same compound id.
+ */
+export function buildIdentityPatch(
+  option: MedicationOption,
+  plannedDose: number | null,
+): CompoundPatch {
+  return {
+    name: option.name,
+    drugClass: option.drugClass,
+    route: option.route,
+    halfLifeDays: option.halfLifeDays,
+    doseUnit: option.doseUnit,
+    ...(plannedDose && plannedDose > 0 ? { plannedDose } : {}),
+  };
+}
+
+export function buildCustomIdentityPatch(draft: CustomCompoundDraft): CompoundPatch {
+  return {
+    name: draft.name.trim(),
+    drugClass: 'other',
+    route: draft.route ?? 'injection',
+    halfLifeDays: draft.halfLifeDays,
+    doseUnit: draft.unit,
+    ...(draft.amount && draft.amount > 0 ? { plannedDose: draft.amount } : {}),
   };
 }
 

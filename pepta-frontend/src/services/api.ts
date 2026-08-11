@@ -10,6 +10,8 @@ import {
   homeResponseSchema,
   userAccountPatchSchema,
   discoverySourceInputSchema,
+  dismissedNudgesResponseSchema,
+  nudgeDismissInputSchema,
   userProfileSettingsPatchSchema,
   userResponseSchema,
   activityLogInputSchema,
@@ -421,6 +423,22 @@ class PeptaApi {
     return this.request("/me/discovery-source", z.unknown(), {
       method: "POST",
       body: JSON.stringify(discoverySourceInputSchema.parse({ source })),
+    });
+  }
+
+  // One-time nudge dismissals. Own endpoint for the same reason as
+  // discovery-source: HomeResponse is strict and bundled into shipped builds,
+  // so this state cannot ride along on /home. Costs one extra request on Home.
+  public listDismissedNudges(): Promise<string[]> {
+    return this.request("/me/nudges", dismissedNudgesResponseSchema).then(
+      (response) => response.dismissed,
+    );
+  }
+
+  public dismissNudge(key: string): Promise<unknown> {
+    return this.request("/me/nudges/dismiss", z.unknown(), {
+      method: "POST",
+      body: JSON.stringify(nudgeDismissInputSchema.parse({ key })),
     });
   }
 

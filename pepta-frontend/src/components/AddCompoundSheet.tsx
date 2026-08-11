@@ -26,7 +26,9 @@ import { currentMedicationCatalog } from '../services/medicationCatalogStore';
 import {
   buildCompoundInput,
   buildCustomCompoundInput,
+  buildCustomIdentityPatch,
   buildCustomScheduleInput,
+  buildIdentityPatch,
   isCustomCompoundValid,
   parseDecimalInput,
   todayDateOnly,
@@ -60,11 +62,37 @@ export interface AddCompoundSheetProps {
   onBrowseLibrary?: () => void;
   /** Fires after the sheet has fully animated out (safe hand-off point). */
   onDismissed?: () => void;
+  /**
+   * RENAME MODE. When set, the sheet PATCHES this compound's identity instead
+   * of creating a new one — the "Something else" nudge's whole point. The
+   * compound id is the foreign key on every dose log, schedule and cycle the
+   * user already has, so renaming in place keeps that history attached where
+   * a create-and-migrate would orphan it.
+   */
+  renameCompoundId?: string;
 }
 
-export function AddCompoundSheet({ visible, onClose, initialQuery, onBrowseLibrary, onDismissed }: AddCompoundSheetProps) {
+/** Rename mode: update the compound's existing active schedule if it has one,
+ *  otherwise create the missing one. Never leaves two active schedules behind. */
+async function reconcileSchedule(compoundId: string, draft: CustomCompoundDraft): Promise<void> {
+  const desired = buildCustomScheduleInput(draft, compoundId);
+  const existing = (await api.listSchedules()).find(
+    (schedule) => schedule.compoundId === compoundId && schedule.active,
+  );
+  if (existing) {
+    await api.updateSchedule(existing.id, {
+      frequency: desired.frequency,
+      timesOfDay: desired.timesOfDay ?? [],
+    });
+    return;
+  }
+  await api.createSchedule(desired);
+}
+
+export function AddCompoundSheet({ visible, onClose, initialQuery, onBrowseLibrary, onDismissed, renameCompoundId }: AddCompoundSheetProps) {
   const theme = useTheme();
-  const { addCompound } = usePeptaData();
+  const { addCompound, refreshHome, refreshTrack } = usePeptaData();
+  const renaming = renameCompoundId != null;
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<MedicationOption | null>(null);
   const [dose, setDose] = useState<number | null>(null);
@@ -116,7 +144,13 @@ export function AddCompoundSheet({ visible, onClose, initialQuery, onBrowseLibra
     setSaving(true);
     setFailed(false);
     try {
-      await addCompound(buildCompoundInput(selected, dose, todayDateOnly(new Date())));
+      if (renameCompoundId) {
+        await api.updateCompound(renameCompoundId, buildIdentityPatch(selected, dose));
+        // addCompound refreshes for us; a bare PATCH does not.
+        await Promise.all([refreshHome(), refreshTrack()]).catch(() => undefined);
+      } else {
+        await addCompound(buildCompoundInput(selected, dose, todayDateOnly(new Date())));
+      }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
       onClose();
     } catch {
@@ -132,11 +166,21 @@ export function AddCompoundSheet({ visible, onClose, initialQuery, onBrowseLibra
     setSaving(true);
     setFailed(false);
     try {
-      const compound = await addCompound(buildCustomCompoundInput(custom, todayDateOnly(new Date())));
-      // The schedule rides the same save. Best-effort: if it fails, the
-      // compound still exists (that was every sheet-add before today) and
-      // TimingSheet can set the cadence later — never block the save on it.
-      await api.createSchedule(buildCustomScheduleInput(custom, compound.id)).catch(() => undefined);
+      if (renameCompoundId) {
+        await api.updateCompound(renameCompoundId, buildCustomIdentityPatch(custom));
+        // Reuse the compound's existing schedule rather than stacking a second
+        // active one — renaming must not mint duplicate records. Only when the
+        // compound somehow has none do we create. Best-effort, as on the add
+        // path: a cadence failure must not lose the rename.
+        await reconcileSchedule(renameCompoundId, custom).catch(() => undefined);
+        await Promise.all([refreshHome(), refreshTrack()]).catch(() => undefined);
+      } else {
+        const compound = await addCompound(buildCustomCompoundInput(custom, todayDateOnly(new Date())));
+        // The schedule rides the same save. Best-effort: if it fails, the
+        // compound still exists (that was every sheet-add before today) and
+        // TimingSheet can set the cadence later — never block the save on it.
+        await api.createSchedule(buildCustomScheduleInput(custom, compound.id)).catch(() => undefined);
+      }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
       onClose();
     } catch {
@@ -164,14 +208,16 @@ export function AddCompoundSheet({ visible, onClose, initialQuery, onBrowseLibra
         ) : null}
         <View style={{ flex: 1 }}>
           <AppText variant="cardTitle" style={{ fontSize: 17 }}>
-            {custom ? 'Add your own' : 'Add a medication'}
+            {custom ? 'Add your own' : renaming ? 'Which medication?' : 'Add a medication'}
           </AppText>
           <AppText variant="caption" color="textSecondary">
             {custom
               ? 'The basics are enough — you can refine later.'
               : selected
                 ? 'Set your dose and save.'
-                : 'Search and pick your medication.'}
+                : renaming
+                  ? 'Your logged doses stay attached.'
+                  : 'Search and pick your medication.'}
           </AppText>
         </View>
         <Pressable
