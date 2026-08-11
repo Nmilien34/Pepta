@@ -21,7 +21,7 @@ import {
   WeightLogModel,
 } from '../models';
 import { getInsights } from './insights.service';
-import { getMedicationLevels } from './medication-level.service';
+import { getMedicationLevels, getNextDoseCandidates } from './medication-level.service';
 import { getWeeklyRetention } from './muscle-retention.service';
 import { serializeWithSchema } from './serializers';
 
@@ -49,11 +49,17 @@ async function getProfile(userId: string) {
 
 async function getActiveCompounds(userId: string, includeUnmodeled: boolean) {
   const compounds = await CompoundModel.find({ userId, status: 'active' }).sort({ createdAt: -1 });
-  // COMPAT (2026-08-07, tz-param precedent): old shipped clients bundle a
-  // strict compound schema where halfLifeDays is REQUIRED — serving them an
-  // unmodelled compound fails their whole /home parse. Callers that can
-  // handle null send ?unmodeled=1; everyone else simply doesn't receive
-  // those compounds (degraded-but-never-broken).
+  // ⚠️ LOAD-BEARING COMPAT FILTER — DO NOT REMOVE (2026-08-07, tz-param
+  // precedent; re-affirmed by the 2026-08-11 audit).
+  // compoundResponseSchema extends compoundInputSchema, whose halfLifeDays
+  // became nullish when custom medications shipped. Every 1.0.4/1.0.5 client
+  // — and any 1.0.6 build that has not taken the recent OTAs — bundles the
+  // OLD strict schema where halfLifeDays is a REQUIRED positive number. Such
+  // a client hard-fails its entire /home parse on a single unmodelled
+  // compound: not a missing card, a blank Home screen. Only callers that
+  // send ?unmodeled=1 assert they can handle null. Deleting this filter, or
+  // defaulting the flag to true, silently bricks Home for every stale
+  // install. Widen only after those builds are provably gone.
   const visible = includeUnmodeled
     ? compounds
     : compounds.filter((compound) => compound.halfLifeDays != null);
@@ -163,23 +169,25 @@ async function getStreak(userId: string, now: Date) {
   return consecutiveActivityStreak(logs, now);
 }
 
-function nextDoseFromLevels(levels: Awaited<ReturnType<typeof getMedicationLevels>>) {
-  const candidates = levels.filter((level) => level.nextDoseAt && level.hoursUntilNextDose !== null);
-
-  if (candidates.length === 0) {
-    return null;
-  }
-
-  const next = candidates.sort(
-    (left, right) =>
-      new Date(left.nextDoseAt!).getTime() - new Date(right.nextDoseAt!).getTime(),
+/**
+ * Soonest next dose across ALL active schedules — modelled or not.
+ *
+ * This used to read medicationLevels, which silently made scheduling a
+ * property of the pharmacokinetic model: getMedicationLevels skips compounds
+ * with no half-life, so a custom medication produced no countdown and no
+ * dose_due reminder (dose_due arms off home.nextDose). Level data is still
+ * absent for those compounds — no curve is resurrected here, only timing.
+ */
+function soonestNextDose(candidates: Awaited<ReturnType<typeof getNextDoseCandidates>>) {
+  if (candidates.length === 0) return null;
+  const next = [...candidates].sort(
+    (left, right) => new Date(left.nextDoseAt).getTime() - new Date(right.nextDoseAt).getTime(),
   )[0]!;
-
   return {
     compoundId: next.compoundId,
     compoundName: next.compoundName,
-    nextDoseAt: next.nextDoseAt!,
-    hoursUntilNextDose: next.hoursUntilNextDose!,
+    nextDoseAt: next.nextDoseAt,
+    hoursUntilNextDose: next.hoursUntilNextDose,
   };
 }
 
@@ -202,6 +210,7 @@ export async function getHome(
     insightsResult,
     retentionResult,
     streakResult,
+    nextDoseResult,
   ] = await Promise.allSettled([
     getProfile(userId),
     getActiveCompounds(userId, options.includeUnmodeledCompounds === true),
@@ -213,6 +222,7 @@ export async function getHome(
     getInsights(userId, now, { allowAIProse: options.allowAIInsightProse === true }),
     getWeeklyRetention(userId, now),
     getStreak(userId, now),
+    getNextDoseCandidates(userId, now),
   ]);
   const sectionErrors: Record<string, string> = {};
   const results = {
@@ -296,7 +306,9 @@ export async function getHome(
       required: 3,
       unlocked: loggedItems >= 3,
     },
-    nextDose: nextDoseFromLevels(results.medicationLevels),
+    nextDose: soonestNextDose(
+      nextDoseResult.status === 'fulfilled' ? nextDoseResult.value : [],
+    ),
     latestWeight: results.latestWeight,
     insights: results.insights,
     weeklyRetention: results.weeklyRetention,

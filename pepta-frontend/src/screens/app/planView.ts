@@ -2,7 +2,7 @@
 // and a getting-started checklist, both composed from the existing HomeResponse
 // (profile goal/pace/targets + setupProgress + today's signals). No RN imports.
 
-import type { HomeResponse } from '@pepta/shared';
+import type { HomeResponse, TrackResponse } from '@pepta/shared';
 import { formatShortDate } from './progressView';
 
 export interface PlanSummary {
@@ -49,7 +49,10 @@ export interface GettingStarted {
   total: number;
 }
 
-export function buildGettingStarted(home: HomeResponse): GettingStarted {
+export function buildGettingStarted(
+  home: HomeResponse,
+  track?: TrackResponse | null,
+): GettingStarted {
   const setup = home.setupProgress;
   const onMed = home.profile?.medicationStatus === 'active' || home.activeCompounds.length > 0;
   const med = home.activeCompounds[0]?.name ?? home.nextDose?.compoundName ?? null;
@@ -59,7 +62,13 @@ export function buildGettingStarted(home: HomeResponse): GettingStarted {
     tasks.push({
       key: 'shot',
       label: med ? `Log your first ${med} shot` : 'Log your first shot',
-      done: home.medicationLevels.length > 0,
+      // Dose logs, NOT medicationLevels (2026-08-11 audit): the level list
+      // excludes unmodelled compounds, so a custom-medication user could log
+      // doses forever and never tick this off. Falls back to the old signal
+      // only when track hasn't loaded, so nothing regresses mid-fetch.
+      done: track
+        ? (track.doseLogs ?? []).some((dose) => dose.deletedAt == null)
+        : home.medicationLevels.length > 0,
       action: 'dose',
     });
   }

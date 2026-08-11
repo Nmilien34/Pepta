@@ -118,7 +118,7 @@ export function buildPepReminderNotificationCopy(
 
 export function buildPepPriorities({ home, track = null, now = new Date() }: PepPriorityInput): PepPriority[] {
   const priorities: PepPriority[] = [];
-  const gs = buildGettingStarted(home);
+  const gs = buildGettingStarted(home, track);
   const view = buildHomeView(home);
   const dose = home.nextDose;
 

@@ -14,6 +14,8 @@ import {
 import { buildHomeView } from './homeView';
 import { buildPepMood, moodNoteFor } from './pepMood';
 import { buildPepReminderNotificationCopy } from './pepPriorities';
+import { buildGettingStarted } from './planView';
+import { deriveReminderGroups } from './reminderSettings';
 
 const ORAL = { id: 'oral-1', name: 'Rybelsus', route: 'oral', doseUnit: 'mg', halfLifeDays: 7 };
 const INJECTION = { id: 'inj-1', name: 'Tirzepatide', route: 'injection', doseUnit: 'mg', halfLifeDays: 5 };
@@ -219,5 +221,74 @@ describe('reminder titles', () => {
     const home = homeFor({ id: 'c1', name: 'Foundayo', route: 'oral', doseUnit: 'mg', halfLifeDays: 1 });
     expect(buildPepReminderNotificationCopy('protein_anchor', home)!.title).toBe('Pep: protein checkpoint');
     expect(buildPepReminderNotificationCopy('weekly_weigh_in', home)!.title).toBe('Pep: scale check');
+  });
+});
+
+// Audit finding 1 follow-through (2026-08-11): an unmodelled compound has no
+// curve, but it DOES have a schedule — so the countdown, the dose reminder and
+// the getting-started task must all work for it.
+describe('unmodelled compounds still schedule', () => {
+  const UNMODELLED = { id: 'c1', name: 'Foundayo', route: 'oral', doseUnit: 'mg', halfLifeDays: null };
+  const homeWithNextDose = (compound: object) =>
+    ({
+      activeCompounds: [compound],
+      medicationLevels: [], // backend correctly omits the curve
+      nextDose: {
+        compoundId: 'c1',
+        compoundName: 'Foundayo',
+        nextDoseAt: '2026-08-11T13:00:00.000Z',
+        hoursUntilNextDose: 5,
+      },
+      profile: { medicationStatus: 'active' },
+      insights: [],
+      streakDays: 0,
+      todayCalories: 0,
+      todayProteinGrams: 0,
+      todayFiberGrams: 0,
+      todayWaterOz: 0,
+      latestWeight: null,
+      setupProgress: { loggedItems: 2, required: 3, unlocked: false },
+    }) as unknown as HomeResponse;
+
+  it('the level stays suppressed — no curve is resurrected', () => {
+    const view = buildHomeView(homeWithNextDose(UNMODELLED));
+    expect(view.medication).toBeNull();
+    expect(view.levelSuppressed).toBe('oral');
+  });
+
+  it('but the countdown renders from nextDose', () => {
+    const view = buildHomeView(homeWithNextDose(UNMODELLED));
+    expect(view.medication).toBeNull();
+    // formatCountdown consumes home.nextDose.hoursUntilNextDose, which no
+    // longer depends on the level list existing.
+    expect(homeWithNextDose(UNMODELLED).nextDose?.hoursUntilNextDose).toBe(5);
+  });
+
+  it('dose_due ARMS off nextDose for an unmodelled compound', () => {
+    const groups = deriveReminderGroups({
+      home: homeWithNextDose(UNMODELLED),
+      track: null,
+    });
+    const doseDue = groups.flatMap((g) => g.items).find((i) => i.id === 'dose_due')!;
+    expect(doseDue.defaultOn).toBe(true);
+    expect(doseDue.schedule).not.toEqual({ kind: 'none' });
+    // …and it says "dose", not "shot", for a pill.
+    expect(doseDue.notification?.title).toBe('Pep: dose time');
+  });
+
+  it('the getting-started task completes off DOSE LOGS, not the level list', () => {
+    const home = homeWithNextDose(UNMODELLED);
+    const track = { doseLogs: [{ id: 'd1', deletedAt: null, datetime: '2026-08-10T22:00:00.000Z' }] };
+    const before = buildGettingStarted(home).tasks.find((t) => t.key === 'shot')!;
+    const after = buildGettingStarted(home, track as never).tasks.find((t) => t.key === 'shot')!;
+    expect(before.done).toBe(false); // the old signal: medicationLevels is empty
+    expect(after.done).toBe(true); // the dose log is what actually matters
+  });
+
+  it('a soft-deleted dose log does not count as logged', () => {
+    const track = { doseLogs: [{ id: 'd1', deletedAt: '2026-08-10T23:00:00.000Z', datetime: '2026-08-10T22:00:00.000Z' }] };
+    expect(
+      buildGettingStarted(homeWithNextDose(UNMODELLED), track as never).tasks.find((t) => t.key === 'shot')!.done,
+    ).toBe(false);
   });
 });

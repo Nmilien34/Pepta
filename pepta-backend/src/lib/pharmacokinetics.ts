@@ -101,7 +101,7 @@ function levelAt(
   return roundLevel(level);
 }
 
-function latestDose(doses: MedicationDose[]): MedicationDose | null {
+export function latestDose(doses: MedicationDose[]): MedicationDose | null {
   const sorted = doses
     .filter((dose) => !Number.isNaN(new Date(dose.datetime).getTime()))
     .sort(
@@ -213,7 +213,15 @@ function nextDoseFromTimes(input: {
   return null;
 }
 
-function nextDoseFromSchedule(input: {
+/**
+ * EXPORTED (2026-08-11) so scheduling can be computed WITHOUT the PK model.
+ * Next-dose timing is a property of the schedule — frequency, dose times,
+ * cycle pattern, last logged dose — and needs no half-life. It lived behind
+ * computeMedicationLevel, which meant a compound with no half-life produced
+ * no projection at all: no countdown and no dose reminder. Same function,
+ * same inputs, now reachable on its own.
+ */
+export function projectNextDoseAt(input: {
   latest: MedicationDose | null;
   now: Date;
   schedule?: MedicationSchedule;
@@ -346,7 +354,7 @@ export function computeMedicationLevel(
     curveDaysAfter,
   });
   const latest = latestDose(input.doses);
-  const nextDose = nextDoseFromSchedule({
+  const nextDose = projectNextDoseAt({
     latest,
     now,
     schedule: input.schedule,

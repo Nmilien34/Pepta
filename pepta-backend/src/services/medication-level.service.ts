@@ -1,5 +1,9 @@
 import { hasPattern, medicationLevelResponseSchema } from "@pepta/shared";
-import { computeMedicationLevel } from "../lib/pharmacokinetics";
+import {
+  computeMedicationLevel,
+  latestDose,
+  projectNextDoseAt,
+} from "../lib/pharmacokinetics";
 import {
   CompoundModel,
   CycleModel,
@@ -7,6 +11,115 @@ import {
   ScheduleModel,
   UserProfileModel,
 } from "../models";
+
+const MS_PER_HOUR = 60 * 60 * 1000;
+
+/** Same frequency→interval mapping the level projection uses. */
+function intervalDaysFor(schedule: { intervalDays?: number | null; frequency?: string } | null) {
+  return (
+    schedule?.intervalDays ??
+    (schedule?.frequency === "weekly"
+      ? 7
+      : schedule?.frequency === "biweekly"
+        ? 14
+        : schedule?.frequency === "daily"
+          ? 1
+          : undefined)
+  );
+}
+
+export interface NextDoseCandidate {
+  compoundId: string;
+  compoundName: string;
+  nextDoseAt: string;
+  hoursUntilNextDose: number;
+}
+
+/**
+ * Next-dose timing for EVERY active compound, modelled or not.
+ *
+ * Scheduling is a property of the schedule, not of the pharmacokinetic model
+ * (2026-08-11). This used to be a by-product of getMedicationLevels, which
+ * skips compounds with no half-life — so a custom medication produced no
+ * countdown and, because dose_due reads home.nextDose, no reminder either.
+ * A compound with no curve still knows when its next dose is due.
+ *
+ * DECOUPLING, NOT RE-DERIVATION: this feeds projectNextDoseAt the exact
+ * inputs computeMedicationLevel feeds it — same latest-dose selection, same
+ * interval mapping, same cycle pattern, same profile timezone — so modelled
+ * compounds must produce byte-identical values. A regression test pins that.
+ */
+export async function getNextDoseCandidates(
+  userId: string,
+  now = new Date(),
+): Promise<NextDoseCandidate[]> {
+  const [compounds, cycles, profile] = await Promise.all([
+    CompoundModel.find({ userId, status: "active" }).sort({ createdAt: 1 }),
+    CycleModel.find({ userId, active: true }).sort({ startDate: -1 }),
+    UserProfileModel.findOne({ userId }).select({ timezone: 1 }),
+  ]);
+
+  const candidates = await Promise.all(
+    compounds.map(async (compound) => {
+      // NOTE: deliberately no halfLifeDays check — that is the whole fix.
+      const [doseLogs, schedule] = await Promise.all([
+        DoseLogModel.find({ userId, compoundId: compound._id }).sort({ datetime: 1 }),
+        ScheduleModel.findOne({ userId, compoundId: compound._id, active: true }).sort({
+          updatedAt: -1,
+        }),
+      ]);
+      const intervalDays = intervalDaysFor(schedule);
+      const cycle = cycles.find(
+        (candidate) =>
+          hasPattern(candidate) &&
+          candidate.compoundIds.some((id) => id.toString() === compound._id.toString()),
+      );
+
+      const nextDoseAt = projectNextDoseAt({
+        latest: latestDose(
+          doseLogs.map((doseLog) => ({
+            amount: doseLog.amount,
+            datetime: doseLog.datetime.toISOString(),
+          })),
+        ),
+        now,
+        schedule: schedule
+          ? {
+              frequency: schedule.frequency,
+              intervalDays,
+              daysOfWeek: schedule.daysOfWeek,
+              timesOfDay: schedule.timesOfDay,
+            }
+          : undefined,
+        fallbackIntervalDays: intervalDays,
+        timeZone: profile?.timezone ?? undefined,
+        cyclePattern:
+          cycle && hasPattern(cycle)
+            ? {
+                startDate: cycle.startDate,
+                weeksOn: cycle.weeksOn,
+                weeksOff: cycle.weeksOff,
+                repeats: cycle.repeats ?? true,
+              }
+            : undefined,
+      });
+      if (nextDoseAt === null) return null;
+
+      return {
+        compoundId: compound._id.toString(),
+        compoundName: compound.name,
+        nextDoseAt: nextDoseAt.toISOString(),
+        // Identical rounding to computeMedicationLevel's.
+        hoursUntilNextDose: Math.max(
+          0,
+          Math.round((nextDoseAt.getTime() - now.getTime()) / MS_PER_HOUR),
+        ),
+      } satisfies NextDoseCandidate;
+    }),
+  );
+
+  return candidates.filter((candidate) => candidate != null);
+}
 
 export async function getMedicationLevels(userId: string, now = new Date()) {
   const [compounds, cycles, profile] = await Promise.all([

@@ -83,7 +83,7 @@ export function HomeScreen() {
   // the day-one checklist is done — a new user has enough to read already.
   const teach = useMemo(() => {
     if (!home) return null;
-    if (buildGettingStarted(home).show) return null;
+    if (buildGettingStarted(home, track).show) return null;
     return buildPepTeachCard({
       compoundNames: home.activeCompounds.map((c) => c.name),
       seenEntryIds: seen,
@@ -119,7 +119,7 @@ export function HomeScreen() {
 
   const view = buildHomeView(home);
   const plan = buildPlanSummary(home);
-  const gettingStarted = buildGettingStarted(home);
+  const gettingStarted = buildGettingStarted(home, track);
   const selectedRange = home.selectedRange ?? homeRange;
   const rangeAvailability = home.rangeAvailability ?? { today: true, week: false, month: false, year: false };
   const activity = buildActivity(track, home.profile, new Date(), selectedRange, home.rangeTotals);
