@@ -19,7 +19,6 @@ import { Reveal } from './Reveal';
 import { Icon } from './Icon';
 import { BottomSheet } from './BottomSheet';
 import { Button } from './Button';
-import { Chip } from './onboarding/Chip';
 import { DoseTimeSheet } from './DoseTimeSheet';
 import { AddCompoundSheet } from './AddCompoundSheet';
 import { useTheme } from '../theme';
