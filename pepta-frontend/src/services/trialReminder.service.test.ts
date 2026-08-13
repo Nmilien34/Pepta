@@ -120,4 +120,56 @@ describe("scheduleTrialEndReminder", () => {
       }),
     ).resolves.toBeNull();
   });
+
+  it("schedules the value touchpoints alongside the day-2 message", async () => {
+    await scheduleTrialEndReminder(
+      info({ expirationDate: inHours(72), periodType: "TRIAL" }),
+      "pro",
+      { adapter: a, now: NOW },
+    );
+
+    const ids = a.scheduleNotificationAsync.mock.calls.map((c) => c[0]?.identifier);
+    expect(ids).toContain(TRIAL_REMINDER_ID);
+    expect(ids).toContain("pepta.trial.ready");
+    expect(ids).toContain("pepta.trial.day-one");
+  });
+
+  it("queues the day-2 message FIRST, so a sequence failure cannot lose it", async () => {
+    // The paywall's promise hangs on the day-2 notification. The extra
+    // touchpoints are upside; they must never take it down with them.
+    a.scheduleNotificationAsync.mockImplementation(async (request: { identifier: string }) => {
+      if (request.identifier !== TRIAL_REMINDER_ID) throw new Error("scheduling failed");
+      return request.identifier;
+    });
+
+    const plan = await scheduleTrialEndReminder(
+      info({ expirationDate: inHours(72), periodType: "TRIAL" }),
+      "pro",
+      { adapter: a, now: NOW },
+    );
+
+    expect(plan).not.toBeNull();
+    expect(a.scheduleNotificationAsync.mock.calls[0]?.[0]?.identifier).toBe(TRIAL_REMINDER_ID);
+  });
+
+  it("clears the sequence on re-entry so a restore cannot stack two sets", async () => {
+    await scheduleTrialEndReminder(
+      info({ expirationDate: inHours(72), periodType: "TRIAL" }),
+      "pro",
+      { adapter: a, now: NOW },
+    );
+
+    const canceled = a.cancelScheduledNotificationAsync.mock.calls.map((c) => c[0]);
+    expect(canceled).toContain("pepta.trial.ready");
+    expect(canceled).toContain("pepta.trial.day-one");
+  });
+
+  it("schedules no sequence for a purchase that was not a trial", async () => {
+    await scheduleTrialEndReminder(
+      info({ expirationDate: inHours(720), periodType: "NORMAL" }),
+      "pro",
+      { adapter: a, now: NOW },
+    );
+    expect(a.scheduleNotificationAsync).not.toHaveBeenCalled();
+  });
 });

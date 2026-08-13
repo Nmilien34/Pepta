@@ -13,6 +13,11 @@
 import { Platform } from "react-native";
 import * as Notifications from "expo-notifications";
 import { planTrialReminder, type TrialReminderPlan } from "../screens/onboarding/trialReminder";
+import {
+  planTrialSequence,
+  TRIAL_SEQUENCE_IDS,
+  type TrialSequenceStep,
+} from "../screens/onboarding/trialSequence";
 
 /** Stable id so re-purchasing or restoring replaces rather than duplicates. */
 export const TRIAL_REMINDER_ID = "pepta.trial-ending";
@@ -87,8 +92,15 @@ export async function scheduleTrialEndReminder(
   const adapter = options.adapter ?? defaultAdapter;
 
   let plan: TrialReminderPlan | null;
+  let steps: TrialSequenceStep[] = [];
   try {
     plan = trialPlanFor(customerInfo, entitlementId, options.now);
+    const entitlement = customerInfo?.entitlements?.active?.[entitlementId];
+    steps = planTrialSequence({
+      expirationISO: entitlement?.expirationDate ?? null,
+      isTrial: isTrialPeriod(entitlement?.periodType),
+      now: options.now,
+    });
   } catch {
     return null;
   }
@@ -99,6 +111,11 @@ export async function scheduleTrialEndReminder(
     await adapter.cancelScheduledNotificationAsync(TRIAL_REMINDER_ID);
   } catch {
     // Nothing scheduled — fine.
+  }
+  // Same for the sequence: a restore or re-subscribe must not stack a second
+  // set of touchpoints on top of the first.
+  for (const id of Object.values(TRIAL_SEQUENCE_IDS)) {
+    await adapter.cancelScheduledNotificationAsync(id).catch(() => undefined);
   }
 
   if (!plan) return null;
@@ -124,6 +141,27 @@ export async function scheduleTrialEndReminder(
         date: plan.fireAt,
       },
     });
+
+    // The earlier value touchpoints ride along on the SAME permission check
+    // and the same purchase moment. Scheduled after the day-2 message on
+    // purpose: if anything here throws, the message the paywall's promise
+    // hangs on is already safely queued.
+    for (const step of steps) {
+      await adapter
+        .scheduleNotificationAsync({
+          identifier: step.id,
+          content: {
+            title: step.title,
+            body: step.body,
+            data: { kind: "trial_sequence" },
+          },
+          trigger: {
+            type: Notifications.SchedulableTriggerInputTypes.DATE,
+            date: step.fireAt,
+          },
+        })
+        .catch(() => undefined);
+    }
     return plan;
   } catch {
     // A failure to schedule must never block unlocking the app the user just
