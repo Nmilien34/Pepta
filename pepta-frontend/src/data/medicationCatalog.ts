@@ -239,3 +239,33 @@ export function searchMedications(
     (item) => item.name.toLowerCase().includes(q) || item.subtitle.toLowerCase().includes(q),
   );
 }
+
+/** Browse filter on the medication picker. Not a route answer — see below. */
+export type MedicationRouteFilter = 'all' | 'injection' | 'oral';
+
+/**
+ * Narrow the browse list by how the medication is taken.
+ *
+ * A CONVENIENCE, NOT A BOUNDARY. Three rules keep it from ever becoming a dead
+ * end that pushes someone into "Something else" — which is the junk-record path
+ * the data-health D3 detector exists to clean up:
+ *
+ *  1. Search ignores this entirely (see MedicationPickerScreen): typing a real
+ *     medication's name always finds it, whatever the filter says.
+ *  2. routeAmbiguous entries appear under EVERY filter. The flag means the
+ *     route is genuinely undetermined — compounded meds come as injections or
+ *     as oral drops/troches — so excluding them from either list would hide a
+ *     legitimate answer. They sort last in the catalog, so the medications
+ *     whose route IS pinned still come first.
+ *  3. It never touches compound.route. The route still comes from the picked
+ *     catalog entry, or from the route question for ambiguous ones. This is why
+ *     an "all" option is safe here where "Not sure" was not safe on the route
+ *     question (2026-08-10): declining to narrow a list stores nothing.
+ */
+export function filterMedicationsByRoute(
+  items: readonly MedicationOption[],
+  filter: MedicationRouteFilter,
+): MedicationOption[] {
+  if (filter === 'all') return [...items];
+  return items.filter((item) => item.routeAmbiguous === true || item.route === filter);
+}
