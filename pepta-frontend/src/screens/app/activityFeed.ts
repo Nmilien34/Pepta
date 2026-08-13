@@ -206,9 +206,23 @@ export function buildActivityFeed({
     else byDay.set(day, [entry]);
   }
 
-  return [...byDay.entries()]
-    .sort(([left], [right]) => (left < right ? 1 : -1))
-    .slice(0, maxDays)
+  const ordered = [...byDay.entries()].sort(([left], [right]) => (left < right ? 1 : -1));
+  const selected = ordered.slice(0, maxDays);
+
+  // THE DOSE IS THIS APP'S ANCHOR, so it is never allowed to fall off the end.
+  // A weekly injector who logs water daily fills the three most recent days
+  // with habit logs and pushes their last shot out of the window entirely —
+  // three rows of water and no dose, where the doses-only card this replaced
+  // would have shown their last eight. When the window contains no dose, the
+  // most recent dose day is appended (it is older, so it stays last).
+  const hasDose = (day: [string, ActivityEntry[]]) =>
+    day[1].some((entry) => entry.kind === 'dose');
+  if (!selected.some(hasDose)) {
+    const mostRecentDoseDay = ordered.find(hasDose);
+    if (mostRecentDoseDay) selected.push(mostRecentDoseDay);
+  }
+
+  return selected
     .map(([date, dayEntries]) => ({
       date,
       label: dayLabel(date, now),

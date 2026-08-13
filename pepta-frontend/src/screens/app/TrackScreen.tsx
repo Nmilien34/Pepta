@@ -41,7 +41,6 @@ import {
   type LevelSuppressionReason,
 } from './levelSuppression';
 
-const RANGES = ['7d', '30d', '90d', '1y'];
 
 export function TrackScreen() {
   const theme = useTheme();
@@ -597,15 +596,14 @@ function MedicationLevelCardContent({
 
       {hasCurve ? (
         <>
-          <View style={{ flexDirection: 'row', alignSelf: 'flex-start', backgroundColor: theme.colors.surfaceAlt, borderRadius: theme.radii.pill, padding: 3, marginTop: theme.spacing.md }}>
-            {RANGES.map((r, i) => (
-              <View key={r} style={[{ paddingVertical: 5, paddingHorizontal: 11, borderRadius: theme.radii.pill }, i === 0 ? { backgroundColor: theme.colors.surface } : null]}>
-                <AppText variant="caption" color={i === 0 ? 'textPrimary' : 'textSecondary'} style={{ fontWeight: '700' }}>
-                  {r}
-                </AppText>
-              </View>
-            ))}
-          </View>
+          {/* The 7d/30d/90d/1y control that used to sit here was a View, not a
+              Pressable: no onPress, no state, `i === 0` hardcoded so "7d" was
+              always lit. It never did anything, and the backend only ever
+              serves +/-7 days (curveDaysBefore/After default to 7), so three of
+              its four options had neither wiring nor data. Removed rather than
+              left as decoration above a chart that now tells the truth — the
+              dated axis already says what window this is. Restore it when
+              computeMedicationLevel takes a window parameter. */}
           {/* The whole curve, with its timestamps — not curve.map(p => p.level).
               Dropping datetime is what turned a real time series into a shape:
               no axis, no now-marker, and a dot on the LAST point, six days into

@@ -144,6 +144,48 @@ describe('route awareness', () => {
   });
 });
 
+describe('the dose never falls off the end', () => {
+  it('keeps the last dose visible for a weekly injector who logs daily habits', () => {
+    // Regression: three days of water filled the window and the shot from five
+    // days ago vanished — worse than the doses-only card this replaced.
+    const feed = buildActivityFeed({
+      home: home(),
+      now: NOW,
+      track: track({
+        doseLogs: [{ id: 'd', compoundId: 'c1', amount: 5, unit: 'mg', datetime: at(8, 9), deletedAt: null }],
+        waterLogs: [11, 12, 13].map((d) => ({ id: `w${d}`, amountOz: 64, datetime: at(d, 9), deletedAt: null })),
+      }),
+    });
+    const kinds = feed.flatMap((day) => day.entries.map((entry) => entry.kind));
+    expect(kinds).toContain('dose');
+    // Appended, not promoted: recency order is preserved.
+    expect(feed[feed.length - 1]!.entries.some((e) => e.kind === 'dose')).toBe(true);
+  });
+
+  it('does not append a duplicate when a dose is already in the window', () => {
+    const feed = buildActivityFeed({
+      home: home(),
+      now: NOW,
+      track: track({
+        doseLogs: [{ id: 'd', compoundId: 'c1', amount: 5, unit: 'mg', datetime: at(13, 9), deletedAt: null }],
+        waterLogs: [{ id: 'w', amountOz: 64, datetime: at(13, 10), deletedAt: null }],
+      }),
+    });
+    expect(feed).toHaveLength(1);
+    expect(feed.flatMap((d) => d.entries).filter((e) => e.kind === 'dose')).toHaveLength(1);
+  });
+
+  it('stays empty when the user has no doses at all', () => {
+    const feed = buildActivityFeed({
+      home: home(),
+      now: NOW,
+      track: track({ waterLogs: [{ id: 'w', amountOz: 64, datetime: at(13, 9), deletedAt: null }] }),
+    });
+    expect(feed).toHaveLength(1);
+    expect(feed[0]!.entries.every((e) => e.kind !== 'dose')).toBe(true);
+  });
+});
+
 describe('entryTime', () => {
   it('formats a clock time', () => {
     expect(entryTime(at(13, 9))).toMatch(/9:00/);
