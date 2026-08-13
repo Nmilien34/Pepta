@@ -27,7 +27,8 @@ vi.mock("react-native", () => ({
 // celebration. It owns hooks and Animated, so it must be mocked rather than
 // half-rendered through a minimal react-native mock.
 vi.mock("../components/DoseCelebration", () => ({
-  DoseCelebrationOverlay: () => null,
+  DoseCelebrationOverlay: (props: Record<string, unknown>) =>
+    React.createElement("DoseCelebrationOverlay", props),
 }));
 
 vi.mock("../components/AppText", () => ({
@@ -170,5 +171,105 @@ describe("LogSheetsProvider", () => {
     });
 
     expect(textContent(tree!.root)).not.toContain("Shot saved");
+  });
+
+  it("HOLDS the celebration until the sheet has fully dismissed", async () => {
+    // QuickLogSheet is a native Modal — on iOS its own window sits ABOVE this
+    // tree. Showing the celebration on commit would play the confetti burst and
+    // most of the card's spring behind a sheet still animating out, so the user
+    // would meet it already half over. It must wait for onDismissed.
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+    await act(async () => {
+      tree = TestRenderer.create(
+        <LogSheetsProvider>
+          <Launcher />
+        </LogSheetsProvider>,
+      );
+    });
+
+    const quickSheet = findByMockType(tree!.root, "QuickLogSheet");
+    await act(async () => {
+      quickSheet.props.onDoseLogged({
+        previousDoseCount: 0,
+        noun: "shot",
+        tracksLevels: true,
+      });
+    });
+
+    // Still nothing on screen — the sheet is mid-dismiss.
+    expect(
+      findByMockType(tree!.root, "DoseCelebrationOverlay").props.celebration,
+    ).toBeNull();
+
+    await act(async () => {
+      findByMockType(tree!.root, "QuickLogSheet").props.onDismissed();
+    });
+
+    const shown = findByMockType(tree!.root, "DoseCelebrationOverlay").props
+      .celebration as { title: string; burst: boolean };
+    expect(shown.title).toBe("You did it!");
+    expect(shown.burst).toBe(true);
+  });
+
+  it("does not stack a toast and a celebration for one tap", async () => {
+    // The one-tap path raises "Shot saved" as well. Two notifications for one
+    // action is clutter, and the celebration already says it with the payoff.
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+    await act(async () => {
+      tree = TestRenderer.create(
+        <LogSheetsProvider>
+          <Launcher />
+        </LogSheetsProvider>,
+      );
+    });
+
+    const quickSheet = findByMockType(tree!.root, "QuickLogSheet");
+    await act(async () => {
+      quickSheet.props.onQuickShotSaved({ title: "Shot saved", detail: "2.5 mg logged" });
+      quickSheet.props.onDoseLogged({
+        previousDoseCount: 0,
+        noun: "shot",
+        tracksLevels: true,
+      });
+    });
+    await act(async () => {
+      findByMockType(tree!.root, "QuickLogSheet").props.onDismissed();
+    });
+
+    expect(tree!.root.findAll((n) => String(n.type) === "LogSavedToast")).toHaveLength(0);
+    expect(
+      findByMockType(tree!.root, "DoseCelebrationOverlay").props.celebration,
+    ).not.toBeNull();
+  });
+
+  it("still opens the meal sheet when a celebration is also queued", async () => {
+    // The flush must not be swallowed by the meal early-return, and vice versa.
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+    await act(async () => {
+      tree = TestRenderer.create(
+        <LogSheetsProvider>
+          <Launcher />
+        </LogSheetsProvider>,
+      );
+    });
+    const launcher = findByMockType(tree!.root, "Launcher");
+    await act(async () => {
+      launcher.props.openQuickLog();
+    });
+    await act(async () => {
+      findByMockType(tree!.root, "QuickLogSheet").props.onDoseLogged({
+        previousDoseCount: 2,
+        noun: "shot",
+        tracksLevels: true,
+      });
+      findByMockType(tree!.root, "QuickLogSheet").props.onMeal();
+    });
+    await act(async () => {
+      findByMockType(tree!.root, "QuickLogSheet").props.onDismissed();
+    });
+
+    expect(
+      findByMockType(tree!.root, "DoseCelebrationOverlay").props.celebration,
+    ).not.toBeNull();
   });
 });

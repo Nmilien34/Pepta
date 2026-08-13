@@ -49,6 +49,11 @@ export function LogSheetsProvider({ children }: { children: ReactNode }) {
   // Lives HERE rather than in the sheet: the sheet dismisses itself on commit,
   // so anything rendered inside it would unmount before it could be seen.
   const [celebration, setCelebration] = useState<DoseCelebration | null>(null);
+  // HELD until the sheet is fully gone. QuickLogSheet is a native Modal, which
+  // on iOS lives in its own window ABOVE this tree — showing the celebration on
+  // commit would play the burst and most of the card's spring behind a sheet
+  // that is still animating out, so the user meets it already half over.
+  const pendingCelebration = useRef<DoseCelebration | null>(null);
   const pendingMealOpen = useRef(false);
   const pendingQuickOpen = useRef(false);
   const mealOpenTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -81,6 +86,12 @@ export function LogSheetsProvider({ children }: { children: ReactNode }) {
     setMealOpen(true);
   }, [quickOpen]);
   const handleQuickDismissed = useCallback(() => {
+    // Flush first, and unconditionally — the meal early-return below must not
+    // swallow a queued celebration.
+    if (pendingCelebration.current) {
+      setCelebration(pendingCelebration.current);
+      pendingCelebration.current = null;
+    }
     if (!pendingMealOpen.current) return;
     pendingMealOpen.current = false;
     mealOpenTimer.current = setTimeout(() => {
@@ -127,7 +138,14 @@ export function LogSheetsProvider({ children }: { children: ReactNode }) {
         onClose={() => setQuickOpen(false)}
         onMeal={openMeal}
         onQuickShotSaved={showToast}
-        onDoseLogged={(input) => setCelebration(doseCelebrationFor(input))}
+        onDoseLogged={(input) => {
+          pendingCelebration.current = doseCelebrationFor(input);
+          // GAP 2: the one-tap path also raises a "Shot saved" toast. Two
+          // notifications for one tap is clutter, and the celebration already
+          // says it — louder and with the payoff attached.
+          setToast(null);
+          if (toastTimer.current) clearTimeout(toastTimer.current);
+        }}
       />
       <MealLogSheet
         visible={mealOpen}
