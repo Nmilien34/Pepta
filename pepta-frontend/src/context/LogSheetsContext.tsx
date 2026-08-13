@@ -16,6 +16,11 @@ import { View } from "react-native";
 import { AppText } from "../components/AppText";
 import { Icon } from "../components/Icon";
 import { QuickLogSheet, type QuickLogMode } from "../components/QuickLogSheet";
+import { DoseCelebrationOverlay } from "../components/DoseCelebration";
+import {
+  doseCelebrationFor,
+  type DoseCelebration,
+} from "../screens/app/doseCelebration";
 import { MealLogSheet } from "../components/MealLogSheet";
 import { useTheme } from "../theme";
 
@@ -41,6 +46,9 @@ export function LogSheetsProvider({ children }: { children: ReactNode }) {
   const [mealOpen, setMealOpen] = useState(false);
   const [mealReturnsToQuickLog, setMealReturnsToQuickLog] = useState(false);
   const [toast, setToast] = useState<LogToastMessage | null>(null);
+  // Lives HERE rather than in the sheet: the sheet dismisses itself on commit,
+  // so anything rendered inside it would unmount before it could be seen.
+  const [celebration, setCelebration] = useState<DoseCelebration | null>(null);
   const pendingMealOpen = useRef(false);
   const pendingQuickOpen = useRef(false);
   const mealOpenTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -119,6 +127,7 @@ export function LogSheetsProvider({ children }: { children: ReactNode }) {
         onClose={() => setQuickOpen(false)}
         onMeal={openMeal}
         onQuickShotSaved={showToast}
+        onDoseLogged={(input) => setCelebration(doseCelebrationFor(input))}
       />
       <MealLogSheet
         visible={mealOpen}
@@ -127,6 +136,10 @@ export function LogSheetsProvider({ children }: { children: ReactNode }) {
         onDismissed={handleMealDismissed}
       />
       {toast ? <LogSavedToast message={toast} /> : null}
+      <DoseCelebrationOverlay
+        celebration={celebration}
+        onDone={() => setCelebration(null)}
+      />
     </LogSheetsContext.Provider>
   );
 }

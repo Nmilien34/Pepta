@@ -1,0 +1,218 @@
+<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pepta — Home log CTA, rev 2: quieter (design)</title>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   Pepta — LOG-FIRST CTA, REV 2 (2026-08-13).
+
+   WHAT WAS WRONG WITH REV 1: it used Button.tsx primary — the
+   56px full-width purple gradient with a purple glow — inside a
+   data card. That is the SCREEN-level purchase CTA; borrowing it
+   here put six purple elements in one small card (icon, stat,
+   active bar, gradient, glow, halo) and made a status card look
+   like a landing page.
+
+   THE APP ALREADY HAS AN IN-CARD ACTION IDIOM and rev 1 ignored
+   it: the Pep teach card's "Read it" is a small near-black pill —
+   backgroundColor textPrimary #0E0E12, pill radius, padding 7/14,
+   caption 13px weight 800, label in surface white
+   (HomeScreen.tsx:510-517). Same idiom as the data-health card.
+   Purple stays on the DATA (stat, bars, icon); the ACTION is
+   near-black. That separation is the whole fix.
+
+   Four treatments below, quietest first. All four are the same
+   card otherwise, so the comparison is only the action.
+
+   MOTION, REV 2: the expanding purple halo is gone — it was the
+   loudest thing on screen and it recoloured the card. What's left
+   is a shadow breath (the pill's own shadow softens and lifts)
+   plus a 1.5% scale, ~60% of the cycle at rest. Toggle it on and
+   off to judge whether it's noticeable ENOUGH; that is the real
+   risk now, not whether it's too much.
+   ============================================================ */
+:root{
+  --primary:#7C5CFC; --gradStart:#6751E8; --gradEnd:#8C63F4;
+  --bg:#FAFAFB; --surface:#FFFFFF; --surfaceAlt:#F2F3F5;
+  --border:#ECECEF; --text:#0E0E12; --text2:#6B6B76; --text3:#A1A1AC;
+  --barIdle:#E7E1FF; --tint:#F1EDFF;
+  --cycle:2.8s;
+}
+*{box-sizing:border-box}
+body{margin:0;background:#EFEFF3;font-family:'Hanken Grotesk',system-ui,sans-serif;color:var(--text);
+  padding:34px 18px 70px;-webkit-font-smoothing:antialiased}
+h1{font-size:19px;font-weight:800;letter-spacing:-.3px;margin:0 0 4px;text-align:center}
+.sub{font-size:13px;color:var(--text2);text-align:center;margin:0 0 22px;line-height:18px}
+.controls{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:0 auto 26px;max-width:560px}
+.controls button{font-family:inherit;font-size:12.5px;font-weight:700;padding:9px 15px;border-radius:9999px;
+  border:1px solid var(--border);background:var(--surface);color:var(--text2);cursor:pointer}
+.controls button.on{background:var(--text);color:#fff;border-color:var(--text)}
+.grid{display:flex;gap:22px;justify-content:center;flex-wrap:wrap;align-items:flex-start}
+.phone{width:330px;background:var(--bg);border-radius:30px;padding:16px 14px 20px;
+  box-shadow:0 18px 50px rgba(17,17,26,.13)}
+.stateName{font-size:11.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--text3);margin:0 0 9px 4px}
+.note{font-size:12px;color:var(--text2);line-height:17px;margin:10px 4px 0}
+
+.card{background:var(--surface);border-radius:24px;padding:18px;box-shadow:0 8px 24px rgba(17,17,26,.06)}
+.row{display:flex;align-items:center;justify-content:space-between}
+.hl{display:flex;align-items:center;gap:8px}
+.title{font-size:15px;font-weight:700;letter-spacing:-.2px}
+.pill{background:var(--surfaceAlt);padding:5px 11px;border-radius:9999px;font-size:13px;font-weight:600;color:var(--text3)}
+.statRow{display:flex;align-items:flex-end;justify-content:space-between;margin-top:12px}
+.stat{font-size:30px;line-height:34px;font-weight:800;letter-spacing:-.5px;color:var(--text3)}
+.stat.live{color:var(--primary)}
+.unit{font-size:13px;color:var(--text2);margin-left:5px}
+.cap{font-size:13px;line-height:18px;color:var(--text3);margin-top:6px}
+.bars{display:flex;align-items:flex-end;gap:6px;height:46px}
+.bars i{width:7px;border-radius:4px;background:var(--barIdle);display:block}
+
+/* the explanatory line, unchanged from shipped */
+.divider{display:flex;align-items:center;gap:6px;margin-top:12px;padding-top:8px;border-top:.5px solid var(--border)}
+.divider span{font-size:13px;line-height:18px;color:var(--text2)}
+
+/* --- A: native dark pill, sized to content, on the same line as the copy --- */
+.actionRow{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  margin-top:12px;padding-top:10px;border-top:.5px solid var(--border)}
+.actionRow p{margin:0;font-size:13px;line-height:18px;color:var(--text2);flex:1}
+.darkPill{display:inline-flex;align-items:center;gap:6px;background:var(--text);color:#fff;
+  border:0;border-radius:9999px;padding:7px 14px;font-family:inherit;font-size:13px;font-weight:800;
+  letter-spacing:-.1px;cursor:pointer;white-space:nowrap;box-shadow:0 2px 6px rgba(17,17,26,.10)}
+
+/* --- B: full-width dark bar, shorter than the screen CTA --- */
+.wide{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;height:44px;
+  background:var(--text);color:#fff;border:0;border-radius:9999px;font-family:inherit;font-size:14px;
+  font-weight:800;letter-spacing:-.1px;cursor:pointer;margin-top:12px;box-shadow:0 3px 10px rgba(17,17,26,.12)}
+
+/* --- C: soft tinted, purple but not a slab --- */
+.tint{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;height:44px;
+  background:var(--tint);color:var(--gradStart);border:0;border-radius:9999px;font-family:inherit;
+  font-size:14px;font-weight:800;letter-spacing:-.1px;cursor:pointer;margin-top:12px}
+
+/* --- D: no button at all — the dead sentence becomes the action --- */
+.tapRow{display:flex;align-items:center;gap:9px;width:100%;margin-top:12px;padding-top:10px;
+  border-top:.5px solid var(--border);background:none;border-left:0;border-right:0;border-bottom:0;
+  font-family:inherit;cursor:pointer;text-align:left}
+.tapRow .plus{width:26px;height:26px;border-radius:9px;background:var(--tint);display:flex;align-items:center;
+  justify-content:center;flex:none}
+.tapRow span{flex:1;font-size:13px;line-height:18px;color:var(--text);font-weight:700}
+
+/* --- motion: shadow breath + micro scale. No halo, no recolouring. --- */
+.on-pulse .darkPill,.on-pulse .wide,.on-pulse .tint,.on-pulse .tapRow .plus{
+  animation:breathe var(--cycle) cubic-bezier(.4,0,.2,1) infinite}
+@keyframes breathe{
+  0%,60%,100%{transform:scale(1);box-shadow:0 2px 6px rgba(17,17,26,.10)}
+  22%{transform:scale(1.015);box-shadow:0 7px 18px rgba(17,17,26,.20)}
+}
+@media (prefers-reduced-motion:reduce){ .on-pulse *{animation:none!important} }
+</style></head><body>
+
+<h1>Log CTA — rev 2: purple is the data, near-black is the action</h1>
+<p class="sub">Four treatments, quietest first. Rev 1’s gradient slab and purple halo are gone.<br>Judge whether the motion is noticeable <b>enough</b> now — that’s the new risk.</p>
+
+<div class="controls">
+  <button data-c="2.2s">2.2s</button>
+  <button data-c="2.8s" class="on">2.8s (default)</button>
+  <button data-c="3.6s">3.6s</button>
+  <button id="toggle" class="on">Motion on</button>
+</div>
+
+<div class="grid">
+
+  <div class="phone">
+    <p class="stateName">A · Native pill, inline</p>
+    <div class="card">
+      <div class="row"><div class="hl">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7C5CFC" stroke-width="2" stroke-linecap="round"><path d="M18 2l4 4M17 7l-1.5-1.5M20.5 3.5L19 2M14.5 6.5L4 17l-2 5 5-2L17.5 9.5z"/></svg>
+        <span class="title">Medication Level</span></div>
+        <span class="pill">No doses yet</span></div>
+      <div class="statRow"><div><div><span class="stat">—</span><span class="unit">mg</span></div>
+        <div class="cap">Current estimate</div></div>
+        <div class="bars"><i style="height:20px"></i><i style="height:26px"></i><i style="height:22px"></i><i style="height:30px"></i><i style="height:26px"></i><i style="height:24px"></i><i style="height:32px"></i></div></div>
+      <div class="actionRow">
+        <p>Log your first shot to start tracking levels.</p>
+        <button class="darkPill">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Log</button>
+      </div>
+    </div>
+    <p class="note"><b>Exactly the “Read it” spec</b> — 7/14 padding, 13px/800. Reads as part of the app, not bolted on. Quietest, and the one I’d ship.</p>
+  </div>
+
+  <div class="phone">
+    <p class="stateName">B · Full-width, dark</p>
+    <div class="card">
+      <div class="row"><div class="hl">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7C5CFC" stroke-width="2" stroke-linecap="round"><path d="M18 2l4 4M17 7l-1.5-1.5M20.5 3.5L19 2M14.5 6.5L4 17l-2 5 5-2L17.5 9.5z"/></svg>
+        <span class="title">Medication Level</span></div>
+        <span class="pill">No doses yet</span></div>
+      <div class="statRow"><div><div><span class="stat">—</span><span class="unit">mg</span></div>
+        <div class="cap">Current estimate</div></div>
+        <div class="bars"><i style="height:20px"></i><i style="height:26px"></i><i style="height:22px"></i><i style="height:30px"></i><i style="height:26px"></i><i style="height:24px"></i><i style="height:32px"></i></div></div>
+      <div class="divider">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6B6B76" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2" stroke-linecap="round"/></svg>
+        <span>Log your first shot to start tracking levels.</span></div>
+      <button class="wide">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Log a shot</button>
+    </div>
+    <p class="note">Same colour discipline, more weight. 44px, not the screen CTA’s 56px. Hardest to miss; slightly bottom-heavy.</p>
+  </div>
+
+  <div class="phone">
+    <p class="stateName">C · Soft tint</p>
+    <div class="card">
+      <div class="row"><div class="hl">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7C5CFC" stroke-width="2" stroke-linecap="round"><path d="M18 2l4 4M17 7l-1.5-1.5M20.5 3.5L19 2M14.5 6.5L4 17l-2 5 5-2L17.5 9.5z"/></svg>
+        <span class="title">Medication Level</span></div>
+        <span class="pill">No doses yet</span></div>
+      <div class="statRow"><div><div><span class="stat">—</span><span class="unit">mg</span></div>
+        <div class="cap">Current estimate</div></div>
+        <div class="bars"><i style="height:20px"></i><i style="height:26px"></i><i style="height:22px"></i><i style="height:30px"></i><i style="height:26px"></i><i style="height:24px"></i><i style="height:32px"></i></div></div>
+      <div class="divider">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6B6B76" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2" stroke-linecap="round"/></svg>
+        <span>Log your first shot to start tracking levels.</span></div>
+      <button class="tint">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6751E8" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Log a shot</button>
+    </div>
+    <p class="note">Keeps purple without a slab of it — the tint is the same <code>#F1EDFF</code> the Friends glyph uses. Softest of the three buttons.</p>
+  </div>
+
+  <div class="phone">
+    <p class="stateName">D · No button — the line becomes the action</p>
+    <div class="card">
+      <div class="row"><div class="hl">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7C5CFC" stroke-width="2" stroke-linecap="round"><path d="M18 2l4 4M17 7l-1.5-1.5M20.5 3.5L19 2M14.5 6.5L4 17l-2 5 5-2L17.5 9.5z"/></svg>
+        <span class="title">Medication Level</span></div>
+        <span class="pill">No doses yet</span></div>
+      <div class="statRow"><div><div><span class="stat">—</span><span class="unit">mg</span></div>
+        <div class="cap">Current estimate</div></div>
+        <div class="bars"><i style="height:20px"></i><i style="height:26px"></i><i style="height:22px"></i><i style="height:30px"></i><i style="height:26px"></i><i style="height:24px"></i><i style="height:32px"></i></div></div>
+      <button class="tapRow">
+        <span class="plus"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6751E8" stroke-width="3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>
+        <span>Log your first shot to start tracking levels.</span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A1A1AC" stroke-width="2.4" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>
+      </button>
+    </div>
+    <p class="note">Adds no chrome at all — it makes the sentence that was already there tappable. Most restrained; also the easiest to overlook, which cuts against the goal.</p>
+  </div>
+
+</div>
+
+<script>
+  var c = document.querySelectorAll('.controls button[data-c]');
+  c.forEach(function (b) {
+    b.addEventListener('click', function () {
+      c.forEach(function (x) { x.classList.remove('on'); });
+      b.classList.add('on');
+      document.documentElement.style.setProperty('--cycle', b.dataset.c);
+    });
+  });
+  var cards = document.querySelectorAll('.card');
+  cards.forEach(function (el) { el.classList.add('on-pulse'); });
+  var on = true;
+  document.getElementById('toggle').addEventListener('click', function () {
+    on = !on;
+    this.textContent = on ? 'Motion on' : 'Motion off';
+    this.classList.toggle('on', on);
+    cards.forEach(function (el) { el.classList.toggle('on-pulse', on); });
+  });
+</script>
+</body></html>

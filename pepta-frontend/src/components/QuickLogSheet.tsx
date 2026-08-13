@@ -42,7 +42,7 @@ import {
   type InjectionSite,
 } from "../screens/app/trackView";
 import { BodyMap } from "./BodyMap";
-import { doseNoun } from "../screens/app/levelSuppression";
+import { doseNoun, globalDoseNoun } from "../screens/app/levelSuppression";
 import { AddCompoundSheet } from "./AddCompoundSheet";
 import { measurementLabel } from "../screens/app/progressView";
 import {
@@ -100,6 +100,8 @@ export interface QuickLogSheetProps {
   onClose(): void;
   onMeal(): void;
   onQuickShotSaved?: (message: { title: string; detail: string }) => void;
+  /** Fires after ANY dose log — the form path and the one-tap path alike. */
+  onDoseLogged?: (input: { previousDoseCount: number; noun: string; tracksLevels: boolean }) => void;
   onDismissed?: () => void;
   // Open straight to a specific entry form (used by the getting-started checklist).
   initialMode?: QuickLogMode;
@@ -110,6 +112,7 @@ export function QuickLogSheet({
   onClose,
   onMeal,
   onQuickShotSaved,
+  onDoseLogged,
   onDismissed,
   initialMode,
 }: QuickLogSheetProps) {
@@ -254,6 +257,19 @@ export function QuickLogSheet({
       .catch(() => undefined);
   };
 
+  // Counted BEFORE the new log is applied, so 0 genuinely means "their first".
+  const celebrateDose = () => {
+    const live = (track?.doseLogs ?? []).filter((d) => d.deletedAt == null);
+    const compounds = home?.activeCompounds ?? [];
+    onDoseLogged?.({
+      previousDoseCount: live.length,
+      noun: globalDoseNoun(compounds),
+      // An oral or unmodelled compound has no curve, so the copy must not
+      // promise one — same suppression the level surfaces use.
+      tracksLevels: compounds.some((c) => c.route !== 'oral' && c.halfLifeDays != null),
+    });
+  };
+
   const now = () => new Date().toISOString();
   const refreshHomeTrack = () =>
     Promise.all([refreshHome(), refreshTrack()]).then(() => undefined);
@@ -267,6 +283,7 @@ export function QuickLogSheet({
         Date.now() - doseOffsetH * 3_600_000,
       ).toISOString();
       const input = toDoseInput(dose, doseTs);
+      celebrateDose();
       commit(
         () => addDoseLog(input),
         () => saveLog("dose", input),
@@ -345,6 +362,7 @@ export function QuickLogSheet({
       title: `${capitalizedNoun(quickShot?.route)} saved`,
       detail: `${doseLabel} logged for today`,
     });
+    celebrateDose();
     commit(
       () => addDoseLog(input),
       () => saveLog("dose", input),

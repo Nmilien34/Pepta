@@ -23,6 +23,13 @@ vi.mock("react-native", () => ({
   }) => React.createElement("View", props, children),
 }));
 
+// Presentation-only here: this suite tests sheet orchestration, not the
+// celebration. It owns hooks and Animated, so it must be mocked rather than
+// half-rendered through a minimal react-native mock.
+vi.mock("../components/DoseCelebration", () => ({
+  DoseCelebrationOverlay: () => null,
+}));
+
 vi.mock("../components/AppText", () => ({
   AppText: ({
     children,

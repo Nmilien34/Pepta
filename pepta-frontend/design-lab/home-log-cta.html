@@ -1,0 +1,263 @@
+<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pepta — Home: log-first CTA on the Medication Level card (design)</title>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   Pepta — LOG-FIRST CTA (2026-08-13 brief).
+
+   THE PROBLEM: the level model computes nothing until a dose
+   exists, and Home currently states that ("Log your first dose to
+   start tracking levels.") without offering a way to do it. The
+   sentence is a diagnosis with no treatment — the user has to go
+   find the + tab on their own.
+
+   THE FIX: put the action inside the card that makes the claim,
+   and make the first-run instance ask to be noticed.
+
+   Fidelity sources (design-from-shipped-components rule):
+   · card         = Card.tsx — radius 24, padding 18,
+                    shadow 0 8px 24px rgba(17,17,26,0.06)
+   · header row   = HomeScreen.tsx:315-328 (icon 18 + cardTitle 15
+                    + info glyph, status pill on surfaceAlt)
+   · stat + bars  = HomeScreen.tsx:329-353 — statBig 30/34 800,
+                    bars w7 gap6 max-h46 r4, last #7C5CFC, rest
+                    #E7E1FF
+   · divider row  = HomeScreen.tsx:355-362 — 0.5px #ECECEF, 14px
+                    time glyph, caption 13/18
+   · CTA          = Button.tsx primary — h56, pill radius,
+                    gradient #6751E8 → #8C63F4 at (0,0)→(1,.85),
+                    1px rgba(255,255,255,.18) border, top sheen
+                    overlay to 44% height, press scale .97
+   · tokens       = theme/colors.ts, theme/spacing.ts, Hanken
+
+   COPY IS ROUTE-AWARE. "shot" here is globalDoseNoun() output —
+   an all-oral user reads "dose", a mixed user reads "dose". The
+   sweep that made every Home string route-aware already covers
+   this; the button must not reintroduce a hardcoded "shot".
+
+   MOTION SPEC — the part to sign off on.
+   The ask was "blinking, but not too fast, with ease". Blinking
+   opacity reads as a broken element, so this is a BREATH, not a
+   blink: a halo ring that expands and fades out of the button
+   plus a ~2% scale, ease-in-out, with a REST between pulses so
+   the screen is still most of the time. Three speeds are wired
+   below — pick one and I'll port that exact curve.
+   · halo: scale 1 → 1.18, opacity .45 → 0, cubic-bezier(.2,.7,.2,1)
+   · body: scale 1 → 1.02 → 1 on the same clock
+   · rest: 55% of the cycle is motionless
+   · stops for good once a dose exists (State B has no pulse)
+   · honours prefers-reduced-motion: no transform, static ring
+   ============================================================ */
+:root{
+  --primary:#7C5CFC; --gradStart:#6751E8; --gradEnd:#8C63F4;
+  --bg:#FAFAFB; --surface:#FFFFFF; --surfaceAlt:#F2F3F5;
+  --border:#ECECEF; --text:#0E0E12; --text2:#6B6B76; --text3:#A1A1AC;
+  --barIdle:#E7E1FF;
+  --cycle:2.6s;
+}
+*{box-sizing:border-box}
+body{margin:0;background:#EFEFF3;font-family:'Hanken Grotesk',system-ui,sans-serif;color:var(--text);
+  padding:34px 18px 70px;-webkit-font-smoothing:antialiased}
+h1{font-size:19px;font-weight:800;letter-spacing:-.3px;margin:0 0 4px;text-align:center}
+.sub{font-size:13px;color:var(--text2);text-align:center;margin:0 0 22px;line-height:18px}
+.controls{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:0 auto 26px;max-width:520px}
+.controls button{font-family:inherit;font-size:12.5px;font-weight:700;padding:9px 15px;border-radius:9999px;
+  border:1px solid var(--border);background:var(--surface);color:var(--text2);cursor:pointer}
+.controls button.on{background:var(--text);color:#fff;border-color:var(--text)}
+.grid{display:flex;gap:26px;justify-content:center;flex-wrap:wrap;align-items:flex-start}
+.phone{width:340px;background:var(--bg);border-radius:30px;padding:16px 14px 20px;
+  box-shadow:0 18px 50px rgba(17,17,26,.13)}
+.stateName{font-size:11.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--text3);
+  margin:0 0 9px 4px}
+.note{font-size:12px;color:var(--text2);line-height:17px;margin:10px 4px 0;max-width:340px}
+
+/* ---- Card: Card.tsx ---- */
+.card{background:var(--surface);border-radius:24px;padding:18px;box-shadow:0 8px 24px rgba(17,17,26,.06)}
+.row{display:flex;align-items:center;justify-content:space-between}
+.hl{display:flex;align-items:center;gap:8px}
+.title{font-size:15px;font-weight:700;letter-spacing:-.2px}
+.pill{background:var(--surfaceAlt);padding:5px 11px;border-radius:9999px;font-size:13px;font-weight:600;color:var(--text2)}
+.pill.idle{color:var(--text3)}
+.statRow{display:flex;align-items:flex-end;justify-content:space-between;margin-top:12px}
+.stat{font-size:30px;line-height:34px;font-weight:800;letter-spacing:-.5px;color:var(--primary)}
+.stat.idle{color:var(--text3)}
+.unit{font-size:13px;color:var(--text2);margin-left:5px}
+.cap{font-size:13px;line-height:18px;color:var(--text3);margin-top:6px}
+.bars{display:flex;align-items:flex-end;gap:6px;height:46px}
+.bars i{width:7px;border-radius:4px;background:var(--barIdle);display:block}
+.divider{display:flex;align-items:center;gap:6px;margin-top:12px;padding-top:8px;border-top:.5px solid var(--border)}
+.divider span{font-size:13px;line-height:18px;color:var(--text2)}
+
+/* ---- CTA: Button.tsx primary ---- */
+.ctaWrap{position:relative;margin-top:12px}
+.cta{position:relative;height:56px;border-radius:9999px;border:1px solid rgba(255,255,255,.18);
+  background:linear-gradient(107deg,var(--gradStart) 0%,var(--gradEnd) 100%);
+  color:#fff;font-family:inherit;font-size:16px;font-weight:700;letter-spacing:-.2px;
+  width:100%;cursor:pointer;overflow:hidden;display:flex;align-items:center;justify-content:center;gap:8px;
+  box-shadow:0 10px 22px rgba(108,84,232,.28)}
+.cta::before{content:'';position:absolute;inset:1px 1px auto 1px;height:44%;border-radius:9999px 9999px 40% 40%;
+  background:linear-gradient(180deg,rgba(255,255,255,.24),rgba(255,255,255,0));pointer-events:none}
+.cta:active{transform:scale(.97)}
+/* halo lives BEHIND the button, clipped by nothing */
+.halo{position:absolute;inset:0;border-radius:9999px;border:2px solid var(--primary);pointer-events:none;opacity:0}
+
+/* ---- The breath ---- */
+.pulsing .cta{animation:breathe var(--cycle) cubic-bezier(.2,.7,.2,1) infinite}
+.pulsing .halo{animation:halo var(--cycle) cubic-bezier(.2,.7,.2,1) infinite}
+@keyframes breathe{
+  0%,44%,100%{transform:scale(1)}     /* 56% of the cycle is rest */
+  16%{transform:scale(1.02)}
+}
+@keyframes halo{
+  0%{transform:scale(1);opacity:.45}
+  38%{transform:scale(1.18);opacity:0}
+  100%{transform:scale(1.18);opacity:0}
+}
+@media (prefers-reduced-motion:reduce){
+  .pulsing .cta,.pulsing .halo{animation:none}
+  .pulsing .halo{opacity:.35}
+}
+</style></head><body>
+
+<h1>Home — log-first CTA on the Medication Level card</h1>
+<p class="sub">The card that says “no data yet” now offers the fix.<br>Pick a breath speed; that curve gets ported 1:1.</p>
+
+<div class="controls">
+  <button data-c="2.0s">Quick · 2.0s</button>
+  <button data-c="2.6s" class="on">Calm · 2.6s (default)</button>
+  <button data-c="3.4s">Slow · 3.4s</button>
+  <button id="toggle">Pause motion</button>
+</div>
+
+<div class="grid">
+
+  <!-- STATE A: first run, no doses -->
+  <div class="phone">
+    <p class="stateName">A · First run — no dose logged</p>
+    <div class="card">
+      <div class="row">
+        <div class="hl">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7C5CFC" stroke-width="2" stroke-linecap="round"><path d="M18 2l4 4M17 7l-1.5-1.5M20.5 3.5L19 2M14.5 6.5L4 17l-2 5 5-2L17.5 9.5z"/></svg>
+          <span class="title">Medication Level</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A1A1AC" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01" stroke-linecap="round"/></svg>
+        </div>
+        <span class="pill idle">No doses yet</span>
+      </div>
+      <div class="statRow">
+        <div>
+          <div><span class="stat idle">—</span><span class="unit">mg</span></div>
+          <div class="cap">Current estimate</div>
+        </div>
+        <div class="bars">
+          <i style="height:20px"></i><i style="height:26px"></i><i style="height:22px"></i><i style="height:30px"></i><i style="height:26px"></i><i style="height:24px"></i><i style="height:32px"></i>
+        </div>
+      </div>
+      <div class="divider">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6B6B76" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2" stroke-linecap="round"/></svg>
+        <span>Log your first shot to start tracking levels.</span>
+      </div>
+      <div class="ctaWrap pulsing" id="wrapA">
+        <span class="halo"></span>
+        <button class="cta">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          Log a shot
+        </button>
+      </div>
+    </div>
+    <p class="note"><b>Breath, not blink.</b> A halo expands out of the button and fades; the button itself moves 2%. 56% of every cycle is completely still, so it reads as an invitation rather than an alarm.</p>
+  </div>
+
+  <!-- STATE B: has data -->
+  <div class="phone">
+    <p class="stateName">B · Has doses — pulse off</p>
+    <div class="card">
+      <div class="row">
+        <div class="hl">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7C5CFC" stroke-width="2" stroke-linecap="round"><path d="M18 2l4 4M17 7l-1.5-1.5M20.5 3.5L19 2M14.5 6.5L4 17l-2 5 5-2L17.5 9.5z"/></svg>
+          <span class="title">Medication Level</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A1A1AC" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01" stroke-linecap="round"/></svg>
+        </div>
+        <span class="pill">Low</span>
+      </div>
+      <div class="statRow">
+        <div>
+          <div><span class="stat">0.64</span><span class="unit">mg</span></div>
+          <div class="cap">Current estimate</div>
+        </div>
+        <div class="bars">
+          <i style="height:44px;background:#E7E1FF"></i><i style="height:34px"></i><i style="height:27px"></i><i style="height:21px"></i><i style="height:16px"></i><i style="height:12px"></i><i style="height:9px;background:#7C5CFC"></i>
+        </div>
+      </div>
+      <div class="divider">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6B6B76" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2" stroke-linecap="round"/></svg>
+        <span>Next shot in 2d 4h</span>
+      </div>
+      <div class="ctaWrap">
+        <button class="cta">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          Log a shot
+        </button>
+      </div>
+    </div>
+    <p class="note"><b>Same button, no motion.</b> Once a dose exists the pulse has done its job and stops for good — it never returns, so a long-time user never has a twitching Home screen.</p>
+  </div>
+
+  <!-- STATE C: oral -->
+  <div class="phone">
+    <p class="stateName">C · Oral user — suppressed level</p>
+    <div class="card">
+      <div class="row">
+        <div class="hl">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7C5CFC" stroke-width="2"><rect x="2.5" y="8.5" width="19" height="7" rx="3.5"/><path d="M12 8.5v7"/></svg>
+          <span class="title">Medication Level</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A1A1AC" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01" stroke-linecap="round"/></svg>
+        </div>
+        <span class="pill idle">Not tracked</span>
+      </div>
+      <div class="statRow">
+        <div>
+          <div><span class="stat idle">—</span><span class="unit">mg</span></div>
+          <div class="cap">Current estimate</div>
+        </div>
+        <div class="bars">
+          <i style="height:20px"></i><i style="height:26px"></i><i style="height:22px"></i><i style="height:30px"></i><i style="height:26px"></i><i style="height:24px"></i><i style="height:32px"></i>
+        </div>
+      </div>
+      <div class="divider">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6B6B76" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2" stroke-linecap="round"/></svg>
+        <span>Level tracking isn’t available for oral medications yet.</span>
+      </div>
+      <div class="ctaWrap pulsing" id="wrapC">
+        <span class="halo"></span>
+        <button class="cta">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          Log a dose
+        </button>
+      </div>
+    </div>
+    <p class="note"><b>Open question for you.</b> An oral user gets no curve at all, so the CTA can’t promise one — but logging still drives their history, streak and next-dose timing. Shown here pulsing and route-aware (“dose”, never “shot”). Say if you’d rather it stay calm for them.</p>
+  </div>
+
+</div>
+
+<script>
+  var cycle = document.querySelectorAll('.controls button[data-c]');
+  cycle.forEach(function (b) {
+    b.addEventListener('click', function () {
+      cycle.forEach(function (x) { x.classList.remove('on'); });
+      b.classList.add('on');
+      document.documentElement.style.setProperty('--cycle', b.dataset.c);
+    });
+  });
+  var paused = false;
+  document.getElementById('toggle').addEventListener('click', function () {
+    paused = !paused;
+    this.textContent = paused ? 'Resume motion' : 'Pause motion';
+    this.classList.toggle('on', paused);
+    ['wrapA', 'wrapC'].forEach(function (id) {
+      document.getElementById(id).classList.toggle('pulsing', !paused);
+    });
+  });
+</script>
+</body></html>

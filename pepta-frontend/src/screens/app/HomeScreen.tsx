@@ -14,7 +14,7 @@ import { useNavigation, type NavigationProp } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { HomeRangeKey } from '@pepta/shared';
 import { useTheme } from '../../theme';
-import { AppText, Button, Card, CountUp, DataHealthCardView, Mascot, ProgressBar, ProgressRing, Reveal, SectionErrorBanner, WaterCup } from '../../components';
+import { AppText, Button, Card, CountUp, DataHealthCardView, LogDoseCta, Mascot, ProgressBar, ProgressRing, Reveal, SectionErrorBanner, WaterCup } from '../../components';
 import { useCompanionName } from '../../components/useCompanionName';
 import { LivingMascot } from '../../components/LivingMascot';
 import { useSeenTeachCards } from './useSeenTeachCards';
@@ -56,6 +56,11 @@ export function HomeScreen() {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
   const { home, track, homeLoading, homeError, homeRefreshing, homeRange, refreshHome, refreshTrack, bumpProtein, bumpWater, bumpFiber, pendingLogs, lastSyncedAt } = usePeptaData();
   const { openQuickLog, openMeal } = useLogSheets();
+  // Dose LOGS, not medicationLevels — the level list excludes unmodelled and
+  // oral compounds, so reading it here would leave those users pulsing forever
+  // no matter how much they logged (same trap as the 2026-08-11 audit's
+  // getting-started task).
+  const hasLoggedDose = (track?.doseLogs ?? []).some((dose) => dose.deletedAt == null);
   const [rangeOpen, setRangeOpen] = useState(false);
 
   const onTask = (action: LogAction | null) => {
@@ -356,10 +361,18 @@ export function HomeScreen() {
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: theme.spacing.md, paddingTop: theme.spacing.sm, borderTopWidth: 0.5, borderTopColor: theme.colors.border }}>
                     <Icon name="time-outline" size={14} color={theme.colors.textSecondary} />
                     <AppText variant="caption" color="textSecondary">
-                      Next shot in {view.medication.countdown}
+                      Next {globalDoseNoun(home.activeCompounds)} in {view.medication.countdown}
                     </AppText>
                   </View>
                 ) : null}
+                {/* Same button, no heartbeat: the pulse has done its job the
+                    moment a dose exists, and a long-time user must never have a
+                    twitching Home screen. */}
+                <LogDoseCta
+                  label={`Log a ${globalDoseNoun(home.activeCompounds)}`}
+                  pulse={false}
+                  onPress={() => openQuickLog('dose')}
+                />
               </Card>
             ) : (
               <Card>
@@ -405,6 +418,13 @@ export function HomeScreen() {
                       : `Log your first ${globalDoseNoun(home.activeCompounds)} to start tracking levels.`}
                   </AppText>
                 </View>
+                {/* The card states the problem; this is the fix. It beats only
+                    while there is genuinely nothing logged. */}
+                <LogDoseCta
+                  label={`Log a ${globalDoseNoun(home.activeCompounds)}`}
+                  pulse={!hasLoggedDose}
+                  onPress={() => openQuickLog('dose')}
+                />
               </Card>
             )}
           </Reveal>

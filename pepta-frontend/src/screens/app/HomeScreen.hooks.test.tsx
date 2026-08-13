@@ -111,6 +111,9 @@ vi.mock("../../components", () => {
     // but it owns hooks, so it must exist as a real component or the hook-order
     // assertion below is measuring a crash instead of the order.
     DataHealthCardView: passthrough("DataHealthCardView"),
+    // Owns useRef + useState + two useEffects. Same reasoning as above: it has
+    // to exist as a real component or this test measures a crash, not order.
+    LogDoseCta: passthrough("LogDoseCta"),
     Mascot: passthrough("Mascot"),
     ProgressBar: passthrough("ProgressBar"),
     ProgressRing: passthrough("ProgressRing"),
