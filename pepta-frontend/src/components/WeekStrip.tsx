@@ -38,7 +38,14 @@ export function WeekStrip({ days }: { days: StripDay[] }) {
               borderRadius: 9,
               alignItems: 'center',
               justifyContent: 'center',
-              backgroundColor: day.isToday ? theme.colors.primary : 'transparent',
+              // A day you took your medication gets a light purple fill; TODAY
+              // still wins with the solid one, so a day that is both reads as
+              // today — the strip must never show two selected-looking squares.
+              backgroundColor: day.isToday
+                ? theme.colors.primary
+                : day.mark === 'logged'
+                  ? '#EFEBFF'
+                  : 'transparent',
             }}
           >
             <AppText
@@ -46,7 +53,11 @@ export function WeekStrip({ days }: { days: StripDay[] }) {
               style={{
                 fontSize: 13,
                 fontWeight: '700',
-                color: day.isToday ? theme.colors.onPrimary : theme.colors.textPrimary,
+                color: day.isToday
+                  ? theme.colors.onPrimary
+                  : day.mark === 'logged'
+                    ? '#6751E8'
+                    : theme.colors.textPrimary,
               }}
             >
               {day.dayOfMonth}
@@ -58,12 +69,10 @@ export function WeekStrip({ days }: { days: StripDay[] }) {
               height: 4.5,
               borderRadius: 99,
               marginTop: 4,
-              backgroundColor:
-                day.mark === 'due'
-                  ? theme.colors.primary
-                  : day.mark === 'logged'
-                    ? theme.colors.fiber
-                    : 'transparent',
+              // Dot = what is COMING (frequency). Fill = what was TAKEN. Logged
+              // days used to carry a green dot; that colour said nothing the
+              // fill does not, and two meanings on one mark read as noise.
+              backgroundColor: day.mark === 'due' ? theme.colors.primary : 'transparent',
             }}
           />
         </View>

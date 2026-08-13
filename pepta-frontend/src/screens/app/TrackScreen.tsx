@@ -19,17 +19,20 @@ import { activeCycleOf, cyclePillFor, isLastDoseOfCycle, patternOf, shortDateOnl
 import {
   compoundIconName,
   compoundStatusLabel,
-  formatDoseAmount,
   formatDoseRelative,
   formatNextDoseAt,
   siteLabel,
   sideEffectSummary,
-  sideEffectTypeLabel,
-  sortDoses,
   sortSideEffects,
   suggestNextSite,
   usedSites,
 } from './trackView';
+import {
+  buildActivityFeed,
+  entryTime,
+  type ActivityDay,
+  type ActivityKind,
+} from './activityFeed';
 import {
   doseNoun,
   globalDoseNoun,
@@ -78,6 +81,10 @@ export function TrackScreen() {
   const cyclePill = useMemo(() => cyclePillFor(pattern, new Date()), [pattern]);
   const cycleToday = useMemo(() => todayCycleStatus(pattern, new Date()), [pattern]);
   const resting = cycleToday?.phase === 'rest';
+  // ABOVE EVERY EARLY RETURN — this screen has two. A hook placed after one
+  // runs a different number of hooks once data lands, which is exactly what
+  // blanked the app on entry in builds 20-22 (see HomeScreen.hooks.test.tsx).
+  const activityDays = useMemo(() => buildActivityFeed({ track, home }), [track, home]);
 
   if (!home && !track && (homeError || trackError)) {
     return (
@@ -106,7 +113,6 @@ export function TrackScreen() {
   // ring, the chart and the Current/Peak/Trough row all read this.
   const { level: ml, suppressed: levelSuppressed } = resolveLevelView(home);
   const compounds = home?.activeCompounds ?? [];
-  const doses = sortDoses(track?.doseLogs ?? []);
   const sideEffects = sortSideEffects(track?.sideEffectLogs ?? []);
   // Any injectable at all keeps the body map: a mixed user still rotates sites
   // for their injection, and hiding it would lose that. All-oral hides it.
@@ -114,7 +120,6 @@ export function TrackScreen() {
   const doseWord = globalDoseNoun(compounds);
   const used = usedSites(track?.doseLogs ?? []);
   const next = suggestNextSite(track?.doseLogs ?? []);
-  const compoundName = (id: string) => compounds.find((c) => c.id === id)?.name ?? 'Dose';
   const levelPct = ml && ml.peakEstimate > 0 ? Math.min(1, ml.currentEstimate / ml.peakEstimate) : 0;
   // Prefer the authoritative nextDose block; fall back to the level engine.
   const nextDoseHours = home?.nextDose?.hoursUntilNextDose ?? ml?.hoursUntilNextDose ?? null;
@@ -205,6 +210,15 @@ export function TrackScreen() {
             )}
           </Reveal>
 
+          {/* Your log — slot 2, directly under the week strip. This used to be
+              "Dose history" five cards down, showing doses only; someone who
+              had just logged something scrolled past four cards to see it. */}
+          <View onLayout={(e) => { doseHistoryY.current = e.nativeEvent.layout.y; }}>
+            <Reveal delay={100} style={{ marginTop: 12 }}>
+              <ActivityFeedCard days={activityDays} />
+            </Reveal>
+          </View>
+
           {/* compounds */}
           <Reveal delay={140} style={{ marginTop: 12 }}>
             <Card>
@@ -263,6 +277,32 @@ export function TrackScreen() {
             </Card>
           </Reveal>
 
+          {/* medication level chart */}
+          {ml || compounds.length > 0 ? (
+            <Reveal delay={300} style={{ marginTop: 12 }}>
+              <Card>
+                <MedicationLevelCardContent
+                  ml={ml}
+                  compoundName={ml?.compoundName ?? compounds[0]?.name ?? 'Medication'}
+                  doseTimes={(track?.doseLogs ?? [])
+                    .filter((d) => d.deletedAt == null && (!ml || d.compoundId === ml.compoundId))
+                    .map((d) => ({ datetime: d.datetime }))}
+                  levelUnit={
+                    compounds.find((c) => c.id === ml?.compoundId)?.doseUnit ??
+                    compounds[0]?.doseUnit ??
+                    'mg'
+                  }
+                  doseWord={doseNoun(
+                    compounds.find((c) => c.id === ml?.compoundId)?.route ?? compounds[0]?.route,
+                  )}
+                  suppressed={levelSuppressed}
+                  onLogDose={() => openQuickLog('dose')}
+                  onOpenSettings={() => navigation.navigate('DoseSettings')}
+                />
+              </Card>
+            </Reveal>
+          ) : null}
+
           {/* Injection sites — hidden entirely for a user whose medications are
               all oral. Present unchanged the moment any compound is
               injectable, including a mixed user who still needs the map. */}
@@ -292,72 +332,6 @@ export function TrackScreen() {
             </Card>
           </Reveal>
           ) : null}
-
-          {/* medication level chart */}
-          {ml || compounds.length > 0 ? (
-            <Reveal delay={300} style={{ marginTop: 12 }}>
-              <Card>
-                <MedicationLevelCardContent
-                  ml={ml}
-                  compoundName={ml?.compoundName ?? compounds[0]?.name ?? 'Medication'}
-                  doseTimes={(track?.doseLogs ?? [])
-                    .filter((d) => d.deletedAt == null && (!ml || d.compoundId === ml.compoundId))
-                    .map((d) => ({ datetime: d.datetime }))}
-                  levelUnit={
-                    compounds.find((c) => c.id === ml?.compoundId)?.doseUnit ??
-                    compounds[0]?.doseUnit ??
-                    'mg'
-                  }
-                  doseWord={doseNoun(
-                    compounds.find((c) => c.id === ml?.compoundId)?.route ?? compounds[0]?.route,
-                  )}
-                  suppressed={levelSuppressed}
-                  onLogDose={() => openQuickLog('dose')}
-                  onOpenSettings={() => navigation.navigate('DoseSettings')}
-                />
-              </Card>
-            </Reveal>
-          ) : null}
-
-          {/* dose history */}
-          <View onLayout={(e) => { doseHistoryY.current = e.nativeEvent.layout.y; }}>
-          <Reveal delay={360} style={{ marginTop: 12 }}>
-            <Card>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Icon name="history" size={18} color={theme.colors.textSecondary} />
-                <AppText variant="cardTitle" style={{ fontSize: 15 }}>
-                  Dose history
-                </AppText>
-              </View>
-              {doses.length > 0 ? (
-                doses.slice(0, 8).map((d, i) => (
-                  <View
-                    key={d.id}
-                    style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 11, borderBottomWidth: i < Math.min(doses.length, 8) - 1 ? 0.5 : 0, borderBottomColor: theme.colors.border }}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <AppText variant="bodyStrong" style={{ fontWeight: '700' }}>
-                        {compoundName(d.compoundId)} · {formatDoseAmount(d)}
-                      </AppText>
-                      <AppText variant="caption" color="textSecondary">
-                        {formatDoseRelative(d.datetime, new Date())}
-                        {d.injectionSite ? ` · ${siteLabel(d.injectionSite)}` : ''}
-                        {d.sideEffects && d.sideEffects.length > 0
-                          ? ` · ${d.sideEffects.map(sideEffectTypeLabel).join(', ')}`
-                          : ''}
-                      </AppText>
-                    </View>
-                    <Icon name="chevron-forward" size={16} color={theme.colors.textTertiary} />
-                  </View>
-                ))
-              ) : (
-                <AppText variant="body" color="textSecondary" style={{ marginTop: theme.spacing.md }}>
-                  No shots logged yet.
-                </AppText>
-              )}
-            </Card>
-          </Reveal>
-          </View>
 
           {/* Mix calculator — reconstitution is a vial-and-syringe task, so the
               front door is hidden entirely for an all-oral user. */}
@@ -485,6 +459,83 @@ export function TrackScreen() {
 // baseline, bezier smoothing over a step function, and the emphasised dot on
 // the LAST sample — six days into the future — beside a caption reading
 // "Current". MedicationLevelChart draws the same data with its time intact.
+// "Your log" — every kind of log the user recorded, grouped by day. Replaces
+// the doses-only "Dose history" that sat five cards down; see activityFeed.ts.
+const ACTIVITY_ICON: Record<ActivityKind, { name: string; bg: string; fg: string }> = {
+  dose: { name: 'needle', bg: '#EFEBFF', fg: '#6751E8' },
+  weight: { name: 'scale', bg: '#F2F3F5', fg: '#52525B' },
+  protein: { name: 'food-drumstick', bg: '#FFEDE0', fg: '#D2691E' },
+  water: { name: 'water', bg: '#E3F2FF', fg: '#2A8FD8' },
+  meal: { name: 'nutrition', bg: '#E8F8EE', fg: '#1E8E40' },
+  sideEffect: { name: 'alert-circle-outline', bg: '#FFF4E5', fg: '#B87514' },
+  activity: { name: 'pulse', bg: '#FFE9EC', fg: '#C2415A' },
+  measurement: { name: 'chart-line', bg: '#F2F3F5', fg: '#52525B' },
+};
+
+function ActivityFeedCard({ days }: { days: ActivityDay[] }) {
+  const theme = useTheme();
+  return (
+    <Card>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <Icon name="history" size={18} color={theme.colors.textSecondary} />
+        <AppText variant="cardTitle" style={{ fontSize: 15 }}>
+          Your log
+        </AppText>
+      </View>
+      {days.length === 0 ? (
+        <AppText variant="body" color="textSecondary" style={{ marginTop: theme.spacing.md }}>
+          Nothing logged yet.
+        </AppText>
+      ) : (
+        days.map((day) => (
+          <View key={day.date}>
+            <AppText
+              variant="sectionHeader"
+              color="textTertiary"
+              style={{ textTransform: 'uppercase', marginTop: theme.spacing.md }}
+            >
+              {day.label}
+            </AppText>
+            {day.entries.map((entry, index) => {
+              const icon = ACTIVITY_ICON[entry.kind];
+              return (
+                <View
+                  key={entry.id}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 11,
+                    paddingVertical: 11,
+                    borderBottomWidth: index < day.entries.length - 1 ? 0.5 : 0,
+                    borderBottomColor: theme.colors.border,
+                  }}
+                >
+                  <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: icon.bg, alignItems: 'center', justifyContent: 'center' }}>
+                    <Icon name={icon.name} size={16} color={icon.fg} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <AppText variant="bodyStrong" style={{ fontWeight: '700' }}>
+                      {entry.title}
+                    </AppText>
+                    {entry.detail ? (
+                      <AppText variant="caption" color="textSecondary" style={{ marginTop: 2 }}>
+                        {entry.detail}
+                      </AppText>
+                    ) : null}
+                  </View>
+                  <AppText variant="caption" color="textTertiary" style={{ fontWeight: '600' }}>
+                    {entryTime(entry.datetime)}
+                  </AppText>
+                </View>
+              );
+            })}
+          </View>
+        ))
+      )}
+    </Card>
+  );
+}
+
 function MedicationLevelCardContent({
   ml,
   compoundName,
