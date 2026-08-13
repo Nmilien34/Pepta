@@ -9,25 +9,22 @@ describe("planTrialReminder", () => {
     const plan = planTrialReminder({ expirationISO: inHours(72), isTrial: true, now: NOW });
     expect(plan).not.toBeNull();
     expect(plan!.fireAt.toISOString()).toBe(inHours(48));
-    expect(plan!.title).toBe("Your free trial ends tomorrow");
+    expect(plan!.title).toBe("Hope you’re enjoying Pepta");
   });
 
-  it("names the price they are about to be charged", () => {
-    const plan = planTrialReminder({
-      expirationISO: inHours(72),
-      isTrial: true,
-      priceString: "$9.99",
-      now: NOW,
-    });
-    expect(plan!.body).toContain("$9.99");
-    expect(plan!.body).toContain("cancel in Settings");
-  });
-
-  it("stays vague when it cannot say the price", () => {
-    // Better a soft reminder than a confident wrong number.
+  it("NAMES NO PRICE and offers no cancellation path", () => {
+    // The old copy did both and read as a churn prompt 24h before the charge.
+    // This is the whole point of the 2026-08-12 rewrite — if either creeps
+    // back in, it is a product decision, not an accident.
     const plan = planTrialReminder({ expirationISO: inHours(72), isTrial: true, now: NOW });
     expect(plan!.body).not.toContain("$");
-    expect(plan!.body).toContain("tomorrow");
+    expect(plan!.body).not.toMatch(/cancel|settings|renew|charge/i);
+  });
+
+  it("gives a reason to open the app", () => {
+    const plan = planTrialReminder({ expirationISO: inHours(72), isTrial: true, now: NOW });
+    expect(`${plan!.title} ${plan!.body}`).toMatch(/Pepta/);
+    expect(plan!.body.length).toBeGreaterThan(20);
   });
 
   it("schedules nothing when the purchase was not a trial", () => {
@@ -48,14 +45,12 @@ describe("planTrialReminder", () => {
     expect(planTrialReminder({ expirationISO: barelyLeft, isTrial: true, now: NOW })).toBeNull();
   });
 
-  it("halves a short trial instead of skipping it, and stops saying tomorrow", () => {
-    // A 6-hour trial cannot get 24 hours' notice. It gets 3 hours — and the
-    // copy must not promise "tomorrow" when it will fire the same day.
+  it("halves a short trial instead of skipping it", () => {
+    // A 6-hour trial cannot get 24 hours' lead. It lands at 3 hours. The copy
+    // no longer references timing at all, so it stays correct at any lead.
     const plan = planTrialReminder({ expirationISO: inHours(6), isTrial: true, now: NOW });
     expect(plan!.fireAt.toISOString()).toBe(inHours(3));
-    expect(plan!.title).toBe("Your free trial ends soon");
-    expect(plan!.body).toContain("soon");
-    expect(plan!.body).not.toContain("tomorrow");
+    expect(plan!.title).toBe("Hope you’re enjoying Pepta");
   });
 
   it("never schedules in the past", () => {

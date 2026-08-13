@@ -1,9 +1,18 @@
-// When to warn someone that their free trial is about to convert.
+// The day-2 touchpoint of a free trial.
 //
-// This exists because the paywall PROMISES it ("We'll remind you before it
-// ends"). A promise made to close a sale that the app then does not keep is
-// worse than not making it — the person finds out by being charged. If this
-// module is ever unwired, take the line off the paywall in the same change.
+// WHAT THIS IS NOT, as of 2026-08-12: it is no longer a price warning. The old
+// copy named the renewal price and pointed at Settings to cancel, which read as
+// a cancellation prompt 24h before the charge — we shipped a churn button and
+// called it a courtesy. Its job now is to bring someone back into the app while
+// their trial is still live, so the decision is made against what Pepta has
+// actually tracked for them rather than against a dollar figure.
+//
+// KNOWN TRADE-OFF (Nick's call, 2026-08-12): the paywall still says "we'll
+// remind you before it ends", and this message no longer says that. The promise
+// is deliberately carried by the paywall alone; the cost, if it shows up, is
+// refund requests and surprise-charge reviews rather than churn. If those start
+// appearing, the cheapest fix is one honest clause here — not deleting the
+// notification.
 //
 // Deliberately a local notification rather than a server push: it is scheduled
 // on the device the moment the purchase succeeds, so it does not depend on the
@@ -12,12 +21,12 @@
 //
 // Pure and RN-free.
 
-/** How far ahead of expiry we aim to warn. A full day to act on it. */
+/** How far ahead of expiry this lands. A full day of trial still to use. */
 export const TRIAL_REMINDER_LEAD_MS = 24 * 60 * 60 * 1000;
 
 /**
  * Below this, a notification is noise — it would land essentially with the
- * charge, which is the thing we said we would give warning about.
+ * charge, too late for the person to get anything out of the trial.
  */
 export const MIN_NOTICE_MS = 30 * 60 * 1000;
 
@@ -32,8 +41,6 @@ export interface PlanTrialReminderOptions {
   expirationISO: string | null | undefined;
   /** True only when this purchase actually started a free trial. */
   isTrial: boolean;
-  /** Price to name in the body, e.g. "$9.99". Omitted if unknown. */
-  priceString?: string | null;
   now?: Date;
 }
 
@@ -46,7 +53,6 @@ export interface PlanTrialReminderOptions {
 export function planTrialReminder({
   expirationISO,
   isTrial,
-  priceString,
   now = new Date(),
 }: PlanTrialReminderOptions): TrialReminderPlan | null {
   if (!isTrial || !expirationISO) return null;
@@ -62,18 +68,14 @@ export function planTrialReminder({
   const lead = Math.min(TRIAL_REMINDER_LEAD_MS, msLeft / 2);
   const fireAt = new Date(expiresAt.getTime() - lead);
 
-  // "Tomorrow" is only true on the full-day lead. On the halfway fallback the
-  // notification may land hours before expiry, so the copy has to say the
-  // vaguer, true thing rather than the crisper, wrong one.
-  const aDayAhead = lead === TRIAL_REMINDER_LEAD_MS;
-  const when = aDayAhead ? 'tomorrow' : 'soon';
-  const price = priceString?.trim();
-
+  // Warmth, and a reason to open the app — no price, no cancellation path.
+  // Deliberately generic: a local notification is composed HERE, at purchase
+  // time, and iOS fires exactly this text days later, so it cannot name what
+  // the user has logged since. Anything data-specific has to be re-composed on
+  // a later app foreground, not promised here.
   return {
     fireAt,
-    title: aDayAhead ? 'Your free trial ends tomorrow' : 'Your free trial ends soon',
-    body: price
-      ? `Heads up like I promised — Pepta renews at ${price} ${when}. Keep going, or cancel in Settings. No hard feelings either way.`
-      : `Heads up like I promised — your trial ends ${when}. Keep going, or cancel in Settings. No hard feelings either way.`,
+    title: 'Hope you’re enjoying Pepta',
+    body: 'Your levels, doses and protein are all tracked and running. Tap in and see where you’re at.',
   };
 }
