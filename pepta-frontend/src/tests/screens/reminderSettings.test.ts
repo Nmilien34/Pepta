@@ -12,6 +12,7 @@ function track(overrides: Partial<TrackResponse> = {}): TrackResponse {
     activityLogs: [],
     sideEffectLogs: [],
     measurements: [],
+  weightLogs: [],
     sectionErrors: {},
     ...overrides,
   };

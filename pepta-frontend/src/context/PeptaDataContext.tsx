@@ -170,6 +170,7 @@ function emptyTrackResponse(): TrackResponse {
     activityLogs: [],
     sideEffectLogs: [],
     measurements: [],
+    weightLogs: [],
     sectionErrors: {},
   };
 }

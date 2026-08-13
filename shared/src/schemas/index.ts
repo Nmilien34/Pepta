@@ -1096,6 +1096,13 @@ export const trackResponseSchema = z
     activityLogs: z.array(activityLogResponseSchema),
     sideEffectLogs: z.array(sideEffectLogResponseSchema),
     measurements: z.array(measurementResponseSchema),
+    // Added 2026-08-13 for Track's activity feed. Weight is one of the most
+    // logged things a GLP-1 user has and was the only kind missing here —
+    // Home only ever carried latestWeight, a single value, not a history.
+    // SAFE TO ADD: this schema is .strip(), so a client that predates the
+    // field drops it rather than failing. Optional with a default so a NEW
+    // client still parses an OLD backend's response during the deploy gap.
+    weightLogs: z.array(weightLogResponseSchema).default([]),
     sectionErrors: z.record(z.string()).default({}),
   })
   // Response schema: tolerate unknown/extra server fields (strip, not strict) so

@@ -52,6 +52,7 @@ export { RulerPicker, type RulerPickerProps } from "./RulerPicker";
 export { Slider, type SliderProps } from "./Slider";
 export { Confetti, type ConfettiProps } from "./Confetti";
 export { LogDoseCta, type LogDoseCtaProps } from "./LogDoseCta";
+export { MedicationLevelChart, type MedicationLevelChartProps } from "./MedicationLevelChart";
 export { ProgressRing, type ProgressRingProps } from "./ProgressRing";
 export { CountUp, type CountUpProps } from "./CountUp";
 export { DateWheel, type DateWheelProps } from "./DateWheel";

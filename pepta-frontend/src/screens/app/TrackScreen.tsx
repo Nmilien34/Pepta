@@ -9,7 +9,7 @@ import * as Haptics from 'expo-haptics';
 import { useNavigation, type NavigationProp } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../theme';
-import { AddCompoundSheet, AppText, BodyMap, Button, Card, Mascot, ProgressRing, Reveal, ScreenHeader, SectionErrorBanner, TrendLineChart } from '../../components';
+import { AddCompoundSheet, AppText, BodyMap, Button, Card, Mascot, ProgressRing, Reveal, MedicationLevelChart, ScreenHeader, SectionErrorBanner } from '../../components';
 import { WeekStrip } from '../../components/WeekStrip';
 import { ScheduleSheet } from '../../components/ScheduleSheet';
 import { usePeptaData } from '../../context/PeptaDataContext';
@@ -300,6 +300,14 @@ export function TrackScreen() {
                 <MedicationLevelCardContent
                   ml={ml}
                   compoundName={ml?.compoundName ?? compounds[0]?.name ?? 'Medication'}
+                  doseTimes={(track?.doseLogs ?? [])
+                    .filter((d) => d.deletedAt == null && (!ml || d.compoundId === ml.compoundId))
+                    .map((d) => ({ datetime: d.datetime }))}
+                  levelUnit={
+                    compounds.find((c) => c.id === ml?.compoundId)?.doseUnit ??
+                    compounds[0]?.doseUnit ??
+                    'mg'
+                  }
                   doseWord={doseNoun(
                     compounds.find((c) => c.id === ml?.compoundId)?.route ?? compounds[0]?.route,
                   )}
@@ -470,20 +478,18 @@ export function TrackScreen() {
   );
 }
 
-// Medication-level curve — rendered by react-native-chart-kit via the shared
-// TrendLineChart brand config. `levels` is the REAL pharmacokinetic curve from
-// the /home response (ml.curve), never placeholder data.
-function LevelChart({ levels, color }: { levels: number[]; color: string }) {
-  return (
-    <View style={{ marginTop: 12 }}>
-      <TrendLineChart values={levels} color={color} height={96} fillOpacity={0.1} showLastDot />
-    </View>
-  );
-}
-
+// Medication-level curve. The data was always real — ml.curve is the
+// pharmacokinetic series from /home — but until 2026-08-13 it was rendered as a
+// bare shape: chart-kit with every axis, label and gridline disabled, fed
+// curve.map(p => p.level) so each point's timestamp was discarded, no zero
+// baseline, bezier smoothing over a step function, and the emphasised dot on
+// the LAST sample — six days into the future — beside a caption reading
+// "Current". MedicationLevelChart draws the same data with its time intact.
 function MedicationLevelCardContent({
   ml,
   compoundName,
+  doseTimes,
+  levelUnit,
   doseWord,
   suppressed,
   onLogDose,
@@ -491,6 +497,9 @@ function MedicationLevelCardContent({
 }: {
   ml: NonNullable<ReturnType<typeof usePeptaData>['home']>['medicationLevels'][number] | null;
   compoundName: string;
+  /** Logged doses for THIS compound — each one marks a rise on the curve. */
+  doseTimes: { datetime: string }[];
+  levelUnit: string;
   /** This compound's own noun — the card is about one medication. */
   doseWord: string;
   /** Oral route or no half-life: the curve is suppressed, not pending. */
@@ -546,13 +555,17 @@ function MedicationLevelCardContent({
               </View>
             ))}
           </View>
-          <LevelChart levels={ml.curve.map((p) => p.level)} color={theme.colors.primary} />
+          {/* The whole curve, with its timestamps — not curve.map(p => p.level).
+              Dropping datetime is what turned a real time series into a shape:
+              no axis, no now-marker, and a dot on the LAST point, six days into
+              the future, beside a caption that read "Current". */}
+          <MedicationLevelChart curve={ml.curve} doses={doseTimes} unit={levelUnit} />
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
             <AppText variant="caption" color="textSecondary">
-              Current {ml.currentEstimate}
+              Peak {ml.peakEstimate}
             </AppText>
             <AppText variant="caption" color="textSecondary">
-              Peak {ml.peakEstimate} · Trough {ml.troughEstimate}
+              Trough {ml.troughEstimate}
             </AppText>
           </View>
         </>

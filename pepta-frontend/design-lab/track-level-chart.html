@@ -1,0 +1,241 @@
+<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pepta — Medication level chart, shipped vs practical (design)</title>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#FAFAFB;--surface:#FFF;--alt:#F3F4F7;--border:#E8E8EE;--hair:rgba(14,14,18,.08);
+    --tp:#0E0E12;--ts:#6B6B76;--tt:#A6A6B0;
+    --primary:#7C5CFC;--g1:#8B6CFF;--g2:#C77DFF;
+    --protein:#FF8A3D;--fiber:#34C759;--water:#2FA8FF;--weight:#E25CC4;--act:#FF6B4A;
+    --bodymap:#C9D2F2;--warning:#FFB020;--danger:#FF4D4F;
+    --cs:0 1px 1.5px rgba(16,16,24,.05),0 4px 12px rgba(16,16,24,.06);
+    --f:'Hanken Grotesk',-apple-system,system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:linear-gradient(180deg,#EDEEF2 0%,#E2E3E9 100%);background-attachment:fixed;font-family:var(--f);color:var(--tp);padding:48px 24px 96px;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  .lab-head{max-width:1320px;margin:0 auto 28px}
+  .lab-head h1{font-weight:800;font-size:30px;letter-spacing:-.6px}
+  .lab-head p{font-weight:500;font-size:15px;color:var(--ts);margin-top:6px}
+  .gallery{max-width:1320px;margin:0 auto;display:flex;flex-wrap:wrap;gap:40px;align-items:flex-start;justify-content:center}
+  .divider{flex-basis:100%;display:flex;align-items:center;gap:14px;margin:14px 0 2px}
+  .divider h2{font-weight:800;font-size:20px;letter-spacing:-.3px}
+  .divider .ln{flex:1;height:1px;background:rgba(14,14,18,.1)}
+  .divider .ct{font-weight:600;font-size:13px;color:var(--ts)}
+  .fw{display:flex;flex-direction:column;align-items:center;gap:12px}
+  .fl{font-weight:600;font-size:13px;color:#52525B}
+  /* device */
+  .device{width:344px;background:var(--bg);border-radius:54px;border:8px solid #0A0A0E;overflow:hidden;position:relative;box-shadow:0 0 0 1px rgba(0,0,0,.5),0 38px 64px -26px rgba(13,13,22,.5),0 14px 30px -14px rgba(13,13,22,.24)}
+  .device::before{content:"";position:absolute;top:12px;left:50%;transform:translateX(-50%);width:96px;height:25px;border-radius:999px;background:#0A0A0E;z-index:6}
+  .sb{display:flex;justify-content:space-between;align-items:center;padding:15px 24px 8px}
+  .sb .tt{font-weight:700;font-size:14px}
+  .sb .ri{display:flex;align-items:center;gap:6px;font-size:15px}
+  .scr{padding:6px 0 0}
+  .pad{padding:0 16px}
+  /* type */
+  .h1{font-weight:800;font-size:30px;line-height:34px;letter-spacing:-.6px}
+  .big{font-weight:800;font-size:26px;letter-spacing:-.6px;line-height:1}
+  .big2{font-weight:800;font-size:21px;letter-spacing:-.4px;line-height:1}
+  .unit{font-weight:700;font-size:15px;color:var(--ts)}
+  .nm{font-weight:700;font-size:15.5px;letter-spacing:-.1px}
+  .den{font-weight:500;font-size:13px;color:var(--tt)}
+  .lab{font-weight:500;font-size:12.5px;color:var(--ts)}
+  .sub{font-weight:500;font-size:14px;line-height:19px;color:var(--ts)}
+  .sec{font-weight:700;font-size:11px;letter-spacing:.8px;text-transform:uppercase;color:var(--tt)}
+  .link{color:var(--primary);font-weight:700;font-size:13px}
+  /* card */
+  .card{background:var(--surface);border-radius:20px;padding:16px;border:.5px solid var(--hair);box-shadow:var(--cs)}
+  .ch{display:flex;align-items:center;gap:8px}
+  .ch i.ic{font-size:18px}
+  .info{color:var(--tt);font-size:15px}
+  .row{display:flex;align-items:center}.bt{justify-content:space-between}
+  .pill{display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-radius:999px;font-weight:600;font-size:12px}
+  .state{font-weight:600;font-size:12px;color:var(--ts);background:var(--alt);padding:5px 11px;border-radius:999px}
+  /* logo + header */
+  .logo{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--g1),var(--g2));display:flex;align-items:center;justify-content:center;box-shadow:0 3px 8px rgba(124,92,252,.3)}
+  .logo i{color:#fff;font-size:18px}
+  .brandmark{width:34px;height:34px;border-radius:999px;background:#EFEBFF;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0}
+  .wm{font-weight:800;font-size:21px;letter-spacing:-.5px}
+  .today{display:inline-flex;align-items:center;gap:5px;padding:7px 11px;border-radius:999px;background:var(--surface);border:.5px solid var(--hair);box-shadow:var(--cs);font-weight:700;font-size:13px}
+  .streak{display:inline-flex;align-items:center;gap:3px;font-weight:800;font-size:15px}
+  .av{width:34px;height:34px;border-radius:999px;background:var(--alt);border:.5px solid var(--hair);display:flex;align-items:center;justify-content:center;overflow:hidden}
+  /* schedule additions (week strip · month sheet · rest band) */
+  .wks{display:flex;justify-content:space-between;margin-top:12px;padding-top:12px;border-top:.5px solid var(--hair)}
+  .wkd{flex:1;text-align:center}
+  .wkd .dw{font-weight:700;font-size:10px;color:var(--tt);margin-bottom:6px}
+  .wkd .dn{width:28px;height:28px;margin:0 auto;border-radius:9px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:var(--tp)}
+  .wkd.on .dn{background:var(--primary);color:#fff}
+  .wkd .dd{width:4.5px;height:4.5px;border-radius:99px;margin:4px auto 0;background:transparent}
+  .wkd .dd.due{background:var(--primary)} .wkd .dd.log{background:var(--fiber)}
+  .cal{display:grid;grid-template-columns:repeat(7,1fr)}
+  .cal .cdw{font-weight:700;font-size:9.5px;color:var(--tt);text-align:center;padding-bottom:7px}
+  .cd{position:relative;height:36px;display:flex;flex-direction:column;align-items:center;justify-content:center}
+  .cd span{font-weight:600;font-size:12.5px;color:var(--tp)}
+  .cd.out span{color:#D9D9E0}
+  .cd.now span{color:#fff;font-weight:700}
+  .cd.now:before{content:"";position:absolute;width:27px;height:27px;border-radius:9px;background:var(--primary);z-index:-1}
+  .cd.rest{background:rgba(52,199,89,.09)}
+  .cd.rest.rs{border-radius:10px 0 0 10px}.cd.rest.re{border-radius:0 10px 10px 0}
+  .cd .dd{width:4.5px;height:4.5px;border-radius:99px;margin-top:1px}
+  /* Bottom padding is 34px, not 18: the shipped BottomSheet wraps its content in
+     SafeAreaView edges={['bottom']}, so the home-indicator inset sits beneath the
+     last row. At 18px the "Cycle · 8 wk on, 2 off" row read as jammed against the
+     screen edge — the mockup was under-representing the sheet, not a design call. */
+  .dsheet{position:absolute;left:0;right:0;bottom:0;background:var(--surface);border-radius:22px 22px 0 0;padding:14px 16px 34px;box-shadow:0 -14px 40px rgba(16,16,24,.16);z-index:5}
+  .dgrab{width:34px;height:4px;border-radius:99px;background:#E4E4EA;margin:0 auto 12px}
+  .dim{position:absolute;inset:0;background:rgba(14,14,18,.32);z-index:4}
+  /* segments / steppers / bars */
+  .seg{height:6px;border-radius:999px;flex:1;background:#E9E9EE}.seg.on{background:linear-gradient(90deg,var(--g1),var(--g2))}
+  .stepper{display:flex;align-items:center;justify-content:space-between;background:var(--alt);border-radius:999px;padding:4px}
+  .sbtn{width:30px;height:30px;border-radius:999px;background:var(--surface);border:.5px solid var(--hair);display:flex;align-items:center;justify-content:center;box-shadow:0 1px 2px rgba(17,17,26,.05)}
+  .sbtn i{font-size:16px}
+  .sv{font-weight:700;font-size:13px}
+  .pbar{height:7px;border-radius:999px;background:var(--alt);overflow:hidden}
+  .mb{width:7px;border-radius:4px;background:#E9E5FA}.mb.on{background:var(--primary)}
+  .ringwrap{position:relative;display:flex;align-items:center;justify-content:center}
+  .ringtxt{position:absolute;display:flex;flex-direction:column;align-items:center}
+  .grid{display:flex;gap:12px;margin-top:12px}.col{flex:1;display:flex;flex-direction:column;gap:12px}
+  .mt6{margin-top:6px}.mt8{margin-top:8px}.mt10{margin-top:10px}.mt12{margin-top:12px}.mt14{margin-top:14px}.mt16{margin-top:16px}.mt20{margin-top:20px}.mt24{margin-top:24px}
+  .logchip{display:inline-flex;align-items:center;gap:5px;background:var(--alt);border-radius:999px;padding:5px 10px;font-weight:600;font-size:12px}
+  /* segmented control */
+  .segctl{display:inline-flex;background:var(--alt);border-radius:999px;padding:3px;gap:2px}
+  .segctl span{padding:5px 11px;border-radius:999px;font-weight:700;font-size:12px;color:var(--ts)}
+  .segctl span.on{background:var(--surface);color:var(--tp);box-shadow:0 1px 2px rgba(17,17,26,.06)}
+  /* list rows (settings) */
+  .lrow{display:flex;align-items:center;gap:12px;padding:13px 4px;border-bottom:.5px solid var(--hair)}
+  .lrow:last-child{border-bottom:none}
+  .lic{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+  /* tab bar */
+  .tabbar{margin-top:14px;background:var(--surface);border-top:.5px solid var(--hair);display:flex;align-items:flex-start;justify-content:space-between;padding:11px 24px 24px}
+  .tab{display:flex;flex-direction:column;align-items:center;gap:4px;width:44px;color:var(--tt)}
+  .tab i{font-size:22px}.tab span{font-size:10px;font-weight:600}.tab.on{color:var(--primary)}
+  .fw2{width:44px;display:flex;justify-content:center}
+  .fab{width:52px;height:52px;border-radius:16px;background:linear-gradient(135deg,var(--g1),var(--g2));display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:0 7px 16px rgba(124,92,252,.34);border:4px solid var(--surface);margin-top:-8px}
+  .fab i{font-size:23px}
+  /* body map dots */
+  .dot-used{fill:var(--primary)}
+  .dot-free{fill:#fff;stroke:#B7C0E6;stroke-width:2}
+  .dot-next{fill:#fff;stroke:var(--primary);stroke-width:2.5}
+  /* ===================== ONBOARDING ===================== */
+  .ob{min-height:600px;display:flex;flex-direction:column;padding:14px 18px 20px}
+  .obtop{display:flex;align-items:center;gap:11px;margin-bottom:18px}
+  .obbar{flex:1;height:6px;border-radius:999px;background:var(--alt);overflow:hidden}
+  .obfill{height:100%;background:var(--tp);border-radius:999px}
+  .back{font-size:21px;color:var(--ts)}
+  .spc{flex:1}
+  .obh{font-weight:800;font-size:24px;line-height:28px;letter-spacing:-.45px}
+  .obh.lg{font-size:28px;line-height:32px}
+  .opt{display:flex;align-items:center;gap:13px;padding:15px;border-radius:18px;background:var(--alt);border:2px solid transparent}
+  .opt.sel{background:var(--surface);border-color:var(--tp);box-shadow:var(--cs)}
+  .opt i.oi{font-size:22px;flex-shrink:0;width:26px;text-align:center}
+  .opt .ol{flex:1}
+  .chk{width:24px;height:24px;border-radius:999px;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;color:transparent;font-size:12px;flex-shrink:0}
+  .chk.on{background:var(--tp);border-color:var(--tp);color:#fff}
+  .chip{padding:11px 16px;border-radius:999px;background:var(--alt);border:2px solid transparent;font-weight:600;font-size:14px;display:inline-flex;gap:6px;align-items:center}
+  .chip.sel{background:var(--surface);border-color:var(--tp);box-shadow:var(--cs)}
+  .field{display:flex;align-items:center;justify-content:space-between;background:var(--alt);border-radius:16px;padding:15px}
+  .obbtn{height:54px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;color:#fff;background:linear-gradient(135deg,var(--g1),var(--g2));box-shadow:0 8px 18px rgba(124,92,252,.3)}
+  .authbtn{height:54px;border-radius:999px;display:flex;align-items:center;justify-content:center;gap:9px;font-weight:700;font-size:16px}
+  .authbtn i{font-size:21px}
+  .authbtn.apple{background:#0E0E12;color:#fff}
+  .authbtn.google{background:var(--surface);color:var(--tp);border:1px solid var(--border)}
+  .mascot{display:flex;justify-content:center}
+  .wheel{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:8px 0}
+  .wrow{font-weight:700;font-size:17px;color:var(--tt)}
+  .wrow.sel{font-weight:800;font-size:23px;color:var(--tp)}
+  .wrow.d1{opacity:.45}.wrow.d2{opacity:.22}
+  .band{position:absolute;top:50%;left:0;right:0;transform:translateY(-50%);height:42px;background:var(--alt);border-radius:13px;z-index:-1}
+  .toggle{display:inline-flex;background:var(--alt);border-radius:999px;padding:3px}
+  .toggle span{padding:7px 16px;border-radius:999px;font-weight:700;font-size:13px;color:var(--ts)}
+  .toggle span.on{background:var(--surface);color:var(--tp);box-shadow:0 1px 2px rgba(17,17,26,.06)}
+  .ptrack{position:relative;height:8px;background:var(--alt);border-radius:999px;margin-top:14px}
+  .pfill{position:absolute;left:0;height:8px;border-radius:999px;background:linear-gradient(90deg,var(--g1),var(--g2))}
+  .pthumb{position:absolute;top:-8px;width:24px;height:24px;border-radius:999px;background:var(--surface);box-shadow:var(--cs);border:2px solid var(--primary)}
+  .estchip{display:inline-flex;align-items:center;gap:6px;background:#EFEBFF;color:#5B45C9;font-weight:700;font-size:13px;padding:7px 13px;border-radius:999px}
+  .stat{background:var(--alt);border-radius:16px;padding:13px}
+  .statv{font-weight:800;font-size:19px;letter-spacing:-.3px;line-height:1;margin-top:7px}
+  .confetti i{position:absolute;border-radius:2px}
+  .lchk{display:flex;align-items:center;gap:10px;padding:10px 0}
+  .lchk .b{width:22px;height:22px;border-radius:999px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .olrow{display:flex;align-items:center;gap:12px;padding:15px;border-radius:16px;background:var(--alt)}
+  .olic{width:34px;height:34px;border-radius:10px;background:var(--surface);display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
+</style><style>
+  svg.tin{width:1em;height:1em;vertical-align:-.125em;flex:none}
+  body{padding:26px 16px 60px}
+  .cmp{display:flex;gap:34px;justify-content:center;align-items:flex-start;flex-wrap:wrap}
+  .device{width:344px}
+</style></head><body>
+<div class="cmp"><div class="fw"><div class="fl">Medication level · today</div>
+  <div class="device" style="border-radius:34px"><div class="scr" style="padding:14px 0">
+    <div class="pad">
+      <div class="card">
+        <div class="row bt"><div class="ch"><svg class="tin" style="color:var(--primary);font-size:18px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19h16M4 15l4-5 4 3 5-7"/></svg><span class="nm">Medication level</span></div>
+          <span class="pill" style="background:var(--alt);color:var(--primary);font-weight:800">68% &rsaquo;</span></div>
+        <div class="segctl mt12"><span class="on">7d</span><span>30d</span><span>90d</span><span>1y</span></div>
+        <svg viewBox="0 0 300 100" class="mt12" style="width:100%;height:96px">
+          <path d="M0 70 C40 64 60 30 98 26 C140 22 152 58 192 62 C232 66 256 38 300 30 L300 96 L0 96 Z" fill="#7C5CFC" fill-opacity=".10"/>
+          <path d="M0 70 C40 64 60 30 98 26 C140 22 152 58 192 62 C232 66 256 38 300 30" fill="none" stroke="#7C5CFC" stroke-width="3" stroke-linecap="round"/>
+          <circle cx="300" cy="30" r="4.5" fill="#7C5CFC" stroke="#fff" stroke-width="2.5"/>
+        </svg>
+        <div class="row bt mt8"><span class="lab">Current 1.42</span><span class="lab">Peak 2.1 · Trough 0.9</span></div>
+      </div>
+    </div>
+  </div></div>
+  <div class="lab mt8" style="max-width:322px">As shipped. No axis values, no dates, no now-marker — the shape is decorative, so you cannot read a number off it or tell past from projected. The 7d/30d/90d/1y control is a <span style="color:var(--tp)">View</span>, not a Pressable: no onPress, no state, <span style="color:var(--tp)">i === 0</span> hardcoded. It does nothing, and the backend only serves ±7 days anyway.</div>
+</div><div class="fw"><div class="fl">Medication level · practical <span style="color:var(--primary)">(proposed)</span></div>
+  <div class="device" style="border-radius:34px"><div class="scr" style="padding:14px 0">
+    <div class="pad">
+      <div class="card">
+        <div class="row bt"><div class="ch"><svg class="tin" style="color:var(--primary);font-size:18px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19h16M4 15l4-5 4 3 5-7"/></svg><span class="nm">Medication level</span></div>
+          <span class="pill" style="background:var(--alt);color:var(--primary);font-weight:800">Settings &rsaquo;</span></div>
+        <div class="segctl mt12"><span class="on">Week</span><span>Month</span><span>90 days</span><span>All</span></div>
+
+        <div style="margin-top:14px">
+          <div style="font-weight:800;font-size:23px;letter-spacing:-.5px;line-height:1">0.31<span class="unit" style="font-size:13px"> mg</span></div>
+          <div class="lab" style="margin-top:3px">Right now · Wed, Aug 13 at 2:00 PM</div>
+        </div>
+
+        <svg viewBox="0 0 320 116" class="mt12" style="width:100%;height:122px">
+          <!-- gridlines + right-hand scale, so a value is readable -->
+          <g stroke="#E8E8EE" stroke-width="1" stroke-dasharray="3 4">
+            <line x1="0" y1="16" x2="272" y2="16"/><line x1="0" y1="34" x2="272" y2="34"/>
+            <line x1="0" y1="52" x2="272" y2="52"/><line x1="0" y1="70" x2="272" y2="70"/>
+          </g>
+          <line x1="0" y1="88" x2="272" y2="88" stroke="#DDDDE4" stroke-width="1"/>
+          <g font-family="'Hanken Grotesk'" font-size="9" font-weight="600" fill="#A6A6B0">
+            <text x="278" y="19">0.4</text><text x="278" y="37">0.3</text>
+            <text x="278" y="55">0.2</text><text x="278" y="73">0.1</text><text x="278" y="91">0</text>
+          </g>
+
+          <!-- PAST: solid, computed from doses actually logged -->
+          <path d="M0 56 C22 62 50 67 78 70 L78 20 C96 24 116 31 136 38 L136 88 L0 88 Z" fill="#7C5CFC" fill-opacity=".13"/>
+          <path d="M0 56 C22 62 50 67 78 70 L78 20 C96 24 116 31 136 38" fill="none" stroke="#7C5CFC" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+          <!-- FUTURE: dashed + lighter fill, projected from the schedule -->
+          <path d="M136 38 C158 46 190 56 214 62 L214 22 C232 27 252 34 272 40 L272 88 L136 88 Z" fill="#7C5CFC" fill-opacity=".06"/>
+          <path d="M136 38 C158 46 190 56 214 62 L214 22 C232 27 252 34 272 40" fill="none" stroke="#7C5CFC" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="5 4" opacity=".75"/>
+
+          <!-- dose markers, so the spikes are explained -->
+          <g fill="#7C5CFC"><circle cx="78" cy="20" r="2.6"/><circle cx="214" cy="22" r="2.6" opacity=".5"/></g>
+
+          <!-- now -->
+          <line x1="136" y1="10" x2="136" y2="88" stroke="#7C5CFC" stroke-width="1.5" stroke-dasharray="2 3" opacity=".55"/>
+          <circle cx="136" cy="38" r="5" fill="#7C5CFC" stroke="#fff" stroke-width="2.5"/>
+
+          <g font-family="'Hanken Grotesk'" font-size="9" font-weight="600" fill="#A6A6B0" text-anchor="middle">
+            <text x="6" y="104">Aug 6</text><text x="78" y="104">Aug 10</text>
+            <text x="136" y="104" fill="#7C5CFC" font-weight="800">Today</text>
+            <text x="214" y="104">Aug 17</text><text x="266" y="104">Aug 20</text>
+          </g>
+        </svg>
+
+        <div class="row bt mt8" style="padding-top:9px;border-top:.5px solid var(--hair)">
+          <span class="lab"><span style="display:inline-block;width:14px;height:2.5px;background:#7C5CFC;vertical-align:3px;border-radius:2px"></span> Logged</span>
+          <span class="lab"><span style="display:inline-block;width:14px;height:2.5px;background:repeating-linear-gradient(90deg,#7C5CFC 0 5px,transparent 5px 9px);vertical-align:3px;opacity:.75"></span> Projected</span>
+          <span class="lab">Peak 0.45 · Trough 0.08</span>
+        </div>
+      </div>
+    </div>
+  </div></div>
+  <div class="lab mt8" style="max-width:322px">Same purple, readable chart. Four additions, each answering a question the shipped one cannot: <b style="color:var(--tp)">a right-hand scale + gridlines</b> (how much?), <b style="color:var(--tp)">dated x-axis</b> (when?), <b style="color:var(--tp)">a now line, dot and headline value</b> (where am I?), and <b style="color:var(--tp)">solid past vs dashed future</b> (what is measured vs guessed?). Small dots mark the doses that cause each rise.<br><br>That last one is where this goes further than Shotsy, whose entire line is dashed: the left of the marker is computed from doses you actually logged, the right is a projection from your schedule. Drawing them the same way would let a projection pass as history.<br><br><b style="color:var(--tp)">Not free:</b> the range control needs real wiring and a backend window parameter — today it is decorative and only ±7 days of curve exists, so Month/90 days/All have nothing behind them.</div>
+</div></div>
+</body></html>

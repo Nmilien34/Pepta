@@ -1,0 +1,305 @@
+<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pepta — Track: the whole screen, before and after (design)</title>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   Pepta — TRACK, FULL SCREEN REORDER (2026-08-13).
+
+   Every card that is on Track today, drawn in full, in both
+   orders. Nothing here is invented: each block is the shipped
+   content from TrackScreen.tsx, so the comparison is honest about
+   what actually moves.
+
+   WHAT MOVES: exactly one thing. "Dose history" (today's card #5)
+   becomes "Your log" (card #2), directly under the next-dose card,
+   and widens from doses-only to every kind of log. Everything else
+   keeps its relative order and simply shifts down one slot.
+
+   WHY ONLY ONE MOVE: the rest of the screen is already ordered by
+   how often it is needed — countdown, then what you take, then
+   where you put it, then the curve, then tools. Rearranging more
+   would be churn. The complaint was that the thing you just did is
+   the hardest thing to see, and that is fixed by one promotion.
+
+   Fidelity sources (design-from-shipped-components rule):
+   · next dose   = TrackScreen.tsx:137-206 — sectionHeader label,
+                   statBig countdown, ProgressRing 74, WeekStrip
+   · compounds   = :208-264 — 34px rounded chip, name + dose ·
+                   half-life, green Active pill, "+ Add"
+   · sites       = :266-294 — BodyMap, Used/Next legend, History
+   · level       = :296-312 — MedicationLevelCardContent
+   · history     = :314-352 — the row idiom this feed inherits
+   · mix/library = :354-400 — row cards, chevron-forward
+   · side effect = :401+   — warning icon, bodyStrong + caption
+   · tokens      = theme/colors.ts, Hanken Grotesk
+
+   ⚠ Weight rows are dashed: trackResponseSchema has no weightLogs
+   yet. Safe to add (.strip()), unlike homeResponseSchema (.strict()).
+   ============================================================ */
+:root{
+  --primary:#7C5CFC; --gradStart:#6751E8;
+  --bg:#FAFAFB; --surface:#FFFFFF; --surfaceAlt:#F2F3F5;
+  --border:#ECECEF; --text:#0E0E12; --text2:#6B6B76; --text3:#A1A1AC;
+  --tint:#F1EDFF; --green:#1E8E40; --greenBg:#E8F8EE; --warn:#F0B429;
+}
+*{box-sizing:border-box}
+body{margin:0;background:#E9E9EE;font-family:'Hanken Grotesk',system-ui,sans-serif;color:var(--text);
+  padding:28px 18px 60px;-webkit-font-smoothing:antialiased}
+h1{font-size:19px;font-weight:800;letter-spacing:-.3px;margin:0 0 4px;text-align:center}
+.sub{font-size:13px;color:var(--text2);text-align:center;margin:0 0 18px;line-height:18px}
+.gap{max-width:680px;margin:0 auto 22px;padding:10px 14px;border-radius:13px;background:#FFF4E8;
+  font-size:12.5px;line-height:18px;color:#7A4A12}
+.stage{display:flex;gap:30px;justify-content:center;align-items:flex-start;flex-wrap:wrap}
+.col{width:352px}
+.label{font-size:12px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;margin:0 0 10px;text-align:center}
+.label.before{color:#9A9AA4}
+.label.after{color:var(--gradStart)}
+.phone{background:var(--bg);border-radius:34px;padding:0 0 14px;box-shadow:0 22px 58px rgba(17,17,26,.17);overflow:hidden}
+.nav{padding:16px 18px 10px;background:var(--bg)}
+.nav h2{margin:0;font-size:26px;font-weight:800;letter-spacing:-.5px}
+.scroll{padding:0 13px}
+
+.card{background:var(--surface);border-radius:24px;padding:16px;box-shadow:0 8px 24px rgba(17,17,26,.06);margin-top:11px}
+.slot{position:relative}
+.num{position:absolute;left:-9px;top:-9px;width:24px;height:24px;border-radius:9999px;background:var(--text);color:#fff;
+  font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;z-index:3;
+  box-shadow:0 2px 6px rgba(0,0,0,.2)}
+.num.hot{background:var(--gradStart)}
+.secHead{font-size:12px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--text3)}
+.hd{display:flex;align-items:center;justify-content:space-between}
+.hl{display:flex;align-items:center;gap:8px}
+.ct{font-size:15px;font-weight:700;letter-spacing:-.2px}
+.link{font-size:13px;font-weight:700;color:var(--primary)}
+.big{font-size:30px;line-height:34px;font-weight:800;letter-spacing:-.5px;margin-top:8px}
+.cap{font-size:12.5px;line-height:17px;color:var(--text2);margin-top:6px}
+.ring{width:74px;height:74px;border-radius:9999px;flex:none;
+  background:conic-gradient(var(--primary) 0 62%, #EFEBFF 62% 100%);display:flex;align-items:center;justify-content:center}
+.ring i{width:58px;height:58px;border-radius:9999px;background:var(--surface);display:flex;align-items:center;
+  justify-content:center;font-size:12.5px;font-weight:700;color:var(--primary);font-style:normal}
+.strip{display:flex;justify-content:space-between;margin-top:14px}
+.day{width:38px;text-align:center}
+.day span{display:block;font-size:11px;font-weight:700;color:var(--text3);margin-bottom:6px}
+.dot{width:34px;height:34px;border-radius:12px;background:var(--surfaceAlt);display:flex;align-items:center;
+  justify-content:center;font-size:13px;font-weight:700;color:var(--text2)}
+.dot.done{background:var(--tint);color:var(--gradStart)}
+.dot.due{background:var(--primary);color:#fff}
+.pill{background:var(--greenBg);color:var(--green);font-size:12px;font-weight:700;padding:4px 10px;border-radius:9999px}
+.pill.cyc{background:#EFEBFF;color:var(--primary)}
+
+.row{display:flex;align-items:center;gap:11px;padding:11px 0;border-bottom:.5px solid var(--border)}
+.row:last-child{border-bottom:0}
+.ico{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex:none}
+.rowMain{flex:1;min-width:0}
+.rowTitle{font-size:15px;font-weight:700;letter-spacing:-.1px}
+.rowSub{font-size:12.5px;line-height:17px;color:var(--text2);margin-top:2px}
+.time{font-size:12px;color:var(--text3);font-weight:600;flex:none}
+.dayHead{font-size:11.5px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--text3);margin:14px 0 0}
+.dashed{border:1px dashed #C9A227;border-radius:12px;padding:2px 8px;margin:6px 0;background:#FFFCF2}
+
+.bodymap{height:104px;border-radius:14px;background:var(--surfaceAlt);display:flex;align-items:center;justify-content:center;
+  margin-top:12px;color:var(--text3);font-size:12px;font-weight:600}
+.legend{display:flex;justify-content:center;gap:16px;margin-top:11px;padding-top:8px;border-top:.5px solid var(--border);
+  font-size:12px;color:var(--text2);font-weight:600}
+.curve{height:74px;margin-top:12px;display:flex;align-items:flex-end;gap:5px}
+.curve i{flex:1;border-radius:4px;background:#E7E1FF;display:block}
+.rowcard{display:flex;align-items:center;justify-content:space-between}
+.muted{opacity:.42}
+.moved{outline:2px dashed var(--gradStart);outline-offset:5px;border-radius:26px}
+.tag{position:absolute;right:-6px;top:-10px;background:var(--gradStart);color:#fff;font-size:10.5px;font-weight:800;
+  padding:3px 9px;border-radius:9999px;letter-spacing:.3px;z-index:3}
+.tabs{display:flex;justify-content:space-around;align-items:center;padding:10px 8px 0;margin-top:12px;
+  border-top:.5px solid var(--border);background:rgba(255,255,255,.9)}
+.tab{font-size:10.5px;font-weight:700;color:var(--text3);text-align:center}
+.tab.on{color:var(--primary)}
+</style></head><body>
+
+<h1>Track — the whole screen, before and after</h1>
+<p class="sub">Every card that exists today, in both orders. <b>One thing moves:</b> history goes from slot 5 to slot 2 and widens to every log.<br>Everything else keeps its order and shifts down one.</p>
+
+<p class="gap"><b>Weight rows are dashed</b> because <code>trackResponseSchema</code> carries no <code>weightLogs</code> — doses, meals, water, protein, activity, side effects and measurements only. Safe to add (the schema is <code>.strip()</code>, so old clients drop unknown fields); the same addition to Home would not be, since <code>homeResponseSchema</code> is <code>.strict()</code>.</p>
+
+<div class="stage">
+
+<!-- ==================== BEFORE ==================== -->
+<div class="col">
+  <p class="label before">Before — history is card 5</p>
+  <div class="phone">
+    <div class="nav"><h2>Track</h2></div>
+    <div class="scroll">
+
+      <div class="slot"><span class="num">1</span>
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div>
+            <div style="display:flex;align-items:center;gap:7px">
+              <span class="secHead">Next dose</span><span class="pill cyc">Wk 3 of 8</span>
+            </div>
+            <div class="big">2d 4h</div>
+            <div class="cap">Zepbound · Mon, Aug 17 at 9:00 AM</div>
+          </div>
+          <div class="ring"><i>62%</i></div>
+        </div>
+        <div class="strip">
+          <div class="day"><span>S</span><div class="dot">10</div></div>
+          <div class="day"><span>M</span><div class="dot done">11</div></div>
+          <div class="day"><span>T</span><div class="dot">12</div></div>
+          <div class="day"><span>W</span><div class="dot due">13</div></div>
+          <div class="day"><span>T</span><div class="dot">14</div></div>
+          <div class="day"><span>F</span><div class="dot">15</div></div>
+          <div class="day"><span>S</span><div class="dot">16</div></div>
+        </div>
+      </div></div>
+
+      <div class="slot"><span class="num">2</span>
+      <div class="card">
+        <div class="hd"><span class="secHead">Compounds</span><span class="link">+ Add</span></div>
+        <div class="row"><span class="ico" style="background:#EFEBFF">💉</span>
+          <div class="rowMain"><div class="rowTitle">Zepbound</div><div class="rowSub">5 mg · half-life 5d</div></div>
+          <span class="pill">Active</span></div>
+        <div class="row"><span class="ico" style="background:#E1F5EE">🧪</span>
+          <div class="rowMain"><div class="rowTitle">Research peptide</div><div class="rowSub">mg · half-life 7d</div></div>
+          <span class="pill">Active</span></div>
+      </div></div>
+
+      <div class="slot"><span class="num">3</span>
+      <div class="card">
+        <div class="hd"><div class="hl"><span>📍</span><span class="ct">Injection sites</span></div><span class="link">History</span></div>
+        <div class="bodymap">body map</div>
+        <div class="legend"><span>● Used</span><span>○ Next: Thigh — left</span></div>
+      </div></div>
+
+      <div class="slot"><span class="num">4</span>
+      <div class="card">
+        <div class="hd"><div class="hl"><span>📈</span><span class="ct">Medication Level</span></div><span class="pill" style="background:var(--surfaceAlt);color:var(--text2)">Peaking</span></div>
+        <div style="font-size:29px;font-weight:800;letter-spacing:-.5px;color:var(--primary);margin-top:10px">2.48<span style="font-size:13px;color:var(--text2);margin-left:4px">mg</span></div>
+        <div class="curve"><i style="height:16px"></i><i style="height:26px"></i><i style="height:38px"></i><i style="height:52px"></i><i style="height:64px"></i><i style="height:72px"></i><i style="height:58px;background:#7C5CFC"></i></div>
+      </div></div>
+
+      <div class="slot moved"><span class="num hot">5</span><span class="tag">HARD TO REACH</span>
+      <div class="card">
+        <div class="hl"><span>🕘</span><span class="ct">Dose history</span></div>
+        <div class="row" style="margin-top:4px"><div class="rowMain"><div class="rowTitle">Zepbound · 5 mg</div>
+          <div class="rowSub">Today, 9:04 AM · Stomach — upper left</div></div><span>›</span></div>
+        <div class="row"><div class="rowMain"><div class="rowTitle">Zepbound · 5 mg</div>
+          <div class="rowSub">Mon, Aug 11 · Thigh — right</div></div><span>›</span></div>
+      </div></div>
+
+      <div class="slot muted"><span class="num">6</span>
+      <div class="card"><div class="rowcard"><div class="hl"><span>⚗️</span><span class="ct">Mix calculator</span></div><span>›</span></div></div></div>
+
+      <div class="slot muted"><span class="num">7</span>
+      <div class="card"><div class="rowcard"><div class="hl"><span>📚</span><span class="ct">Peptide library</span></div><span>›</span></div></div></div>
+
+      <div class="slot muted"><span class="num">8</span>
+      <div class="card"><div class="hl"><span>⚠️</span><span class="ct">Side effects</span></div>
+        <div class="row" style="margin-top:4px"><div class="rowMain"><div class="rowTitle">Nausea</div><div class="rowSub">Yesterday · mild</div></div></div>
+      </div></div>
+
+    </div>
+    <div class="tabs"><span class="tab">Home</span><span class="tab on">Track</span><span class="tab">＋</span><span class="tab">Progress</span><span class="tab">Account</span></div>
+  </div>
+  <p style="font-size:12px;color:var(--text2);line-height:17px;margin:11px 4px 0">
+    Log a shot, open Track, and the confirmation is <b>four cards down</b>. The card is also doses-only — weight, protein, water and side effects never appear on the screen whose job is history.</p>
+</div>
+
+<!-- ==================== AFTER ==================== -->
+<div class="col">
+  <p class="label after">After — history is card 2, and it holds everything</p>
+  <div class="phone">
+    <div class="nav"><h2>Track</h2></div>
+    <div class="scroll">
+
+      <div class="slot"><span class="num">1</span>
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div>
+            <div style="display:flex;align-items:center;gap:7px">
+              <span class="secHead">Next dose</span><span class="pill cyc">Wk 3 of 8</span>
+            </div>
+            <div class="big">2d 4h</div>
+            <div class="cap">Zepbound · Mon, Aug 17 at 9:00 AM</div>
+          </div>
+          <div class="ring"><i>62%</i></div>
+        </div>
+        <div class="strip">
+          <div class="day"><span>S</span><div class="dot">10</div></div>
+          <div class="day"><span>M</span><div class="dot done">11</div></div>
+          <div class="day"><span>T</span><div class="dot">12</div></div>
+          <div class="day"><span>W</span><div class="dot due">13</div></div>
+          <div class="day"><span>T</span><div class="dot">14</div></div>
+          <div class="day"><span>F</span><div class="dot">15</div></div>
+          <div class="day"><span>S</span><div class="dot">16</div></div>
+        </div>
+      </div></div>
+
+      <div class="slot moved"><span class="num hot">2</span><span class="tag">MOVED + WIDENED</span>
+      <div class="card">
+        <div class="hd"><div class="hl"><span>🕘</span><span class="ct">Your log</span></div><span class="link">See all</span></div>
+
+        <p class="dayHead">Today</p>
+        <div class="row"><span class="ico" style="background:#F1EDFF">💉</span>
+          <div class="rowMain"><div class="rowTitle">Zepbound · 5 mg</div><div class="rowSub">Stomach — upper left</div></div>
+          <span class="time">9:04 AM</span></div>
+        <div class="dashed"><div class="row" style="border:0;padding:7px 0"><span class="ico" style="background:#FFF6DA">⚖️</span>
+          <div class="rowMain"><div class="rowTitle">230 lb</div><div class="rowSub">Down 1.2 lb this week</div></div>
+          <span class="time">7:20 AM</span></div></div>
+        <div class="row"><span class="ico" style="background:#FFEDE0">🥩</span>
+          <div class="rowMain"><div class="rowTitle">42 g protein</div><div class="rowSub">Of 140 g today</div></div>
+          <span class="time">8:15 AM</span></div>
+
+        <p class="dayHead">Yesterday</p>
+        <div class="row"><span class="ico" style="background:#E4F6EA">🌊</span>
+          <div class="rowMain"><div class="rowTitle">Nausea · mild</div><div class="rowSub">2 days after your dose</div></div>
+          <span class="time">6:40 PM</span></div>
+        <div class="row"><span class="ico" style="background:#E3F2FF">💧</span>
+          <div class="rowMain"><div class="rowTitle">64 oz water</div><div class="rowSub">Of 100 oz</div></div>
+          <span class="time">All day</span></div>
+      </div></div>
+
+      <div class="slot"><span class="num">3</span>
+      <div class="card">
+        <div class="hd"><span class="secHead">Compounds</span><span class="link">+ Add</span></div>
+        <div class="row"><span class="ico" style="background:#EFEBFF">💉</span>
+          <div class="rowMain"><div class="rowTitle">Zepbound</div><div class="rowSub">5 mg · half-life 5d</div></div>
+          <span class="pill">Active</span></div>
+        <div class="row"><span class="ico" style="background:#E1F5EE">🧪</span>
+          <div class="rowMain"><div class="rowTitle">Research peptide</div><div class="rowSub">mg · half-life 7d</div></div>
+          <span class="pill">Active</span></div>
+      </div></div>
+
+      <div class="slot"><span class="num">4</span>
+      <div class="card">
+        <div class="hd"><div class="hl"><span>📍</span><span class="ct">Injection sites</span></div><span class="link">History</span></div>
+        <div class="bodymap">body map</div>
+        <div class="legend"><span>● Used</span><span>○ Next: Thigh — left</span></div>
+      </div></div>
+
+      <div class="slot"><span class="num">5</span>
+      <div class="card">
+        <div class="hd"><div class="hl"><span>📈</span><span class="ct">Medication Level</span></div><span class="pill" style="background:var(--surfaceAlt);color:var(--text2)">Peaking</span></div>
+        <div style="font-size:29px;font-weight:800;letter-spacing:-.5px;color:var(--primary);margin-top:10px">2.48<span style="font-size:13px;color:var(--text2);margin-left:4px">mg</span></div>
+        <div class="curve"><i style="height:16px"></i><i style="height:26px"></i><i style="height:38px"></i><i style="height:52px"></i><i style="height:64px"></i><i style="height:72px"></i><i style="height:58px;background:#7C5CFC"></i></div>
+      </div></div>
+
+      <div class="slot muted"><span class="num">6</span>
+      <div class="card"><div class="rowcard"><div class="hl"><span>⚗️</span><span class="ct">Mix calculator</span></div><span>›</span></div></div></div>
+
+      <div class="slot muted"><span class="num">7</span>
+      <div class="card"><div class="rowcard"><div class="hl"><span>📚</span><span class="ct">Peptide library</span></div><span>›</span></div></div></div>
+
+      <div class="slot muted"><span class="num">8</span>
+      <div class="card"><div class="hl"><span>⚠️</span><span class="ct">Side effects</span></div>
+        <div class="row" style="margin-top:4px"><div class="rowMain"><div class="rowTitle">Nausea</div><div class="rowSub">Yesterday · mild</div></div></div>
+      </div></div>
+
+    </div>
+    <div class="tabs"><span class="tab">Home</span><span class="tab on">Track</span><span class="tab">＋</span><span class="tab">Progress</span><span class="tab">Account</span></div>
+  </div>
+  <p style="font-size:12px;color:var(--text2);line-height:17px;margin:11px 4px 0">
+    The thing you just did is the second thing you see. Cards 3–8 keep their order and shift down one; nothing else is redesigned.
+    <br><br><b>Open question:</b> side effects (card 8) now appear twice — once in the feed, once in their own card. Worth deciding whether that card survives.</p>
+</div>
+
+</div>
+</body></html>

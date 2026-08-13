@@ -7,6 +7,7 @@ import {
   proteinLogService,
   sideEffectLogService,
   waterLogService,
+  weightLogService,
 } from './logs.service';
 
 function errorMessage(error: unknown): string {
@@ -22,6 +23,10 @@ export async function getTrack(userId: string, query?: LogListQuery) {
     activityLogService.list(userId, query),
     sideEffectLogService.list(userId, query),
     measurementService.list(userId, query),
+    // Weight joins Track for the activity feed. Home only ever carried
+    // latestWeight — a single value, not a history — so a feed of "everything
+    // you logged" could not include the thing users log most after doses.
+    weightLogService.list(userId, query),
   ]);
   const sectionErrors: Record<string, string> = {};
   const names = [
@@ -32,6 +37,7 @@ export async function getTrack(userId: string, query?: LogListQuery) {
     'activityLogs',
     'sideEffectLogs',
     'measurements',
+    'weightLogs',
   ] as const;
 
   for (const [index, result] of entries.entries()) {
@@ -48,6 +54,7 @@ export async function getTrack(userId: string, query?: LogListQuery) {
     activityLogs: entries[4]!.status === 'fulfilled' ? entries[4]!.value : [],
     sideEffectLogs: entries[5]!.status === 'fulfilled' ? entries[5]!.value : [],
     measurements: entries[6]!.status === 'fulfilled' ? entries[6]!.value : [],
+    weightLogs: entries[7]!.status === 'fulfilled' ? entries[7]!.value : [],
     sectionErrors,
   });
 }

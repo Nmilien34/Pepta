@@ -123,6 +123,7 @@ describe("trackWithAddedSideEffect", () => {
         },
       ],
       measurements: [],
+    weightLogs: [],
       sectionErrors: {},
     } as TrackResponse;
 

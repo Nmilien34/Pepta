@@ -122,6 +122,7 @@ function track(overrides: Partial<TrackResponse> = {}): TrackResponse {
       },
     ],
     measurements: [],
+    weightLogs: [],
     sectionErrors: {},
     ...overrides,
   };
