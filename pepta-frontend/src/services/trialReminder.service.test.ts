@@ -53,7 +53,7 @@ describe("scheduleTrialEndReminder", () => {
     const plan = await scheduleTrialEndReminder(
       info({ expirationDate: inHours(72), periodType: "TRIAL" }),
       "pro",
-      { priceString: "$9.99", adapter: a, now: NOW },
+      { adapter: a, now: NOW },
     );
     expect(plan).not.toBeNull();
     const call = a.scheduleNotificationAsync.mock.calls[0]?.[0];
@@ -61,7 +61,7 @@ describe("scheduleTrialEndReminder", () => {
     if (!call) return;
     expect(call.identifier).toBe(TRIAL_REMINDER_ID);
     expect(call.trigger).toEqual({ type: "date", date: new Date(inHours(48)) });
-    expect(call.content.body).toContain("$9.99");
+    expect(call.content.body).not.toContain("$");
   });
 
   it("clears any previous reminder before scheduling, so restores do not stack", async () => {

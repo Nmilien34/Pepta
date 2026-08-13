@@ -307,15 +307,11 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
     setCompleting(true);
     try {
       const result = await revenueCat.purchasePlan(auth.user.id, plan);
-      // Keep the paywall's promise. No-ops when this was not a trial, and
-      // never throws — see scheduleTrialEndReminder. The renewal price in the
-      // reminder is the PURCHASED plan's own billed price ("$40.00" for a
-      // yearly trial), never a monthly value leaking through.
-      const purchasedPackage =
-        plan === "yearly" ? paywallPackages?.yearly : paywallPackages?.monthly;
-      await scheduleTrialEndReminder(result.customerInfo, REVENUECAT_ENTITLEMENT_ID, {
-        priceString: purchasedPackage?.product.priceString ?? null,
-      });
+      // Day-2 touchpoint: brings them back into the app while the trial is
+      // still live. No-ops when this was not a trial, and never throws — see
+      // scheduleTrialEndReminder. Deliberately carries no price and no
+      // cancellation path (2026-08-12); see trialReminder.ts for the trade-off.
+      await scheduleTrialEndReminder(result.customerInfo, REVENUECAT_ENTITLEMENT_ID);
       if (!result.entitlementActive) {
         setFailed(true);
         setMessage(

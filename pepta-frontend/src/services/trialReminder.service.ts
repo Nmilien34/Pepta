@@ -54,7 +54,6 @@ export function isTrialPeriod(periodType: string | null | undefined): boolean {
 export function trialPlanFor(
   customerInfo: TrialCustomerInfo,
   entitlementId: string,
-  priceString?: string | null,
   now?: Date,
 ): TrialReminderPlan | null {
   // Defensive all the way down. This runs in the purchase flow, on an object
@@ -66,7 +65,6 @@ export function trialPlanFor(
   return planTrialReminder({
     expirationISO: entitlement.expirationDate ?? null,
     isTrial: isTrialPeriod(entitlement.periodType),
-    priceString,
     now,
   });
 }
@@ -82,7 +80,6 @@ export async function scheduleTrialEndReminder(
   customerInfo: TrialCustomerInfo,
   entitlementId: string,
   options: {
-    priceString?: string | null;
     adapter?: TrialReminderAdapter;
     now?: Date;
   } = {},
@@ -91,7 +88,7 @@ export async function scheduleTrialEndReminder(
 
   let plan: TrialReminderPlan | null;
   try {
-    plan = trialPlanFor(customerInfo, entitlementId, options.priceString, options.now);
+    plan = trialPlanFor(customerInfo, entitlementId, options.now);
   } catch {
     return null;
   }
