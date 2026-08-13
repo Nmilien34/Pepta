@@ -675,6 +675,35 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
     return () => subscription.remove();
   }, [userId, refreshOutboxCount, runReplay]);
 
+  // FOREGROUND DRAIN. The two triggers above are sign-in and
+  // background→active, so a log that queued while the user was sitting in the
+  // app had nothing to retry it: the queue stayed put, and the header kept
+  // claiming the log was waiting for connectivity that was there the whole
+  // time. A single slow request (the 15s timeout counts) could strand a log
+  // until the user happened to leave the app and come back.
+  //
+  // Backoff, not a poll: 5s, then doubling to a 60s ceiling, and only while
+  // something is actually queued. Any new queued log re-runs this effect and
+  // resets the delay, so the common case retries quickly.
+  useEffect(() => {
+    if (!userId || pendingLogs === 0) return undefined;
+    let cancelled = false;
+    let delayMs = 5_000;
+    let timer: ReturnType<typeof setTimeout>;
+    const tick = () => {
+      void runReplay().finally(() => {
+        if (cancelled) return;
+        delayMs = Math.min(delayMs * 2, 60_000);
+        timer = setTimeout(tick, delayMs);
+      });
+    };
+    timer = setTimeout(tick, delayMs);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [userId, pendingLogs, runReplay]);
+
   // ── Durable last-known snapshot (per user) ────────────────────────────
   // The cache the app never had: Home/Track/Progress lived only in React
   // memory, so every cold start and every re-login began with a spinner even

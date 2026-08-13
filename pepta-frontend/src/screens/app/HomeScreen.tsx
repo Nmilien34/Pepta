@@ -172,7 +172,11 @@ export function HomeScreen() {
                 </AppText>
                 {pendingLogs > 0 ? (
                   <AppText variant="caption" style={{ fontSize: 10, fontWeight: '700', color: '#B58500' }}>
-                    {pendingLogs === 1 ? '1 log saving — will sync when online' : `${pendingLogs} logs saving — will sync when online`}
+                    {/* NOT "when online": the app never checks connectivity.
+                        A log queues on a 5xx, a 15s timeout, or a real network
+                        drop alike, so naming the user's connection diagnoses a
+                        cause we did not measure — usually ours. */}
+                    {pendingLogs === 1 ? '1 log saved on this device — retrying' : `${pendingLogs} logs saved on this device — retrying`}
                   </AppText>
                 ) : lastSyncedAt ? (
                   <AppText variant="caption" color="textTertiary" style={{ fontSize: 10 }}>

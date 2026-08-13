@@ -19,6 +19,32 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * The server ACCEPTED the write (2xx) but we could not read its reply.
+ *
+ * Almost always a response shape this build predates — shipped clients bundle
+ * strict zod schemas, so a widened field parses fine on a new build and throws
+ * on an old one. The distinction matters because the write already landed: a
+ * caller that treats this as a failure tells the user their log did not save
+ * while the record sits on the server, and queues a retry to fix a problem
+ * that does not exist.
+ *
+ * Deliberately NOT an ApiError: ApiError means the server reported a problem.
+ * Here the server reported success and the client is the one that stumbled.
+ */
+export class ResponseParseError extends Error {
+  public readonly parseCause: unknown;
+
+  constructor(
+    public readonly status: number,
+    parseCause?: unknown,
+  ) {
+    super("The server saved this, but its reply could not be read.");
+    this.name = "ResponseParseError";
+    this.parseCause = parseCause;
+  }
+}
+
 function statusToCode(status: number): string {
   switch (status) {
     case 400:
@@ -46,6 +72,10 @@ function statusToCode(status: number): string {
 export function extractApiError(error: unknown): { code: string; message: string } {
   if (error instanceof ApiError) {
     return { code: error.code ?? statusToCode(error.status), message: error.message };
+  }
+  if (error instanceof ResponseParseError) {
+    // NOT serviceUnavailable — the service was available and did the work.
+    return { code: ERROR_CODES.internal, message: error.message };
   }
   if (error instanceof Error) {
     if (error.name === "AbortError") {

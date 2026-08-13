@@ -30,7 +30,7 @@ vi.mock("./api", () => ({
   },
 }));
 
-import { ApiError } from "./apiError";
+import { ApiError, ResponseParseError } from "./apiError";
 import {
   isRetryable,
   makeIdempotencyKey,
@@ -57,6 +57,33 @@ describe("classification", () => {
     expect(isRetryable(serverDown())).toBe(true);
     expect(isRetryable(rejected())).toBe(false);
     expect(isRetryable(new ApiError(401, "UNAUTHORIZED", "no"))).toBe(false);
+  });
+});
+
+describe("a 2xx we could not read is a SAVED log, not a queued one", () => {
+  // The server accepted the write; only the reply was unreadable — almost
+  // always a response shape this build predates. Treating it as a failure told
+  // the user their log had not synced while the record sat on the server.
+  it("is not retryable", () => {
+    expect(isRetryable(new ResponseParseError(200))).toBe(false);
+  });
+
+  it("resolves saved and queues nothing", async () => {
+    mocks.createProteinLog.mockRejectedValueOnce(new ResponseParseError(201));
+    await expect(saveLogDurably("u1", "protein", { grams: 20 })).resolves.toBe("saved");
+    expect(await outboxCount("u1")).toBe(0);
+  });
+
+  it("never surfaces as an error to the caller", async () => {
+    // Throwing here would show a save failure for a log that did save.
+    mocks.createProteinLog.mockRejectedValueOnce(new ResponseParseError(200));
+    await expect(saveLogDurably("u1", "protein", { grams: 5 })).resolves.toBeDefined();
+  });
+
+  it("is still distinct from a 5xx, which DOES queue", async () => {
+    mocks.createProteinLog.mockRejectedValueOnce(serverDown());
+    await expect(saveLogDurably("u1", "protein", { grams: 9 })).resolves.toBe("queued");
+    expect(await outboxCount("u1")).toBe(1);
   });
 });
 

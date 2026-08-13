@@ -136,7 +136,7 @@ import {
 } from "@pepta/shared";
 import { z } from "zod";
 import { API_BASE_URL } from "../config";
-import { ApiError } from "./apiError";
+import { ApiError, ResponseParseError } from "./apiError";
 import type { FoodSearchResult } from "../screens/app/mealLog";
 import type { CompanionNote } from "../screens/app/companionNotes";
 
@@ -260,9 +260,18 @@ class PeptaApi {
       await this.failFromResponse(response); // throws an ApiError
     }
 
-    const json = (await response.json()) as unknown;
-    const envelope = z.object({ data: z.unknown() }).parse(json);
-    return schema.parse(envelope.data);
+    // PAST THIS POINT THE WRITE HAS LANDED. The status was 2xx, so anything
+    // that throws below is us failing to read a reply the server already
+    // acted on — usually a response shape this build predates. Callers must
+    // be able to tell that apart from "the request never arrived", or they
+    // report a saved log as unsaved and queue a pointless retry.
+    try {
+      const json = (await response.json()) as unknown;
+      const envelope = z.object({ data: z.unknown() }).parse(json);
+      return schema.parse(envelope.data);
+    } catch (error) {
+      throw new ResponseParseError(response.status, error);
+    }
   }
 
   private async fetchNoContent(

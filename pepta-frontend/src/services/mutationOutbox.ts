@@ -24,7 +24,7 @@
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { api } from "./api";
-import { ApiError } from "./apiError";
+import { ApiError, ResponseParseError } from "./apiError";
 
 export type OutboxKind =
   | "dose"
@@ -85,6 +85,10 @@ export function parseOutbox(raw: string | null): OutboxEntry[] {
  * (no HTTP status ever arrived) or the server itself failed. A 4xx is final.
  */
 export function isRetryable(error: unknown): boolean {
+  // The server ACCEPTED the write and we merely failed to read its reply.
+  // Nothing to retry — the record exists. Checked first because this is the
+  // one failure that is not a failure.
+  if (error instanceof ResponseParseError) return false;
   if (error instanceof ApiError) return error.status >= 500;
   // No ApiError means the request never got a response: network, timeout, DNS.
   return true;
@@ -143,6 +147,11 @@ export async function saveLogDurably(
     await CALLS[kind](body);
     return "saved";
   } catch (error) {
+    // A 2xx whose body we could not parse IS a successful write. Queuing it
+    // would tell the user their log had not synced while it sat on the server,
+    // and the replay would then lean on the idempotency key to undo our own
+    // confusion. Report it as what it is.
+    if (error instanceof ResponseParseError) return "saved";
     if (!isRetryable(error)) throw error;
     const entries = await readEntries(userId);
     entries.push({
