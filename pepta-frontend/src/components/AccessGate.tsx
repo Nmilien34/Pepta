@@ -11,6 +11,7 @@ import { useTheme } from '../theme';
 import { MainTabs } from '../navigation/MainTabs';
 import { AppUpdateGate } from './AppUpdateGate';
 import { ReminderRefreshGate } from './ReminderRefreshGate';
+import { TrialReminderRefreshGate } from './TrialReminderRefreshGate';
 import { OnboardingNavigator } from '../screens/onboarding/OnboardingNavigator';
 import { PaywallScreen } from '../screens/onboarding/PaywallScreen';
 import { hasPurchaseGrace } from '../services/purchaseGrace';
@@ -46,6 +47,10 @@ export function AccessGate() {
       {/* Same placement rule as AppUpdateGate: onboarded shell only, so a
           mid-funnel user's notifications are never touched. */}
       <ReminderRefreshGate />
+      {/* Trial notifications are LOCAL — their text was frozen when the
+          purchase completed, so a copy fix cannot reach anyone already in
+          trial. This re-composes them from current code on launch. */}
+      <TrialReminderRefreshGate />
     </NavigationContainer>
   ) : (
     <OnboardingNavigator />

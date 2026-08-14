@@ -34,6 +34,10 @@ vi.mock("./AppUpdateGate", () => ({
 vi.mock("./ReminderRefreshGate", () => ({
   ReminderRefreshGate: () => React.createElement("ReminderRefreshGate"),
 }));
+// Headless and SDK-dependent (RevenueCat); its own suite covers behavior.
+vi.mock("./TrialReminderRefreshGate", () => ({
+  TrialReminderRefreshGate: () => React.createElement("TrialReminderRefreshGate"),
+}));
 vi.mock("@react-navigation/native", () => ({
   NavigationContainer: ({ children }: { children?: React.ReactNode }) =>
     React.createElement("NavigationContainer", null, children),
@@ -111,6 +115,20 @@ describe("AccessGate", () => {
     mocks.auth.user = { id: "user-1", onboardingComplete: false };
     mocks.access.decision = ACTIVE;
     expect(surface(render())).toBe("OnboardingNavigator");
+  });
+
+  it("re-composes trial notifications in the onboarded shell only", () => {
+    // The gate cancels and re-schedules real notifications. Running it
+    // mid-funnel would touch the queue of someone who has not finished
+    // onboarding — the same placement rule AppUpdateGate follows.
+    const has = (tree: TestRenderer.ReactTestRenderer) =>
+      tree.root.findAll((n) => String(n.type) === "TrialReminderRefreshGate").length > 0;
+
+    mocks.access.decision = ACTIVE;
+    expect(has(render())).toBe(true);
+
+    mocks.auth.user = { onboardingComplete: false };
+    expect(has(render())).toBe(false);
   });
 
   it("provisioning → setup screen, not paywall", () => {
