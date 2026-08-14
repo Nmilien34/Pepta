@@ -60,6 +60,10 @@ vi.mock("../theme/typography", () => ({
 vi.mock("./ReminderRefreshGate", () => ({
   ReminderRefreshGate: () => React.createElement("ReminderRefreshGate"),
 }));
+// Headless sibling in the same shell; covered by trialReminderRefresh.test.
+vi.mock("./TrialReminderRefreshGate", () => ({
+  TrialReminderRefreshGate: () => React.createElement("TrialReminderRefreshGate"),
+}));
 vi.mock("../navigation/MainTabs", () => ({ MainTabs: () => React.createElement("MainTabs") }));
 vi.mock("../screens/onboarding/OnboardingNavigator", () => ({
   OnboardingNavigator: () => React.createElement("OnboardingNavigator"),

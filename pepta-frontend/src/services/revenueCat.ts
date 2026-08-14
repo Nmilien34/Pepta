@@ -50,6 +50,7 @@ interface RevenueCatSdk {
     productIdentifiers: string[],
   ): Promise<Record<string, { status: number }>>;
   restorePurchases(): Promise<CustomerInfo>;
+  getCustomerInfo(): Promise<CustomerInfo>;
   setEmail?(email: string): Promise<void>;
   setDisplayName?(displayName: string): Promise<void>;
   collectDeviceIdentifiers?(): Promise<void>;
@@ -350,6 +351,26 @@ export function createRevenueCatClient(options: RevenueCatClientOptions) {
     };
   }
 
+  /**
+   * The CURRENT entitlement state, without purchasing or restoring.
+   *
+   * Read-only on purpose: `restore()` is the other way to obtain fresh
+   * customerInfo, and it has side effects (it can transfer a subscription
+   * between app user ids). This exists so the trial-reminder re-schedule can
+   * ask "when does their trial actually end?" on launch without touching
+   * anything. Returns null rather than throwing when RevenueCat is not
+   * configured or the lookup fails — the caller must be able to tell "no
+   * answer" from "no trial".
+   */
+  async function getCustomerInfo(): Promise<CustomerInfo | null> {
+    if (!isAvailable() || !configured) return null;
+    try {
+      return await sdk.getCustomerInfo();
+    } catch {
+      return null;
+    }
+  }
+
   async function reset(): Promise<void> {
     if (!configured || !currentUserId) return;
     await sdk.logOut();
@@ -365,6 +386,7 @@ export function createRevenueCatClient(options: RevenueCatClientOptions) {
     getPaywallPackages,
     purchasePlan,
     restore,
+    getCustomerInfo,
     reset,
   };
 }
