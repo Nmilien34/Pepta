@@ -5,7 +5,9 @@ import {
   DEFAULT_COMPANION_NAME,
   companionNameForSave,
   isValidCompanionName,
-  randomCompanionName,
+  surpriseCompanionName,
+  SURPRISE_POOL,
+  COMPANION_CHIP_NAMES,
   resolveCompanionName,
 } from './companion';
 
@@ -58,16 +60,46 @@ describe('isValidCompanionName', () => {
   });
 });
 
-describe('randomCompanionName', () => {
-  it('never returns the name already showing', () => {
-    for (const roll of [0, 0.25, 0.5, 0.75, 0.999]) {
-      expect(randomCompanionName('Sushi', roll)).not.toBe('Sushi');
+describe('surpriseCompanionName', () => {
+  it('never hands back a name already on screen as a chip', () => {
+    for (const roll of [0, 0.25, 0.5, 0.75, 0.999, 1]) {
+      const picked = surpriseCompanionName('Pep', new Set(), roll);
+      expect(COMPANION_CHIP_NAMES as readonly string[]).not.toContain(picked);
+      expect(SURPRISE_POOL).toContain(picked);
     }
   });
 
-  it('always returns a real preset and stays in range at roll = 1', () => {
-    expect(COMPANION_NAME_PRESETS).toContain(randomCompanionName('Pep', 0.999));
-    expect(COMPANION_NAME_PRESETS).toContain(randomCompanionName('Pep', 1));
+  it('never repeats the current pick', () => {
+    for (const roll of [0, 0.4, 0.999]) {
+      expect(surpriseCompanionName('Waffle', new Set(), roll)).not.toBe('Waffle');
+    }
+  });
+
+  it('walks the whole pool before repeating anything', () => {
+    // The point of the bag: rolling repeatedly meets every name once. With
+    // replacement you get Waffle, Waffle, Bean and it reads as a bug.
+    const seen = new Set<string>();
+    let current = 'Pep';
+    for (let i = 0; i < SURPRISE_POOL.length; i += 1) {
+      const picked = surpriseCompanionName(current, seen, 0);
+      expect(seen.has(picked)).toBe(false);
+      seen.add(picked);
+      current = picked;
+    }
+    expect(seen.size).toBe(SURPRISE_POOL.length);
+  });
+
+  it('refills once the bag is empty rather than giving up', () => {
+    const everything = new Set(SURPRISE_POOL);
+    const picked = surpriseCompanionName('Pep', everything, 0.5);
+    expect(SURPRISE_POOL).toContain(picked);
+  });
+
+  it('still refuses the current name when the bag refills', () => {
+    const everything = new Set(SURPRISE_POOL);
+    for (const roll of [0, 0.5, 0.999]) {
+      expect(surpriseCompanionName('Bean', everything, roll)).not.toBe('Bean');
+    }
   });
 });
 

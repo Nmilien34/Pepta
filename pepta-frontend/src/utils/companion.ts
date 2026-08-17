@@ -59,9 +59,37 @@ export function companionNameForSave(raw: string): string | undefined {
   return trimmed;
 }
 
-/** A preset that is not the current pick — for the "Surprise me" die. */
-export function randomCompanionName(current: string, roll = Math.random()): string {
-  const options = COMPANION_NAME_PRESETS.filter((n) => n !== current.trim());
+/** The six offered as chips. The rest are what "Surprise me" reveals. */
+export const COMPANION_CHIP_NAMES = ['Pep', 'Ollie', 'Ivy', 'Otto', 'Gus', 'Pip'] as const;
+
+/**
+ * What the die can land on: everything NOT already on screen. Rolling a name
+ * the user can see is not a surprise, it is a shorter way to tap a chip.
+ */
+export const SURPRISE_POOL: readonly string[] = COMPANION_NAME_PRESETS.filter(
+  (n) => !(COMPANION_CHIP_NAMES as readonly string[]).includes(n),
+);
+
+/**
+ * The die, as a shuffle bag rather than a coin.
+ *
+ * Sampling with replacement is what makes a "random" button feel broken: roll
+ * three times and you see Waffle, Waffle, Bean, and it reads as a bug rather
+ * than a shuffle. Excluding what has already come up means every roll shows
+ * something new until the pool is exhausted, and only then does it refill —
+ * so a user rolling repeatedly meets the whole cast before anything repeats.
+ *
+ * Pure: `seen` and `roll` are passed in, so the sequence is fully testable.
+ */
+export function surpriseCompanionName(
+  current: string,
+  seen: ReadonlySet<string> = new Set(),
+  roll = Math.random(),
+): string {
+  const currentName = current.trim();
+  const fresh = SURPRISE_POOL.filter((n) => n !== currentName && !seen.has(n));
+  // Bag empty: refill, still never handing back what is already shown.
+  const options = fresh.length > 0 ? fresh : SURPRISE_POOL.filter((n) => n !== currentName);
   if (options.length === 0) return DEFAULT_COMPANION_NAME;
   const index = Math.min(options.length - 1, Math.floor(roll * options.length));
   return options[index]!;
