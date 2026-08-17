@@ -293,6 +293,8 @@ const styles = StyleSheet.create({
     color: convo.ink,
     textAlign: 'center',
     marginTop: 14,
+    maxWidth: 276,
+    alignSelf: 'center',
   },
   subline: {
     fontFamily: typography.fonts.medium,
@@ -360,8 +362,10 @@ const styles = StyleSheet.create({
     lineHeight: 15,
     color: convo.faint,
     textAlign: 'center',
-    paddingHorizontal: 4,
+    paddingHorizontal: 2,
     paddingTop: 12,
+    maxWidth: 276,
+    alignSelf: 'center',
   },
   legalLink: {
     fontFamily: typography.fonts.semiBold,
