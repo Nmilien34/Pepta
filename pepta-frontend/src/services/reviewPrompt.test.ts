@@ -16,8 +16,14 @@ const deps = (over: Partial<RequestReviewDeps> = {}): RequestReviewDeps => ({
 
 describe('reviewAskDecision', () => {
   it('asks on an earned milestone', () => {
-    expect(reviewAskDecision({ milestoneKey: 'streak_7', alreadyAsked: false, available: true }))
-      .toBe('ask');
+    for (const key of ['streak_3', 'streak_7', 'streak_30']) {
+      expect(reviewAskDecision({ milestoneKey: key, alreadyAsked: false, available: true }))
+        .toBe('ask');
+    }
+  });
+
+  it('rides the 3-day streak, because most installs never reach day 7', () => {
+    expect(REVIEW_WORTHY_MILESTONES).toContain('streak_3');
   });
 
   it('never asks twice on one install', () => {

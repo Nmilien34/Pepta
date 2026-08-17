@@ -19,8 +19,17 @@
 // `setup_unlocked` fires on day one for finishing a checklist and is
 // explicitly NOT review-worthy — nothing has been proven yet.
 
-/** Milestones that represent real, sustained use. Order-independent. */
-export const REVIEW_WORTHY_MILESTONES: readonly string[] = ['streak_7', 'streak_30'];
+/**
+ * Milestones that represent real use. Order-independent.
+ *
+ * streak_3 is the trigger that matters. Gating on streak_7 was correct in
+ * principle and useless in practice: day-7 retention is low enough that most
+ * installs would never reach the ask at all, so the cap went unspent rather
+ * than being spent badly. Three consecutive days of logging is still a real
+ * habit and nothing like the removed onboarding turn, which asked before the
+ * user had opened the tracker once.
+ */
+export const REVIEW_WORTHY_MILESTONES: readonly string[] = ['streak_3', 'streak_7', 'streak_30'];
 
 export interface ReviewAskInput {
   /** The milestone that just fired, or null when none did. */

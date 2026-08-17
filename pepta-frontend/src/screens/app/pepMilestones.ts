@@ -47,6 +47,15 @@ export const PEP_MILESTONES: readonly PepMilestone[] = [
     when: (f) => f.setupUnlocked,
   },
   {
+    // Three days is where the habit either takes or does not. It is also the
+    // first mark most people ever reach, which is why the review ask rides
+    // this one rather than streak_7 — see services/reviewPrompt.
+    key: 'streak_3',
+    line: 'Three days in a row. That’s the part most people never get past.',
+    emoji: '✨',
+    when: (f) => f.streakDays >= 3,
+  },
+  {
     key: 'streak_7',
     line: 'Seven days straight. That’s a real streak now.',
     emoji: '🔥',

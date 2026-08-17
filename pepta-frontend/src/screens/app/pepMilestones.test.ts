@@ -30,7 +30,12 @@ describe('dueMilestone', () => {
       order.push(due.key);
       seen.add(due.key);
     }
-    expect(order).toEqual(['setup_unlocked', 'streak_7', 'streak_30']);
+    expect(order).toEqual(['setup_unlocked', 'streak_3', 'streak_7', 'streak_30']);
+  });
+
+  it('celebrates three days — the mark most installs actually reach', () => {
+    const due = dueMilestone(facts({ setupUnlocked: true, streakDays: 3 }), new Set(['setup_unlocked']));
+    expect(due?.key).toBe('streak_3');
   });
 
   it('never re-fires a seen milestone', () => {
