@@ -12,6 +12,12 @@
 //
 // GIVE, NEVER GATE. There is no input here. The only action is forward, and
 // the copy never implies the user owes anything for the fact.
+//
+// VOICE. The line that does the work is "most of them quietly" — it names why
+// the number does not match the feeling. A user starting a GLP-1 often has not
+// told anyone, so "millions are on this road with you" reads as a statistic
+// they cannot see. Explaining the gap is what makes the fact land as comfort
+// rather than trivia. "Hi." went with the carousel: they have already arrived.
 
 import React, { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -42,8 +48,8 @@ export function NotAloneScreen({ progress, onBack, onContinue }: NotAloneScreenP
     <ConvoScreen
       progress={progress}
       onBack={onBack}
-      context="Hi. Before anything else, one thing."
-      question="You’re not doing this alone."
+      context="One thing before we start."
+      question="You’re not the only one doing this."
       onTyped={() => setTyped(true)}
       footer={<ConvoButton label="Let’s go" onPress={onContinue} />}
     >
@@ -55,7 +61,7 @@ export function NotAloneScreen({ progress, onBack, onContinue }: NotAloneScreenP
           <CitedStat
             land
             value="1 in 8"
-            line="American adults has taken a GLP-1. Millions are on this exact road with you."
+            line="American adults has taken a GLP-1. Most of them quietly — which is exactly why it can feel like just you."
             cite="KFF Health Tracking Poll, May 2024"
           />
           <View style={styles.faces}>
