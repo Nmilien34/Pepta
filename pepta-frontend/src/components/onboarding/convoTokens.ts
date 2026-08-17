@@ -5,7 +5,10 @@
 // values (dim = 50% ink echo, hairlines) that nothing else in the app uses.
 
 export const convo = {
-  ground: "#FCFBFE",
+  // Same value as theme.colors.bg — one ground for the whole app. Was
+  // #FCFBFE, a cool near-white that shifted temperature the moment
+  // onboarding handed off to Home.
+  ground: "#F7F5F2",
   ink: "#17141F",
   // The previous answer echoes at full type scale, dimmed to 50% — clearly a
   // "recall" under the full-ink live question, but still legible over the ground

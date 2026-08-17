@@ -461,15 +461,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: "row", alignItems: "center", gap: 16, paddingHorizontal: 22, paddingTop: 12, paddingBottom: 8 },
   track: { flex: 1, height: 3, borderRadius: 1.5, backgroundColor: convo.hairline },
   fill: { height: 3, borderRadius: 1.5, backgroundColor: convo.primary },
-  body: {
-    paddingHorizontal: 28,
-    paddingTop: 36,
-    paddingBottom: 30,
-    flexGrow: 1,
-    width: '100%',
-    maxWidth: 328,
-    alignSelf: 'center',
-  },
+  body: { paddingHorizontal: 28, paddingTop: 36, paddingBottom: 30, flexGrow: 1 },
   context: {
     fontFamily: typography.fonts.bold,
     fontSize: 29,

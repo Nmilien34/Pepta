@@ -43,7 +43,9 @@ interface SemanticColors {
 }
 
 const lightColors: SemanticColors = {
-  bg: "#FAFAFB",
+  // The warm ground from the redesign. Shared with convo.ground so the
+  // handoff out of onboarding carries no temperature shift.
+  bg: "#F7F5F2",
   surface: "#FFFFFF",
   surfaceAlt: "#F2F3F5",
   border: "#ECECEF",
