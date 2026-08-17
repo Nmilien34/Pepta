@@ -202,6 +202,9 @@ const styles = StyleSheet.create({
   field: {
     borderWidth: 1.5,
     borderColor: convo.ink,
+    // A shade warmer than the ground, so the field reads as somewhere to type
+    // rather than an outline drawn on the background.
+    backgroundColor: convo.alt,
     borderRadius: 14,
     paddingHorizontal: 15,
     paddingVertical: 4,

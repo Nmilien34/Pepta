@@ -21,6 +21,10 @@ export const convo = {
   ctaBorder: "rgba(23,20,31,0.18)",
   pressFill: "rgba(23,20,31,0.04)",
   surface: "#FFFFFF",
+  // A step warmer than the ground — quiet fills that should read as recessed
+  // rather than raised (the naming field, muted rows). Matches --alt in the
+  // design hub.
+  alt: "#F4F1EC",
   primary: "#7C5CFC",
   onPrimary: "#FFFFFF",
   // Soft purple washes for the ground orbs.
