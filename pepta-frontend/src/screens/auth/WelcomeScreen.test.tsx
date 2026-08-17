@@ -75,6 +75,14 @@ vi.mock("../../theme/typography", () => ({
 vi.mock("../../components", () => ({
   ConvoGround: () => React.createElement("ConvoGround"),
   Mascot: () => React.createElement("Mascot"),
+  // Shared pane — its own rendering is not this screen's concern; what matters
+  // here is that the label and the press wiring reach it.
+  GlassButton: ({ label, onPress }: { label: string; onPress?: () => void }) =>
+    React.createElement(
+      "GlassButton",
+      { accessibilityRole: "button", accessibilityLabel: label, onPress },
+      label,
+    ),
   convo: { ink: "#111", soft: "#555", faint: "#999", ground: "#fff", surface: "#fff", onPrimary: "#fff" },
 }));
 

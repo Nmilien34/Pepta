@@ -73,6 +73,12 @@ vi.mock("react-native-safe-area-context", () => ({
     React.createElement("SafeAreaView", p, children),
 }));
 vi.mock("../../components", () => ({
+  GlassButton: ({ label, onPress }: { label: string; onPress?: () => void }) =>
+    React.createElement(
+      "GlassButton",
+      { accessibilityRole: "button", accessibilityLabel: label, onPress },
+      label,
+    ),
   ConvoButton: ({ label, onPress }: { label: string; onPress?: () => void }) =>
     React.createElement("ConvoButton", { accessibilityLabel: label, onPress }, label),
   ConvoGround: () => React.createElement("ConvoGround"),
@@ -150,6 +156,9 @@ async function mount(onContinue = vi.fn(), onSkipToWall = vi.fn()) {
     tree = TestRenderer.create(
       <TrialOfferScreen
         progress={0.94}
+        companionName="Ollie"
+        goalWeight={170}
+        goalWeightUnit="lb"
         onContinue={onContinue}
         onSkipToWall={onSkipToWall}
       />,
@@ -170,11 +179,18 @@ describe("TrialOfferScreen trial gate", () => {
     const text = nodeText(tree.root);
     expect(text).toContain("3 days on us");
     expect(text).toContain("One last thing");
+    // The shared glass pane, same object as Get started and the paywall CTA.
     expect(
       tree.root.findAll(
-        (n) => String(n.type) === "ConvoButton" && n.props.accessibilityLabel === "See my free offer",
+        (n) => String(n.type) === "GlassButton" && n.props.accessibilityLabel === "See my free offer",
       ),
     ).toHaveLength(1);
+    // The gift comes from the companion the user named, never "we".
+    expect(text).toContain("Ollie would love you");
+    expect(text).not.toContain("We'd love you");
+    // Their own plan, and a date rather than a term of service.
+    expect(text).toContain("Your plan to 170 lb is built and waiting.");
+    expect(text).toContain("Yours free through");
     expect(tree.root.findAll((n) => String(n.type) === "LivingMascot" && n.props.pose === "gift")).toHaveLength(1);
     expect(onSkipToWall).not.toHaveBeenCalled();
   });

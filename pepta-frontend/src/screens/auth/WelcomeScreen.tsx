@@ -33,8 +33,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { LinearGradient } from 'expo-linear-gradient';
-import { ConvoGround, Mascot, convo } from '../../components';
+import { ConvoGround, GlassButton, Mascot, convo } from '../../components';
 import { PRIVACY_URL, TERMS_URL } from '../../config';
 import { typography } from '../../theme/typography';
 
@@ -121,76 +120,7 @@ function FloatingCard({ card }: { card: Card }) {
   );
 }
 
-/**
- * The entry CTA — the glass pane from the design (.g3), rebuilt in RN.
- *
- * expo-blur is not in the binary, so the backdrop blur is the one property
- * that cannot be reproduced. Everything else is 1:1, and the blur was the
- * least of it: on an opaque ground it contributes almost nothing, whereas the
- * rim and the sheen are what actually read as glass.
- *
- * The rim is a real gradient border — bright white at the top-left, fading
- * through nothing, ending purple at the bottom-right — done by painting the
- * gradient full-bleed and insetting the fill by its width. A uniform
- * borderColor cannot express that, and a hard band reads as a painted stripe
- * rather than an edge catching light.
- */
-function GetStartedButton({ onPress }: { onPress(): void }) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel="Get started"
-      onPress={() => {
-        if (Platform.OS !== 'web') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        onPress();
-      }}
-      style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed]}
-    >
-      {/* Rim: linear-gradient(150deg, …) painted edge-to-edge. */}
-      <LinearGradient
-        colors={[
-          'rgba(255,255,255,0.85)',
-          'rgba(255,255,255,0.20)',
-          'rgba(255,255,255,0.06)',
-          'rgba(70,44,170,0.50)',
-        ]}
-        locations={[0, 0.42, 0.66, 1]}
-        start={{ x: 0.1, y: 0 }}
-        end={{ x: 0.9, y: 1 }}
-        style={StyleSheet.absoluteFill}
-      />
 
-      <View style={styles.ctaInner}>
-        {/* The pane itself. */}
-        <LinearGradient
-          colors={['rgba(108,80,240,0.90)', 'rgba(76,48,196,0.88)']}
-          start={{ x: 0.15, y: 0 }}
-          end={{ x: 0.85, y: 1 }}
-          style={StyleSheet.absoluteFill}
-        />
-        {/* Soft inner shadow along the bottom — the spec's inset 0 -7px 14px.
-            A flat band here is what made the first attempt look solid. */}
-        <LinearGradient
-          colors={['rgba(46,26,120,0)', 'rgba(46,26,120,0.42)']}
-          style={styles.ctaFloor}
-          pointerEvents="none"
-        />
-        {/* Sheen: a diagonal band of light across the top-left of the pane. */}
-        <View pointerEvents="none" style={styles.ctaSheenWrap}>
-          <LinearGradient
-            colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.26)', 'rgba(255,255,255,0)']}
-            start={{ x: 0, y: 0.5 }}
-            end={{ x: 1, y: 0.5 }}
-            style={StyleSheet.absoluteFill}
-          />
-        </View>
-        {/* Bright specular line just inside the top edge. */}
-        <View pointerEvents="none" style={styles.ctaTopEdge} />
-        <Text style={styles.ctaLabel}>Get started</Text>
-      </View>
-    </Pressable>
-  );
-}
 
 export function WelcomeScreen({ onContinue, onSignIn }: WelcomeScreenProps) {
   return (
@@ -215,7 +145,7 @@ export function WelcomeScreen({ onContinue, onSignIn }: WelcomeScreenProps) {
             Every shot, what it leaves in you, and what your body does next — tracked in one place.
           </Text>
 
-          <GetStartedButton onPress={onContinue} />
+          <GlassButton label="Get started" onPress={onContinue} marginTop={22} />
 
           {/* Consent rides the CTA rather than owning a turn. Links stay live. */}
           <Text style={styles.legal}>
@@ -305,55 +235,6 @@ const styles = StyleSheet.create({
     marginTop: 9,
     maxWidth: 270,
     alignSelf: 'center',
-  },
-
-  cta: {
-    height: 56,
-    borderRadius: 28,
-    marginTop: 22,
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#462CAA',
-    shadowOpacity: 0.5,
-    shadowRadius: 15,
-    shadowOffset: { width: 0, height: 12 },
-    elevation: 8,
-  },
-  ctaPressed: { opacity: 0.9 },
-  // Inset by the rim's width, so the gradient behind it reads as a border.
-  ctaInner: {
-    ...StyleSheet.absoluteFillObject,
-    margin: 1.2,
-    borderRadius: 26.8,
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  ctaFloor: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 16 },
-  // left -14%, width 58%, height 260%, rotate 22deg — the spec's ::after.
-  ctaSheenWrap: {
-    position: 'absolute',
-    left: '-14%',
-    top: '-120%',
-    width: '58%',
-    height: '260%',
-    transform: [{ rotate: '22deg' }],
-  },
-  ctaTopEdge: {
-    position: 'absolute',
-    top: 0,
-    left: 14,
-    right: 14,
-    height: 1,
-    borderRadius: 1,
-    backgroundColor: 'rgba(255,255,255,0.5)',
-  },
-  ctaLabel: {
-    fontFamily: typography.fonts.bold,
-    fontSize: 16.5,
-    letterSpacing: -0.17,
-    color: convo.onPrimary,
   },
 
   legal: {

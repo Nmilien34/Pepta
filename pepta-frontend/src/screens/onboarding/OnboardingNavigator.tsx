@@ -848,6 +848,12 @@ export function OnboardingNavigator() {
         <TrialOfferScreen
           progress={progress}
           onBack={goBack}
+          // The gift comes from the companion they named in step 4, not from
+          // "we" — useCompanionName reads the profile, which does not exist
+          // yet mid-onboarding, so the answer is passed straight through.
+          companionName={answers.companionName?.trim() || 'Pep'}
+          goalWeight={Math.round(resolveWeights(answers).goalInBodyUnit)}
+          goalWeightUnit={resolveWeights(answers).bodyUnit}
           onContinue={goNext}
           // Control arm / no eligible trial / error: skip the whole warm-up.
           // Advancing from trialCarousel walks shouldSkipStep, so this lands

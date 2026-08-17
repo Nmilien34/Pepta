@@ -26,12 +26,13 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import Svg, { Path } from "react-native-svg";
 import {
-  ConvoButton,
   ConvoGround,
+  GlassButton,
   ConvoProgressHeader,
   convo,
 } from "../../components";
 import { LivingMascot } from "../../components/LivingMascot";
+import { trialEndLabel } from './trialEndLabel';
 import { typography } from "../../theme/typography";
 import { useAuth } from "../../context/AuthContext";
 import { revenueCat } from "../../services/revenueCat";
@@ -144,6 +145,11 @@ function Entrance({
 export interface TrialOfferScreenProps {
   progress: number;
   onBack?(): void;
+  /** The companion's chosen name — the gift comes from them, not from "we". */
+  companionName: string;
+  /** Goal weight + unit, so the plan named here is the user's own. */
+  goalWeight?: number;
+  goalWeightUnit?: string;
   /** Forward to the value carousel. */
   onContinue(): void;
   /** No trial on the live offering (control arm / error): skip A AND B. */
@@ -153,6 +159,9 @@ export interface TrialOfferScreenProps {
 export function TrialOfferScreen({
   progress,
   onBack,
+  companionName,
+  goalWeight,
+  goalWeightUnit,
   onContinue,
   onSkipToWall,
 }: TrialOfferScreenProps) {
@@ -275,20 +284,24 @@ export function TrialOfferScreen({
 
             <Entrance delayMs={520}>
               <Text style={styles.hero}>
-                We&apos;d love you{"\n"}to try Pepta —{"\n"}
+                {companionName} would love you{"\n"}to try Pepta —{"\n"}
                 <Text style={styles.heroAccent}>{trialLabel} on us</Text>
               </Text>
             </Entrance>
 
             <Entrance delayMs={680}>
               <Text style={styles.heroSub}>
-                Your plan is built. The first {trialLabel} are our gift.
+                {goalWeight != null
+                  ? `Your plan to ${goalWeight} ${goalWeightUnit ?? 'lb'} is built and waiting.`
+                  : 'Your plan is built and waiting.'}
+                {"\n"}
+                Yours free through {trialEndLabel(trialLabel, new Date())}.
               </Text>
             </Entrance>
 
             <View style={styles.footer}>
               <Entrance delayMs={840}>
-                <ConvoButton label="See my free offer" variant="solid" onPress={onContinue} />
+                <GlassButton label="See my free offer" onPress={onContinue} />
               </Entrance>
             </View>
           </View>
