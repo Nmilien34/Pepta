@@ -122,11 +122,18 @@ function FloatingCard({ card }: { card: Card }) {
 }
 
 /**
- * The entry CTA. The design calls for glass; expo-blur is not in the binary,
- * so a real backdrop blur would cost a new build. This is the same pane built
- * from a gradient plus the two inner edges that actually sell it — the bright
- * top highlight and the dark bottom shadow. On an opaque ground the blur was
- * contributing almost nothing anyway; the rim is what reads.
+ * The entry CTA — the glass pane from the design (.g3), rebuilt in RN.
+ *
+ * expo-blur is not in the binary, so the backdrop blur is the one property
+ * that cannot be reproduced. Everything else is 1:1, and the blur was the
+ * least of it: on an opaque ground it contributes almost nothing, whereas the
+ * rim and the sheen are what actually read as glass.
+ *
+ * The rim is a real gradient border — bright white at the top-left, fading
+ * through nothing, ending purple at the bottom-right — done by painting the
+ * gradient full-bleed and insetting the fill by its width. A uniform
+ * borderColor cannot express that, and a hard band reads as a painted stripe
+ * rather than an edge catching light.
  */
 function GetStartedButton({ onPress }: { onPress(): void }) {
   return (
@@ -139,15 +146,48 @@ function GetStartedButton({ onPress }: { onPress(): void }) {
       }}
       style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed]}
     >
+      {/* Rim: linear-gradient(150deg, …) painted edge-to-edge. */}
       <LinearGradient
-        colors={['rgba(108,80,240,0.90)', 'rgba(76,48,196,0.88)']}
-        start={{ x: 0.15, y: 0 }}
-        end={{ x: 0.85, y: 1 }}
+        colors={[
+          'rgba(255,255,255,0.85)',
+          'rgba(255,255,255,0.20)',
+          'rgba(255,255,255,0.06)',
+          'rgba(70,44,170,0.50)',
+        ]}
+        locations={[0, 0.42, 0.66, 1]}
+        start={{ x: 0.1, y: 0 }}
+        end={{ x: 0.9, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
-      <View pointerEvents="none" style={styles.ctaTopEdge} />
-      <View pointerEvents="none" style={styles.ctaBottomEdge} />
-      <Text style={styles.ctaLabel}>Get started</Text>
+
+      <View style={styles.ctaInner}>
+        {/* The pane itself. */}
+        <LinearGradient
+          colors={['rgba(108,80,240,0.90)', 'rgba(76,48,196,0.88)']}
+          start={{ x: 0.15, y: 0 }}
+          end={{ x: 0.85, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+        {/* Soft inner shadow along the bottom — the spec's inset 0 -7px 14px.
+            A flat band here is what made the first attempt look solid. */}
+        <LinearGradient
+          colors={['rgba(46,26,120,0)', 'rgba(46,26,120,0.42)']}
+          style={styles.ctaFloor}
+          pointerEvents="none"
+        />
+        {/* Sheen: a diagonal band of light across the top-left of the pane. */}
+        <View pointerEvents="none" style={styles.ctaSheenWrap}>
+          <LinearGradient
+            colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.26)', 'rgba(255,255,255,0)']}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            style={StyleSheet.absoluteFill}
+          />
+        </View>
+        {/* Bright specular line just inside the top edge. */}
+        <View pointerEvents="none" style={styles.ctaTopEdge} />
+        <Text style={styles.ctaLabel}>Get started</Text>
+      </View>
     </Pressable>
   );
 }
@@ -279,21 +319,33 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   ctaPressed: { opacity: 0.9 },
+  // Inset by the rim's width, so the gradient behind it reads as a border.
+  ctaInner: {
+    ...StyleSheet.absoluteFillObject,
+    margin: 1.2,
+    borderRadius: 26.8,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ctaFloor: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 16 },
+  // left -14%, width 58%, height 260%, rotate 22deg — the spec's ::after.
+  ctaSheenWrap: {
+    position: 'absolute',
+    left: '-14%',
+    top: '-120%',
+    width: '58%',
+    height: '260%',
+    transform: [{ rotate: '22deg' }],
+  },
   ctaTopEdge: {
     position: 'absolute',
     top: 0,
-    left: 0,
-    right: 0,
-    height: 1.5,
-    backgroundColor: 'rgba(255,255,255,0.55)',
-  },
-  ctaBottomEdge: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 7,
-    backgroundColor: 'rgba(46,26,120,0.28)',
+    left: 14,
+    right: 14,
+    height: 1,
+    borderRadius: 1,
+    backgroundColor: 'rgba(255,255,255,0.5)',
   },
   ctaLabel: {
     fontFamily: typography.fonts.bold,
