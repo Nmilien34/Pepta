@@ -1,7 +1,12 @@
-// Consent moved off its own onboarding turn and onto the welcome CTA, so the
-// legal links must stay live here (coverage inherited from the deleted
+// Consent lives on the welcome CTA rather than its own onboarding turn, so
+// the legal links must stay live here (coverage inherited from the deleted
 // PrivacyScreen test) and the disclosure must sit next to the button that
 // constitutes agreement.
+//
+// The screen became the carousel on 2026-08-17. What is guaranteed is
+// unchanged: both legal links open, Get started enters the funnel, Sign in
+// reaches the returning-user path — and, new, that NONE of it waits on an
+// animation. The turn this replaced hid its footer for 2.14s.
 
 import React from "react";
 import TestRenderer, { act, type ReactTestInstance } from "react-test-renderer";
@@ -14,25 +19,49 @@ const mocks = vi.hoisted(() => ({
   onSignIn: vi.fn(),
 }));
 
-vi.mock("react-native", () => ({
-  Linking: { openURL: mocks.openURL },
-  Platform: { OS: "ios" },
-  Pressable: ({
-    children,
-    ...props
-  }: {
-    children?: React.ReactNode;
-  }) => React.createElement("Pressable", props, children),
-  StyleSheet: { create: (styles: unknown) => styles },
-  Text: ({ children, ...props }: { children?: React.ReactNode }) =>
-    React.createElement("Text", props, children),
-  View: "View",
+vi.mock("react-native", () => {
+  const Animated = {
+    View: ({ children, ...props }: { children?: React.ReactNode }) =>
+      React.createElement("Animated.View", props, children),
+    Value: class {
+      interpolate() {
+        return 0;
+      }
+    },
+    timing: () => ({ start: vi.fn(), stop: vi.fn() }),
+    sequence: () => ({ start: vi.fn(), stop: vi.fn() }),
+    loop: () => ({ start: vi.fn(), stop: vi.fn() }),
+  };
+  return {
+    Animated,
+    Easing: { inOut: () => undefined, quad: undefined },
+    Image: "Image",
+    Linking: { openURL: mocks.openURL },
+    Platform: { OS: "ios" },
+    Pressable: ({ children, ...props }: { children?: React.ReactNode }) =>
+      React.createElement("Pressable", props, children),
+    StatusBar: "StatusBar",
+    StyleSheet: {
+      create: (styles: unknown) => styles,
+      absoluteFill: {},
+    },
+    Text: ({ children, ...props }: { children?: React.ReactNode }) =>
+      React.createElement("Text", props, children),
+    View: "View",
+  };
+});
+
+vi.mock("react-native-safe-area-context", () => ({
+  SafeAreaView: ({ children }: { children?: React.ReactNode }) =>
+    React.createElement("View", null, children),
 }));
 
 vi.mock("expo-haptics", () => ({
-  notificationAsync: vi.fn(() => Promise.resolve()),
-  NotificationFeedbackType: { Success: "success" },
+  impactAsync: vi.fn(() => Promise.resolve()),
+  ImpactFeedbackStyle: { Medium: "m" },
 }));
+
+vi.mock("expo-linear-gradient", () => ({ LinearGradient: "LinearGradient" }));
 
 vi.mock("../../config", () => ({
   PRIVACY_URL: "https://pepta.test/privacy",
@@ -40,22 +69,13 @@ vi.mock("../../config", () => ({
 }));
 
 vi.mock("../../theme/typography", () => ({
-  typography: { fonts: { medium: "m", semiBold: "sb", bold: "b", heavy: "h" } },
+  typography: { fonts: { medium: "m", semiBold: "sb", bold: "b", heavy: "h", serif: "serif" } },
 }));
 
-// The scaffold renders the footer (where consent + CTAs live).
 vi.mock("../../components", () => ({
-  ConvoScreen: ({
-    children,
-    footer,
-  }: {
-    children?: React.ReactNode;
-    footer?: React.ReactNode;
-  }) => React.createElement("View", null, children, footer),
-  ConvoButton: ({ label, onPress }: { label: string; onPress?: () => void }) =>
-    React.createElement("ConvoButton", { accessibilityLabel: label, onPress }, label),
-  CitedStat: () => React.createElement("CitedStat"),
-  convo: { ink: "#111", soft: "#555", faint: "#999", ground: "#fff" },
+  ConvoGround: () => React.createElement("ConvoGround"),
+  Mascot: () => React.createElement("Mascot"),
+  convo: { ink: "#111", soft: "#555", faint: "#999", ground: "#fff", surface: "#fff", onPrimary: "#fff" },
 }));
 
 function link(
@@ -74,6 +94,22 @@ function link(
   return match;
 }
 
+function button(
+  root: TestRenderer.ReactTestRenderer["root"],
+  label: string,
+): ReactTestInstance {
+  const match = root
+    .findAll(
+      (node) =>
+        node.props.accessibilityRole === "button" &&
+        node.props.accessibilityLabel === label &&
+        typeof node.props.onPress === "function",
+    )
+    .at(0);
+  if (!match) throw new Error(`No button named "${label}"`);
+  return match;
+}
+
 function allText(node: ReactTestInstance): string {
   return node.children
     .map((child) =>
@@ -82,10 +118,11 @@ function allText(node: ReactTestInstance): string {
     .join("");
 }
 
-describe("WelcomeScreen inline consent", () => {
+describe("WelcomeScreen", () => {
   beforeEach(() => {
     mocks.openURL.mockClear();
     mocks.onContinue.mockClear();
+    mocks.onSignIn.mockClear();
   });
 
   async function render() {
@@ -98,11 +135,14 @@ describe("WelcomeScreen inline consent", () => {
     return tree!;
   }
 
-  it('states "by continuing you agree" beside the entry CTA', async () => {
+  it("shows the promise, the CTA and the consent line on the first frame", async () => {
     const tree = await render();
     const text = allText(tree.root);
+    // No typing gate: everything the user needs is present immediately.
+    expect(text).toContain("Know exactly where you stand.");
+    expect(text).toContain("Get started");
     expect(text).toContain("By continuing you agree");
-    expect(text).toContain("I’m ready");
+    expect(text).toContain("Already have an account?");
   });
 
   it("opens the hosted Terms and Privacy pages from the disclosure", async () => {
@@ -122,8 +162,23 @@ describe("WelcomeScreen inline consent", () => {
   it("continues straight into the funnel — no consent gate in between", async () => {
     const tree = await render();
     await act(async () => {
-      tree.root.findByProps({ accessibilityLabel: "I’m ready" }).props.onPress();
+      button(tree.root, "Get started").props.onPress();
     });
     expect(mocks.onContinue).toHaveBeenCalledTimes(1);
+    expect(mocks.onSignIn).not.toHaveBeenCalled();
+  });
+
+  it("routes a returning user to sign in without entering onboarding", async () => {
+    const tree = await render();
+    await act(async () => {
+      button(tree.root, "Sign in").props.onPress();
+    });
+    expect(mocks.onSignIn).toHaveBeenCalledTimes(1);
+    expect(mocks.onContinue).not.toHaveBeenCalled();
+  });
+
+  it("renders all five carousel cards", async () => {
+    const tree = await render();
+    expect(tree.root.findAllByType("Image" as never)).toHaveLength(5);
   });
 });

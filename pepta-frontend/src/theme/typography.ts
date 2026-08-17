@@ -23,6 +23,8 @@ const family = {
   semiBold: 'HankenGrotesk_600SemiBold',
   bold: 'HankenGrotesk_700Bold',
   heavy: 'HankenGrotesk_800ExtraBold',
+  // The one serif. Welcome promise only — see theme/fonts.ts.
+  serif: 'PlayfairDisplay_600SemiBold',
 } as const;
 
 type TypeStyle = Pick<TextStyle, 'fontSize' | 'lineHeight' | 'fontWeight' | 'letterSpacing' | 'fontFamily'>;

@@ -2,6 +2,12 @@
 // geometric grotesk that goes near-black at 800 for the big stats/titles the
 // brand leans on. React Native picks weights by family NAME (not fontWeight),
 // so each weight is a distinct family; typography.ts references these names.
+//
+// Playfair Display 600 is the ONE serif, used only for the welcome screen's
+// promise line. It buys contrast against the wordmark sitting directly above
+// it — the two read as one heavy block when both are Hanken. Loading it here
+// (rather than lazily on that screen) keeps the first-paint gate honest: the
+// welcome screen IS the first paint.
 
 import {
   useFonts,
@@ -10,6 +16,7 @@ import {
   HankenGrotesk_700Bold,
   HankenGrotesk_800ExtraBold,
 } from '@expo-google-fonts/hanken-grotesk';
+import { PlayfairDisplay_600SemiBold } from '@expo-google-fonts/playfair-display';
 
 // Family names, keyed by weight role. Kept in sync with FONT_FAMILIES in
 // typography.ts (which only needs the strings, not the asset imports).
@@ -18,6 +25,8 @@ export const FONT_FAMILIES = {
   semiBold: 'HankenGrotesk_600SemiBold',
   bold: 'HankenGrotesk_700Bold',
   heavy: 'HankenGrotesk_800ExtraBold',
+  /** Serif display — welcome promise only. */
+  serif: 'PlayfairDisplay_600SemiBold',
 } as const;
 
 // Returns true once the Hanken faces are ready. App gates its first paint on
@@ -30,6 +39,7 @@ export function useAppFonts(): boolean {
     HankenGrotesk_600SemiBold,
     HankenGrotesk_700Bold,
     HankenGrotesk_800ExtraBold,
+    PlayfairDisplay_600SemiBold,
   });
   return loaded || error != null;
 }
