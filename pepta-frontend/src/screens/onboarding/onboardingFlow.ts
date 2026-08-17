@@ -49,6 +49,9 @@ import { symptomForWeekBeat } from './symptomWeek';
 
 export const ONBOARDING_STEPS = [
   'welcome',
+  // The gift, given before anything is asked. Was the welcome screen's payload
+  // until the carousel took screen 1 — see NotAloneScreen.
+  'notAlone',
   'meetPep',
   // Optional, never a gate — the default stays 'Pep'. Sits here so the
   // introduction is still on screen; asking later would feel bolted on.

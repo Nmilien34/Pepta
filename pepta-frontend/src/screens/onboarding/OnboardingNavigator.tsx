@@ -28,6 +28,7 @@ import { MeetPepScreen } from './MeetPepScreen';
 import { NameCompanionScreen } from './NameCompanionScreen';
 import { NeedsScreen, type NeedType } from './NeedsScreen';
 import { WelcomeScreen } from '../auth/WelcomeScreen';
+import { NotAloneScreen } from './NotAloneScreen';
 import { SignInScreen } from '../auth/SignInScreen';
 import { JourneyStageScreen, type JourneyStage } from './JourneyStageScreen';
 import { MedicationPickerScreen } from './MedicationPickerScreen';
@@ -476,6 +477,8 @@ export function OnboardingNavigator() {
   switch (step) {
     case 'welcome':
       return <WelcomeScreen onContinue={goNext} onSignIn={() => setSignInOpen(true)} />;
+    case 'notAlone':
+      return <NotAloneScreen progress={progress} onBack={goBack} onContinue={goNext} />;
     case 'meetPep':
       return <MeetPepScreen progress={progress} onBack={goBack} onContinue={goNext} />;
     case 'nameCompanion':

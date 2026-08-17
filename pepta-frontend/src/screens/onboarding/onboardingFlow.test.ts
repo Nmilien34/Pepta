@@ -12,9 +12,10 @@ import {
 describe('onboarding flow', () => {
   it('starts at welcome, sits sign-in right before the paywall, ends at welcomeIn', () => {
     expect(ONBOARDING_STEPS[0]).toBe('welcome');
-    expect(ONBOARDING_STEPS[1]).toBe('meetPep');
+    expect(ONBOARDING_STEPS[1]).toBe('notAlone');
     expect(ONBOARDING_STEPS[ONBOARDING_STEPS.length - 1]).toBe('welcomeIn');
-    expect(nextStep('welcome')).toBe('meetPep');
+    expect(nextStep('welcome')).toBe('notAlone');
+    expect(nextStep('notAlone')).toBe('meetPep');
     // The rating ask is post-purchase (WelcomeInScreen), never a quiz turn.
     expect(nextStep('reveal')).toBe('trialOffer'); // the warm-up sits between auth and the wall
     expect(nextStep('trialCarousel')).toBe('paywall');
@@ -114,7 +115,11 @@ describe('onboarding flow', () => {
     expect(nextStep('fearAnswered')).toBe('discoverySource');
     expect(nextStep('discoverySource')).toBe('medication');
     expect(stepIndex('fearAnswered')).toBeLessThan(stepIndex('currentDose'));
-    expect(stepIndex('fearAnswered')).toBeLessThanOrEqual(5);
+    // 6 since `notAlone` was inserted at step 2 (2026-08-17). The guard is
+    // about how much the user is ASKED before hearing a reason to care;
+    // the new turn asks nothing, so the count of input turns before the
+    // problem is named is the same as when this was 5.
+    expect(stepIndex('fearAnswered')).toBeLessThanOrEqual(6);
   });
 
   it('never runs more than 9 input turns without a payoff', () => {
@@ -122,7 +127,7 @@ describe('onboarding flow', () => {
     // turn and will fail this test. That is the intended failure — it forces
     // the question "is this really a payoff?" rather than passing silently.
     const BEATS = new Set<string>([
-      'welcome', 'meetPep', 'fearAnswered', 'leanMass', 'company', 'instrument', 'symptomWeek',
+      'welcome', 'notAlone', 'meetPep', 'fearAnswered', 'leanMass', 'company', 'instrument', 'symptomWeek',
       'crafting', 'reveal', 'paywall', 'welcomeIn',
     ]);
     const runLength = (steps: readonly string[]) => {
@@ -179,7 +184,8 @@ describe('onboarding flow', () => {
   it('walks back, with no step before the first', () => {
     expect(prevStep('journeyStage')).toBe('nameCompanion');
     expect(prevStep('nameCompanion')).toBe('meetPep');
-    expect(prevStep('meetPep')).toBe('welcome');
+    expect(prevStep('meetPep')).toBe('notAlone');
+    expect(prevStep('notAlone')).toBe('welcome');
     expect(prevStep('welcome')).toBeNull();
   });
 
@@ -188,12 +194,13 @@ describe('onboarding flow', () => {
   });
 
   it('matches the funnel progress values', () => {
-    // welcome=#1, meetPep=#2, welcomeIn=last (denominator = full step count).
+    // welcome=#1, notAlone=#2, welcomeIn=last (denominator = full step count).
     const n = ONBOARDING_STEPS.length;
     expect(progressForStep('welcome')).toBeCloseTo(1 / n, 5);
-    expect(progressForStep('meetPep')).toBeCloseTo(2 / n, 5);
-    expect(progressForStep('nameCompanion')).toBeCloseTo(3 / n, 5);
-    expect(progressForStep('journeyStage')).toBeCloseTo(4 / n, 5);
+    expect(progressForStep('notAlone')).toBeCloseTo(2 / n, 5);
+    expect(progressForStep('meetPep')).toBeCloseTo(3 / n, 5);
+    expect(progressForStep('nameCompanion')).toBeCloseTo(4 / n, 5);
+    expect(progressForStep('journeyStage')).toBeCloseTo(5 / n, 5);
     expect(progressForStep('welcomeIn')).toBe(1);
   });
 });
