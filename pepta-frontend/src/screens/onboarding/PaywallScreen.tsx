@@ -366,6 +366,7 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
             paddingHorizontal: theme.spacing.xl,
             paddingTop: theme.spacing.sm,
             paddingBottom: theme.spacing.lg,
+            flexGrow: 1,
           }}
           showsVerticalScrollIndicator={false}
         >
@@ -381,6 +382,11 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
           {/* NOT keyed by plan — the proof does not change with the selection,
               so it must not re-animate when the user compares plans. */}
           <PaywallProofCarousel />
+
+          {/* The offer block sits low, anchored above the CTA; the carousel
+              takes whatever height is left. A fixed margin would look right on
+              one device and reopen a gap on a taller one. */}
+          <View style={{ flexGrow: 1, minHeight: 10 }} />
 
           <Rise delay={3 * RISE_STEP_MS}>
             <View style={{ flexDirection: "row", gap: 9, marginTop: theme.spacing.md }}>
@@ -448,7 +454,9 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
           delay={5 * RISE_STEP_MS}
           style={{
             paddingHorizontal: theme.spacing.xl,
-            paddingTop: theme.spacing.sm,
+            // 18 between the terms strip and the CTA: the offer and the action
+            // are separate beats, and 12 (the plans->terms gap) reads as one.
+            paddingTop: 18,
             paddingBottom: theme.spacing.xs,
           }}
         >
