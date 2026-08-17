@@ -32,7 +32,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Icon } from "../../components/Icon";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "../../theme";
-import { AppText, Button } from "../../components";
+import { AppText, GlassButton } from "../../components";
 import { typography } from "../../theme/typography";
 import { trialTermSlides, type TrialTermSlide } from "./paywallTimeline";
 import { useAuth } from "../../context/AuthContext";
@@ -52,6 +52,7 @@ import {
   logPurchaseStarted,
 } from "../../services/funnelEvents";
 import { buildPaywallPricing, freeTrialOf } from "./paywallPricing";
+import { PaywallProofCarousel } from "./PaywallProofCarousel";
 import { markPurchaseSuccess } from "../../services/purchaseGrace";
 import { scheduleTrialEndReminder } from "../../services/trialReminder.service";
 
@@ -60,44 +61,6 @@ export interface PaywallScreenProps {
 }
 
 type Plan = RevenueCatPlan;
-
-// The three outcomes, in brief order (design-lab/paywall-v2.html): the level
-// curve is the differentiator no competitor lists, vial math is the
-// highest-anxiety task in the category, muscle is the community's dominant
-// fear. Bold lines are outcomes in the user's words — the competitor test:
-// "covered, or in a trough" can't sit on anyone else's screen. Copy is
-// static by design; only prices/durations derive from StoreKit.
-const BENEFITS = [
-  {
-    key: "level",
-    icon: "pulse",
-    title: "Know what’s still working — right now",
-    sub: "Your live medication level between shots: covered, or in a trough.",
-    live: true,
-  },
-  {
-    key: "vial",
-    icon: "medical",
-    title: "Never do vial math again",
-    sub: "Exact units from your vial and dose. No spreadsheets, no second-guessing.",
-    live: false,
-  },
-  {
-    key: "muscle",
-    icon: "dumbbell",
-    title: "Lose the fat. Keep the muscle.",
-    sub: "Protein and muscle-protection tracking, tuned to your dose.",
-    live: false,
-  },
-] as const;
-
-// Tile gradients (design rev 2): level = the brand primary gradient tokens;
-// vial/muscle are deepened→lightened sweeps around the water/protein accents.
-const TILE_GRADIENTS: Record<(typeof BENEFITS)[number]["key"], [string, string]> = {
-  level: ["#6751E8", "#8C63F4"],
-  vial: ["#1E96EF", "#54BAFF"],
-  muscle: ["#F0761F", "#FF9E52"],
-};
 
 // The entrance chain's shared curve — TimelineRow's exact shipped easing.
 const RISE_EASING = Easing.bezier(0.2, 0.7, 0.2, 1);
@@ -415,19 +378,9 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
             </AppText>
           </Rise>
 
-          {/* NOT keyed by plan — the benefits don't change with the selection,
-              so they must not re-animate when the user compares plans. */}
-          <View style={[styles.benefitCard, { backgroundColor: theme.colors.surface }]}>
-            {BENEFITS.map((benefit, index) => (
-              <Rise
-                key={benefit.key}
-                delay={index * RISE_STEP_MS}
-                style={index > 0 ? { marginTop: 13 } : undefined}
-              >
-                <BenefitRow benefit={benefit} delay={index * RISE_STEP_MS} />
-              </Rise>
-            ))}
-          </View>
+          {/* NOT keyed by plan — the proof does not change with the selection,
+              so it must not re-animate when the user compares plans. */}
+          <PaywallProofCarousel />
 
           <Rise delay={3 * RISE_STEP_MS}>
             <View style={{ flexDirection: "row", gap: 9, marginTop: theme.spacing.md }}>
@@ -520,7 +473,7 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
               Loading App Store plans…
             </AppText>
           ) : null}
-          <Button
+          <GlassButton
             label={completing ? "Working…" : pricing.cta[plan].label}
             onPress={() => void handleStart()}
             disabled={completing || !plansReady}
@@ -646,94 +599,6 @@ function FadeIn({ children }: { children: React.ReactNode }) {
     return () => animation.stop();
   }, [fade]);
   return <Animated.View style={{ opacity: fade }}>{children}</Animated.View>;
-}
-
-/**
- * The one perpetual pulse on the screen besides the terms carousel: the green
- * dot on the level tile breathes (LivingMascot's heartbeat idiom) because
- * "live" is that benefit's literal claim. Ring scales 1→1.7 while fading,
- * 1.8s round trip, forever.
- */
-function LiveDot() {
-  const theme = useTheme();
-  const pulse = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulse, {
-          toValue: 1,
-          duration: 900,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulse, {
-          toValue: 0,
-          duration: 900,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [pulse]);
-  return (
-    <View style={styles.liveDotWrap} pointerEvents="none">
-      <Animated.View
-        style={[
-          styles.liveDotRing,
-          {
-            backgroundColor: theme.colors.fiber,
-            opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.9, 0.35] }),
-            transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.7] }) }],
-          },
-        ]}
-      />
-      <View style={[styles.liveDotCore, { backgroundColor: theme.colors.fiber }]} />
-    </View>
-  );
-}
-
-/** One benefit row: gradient tile (pop-in 60ms behind its row) + outcome copy. */
-function BenefitRow({
-  benefit,
-  delay,
-}: {
-  benefit: (typeof BENEFITS)[number];
-  delay: number;
-}) {
-  const pop = useRef(new Animated.Value(0.6)).current;
-  useEffect(() => {
-    const animation = Animated.sequence([
-      Animated.delay(delay + 60),
-      Animated.spring(pop, { toValue: 1, friction: 5, tension: 180, useNativeDriver: true }),
-    ]);
-    animation.start();
-    return () => animation.stop();
-  }, [pop, delay]);
-  return (
-    <View style={styles.benefitRow}>
-      <Animated.View style={{ transform: [{ scale: pop }] }}>
-        <LinearGradient
-          colors={TILE_GRADIENTS[benefit.key]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.benefitTile}
-        >
-          <Icon name={benefit.icon} size={18} color="#FFFFFF" />
-        </LinearGradient>
-        {benefit.live ? <LiveDot /> : null}
-      </Animated.View>
-      <View style={{ flex: 1 }}>
-        <AppText variant="bodyStrong" style={{ fontSize: 13.5, fontWeight: "800" }}>
-          {benefit.title}
-        </AppText>
-        <AppText variant="caption" color="textSecondary" style={{ fontSize: 11, marginTop: 1 }}>
-          {benefit.sub}
-        </AppText>
-      </View>
-    </View>
-  );
 }
 
 // Carousel timing: 2.2s hold per term, 260ms slide-fade transition (130 out +
@@ -930,38 +795,6 @@ function PlanColumn({
 }
 
 const styles = StyleSheet.create({
-  benefitCard: {
-    marginTop: 14,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "rgba(14,14,18,0.08)",
-    paddingHorizontal: 14,
-    paddingVertical: 13,
-  },
-  benefitRow: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
-  benefitTile: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#11111A",
-    shadowOpacity: 0.22,
-    shadowRadius: 7,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 3,
-  },
-  liveDotWrap: {
-    position: "absolute",
-    top: -3,
-    right: -3,
-    width: 11,
-    height: 11,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  liveDotRing: { position: "absolute", width: 11, height: 11, borderRadius: 999 },
-  liveDotCore: { width: 9, height: 9, borderRadius: 999, borderWidth: 1.5, borderColor: "#FFFFFF" },
   termsStrip: {
     marginTop: 12,
     height: 34,

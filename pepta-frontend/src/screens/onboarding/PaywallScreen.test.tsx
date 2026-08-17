@@ -175,6 +175,12 @@ vi.mock("../../theme", () => ({
 }));
 
 vi.mock("../../components", () => ({
+  GlassButton: ({ label, onPress, disabled }: { label: string; onPress?: () => void; disabled?: boolean }) =>
+    React.createElement(
+      "Pressable",
+      { onPress, disabled, accessibilityRole: "button", accessibilityLabel: label },
+      label,
+    ),
   AppText: ({ children, ...props }: { children?: React.ReactNode }) =>
     React.createElement("Text", props, children),
   Button: ({
