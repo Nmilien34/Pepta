@@ -150,13 +150,17 @@ function nodeText(node: ReactTestInstance): string {
     .join("");
 }
 
-async function mount(onContinue = vi.fn(), onSkipToWall = vi.fn()) {
+async function mount(
+  over: { companionName?: string } = {},
+  onContinue = vi.fn(),
+  onSkipToWall = vi.fn(),
+) {
   let tree!: TestRenderer.ReactTestRenderer;
   await act(async () => {
     tree = TestRenderer.create(
       <TrialOfferScreen
         progress={0.94}
-        companionName="Ollie"
+        companionName={over.companionName ?? "Ollie"}
         goalWeight={170}
         goalWeightUnit="lb"
         onContinue={onContinue}
@@ -193,6 +197,22 @@ describe("TrialOfferScreen trial gate", () => {
     expect(text).toContain("Yours free through");
     expect(tree.root.findAll((n) => String(n.type) === "LivingMascot" && n.props.pose === "gift")).toHaveLength(1);
     expect(onSkipToWall).not.toHaveBeenCalled();
+  });
+
+  it("survives a long companion name without breaking the beat", async () => {
+    // COMPANION_NAME_MAX is 16, and the hero is three explicit lines. A long
+    // name wraps line one to two, making it four — the screen must still
+    // render its parts rather than pushing the CTA off.
+    mocks.getPaywallPackages.mockResolvedValue(packagesWithTrial(true, TRIAL));
+    const { tree } = await mount({ companionName: "Bartholomew" });
+    const text = nodeText(tree.root);
+    expect(text).toContain("Bartholomew would love you");
+    expect(text).toContain("3 days on us");
+    expect(
+      tree.root.findAll(
+        (n) => String(n.type) === "GlassButton" && n.props.accessibilityLabel === "See my free offer",
+      ),
+    ).toHaveLength(1);
   });
 
   it("derives the duration from the product — a 1-week intro says '1 week on us'", async () => {
