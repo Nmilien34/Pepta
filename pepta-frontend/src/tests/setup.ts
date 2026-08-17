@@ -64,6 +64,14 @@ vi.mock("expo-haptics", () => ({
   NotificationFeedbackType: { Success: "success", Warning: "warning", Error: "error" },
 }));
 
+// expo-store-review reaches expo-modules-core the same way expo-haptics does.
+// The review sheet is fire-and-forget and returns nothing, so an inert mock is
+// all any suite needs; reviewPrompt.test.ts injects its own doubles instead.
+vi.mock("expo-store-review", () => ({
+  isAvailableAsync: vi.fn(() => Promise.resolve(false)),
+  requestReview: vi.fn(() => Promise.resolve()),
+}));
+
 vi.mock("expo-notifications", () => ({
   AndroidImportance: { DEFAULT: 5 },
   SchedulableTriggerInputTypes: {

@@ -15,6 +15,9 @@ import { buildPepMood, moodNoteFor } from '../screens/app/pepMood';
 import { resolveLevelView } from '../screens/app/levelSuppression';
 import { dueMilestone, milestoneFactsFrom, type PepMilestone } from '../screens/app/pepMilestones';
 import { markMilestoneSeen, readSeenMilestones } from '../services/pepMilestoneStore';
+import * as StoreReview from 'expo-store-review';
+import { maybeRequestReview } from '../services/reviewPrompt';
+import { hasAskedForReview, markReviewAsked } from '../services/reviewPromptStore';
 import { resolveCompanionName } from '../utils/companion';
 import { activeCycleOf, patternOf, todayCycleStatus } from '../screens/app/scheduleView';
 import { usePeptaData } from '../context/PeptaDataContext';
@@ -99,6 +102,16 @@ export function PepCompanion() {
     if (due) {
       setActiveMilestone(due);
       void markMilestoneSeen(due.key);
+      // The review ask rides an EARNED milestone and nothing else. It decides
+      // for itself whether this key qualifies (streaks yes, day-one setup no)
+      // and whether the one-per-install ask is already spent, so this call is
+      // safe to make on every milestone.
+      void maybeRequestReview(due.key, {
+        isAvailableAsync: () => StoreReview.isAvailableAsync(),
+        requestReview: () => StoreReview.requestReview(),
+        hasAsked: hasAskedForReview,
+        markAsked: () => markReviewAsked(),
+      });
     }
   }, [home, seenMilestones, activeMilestone]);
 
