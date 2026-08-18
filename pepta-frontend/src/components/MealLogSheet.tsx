@@ -69,11 +69,25 @@ type AiMealAction =
   | "search";
 type CameraMode = "meal" | "product";
 
+/**
+ * A food the user already picked, elsewhere. Only what we actually know goes
+ * in — anything absent is left blank for them rather than guessed.
+ */
+export interface MealSeed {
+  foodName: string;
+  servingSize?: string;
+  protein?: number;
+  calories?: number;
+  fiber?: number;
+}
+
 export interface MealLogSheetProps {
   visible: boolean;
   onClose(): void;
   onBack?: () => void;
   onDismissed?: () => void;
+  /** Prefills manual entry and opens straight into it. */
+  seed?: MealSeed | null;
 }
 
 export function MealLogSheet({
@@ -81,6 +95,7 @@ export function MealLogSheet({
   onClose,
   onBack,
   onDismissed,
+  seed,
 }: MealLogSheetProps) {
   const theme = useTheme();
   const { addMeal, refreshHome, refreshTrack, saveLog } = usePeptaData();
@@ -137,17 +152,23 @@ export function MealLogSheet({
 
   useEffect(() => {
     if (visible) {
-      setView("chooser");
+      // A seed means the user tapped a specific food elsewhere (the Fiber /
+      // Protein "ways to hit it" rows). Landing them on the chooser to pick
+      // "manual" and retype what they just tapped would make that tap a lie —
+      // so open straight into manual with what we know filled in. What we do
+      // NOT know stays blank rather than being guessed at: a fiber food's
+      // protein is left for them, not silently logged as zero-ish truth.
+      setView(seed ? "manual" : "chooser");
       setResult(null);
       setPreview(null);
       setPortion(1);
       setManual({
-        foodName: "",
-        protein: "",
-        calories: "",
+        foodName: seed?.foodName ?? "",
+        protein: seed?.protein != null ? String(seed.protein) : "",
+        calories: seed?.calories != null ? String(seed.calories) : "",
         carbs: "",
         fat: "",
-        fiber: "",
+        fiber: seed?.fiber != null ? String(seed.fiber) : "",
       });
       setQuery("");
       setResults([]);
@@ -159,7 +180,7 @@ export function MealLogSheet({
       setBarcodeOpen(false);
       setPendingAiAction(null);
     }
-  }, [visible]);
+  }, [visible, seed]);
 
   const now = () => new Date().toISOString();
 

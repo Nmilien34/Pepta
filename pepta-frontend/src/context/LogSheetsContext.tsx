@@ -21,12 +21,12 @@ import {
   doseCelebrationFor,
   type DoseCelebration,
 } from "../screens/app/doseCelebration";
-import { MealLogSheet } from "../components/MealLogSheet";
+import { MealLogSheet, type MealSeed } from "../components/MealLogSheet";
 import { useTheme } from "../theme";
 
 interface LogSheetsValue {
   openQuickLog(mode?: QuickLogMode): void;
-  openMeal(): void;
+  openMeal(seed?: MealSeed | null): void;
 }
 
 interface LogToastMessage {
@@ -58,6 +58,8 @@ export function LogSheetsProvider({ children }: { children: ReactNode }) {
   const pendingQuickOpen = useRef(false);
   const mealOpenTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingSeed = useRef<MealSeed | null>(null);
+  const [mealSeed, setMealSeed] = useState<MealSeed | null>(null);
 
   useEffect(
     () => () => {
@@ -75,16 +77,24 @@ export function LogSheetsProvider({ children }: { children: ReactNode }) {
     setQuickMode(mode);
     setQuickOpen(true);
   }, []);
-  const openMeal = useCallback(() => {
-    if (quickOpen) {
-      pendingMealOpen.current = true;
-      setMealReturnsToQuickLog(true);
-      setQuickOpen(false);
-      return;
-    }
-    setMealReturnsToQuickLog(false);
-    setMealOpen(true);
-  }, [quickOpen]);
+  const openMeal = useCallback(
+    (seed?: MealSeed | null) => {
+      // Held in a ref, not state: the sheet may open on a delay (below) and a
+      // seed that re-rendered away in between would silently become a blank
+      // manual form — the failure looks like "the tap did nothing".
+      pendingSeed.current = seed ?? null;
+      setMealSeed(seed ?? null);
+      if (quickOpen) {
+        pendingMealOpen.current = true;
+        setMealReturnsToQuickLog(true);
+        setQuickOpen(false);
+        return;
+      }
+      setMealReturnsToQuickLog(false);
+      setMealOpen(true);
+    },
+    [quickOpen],
+  );
   const handleQuickDismissed = useCallback(() => {
     // Flush first, and unconditionally — the meal early-return below must not
     // swallow a queued celebration.
@@ -95,6 +105,7 @@ export function LogSheetsProvider({ children }: { children: ReactNode }) {
     if (!pendingMealOpen.current) return;
     pendingMealOpen.current = false;
     mealOpenTimer.current = setTimeout(() => {
+      setMealSeed(pendingSeed.current);
       setMealOpen(true);
     }, 40);
   }, []);
@@ -136,7 +147,7 @@ export function LogSheetsProvider({ children }: { children: ReactNode }) {
         initialMode={quickMode}
         onDismissed={handleQuickDismissed}
         onClose={() => setQuickOpen(false)}
-        onMeal={openMeal}
+        onMeal={() => openMeal()}
         onQuickShotSaved={showToast}
         onDoseLogged={(input) => {
           pendingCelebration.current = doseCelebrationFor(input);
@@ -148,6 +159,7 @@ export function LogSheetsProvider({ children }: { children: ReactNode }) {
         }}
       />
       <MealLogSheet
+        seed={mealSeed}
         visible={mealOpen}
         onClose={handleMealClose}
         onBack={mealReturnsToQuickLog ? handleMealBack : undefined}

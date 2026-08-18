@@ -72,9 +72,17 @@ export function NutrientWaysScreen() {
 
   const openFood = (food: NutrientFood) => {
     Haptics.selectionAsync().catch(() => undefined);
-    // No item-detail screen yet, so the photo opens the sheet that can act on
-    // it. A tap that only enlarges a picture would be the weaker door.
-    openMeal();
+    // The row's plus promises "add this", so it opens the meal sheet ALREADY
+    // filled with this food rather than a blank chooser. Only what this screen
+    // actually knows is filled: the nutrient it is about, and the calories.
+    // The other macro is left empty for the user — a fiber food's protein is
+    // not zero just because this screen never measured it.
+    openMeal({
+      foodName: food.name,
+      servingSize: food.serving,
+      calories: food.calories,
+      ...(kind === 'protein' ? { protein: food.amount } : { fiber: food.amount }),
+    });
   };
 
   if (!home) {

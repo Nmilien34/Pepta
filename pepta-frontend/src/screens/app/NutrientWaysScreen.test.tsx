@@ -10,6 +10,7 @@ import { describe, expect, it, vi } from "vitest";
 import TestRenderer, { act } from "react-test-renderer";
 
 const mocks = vi.hoisted(() => ({
+  openMeal: vi.fn(),
   kind: "protein" as "protein" | "fiber",
   home: null as unknown,
   refreshHome: vi.fn(),
@@ -81,7 +82,7 @@ vi.mock("../../context/PeptaDataContext", () => ({
   }),
 }));
 vi.mock("../../context/LogSheetsContext", () => ({
-  useLogSheets: () => ({ openMeal: vi.fn() }),
+  useLogSheets: () => ({ openMeal: mocks.openMeal }),
 }));
 
 import { NutrientWaysScreen } from "./NutrientWaysScreen";
@@ -98,6 +99,7 @@ function homeWith(loggedProtein: number, target: number | null = 120, extra: obj
 }
 
 function render(home: unknown, kind: "protein" | "fiber" = "protein") {
+  mocks.openMeal.mockClear();
   mocks.kind = kind;
   mocks.home = home;
   mocks.refreshHome.mockClear();
@@ -305,5 +307,69 @@ describe("NutrientWaysScreen · the Fiber side", () => {
     // Padding must live on the content, or swiping back clips the first tile.
     expect(strips[0]!.props.contentContainerStyle.paddingHorizontal).toBe(20);
     expect(strips[0]!.props.style.paddingLeft).toBeUndefined();
+  });
+});
+
+describe("NutrientWaysScreen · tapping a food", () => {
+  const rowFor = (tree: TestRenderer.ReactTestRenderer, needle: string) =>
+    tree.root
+      .findAll((n) => String(n.type) === "Pressable")
+      .find((p) => String(p.props.accessibilityLabel).includes(needle));
+
+  it("seeds the meal sheet with the food, not a blank chooser", () => {
+    const tree = render(fiberHome(12), "fiber");
+    act(() => {
+      rowFor(tree, "Edamame")!.props.onPress();
+    });
+    expect(mocks.openMeal).toHaveBeenCalledWith({
+      foodName: "Edamame",
+      servingSize: "1 cup, shelled",
+      calories: 188,
+      fiber: 8,
+    });
+  });
+
+  it("seeds protein on the protein side", () => {
+    const tree = render(homeWith(74), "protein");
+    act(() => {
+      rowFor(tree, "Chicken breast")!.props.onPress();
+    });
+    expect(mocks.openMeal).toHaveBeenCalledWith({
+      foodName: "Chicken breast",
+      servingSize: "4 oz, cooked",
+      calories: 185,
+      protein: 35,
+    });
+  });
+
+  it("never invents the macro this screen did not measure", () => {
+    // Edamame HAS protein; this screen does not know how much, and logging 0
+    // would quietly understate the user's protein for the day.
+    const tree = render(fiberHome(12), "fiber");
+    act(() => {
+      rowFor(tree, "Edamame")!.props.onPress();
+    });
+    const seed = mocks.openMeal.mock.calls[0]![0] as Record<string, unknown>;
+    expect(seed).not.toHaveProperty("protein");
+
+    const tree2 = render(homeWith(74), "protein");
+    act(() => {
+      rowFor(tree2, "Chicken breast")!.props.onPress();
+    });
+    expect(mocks.openMeal.mock.calls[0]![0]).not.toHaveProperty("fiber");
+  });
+
+  it("seeds from the strip photo too — the frame says tap the photos", () => {
+    const tree = render(fiberHome(12), "fiber");
+    const photo = tree.root
+      .findAll((n) => String(n.type) === "Pressable")
+      .find((p) => p.props.accessibilityLabel === "Avocado, 7 g of fiber");
+    expect(photo).toBeDefined();
+    act(() => {
+      photo!.props.onPress();
+    });
+    expect(mocks.openMeal).toHaveBeenCalledWith(
+      expect.objectContaining({ foodName: "Avocado", fiber: 7 }),
+    );
   });
 });
