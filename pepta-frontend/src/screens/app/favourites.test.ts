@@ -227,24 +227,36 @@ describe('worthSavingDrinks', () => {
 });
 
 describe('startingSuggestions', () => {
-  it('offers all three on a genuinely empty screen — food AND the drink', () => {
-    const out = startingSuggestions([]);
-    expect(out).toHaveLength(3);
-    expect(out.filter((s) => s.kind === 'drink')).toHaveLength(1);
+  it('offers only this tab\'s kind — the tabs partition, always', () => {
+    // A drink offered under Food would be saved into the other tab and vanish
+    // from the row the user just tapped.
+    expect(startingSuggestions([], 'food').every((s) => s.kind === 'food')).toBe(true);
+    expect(startingSuggestions([], 'drink').every((s) => s.kind === 'drink')).toBe(true);
   });
 
-  it('stops the moment ANYTHING is saved, on either side', () => {
-    expect(startingSuggestions([fav('Chicken breast', '6 oz')])).toEqual([]);
-    // A saved drink also ends the first run — the screen is no longer empty.
-    expect(startingSuggestions([fav('Water bottle', '16 oz', 'drink')])).toEqual([]);
+  it('covers both sides between them', () => {
+    expect(startingSuggestions([], 'food').length).toBeGreaterThan(0);
+    expect(startingSuggestions([], 'drink').length).toBeGreaterThan(0);
+  });
+
+  it('stops on BOTH tabs the moment anything is saved, on either side', () => {
+    const food = [fav('Chicken breast', '6 oz')];
+    expect(startingSuggestions(food, 'food')).toEqual([]);
+    // A curated Food list must not leave Drinks looking like a first run.
+    expect(startingSuggestions(food, 'drink')).toEqual([]);
+    const drink = [fav('Water bottle', '16 oz', 'drink')];
+    expect(startingSuggestions(drink, 'food')).toEqual([]);
+    expect(startingSuggestions(drink, 'drink')).toEqual([]);
   });
 
   it('carries the numbers each one needs to be saved and logged', () => {
-    for (const s of startingSuggestions([])) {
-      expect(s.name.length).toBeGreaterThan(0);
-      expect(s.portion.length).toBeGreaterThan(0);
-      if (s.kind === 'drink') expect(s.ounces).toBeGreaterThan(0);
-      else expect(s.protein).toBeGreaterThan(0);
+    for (const kind of ['food', 'drink'] as const) {
+      for (const s of startingSuggestions([], kind)) {
+        expect(s.name.length).toBeGreaterThan(0);
+        expect(s.portion.length).toBeGreaterThan(0);
+        if (s.kind === 'drink') expect(s.ounces).toBeGreaterThan(0);
+        else expect(s.protein).toBeGreaterThan(0);
+      }
     }
   });
 });

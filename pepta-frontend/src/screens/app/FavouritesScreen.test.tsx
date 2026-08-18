@@ -240,19 +240,25 @@ describe("FavouritesScreen · before anything is saved", () => {
     expect(texts(await render([chicken], "drink"))).not.toContain("Start with these");
   });
 
-  it("lists all three on a truly empty screen, per the frame", async () => {
+  it("offers only food under Food — the tabs partition", async () => {
     const out = texts(await render([], "food"));
     expect(out).toContain("Greek yogurt");
     expect(out).toContain("Chicken breast");
-    // The drink is offered too, drawn as a vessel rather than a food tile.
-    expect(out).toContain("Water bottle");
+    // The drink belongs to the other tab; offering it here would save
+    // something that vanishes from the row just tapped.
+    expect(out).not.toContain("Water bottle");
   });
 
-  it("draws the suggested drink as a vessel even on the Food tab", async () => {
+  it("offers only drinks under Drinks", async () => {
+    const out = texts(await render([], "drink"));
+    expect(out).toContain("Water bottle");
+    expect(out).not.toContain("Greek yogurt");
+    expect(out).not.toContain("Chicken breast");
+  });
+
+  it("draws no vessel on the Food tab at all", async () => {
     const tree = await render([], "food");
-    const vessels = tree.root.findAll((n) => String(n.type) === "VesselIcon");
-    expect(vessels).toHaveLength(1);
-    expect(vessels[0]!.props.vessel).toBe("bottle");
+    expect(tree.root.findAll((n) => String(n.type) === "VesselIcon")).toHaveLength(0);
   });
 
   it("offers Add your own on the drinks side", async () => {
@@ -406,5 +412,73 @@ describe("FavouritesScreen · the drinks side", () => {
       find(tree, "Remove Morning coffee from favourites")!.props.onPress();
     });
     expect(mocks.removeFavourite).toHaveBeenCalledWith(coffee.key);
+  });
+});
+
+describe("FavouritesScreen · the tabs partition, everywhere", () => {
+  const coffee = row({ key: "drink:morning-coffee:12-oz", kind: "drink", name: "Morning coffee", portion: "Black, large mug", ounces: 12 });
+  const salmon = row({ key: "food:salmon:6-oz", name: "Salmon", portion: "6 oz fillet", protein: 40, calories: 350 });
+
+  const mixedTrack = () => {
+    const at = (d: number) => new Date(Date.now() - d * 86_400_000).toISOString();
+    return {
+      mealLogs: [1, 2, 3].map((d) => ({
+        id: `m${d}`, foodName: "Protein bar", servingSize: "1 bar",
+        protein: 20, calories: 210, datetime: at(d), deletedAt: null,
+      })),
+      waterLogs: [1, 2, 3].map((d) => ({
+        id: `w${d}`, amountOz: 34, datetime: at(d), deletedAt: null,
+      })),
+    };
+  };
+
+  it("shows only saved food under Food, with a mixed list saved", async () => {
+    const out = texts(await render([chicken, salmon, bottle, coffee], "food"));
+    expect(out).toContain("Chicken breast");
+    expect(out).toContain("Salmon");
+    expect(out).not.toContain("Water bottle");
+    expect(out).not.toContain("Morning coffee");
+  });
+
+  it("shows only saved drinks under Drinks, from the same list", async () => {
+    const out = texts(await render([chicken, salmon, bottle, coffee], "drink"));
+    expect(out).toContain("Water bottle");
+    expect(out).toContain("Morning coffee");
+    expect(out).not.toContain("Chicken breast");
+    expect(out).not.toContain("Salmon");
+  });
+
+  it("counts each side separately in the tabs, whichever is showing", async () => {
+    for (const side of ["food", "drink"] as const) {
+      const out = texts(await render([chicken, salmon, bottle, coffee], side));
+      expect(out, side).toContain("Food · 2");
+      expect(out, side).toContain("Drinks · 2");
+    }
+  });
+
+  it("keeps Worth saving partitioned too, with both kinds of log present", async () => {
+    mocks.track = mixedTrack();
+    const food = texts(await render([], "food"));
+    expect(food).toContain("Protein bar");
+    expect(food).not.toContain("Sports bottle");
+
+    mocks.track = mixedTrack();
+    const drink = texts(await render([], "drink"));
+    expect(drink).toContain("Sports bottle");
+    expect(drink).not.toContain("Protein bar");
+  });
+
+  it("never renders a food tile on Drinks or a vessel on Food", async () => {
+    const drinkTree = await render([chicken, bottle, coffee], "drink");
+    // Two drinks saved → two vessels, and no food row to draw a tile for.
+    expect(drinkTree.root.findAll((n) => String(n.type) === "VesselIcon")).toHaveLength(2);
+
+    const foodTree = await render([chicken, bottle, coffee], "food");
+    expect(foodTree.root.findAll((n) => String(n.type) === "VesselIcon")).toHaveLength(0);
+  });
+
+  it("only offers Add your own on the drinks side", async () => {
+    expect(texts(await render([chicken], "food"))).not.toContain("Name it, set the volume");
+    expect(texts(await render([bottle], "drink"))).toContain("Name it, set the volume");
   });
 });

@@ -193,17 +193,26 @@ export const STARTING_SUGGESTIONS: readonly Favourite[] = [
 ];
 
 /**
- * Shown only on a genuinely empty screen — the frame is titled "before
- * anything is saved", and it lists all three together regardless of which tab
- * is selected.
+ * The first-run nudge, for one tab.
  *
- * GATED ON THE WHOLE LIST, not the current tab. Filtering per tab would pop
- * the nudge up on Drinks after the user had already curated Food, which is not
- * a first run and reads as the app forgetting what they did.
+ * TWO SEPARATE RULES, and they are easy to conflate:
+ *
+ *   WHEN it appears is a whole-list question. Only on a genuinely empty
+ *   screen — nothing saved on either side. Gating per tab would pop the nudge
+ *   up on Drinks after the user had already curated Food, which is not a first
+ *   run and reads as the app forgetting what they did.
+ *
+ *   WHAT it contains is a per-tab question. The tabs PARTITION the list: Food
+ *   shows food, Drinks shows drinks, always. A drink offered under Food would
+ *   be saved into the other tab and vanish from the row the user just tapped —
+ *   the one interaction on this screen that could look broken.
  */
-export function startingSuggestions(saved: readonly Favourite[]): Favourite[] {
+export function startingSuggestions(
+  saved: readonly Favourite[],
+  kind: FavouriteKind,
+): Favourite[] {
   if (saved.length > 0) return [];
-  return [...STARTING_SUGGESTIONS];
+  return STARTING_SUGGESTIONS.filter((s) => s.kind === kind);
 }
 
 export interface WorthSavingDrink {

@@ -76,7 +76,7 @@ export function FavouritesScreen() {
         : [],
     [tab, track, favourites],
   );
-  const suggestions = startingSuggestions(favourites);
+  const suggestions = startingSuggestions(favourites, tab);
   const tint = tab === 'food' ? FOOD_TINT : DRINK_TINT;
   const accent = tab === 'food' ? theme.colors.protein : theme.colors.water;
 
@@ -380,17 +380,10 @@ export function FavouritesScreen() {
                       borderBottomColor: theme.colors.border,
                     }}
                   >
-                    {/* Each row wears its own kind: a drink among the
-                        suggestions still draws as a vessel in water blue. */}
-                    <Leading
-                      fav={s}
-                      tint={s.kind === 'food' ? FOOD_TINT : DRINK_TINT}
-                      accent={s.kind === 'food' ? theme.colors.protein : theme.colors.water}
-                    />
-                    <FavouriteBody
-                      fav={s}
-                      accent={s.kind === 'food' ? theme.colors.protein : theme.colors.water}
-                    />
+                    {/* Same tint as the rest of this tab — every suggestion
+                        here is this tab's kind. */}
+                    <Leading fav={s} tint={tint} accent={accent} />
+                    <FavouriteBody fav={s} accent={accent} />
                     <KeepButton
                       label={`Save ${s.name} to favourites`}
                       onPress={() => save({ ...s, savedAt: new Date().toISOString() })}
