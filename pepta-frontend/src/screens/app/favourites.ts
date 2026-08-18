@@ -12,7 +12,7 @@
 //
 // Pure and RN-free.
 
-import type { MealLogResponse } from '@pepta/shared';
+import type { MealLogResponse, WaterLogResponse } from '@pepta/shared';
 
 export type FavouriteKind = 'food' | 'drink';
 
@@ -198,4 +198,68 @@ export function suggestionsFor(
   saved: readonly Favourite[],
 ): Favourite[] {
   return STARTING_SUGGESTIONS.filter((s) => s.kind === kind && !isSaved(saved, s.id));
+}
+
+export interface WorthSavingDrink {
+  key: string;
+  /** The vessel's name on an exact match, else the volume itself. */
+  name: string;
+  ounces: number;
+  count: number;
+}
+
+/**
+ * Drinks the user keeps adding by hand.
+ *
+ * Water logs carry a VOLUME and a time, never a product name — so this groups
+ * by the amount, which is the thing actually being repeated. Someone who taps
+ * 34 oz five times a fortnight has a bottle they keep refilling, and that is
+ * worth one tap. Naming it after a product we never recorded would be
+ * inventing the interesting half.
+ *
+ * The name comes from the vessel row on an EXACT match only. A 20 oz habit is
+ * "20 oz", not "Bottle" — a 16 oz bottle is not what they drank.
+ */
+export function worthSavingDrinks(
+  waterLogs: readonly WaterLogResponse[] | null | undefined,
+  saved: readonly Favourite[],
+  now: Date,
+  vesselName: (ounces: number) => string | null,
+  max = WORTH_SAVING_MAX,
+): WorthSavingDrink[] {
+  const since = now.getTime() - WORTH_SAVING_DAYS * 86_400_000;
+  const counts = new Map<number, number>();
+
+  for (const log of waterLogs ?? []) {
+    if (log.deletedAt != null) continue;
+    const at = new Date(log.datetime).getTime();
+    if (!Number.isFinite(at) || at < since || at > now.getTime()) continue;
+    const oz = Math.round(log.amountOz * 10) / 10;
+    if (!(oz > 0)) continue;
+    counts.set(oz, (counts.get(oz) ?? 0) + 1);
+  }
+
+  return [...counts.entries()]
+    .map(([ounces, count]) => {
+      const name = vesselName(ounces) ?? `${ounces} oz`;
+      return { key: favouriteId('drink', name, `${ounces} oz`), name, ounces, count };
+    })
+    .filter((d) => d.count >= WORTH_SAVING_MIN_LOGS && !isSaved(saved, d.key))
+    .sort((a, b) => b.count - a.count || b.ounces - a.ounces)
+    .slice(0, max);
+}
+
+/** Turn a drink offer into the thing that gets stored. */
+export function favouriteFromDrinkOffer(
+  offer: WorthSavingDrink,
+  savedAt: string,
+): Favourite {
+  return {
+    id: offer.key,
+    kind: 'drink',
+    name: offer.name,
+    portion: `${offer.ounces} oz`,
+    ounces: offer.ounces,
+    savedAt,
+  };
 }

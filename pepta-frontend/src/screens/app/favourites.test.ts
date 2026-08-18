@@ -8,7 +8,9 @@ import {
   favouritesOf,
   isSaved,
   removeFavourite,
+  favouriteFromDrinkOffer,
   worthSaving,
+  worthSavingDrinks,
   worthSavingReason,
   type Favourite,
 } from './favourites';
@@ -156,5 +158,69 @@ describe('worthSaving', () => {
     const saved = favouriteFromOffer(offer, NOW.toISOString());
     expect(saved).toMatchObject({ kind: 'food', name: 'Protein bar', portion: '1 bar', protein: 30, calories: 200 });
     expect(saved.id).toBe(offer.key);
+  });
+});
+
+describe('worthSavingDrinks', () => {
+  const water = (amountOz: number, at: string, over: Record<string, unknown> = {}) =>
+    ({ id: `${amountOz}-${at}`, amountOz, datetime: at, deletedAt: null, ...over }) as never;
+  const named = (oz: number) => (oz === 34 ? 'Sports bottle' : oz === 16 ? 'Bottle' : null);
+
+  const thrice = [water(34, daysAgo(1)), water(34, daysAgo(3)), water(34, daysAgo(6))];
+
+  it('groups by the VOLUME, which is the thing water logs actually record', () => {
+    const out = worthSavingDrinks(thrice, [], NOW, named);
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({ name: 'Sports bottle', ounces: 34, count: 3 });
+  });
+
+  it('names an amount that is not a vessel after the amount, not a near miss', () => {
+    const out = worthSavingDrinks([water(20, daysAgo(1)), water(20, daysAgo(2)), water(20, daysAgo(3))], [], NOW, named);
+    // 20 is between a 16 oz bottle and a 24 oz shaker — calling it either
+    // would claim they drank something they did not.
+    expect(out[0]!.name).toBe('20 oz');
+  });
+
+  it('stays quiet below the threshold', () => {
+    expect(worthSavingDrinks(thrice.slice(0, 2), [], NOW, named)).toEqual([]);
+  });
+
+  it('ignores logs outside the window, deleted logs, and nonsense', () => {
+    expect(worthSavingDrinks([water(34, daysAgo(30)), water(34, daysAgo(31)), water(34, daysAgo(32))], [], NOW, named)).toEqual([]);
+    expect(
+      worthSavingDrinks([...thrice.slice(0, 2), water(34, daysAgo(2), { deletedAt: daysAgo(1) })], [], NOW, named),
+    ).toEqual([]);
+    expect(worthSavingDrinks([water(0, daysAgo(1)), water(-4, daysAgo(2)), water(34, daysAgo(3))], [], NOW, named)).toEqual([]);
+  });
+
+  it('does not offer one already saved', () => {
+    const saved = [favouriteFromDrinkOffer(worthSavingDrinks(thrice, [], NOW, named)[0]!, NOW.toISOString())];
+    expect(worthSavingDrinks(thrice, saved, NOW, named)).toEqual([]);
+  });
+
+  it('treats two different volumes as two habits', () => {
+    const mixed = [...thrice, water(12, daysAgo(1)), water(12, daysAgo(2)), water(12, daysAgo(4))];
+    expect(worthSavingDrinks(mixed, [], NOW, named).map((d) => d.ounces)).toEqual([34, 12]);
+  });
+
+  it('ranks most-added first and caps the list', () => {
+    const many = [
+      ...Array.from({ length: 6 }, (_, i) => water(34, daysAgo(i))),
+      ...Array.from({ length: 5 }, (_, i) => water(16, daysAgo(i))),
+      ...Array.from({ length: 4 }, (_, i) => water(12, daysAgo(i))),
+      ...Array.from({ length: 3 }, (_, i) => water(8, daysAgo(i))),
+    ];
+    expect(worthSavingDrinks(many, [], NOW, named).map((d) => d.ounces)).toEqual([34, 16, 12]);
+  });
+
+  it('survives no logs at all', () => {
+    expect(worthSavingDrinks(null, [], NOW, named)).toEqual([]);
+    expect(worthSavingDrinks(undefined, [], NOW, named)).toEqual([]);
+  });
+
+  it('saves with its volume, so it can be logged and can join Quick add', () => {
+    const offer = worthSavingDrinks(thrice, [], NOW, named)[0]!;
+    const fav = favouriteFromDrinkOffer(offer, NOW.toISOString());
+    expect(fav).toMatchObject({ kind: 'drink', name: 'Sports bottle', portion: '34 oz', ounces: 34 });
   });
 });

@@ -179,3 +179,9 @@ export function vesselForOunces(ounces: number | undefined): string {
   }
   return best.icon;
 }
+
+/** The vessel's name when a volume matches one exactly, else null. */
+export function vesselNameForExactOunces(ounces: number): string | null {
+  const match = [...VESSELS, ...BIG_VESSELS].find((v) => v.ounces === ounces);
+  return match?.name ?? null;
+}

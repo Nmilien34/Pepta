@@ -317,3 +317,74 @@ describe("FavouritesScreen · the right row acts, not the first one", () => {
     );
   });
 });
+
+describe("FavouritesScreen · the drinks side", () => {
+  const waterLogs = (oz: number, times: number) =>
+    Array.from({ length: times }, (_, i) => ({
+      id: `${oz}-${i}`,
+      amountOz: oz,
+      datetime: new Date(Date.now() - (i + 1) * 86_400_000).toISOString(),
+      deletedAt: null,
+    }));
+
+  it("offers drinks you keep adding by hand, from real water logs", async () => {
+    mocks.track = { mealLogs: [], waterLogs: waterLogs(34, 4) };
+    const out = texts(await render([], "drink"));
+    expect(out).toContain("Worth saving");
+    expect(out).toContain("Drinks you keep adding by hand");
+    // 34 oz is a Sports bottle exactly, so it is named as one.
+    expect(out).toContain("Sports bottle");
+    expect(out).toContain("Logged 4 times in two weeks");
+  });
+
+  it("names a volume that is not a vessel after the volume", async () => {
+    mocks.track = { mealLogs: [], waterLogs: waterLogs(20, 3) };
+    expect(texts(await render([], "drink"))).toContain("20 oz");
+  });
+
+  it("stays quiet below the threshold rather than inventing a habit", async () => {
+    mocks.track = { mealLogs: [], waterLogs: waterLogs(34, 2) };
+    expect(texts(await render([], "drink"))).not.toContain("Worth saving");
+  });
+
+  it("saves a drink offer with its volume, so Log and Quick add both work", async () => {
+    mocks.track = { mealLogs: [], waterLogs: waterLogs(34, 4) };
+    const tree = await render([], "drink");
+    press(tree, "Save Sports bottle to favourites");
+    expect(mocks.saveFavourite).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: "drink", name: "Sports bottle", ounces: 34 }),
+    );
+  });
+
+  it("draws every drink row as a vessel, never a generic icon", async () => {
+    mocks.track = { mealLogs: [], waterLogs: waterLogs(34, 4) };
+    const tree = await render([bottle], "drink");
+    const vessels = tree.root.findAll((n) => String(n.type) === "VesselIcon");
+    // One for the saved bottle, one for the offer.
+    expect(vessels.length).toBe(2);
+    expect(vessels.map((v) => v.props.vessel)).toEqual(["bottle", "sports"]);
+  });
+
+  it("keeps food's Worth saving off the drinks tab and vice versa", async () => {
+    const at = (d: number) => new Date(Date.now() - d * 86_400_000).toISOString();
+    mocks.track = {
+      mealLogs: [1, 2, 3].map((d) => ({
+        id: `m${d}`, foodName: "Protein bar", servingSize: "1 bar",
+        protein: 20, calories: 210, datetime: at(d), deletedAt: null,
+      })),
+      waterLogs: waterLogs(34, 4),
+    };
+    expect(texts(await render([], "drink"))).not.toContain("Protein bar");
+    expect(texts(await render([], "food"))).not.toContain("Sports bottle");
+  });
+
+  it("still offers Edit and removes the right drink", async () => {
+    const coffee = row({ key: "drink:morning-coffee:12-oz", kind: "drink", name: "Morning coffee", portion: "Black, large mug", ounces: 12 });
+    const tree = await render([bottle, coffee], "drink");
+    press(tree, "Edit");
+    await act(async () => {
+      find(tree, "Remove Morning coffee from favourites")!.props.onPress();
+    });
+    expect(mocks.removeFavourite).toHaveBeenCalledWith(coffee.key);
+  });
+});

@@ -27,13 +27,15 @@ import { usePeptaData } from '../../context/PeptaDataContext';
 import { useLogSheets } from '../../context/LogSheetsContext';
 import { useTheme } from '../../theme';
 import { useFavourites } from './useFavourites';
-import { vesselForOunces } from './hydration';
+import { vesselForOunces, vesselNameForExactOunces } from './hydration';
 import {
   countsByKind,
+  favouriteFromDrinkOffer,
   favouriteFromOffer,
   favouritesOf,
   suggestionsFor,
   worthSaving,
+  worthSavingDrinks,
   worthSavingReason,
   type Favourite,
   type FavouriteKind,
@@ -63,6 +65,15 @@ export function FavouritesScreen() {
   const rows = favouritesOf(favourites, tab);
   const offers = useMemo(
     () => (tab === 'food' ? worthSaving(track?.mealLogs, favourites, new Date()) : []),
+    [tab, track, favourites],
+  );
+  // Drinks are grouped by the VOLUME being repeated — water logs carry no
+  // product name, so the amount is the thing actually habitual.
+  const drinkOffers = useMemo(
+    () =>
+      tab === 'drink'
+        ? worthSavingDrinks(track?.waterLogs, favourites, new Date(), vesselNameForExactOunces)
+        : [],
     [tab, track, favourites],
   );
   const suggestions = suggestionsFor(tab, favourites);
@@ -293,6 +304,53 @@ export function FavouritesScreen() {
                     <KeepButton
                       label={`Save ${offer.name} to favourites`}
                       onPress={() => save(favouriteFromOffer(offer, new Date().toISOString()))}
+                    />
+                  </View>
+                ))}
+              </Card>
+            </>
+          ) : null}
+
+          {drinkOffers.length > 0 ? (
+            <>
+              <AppText variant="cardTitle" style={{ fontSize: 15, marginTop: 16 }}>
+                Worth saving
+              </AppText>
+              <AppText variant="caption" color="textTertiary" style={{ fontSize: 10.5, marginTop: 6, lineHeight: 15 }}>
+                Drinks you keep adding by hand. Save one and it joins Quick add too.
+              </AppText>
+              <Card style={{ marginTop: 10, paddingVertical: 0 }}>
+                {drinkOffers.map((offer, i) => (
+                  <View
+                    key={offer.key}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 11,
+                      paddingVertical: 11,
+                      borderBottomWidth: i === drinkOffers.length - 1 ? 0 : 0.5,
+                      borderBottomColor: theme.colors.border,
+                    }}
+                  >
+                    <View style={{ width: 40, alignItems: 'center', justifyContent: 'center' }}>
+                      <VesselIcon vessel={vesselForOunces(offer.ounces)} water={accent} width={30} height={36} />
+                    </View>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <AppText variant="cardTitle" style={{ fontSize: 14 }} numberOfLines={1}>
+                        {offer.name}
+                      </AppText>
+                      <AppText variant="caption" color="textTertiary" style={{ fontSize: 10.5, marginTop: 2 }}>
+                        {worthSavingReason(offer.count)}
+                      </AppText>
+                      <View style={{ flexDirection: 'row', gap: 10, marginTop: 5 }}>
+                        <AppText variant="caption" style={{ fontSize: 10.5, fontWeight: '700', color: accent }}>
+                          {offer.ounces} oz
+                        </AppText>
+                      </View>
+                    </View>
+                    <KeepButton
+                      label={`Save ${offer.name} to favourites`}
+                      onPress={() => save(favouriteFromDrinkOffer(offer, new Date().toISOString()))}
                     />
                   </View>
                 ))}
