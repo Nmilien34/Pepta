@@ -33,7 +33,7 @@ import {
   favouriteFromDrinkOffer,
   favouriteFromOffer,
   favouritesOf,
-  suggestionsFor,
+  startingSuggestions,
   worthSaving,
   worthSavingDrinks,
   worthSavingReason,
@@ -76,7 +76,7 @@ export function FavouritesScreen() {
         : [],
     [tab, track, favourites],
   );
-  const suggestions = suggestionsFor(tab, favourites);
+  const suggestions = startingSuggestions(favourites);
   const tint = tab === 'food' ? FOOD_TINT : DRINK_TINT;
   const accent = tab === 'food' ? theme.colors.protein : theme.colors.water;
 
@@ -359,13 +359,13 @@ export function FavouritesScreen() {
           ) : null}
 
           {/* Only before anything is saved — a dead end is worse than a nudge. */}
-          {rows.length === 0 && suggestions.length > 0 ? (
+          {suggestions.length > 0 ? (
             <>
               <AppText variant="cardTitle" style={{ fontSize: 15, marginTop: 16 }}>
                 Start with these
               </AppText>
               <AppText variant="caption" color="textTertiary" style={{ fontSize: 10.5, marginTop: 6, lineHeight: 15 }}>
-                The most-logged items across Pepta. Keep what fits, ignore the rest.
+                The three most-logged items across Pepta. Keep what fits, ignore the rest.
               </AppText>
               <Card style={{ marginTop: 10, paddingVertical: 0 }}>
                 {suggestions.map((s, i) => (
@@ -380,8 +380,17 @@ export function FavouritesScreen() {
                       borderBottomColor: theme.colors.border,
                     }}
                   >
-                    <Leading fav={s} tint={tint} accent={accent} />
-                    <FavouriteBody fav={s} accent={accent} />
+                    {/* Each row wears its own kind: a drink among the
+                        suggestions still draws as a vessel in water blue. */}
+                    <Leading
+                      fav={s}
+                      tint={s.kind === 'food' ? FOOD_TINT : DRINK_TINT}
+                      accent={s.kind === 'food' ? theme.colors.protein : theme.colors.water}
+                    />
+                    <FavouriteBody
+                      fav={s}
+                      accent={s.kind === 'food' ? theme.colors.protein : theme.colors.water}
+                    />
                     <KeepButton
                       label={`Save ${s.name} to favourites`}
                       onPress={() => save({ ...s, savedAt: new Date().toISOString() })}

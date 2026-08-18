@@ -192,12 +192,18 @@ export const STARTING_SUGGESTIONS: readonly Favourite[] = [
   },
 ];
 
-/** The suggestions for one tab, minus anything already saved. */
-export function suggestionsFor(
-  kind: FavouriteKind,
-  saved: readonly Favourite[],
-): Favourite[] {
-  return STARTING_SUGGESTIONS.filter((s) => s.kind === kind && !isSaved(saved, s.id));
+/**
+ * Shown only on a genuinely empty screen — the frame is titled "before
+ * anything is saved", and it lists all three together regardless of which tab
+ * is selected.
+ *
+ * GATED ON THE WHOLE LIST, not the current tab. Filtering per tab would pop
+ * the nudge up on Drinks after the user had already curated Food, which is not
+ * a first run and reads as the app forgetting what they did.
+ */
+export function startingSuggestions(saved: readonly Favourite[]): Favourite[] {
+  if (saved.length > 0) return [];
+  return [...STARTING_SUGGESTIONS];
 }
 
 export interface WorthSavingDrink {

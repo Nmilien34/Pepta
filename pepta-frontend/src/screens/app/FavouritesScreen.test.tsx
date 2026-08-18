@@ -235,6 +235,26 @@ describe("FavouritesScreen · before anything is saved", () => {
     expect(texts(await render([chicken], "food"))).not.toContain("Start with these");
   });
 
+  it("stops suggesting on BOTH tabs once anything is saved", async () => {
+    // A curated Food list must not make Drinks look like a first run.
+    expect(texts(await render([chicken], "drink"))).not.toContain("Start with these");
+  });
+
+  it("lists all three on a truly empty screen, per the frame", async () => {
+    const out = texts(await render([], "food"));
+    expect(out).toContain("Greek yogurt");
+    expect(out).toContain("Chicken breast");
+    // The drink is offered too, drawn as a vessel rather than a food tile.
+    expect(out).toContain("Water bottle");
+  });
+
+  it("draws the suggested drink as a vessel even on the Food tab", async () => {
+    const tree = await render([], "food");
+    const vessels = tree.root.findAll((n) => String(n.type) === "VesselIcon");
+    expect(vessels).toHaveLength(1);
+    expect(vessels[0]!.props.vessel).toBe("bottle");
+  });
+
   it("offers Add your own on the drinks side", async () => {
     const tree = await render([], "drink");
     expect(texts(tree)).toContain("Name it, set the volume");

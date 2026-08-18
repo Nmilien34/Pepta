@@ -11,6 +11,7 @@ import {
   favouriteFromDrinkOffer,
   worthSaving,
   worthSavingDrinks,
+  startingSuggestions,
   worthSavingReason,
   type Favourite,
 } from './favourites';
@@ -222,5 +223,28 @@ describe('worthSavingDrinks', () => {
     const offer = worthSavingDrinks(thrice, [], NOW, named)[0]!;
     const fav = favouriteFromDrinkOffer(offer, NOW.toISOString());
     expect(fav).toMatchObject({ kind: 'drink', name: 'Sports bottle', portion: '34 oz', ounces: 34 });
+  });
+});
+
+describe('startingSuggestions', () => {
+  it('offers all three on a genuinely empty screen — food AND the drink', () => {
+    const out = startingSuggestions([]);
+    expect(out).toHaveLength(3);
+    expect(out.filter((s) => s.kind === 'drink')).toHaveLength(1);
+  });
+
+  it('stops the moment ANYTHING is saved, on either side', () => {
+    expect(startingSuggestions([fav('Chicken breast', '6 oz')])).toEqual([]);
+    // A saved drink also ends the first run — the screen is no longer empty.
+    expect(startingSuggestions([fav('Water bottle', '16 oz', 'drink')])).toEqual([]);
+  });
+
+  it('carries the numbers each one needs to be saved and logged', () => {
+    for (const s of startingSuggestions([])) {
+      expect(s.name.length).toBeGreaterThan(0);
+      expect(s.portion.length).toBeGreaterThan(0);
+      if (s.kind === 'drink') expect(s.ounces).toBeGreaterThan(0);
+      else expect(s.protein).toBeGreaterThan(0);
+    }
   });
 });
