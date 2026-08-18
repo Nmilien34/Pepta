@@ -14,7 +14,7 @@ export interface MedicationView {
   estimate: number;
   unit: string;
   status: string;
-  bars: number[]; // 0..1 normalized heights
+  bars: LevelBar[];
   countdown: string | null;
 }
 
@@ -80,14 +80,81 @@ export function formatCountdown(hours: number | null): string | null {
   return days > 0 ? `${days}d ${h}h` : `${h}h`;
 }
 
-// Sample `count` points evenly across the curve, normalized to the peak.
-export function medicationBars(curve: MedicationLevelResponse['curve'], count = 7): number[] {
+export interface LevelBar {
+  /** 0..1, normalised to the tallest bar shown. */
+  height: number;
+  /** "M", "T" … — the local weekday this bar actually is. */
+  letter: string;
+  isToday: boolean;
+}
+
+const DAY_LETTERS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+
+/** The last `count` local days ending today, oldest first. */
+export function recentDays(now: Date, count = 7): Date[] {
+  const days: Date[] = [];
+  for (let back = count - 1; back >= 0; back -= 1) {
+    const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() - back);
+    days.push(day);
+  }
+  return days;
+}
+
+/** Letters alone, for the empty card — there is no curve to read there. */
+export function recentDayLetters(now: Date, count = 7): string[] {
+  return recentDays(now, count).map((day) => DAY_LETTERS[day.getDay()]!);
+}
+
+/**
+ * One bar per local day for the last week, labelled with that day.
+ *
+ * WHY NOT EVENLY SPACED. The curve spans now−7d to now+7d, so taking `count`
+ * evenly-spaced samples put roughly half the bars in the FUTURE — projections
+ * rendered identically to history, immediately under the words "Current
+ * estimate", with no labels to say which was which. Sampling per day makes the
+ * row mean "your level across this past week", which is what the design's
+ * M T W T F S S was always describing.
+ *
+ * Each day takes the last sample at or before the end of that day, clamped to
+ * `now`, so today's bar is today's level and never a projection.
+ */
+export function medicationBars(
+  curve: MedicationLevelResponse['curve'],
+  now: Date = new Date(),
+  count = 7,
+): LevelBar[] {
   if (curve.length === 0) return [];
-  const n = Math.min(count, curve.length);
-  const step = (curve.length - 1) / Math.max(1, n - 1);
-  const picks = Array.from({ length: n }, (_, i) => curve[Math.round(i * step)]?.level ?? 0);
-  const peak = Math.max(...picks, 1);
-  return picks.map((v) => Math.max(0.06, v / peak));
+
+  const points = curve
+    .map((point) => ({ at: new Date(point.datetime).getTime(), level: point.level }))
+    .filter((point) => Number.isFinite(point.at))
+    .sort((a, b) => a.at - b.at);
+  if (points.length === 0) return [];
+
+  const nowMs = now.getTime();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+
+  const picked = recentDays(now, count).map((day) => {
+    const endOfDay = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1).getTime() - 1;
+    const cutoff = Math.min(endOfDay, nowMs);
+    let level = 0;
+    for (const point of points) {
+      if (point.at > cutoff) break;
+      level = point.level;
+    }
+    return {
+      level,
+      letter: DAY_LETTERS[day.getDay()]!,
+      isToday: day.getTime() === today,
+    };
+  });
+
+  const peak = Math.max(...picked.map((p) => p.level), 1);
+  return picked.map((p) => ({
+    height: Math.max(0.06, p.level / peak),
+    letter: p.letter,
+    isToday: p.isToday,
+  }));
 }
 
 export function medicationStatus(ml: MedicationLevelResponse): string {

@@ -28,7 +28,7 @@ function level(compoundId: string, overrides: Partial<MedicationLevelResponse> =
     currentEstimate: 31.2,
     peakEstimate: 34,
     troughEstimate: 30,
-    curve: Array.from({ length: 8 }, (_, i) => ({ at: `2026-08-0${i + 1}T00:00:00.000Z`, level: 30 + i })),
+    curve: Array.from({ length: 8 }, (_, i) => ({ datetime: `2026-08-0${i + 1}T00:00:00.000Z`, level: 30 + i })),
     nextDoseAt: null,
     hoursUntilNextDose: null,
     estimateBasis: 'relative-dose-equivalent',

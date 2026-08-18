@@ -20,7 +20,7 @@ import { LivingMascot } from '../../components/LivingMascot';
 import { useSeenTeachCards } from './useSeenTeachCards';
 import { usePeptaData } from '../../context/PeptaDataContext';
 import { useLogSheets } from '../../context/LogSheetsContext';
-import { buildHomeView, type GoalView, type HomeWeightPulseView, type RingStat } from './homeView';
+import { buildHomeView, recentDayLetters, type GoalView, type HomeWeightPulseView, type LevelBar, type RingStat } from './homeView';
 import { globalDoseNoun, LEVEL_SUPPRESSION_COPY } from './levelSuppression';
 import { buildActivity, buildTodaysLog, type ActivitySummary, type LogChip, type LogKind } from './homeExtras';
 import { HomeShortcuts, type Shortcut } from './HomeShortcuts';
@@ -412,19 +412,7 @@ export function HomeScreen() {
                       Current estimate
                     </AppText>
                   </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 6, height: 46 }}>
-                    {view.medication.bars.map((h, i) => (
-                      <View
-                        key={i}
-                        style={{
-                          width: 7,
-                          height: Math.round(h * 46),
-                          borderRadius: 4,
-                          backgroundColor: i === view.medication!.bars.length - 1 ? theme.colors.primary : '#E7E1FF',
-                        }}
-                      />
-                    ))}
-                  </View>
+                  <LevelBars bars={view.medication.bars} />
                 </View>
                 {view.medication.countdown ? (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: theme.spacing.md, paddingTop: theme.spacing.sm, borderTopWidth: 0.5, borderTopColor: theme.colors.border }}>
@@ -482,11 +470,7 @@ export function HomeScreen() {
                       Current estimate
                     </AppText>
                   </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 6, height: 46 }}>
-                    {[20, 26, 22, 30, 26, 24, 32].map((h, i) => (
-                      <View key={i} style={{ width: 7, height: h, borderRadius: 4, backgroundColor: '#E7E1FF' }} />
-                    ))}
-                  </View>
+                  <LevelBars bars={null} />
                 </View>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: theme.spacing.md, paddingTop: theme.spacing.sm, borderTopWidth: 0.5, borderTopColor: theme.colors.border }}>
                   <Icon name="time-outline" size={14} color={theme.colors.textSecondary} />
@@ -712,10 +696,50 @@ function PlanCard({ plan }: { plan: PlanSummary }) {
   );
 }
 
+/** Ghost heights for the empty card — a shape, never a claim about a level. */
+const GHOST_BARS = [20, 26, 22, 30, 26, 24, 32];
+const BAR_MAX = 46;
+
+/**
+ * The week of level bars, each under its own day. `bars={null}` is the
+ * first-run card: ghosts at 45%, but the day letters are still the real week,
+ * because those are true whether or not anything has been logged.
+ */
+function LevelBars({ bars }: { bars: LevelBar[] | null }) {
+  const theme = useTheme();
+  const letters = useMemo(() => recentDayLetters(new Date()), []);
+  const row = bars ?? GHOST_BARS.map((h, i) => ({
+    height: h / BAR_MAX,
+    letter: letters[i] ?? '',
+    isToday: i === GHOST_BARS.length - 1,
+  }));
+
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
+      {row.map((bar, i) => (
+        <View key={i} style={{ alignItems: 'center', gap: 5 }}>
+          <View
+            style={{
+              width: 7,
+              height: Math.round(bar.height * BAR_MAX),
+              borderRadius: 4,
+              backgroundColor: bars && bar.isToday ? theme.colors.primary : '#E9E5FA',
+              opacity: bars ? 1 : 0.45,
+            }}
+          />
+          <AppText variant="caption" color="textTertiary" style={{ fontSize: 10 }}>
+            {bar.letter}
+          </AppText>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 const TASK_ICON: Record<string, string> = {
   account: 'checkmark',
   shot: 'medical',
-  meal: 'restaurant',
+  meal: 'food-drumstick',
   water: 'water',
   weight: 'scale',
 };
@@ -735,8 +759,24 @@ function GettingStartedCard({ data, onTask }: { data: GettingStarted; onTask: (a
           {data.doneCount} of {data.total}
         </AppText>
       </View>
-      <View style={{ marginTop: 10, marginBottom: 4 }}>
-        <ProgressBar pct={data.total ? data.doneCount / data.total : 0} color={theme.colors.primary} height={6} />
+      {/* One segment per task, not a continuous bar. The bar answered "how far
+          along am I" with a fraction; the segments answer "how many left" by
+          being countable — which is the question a five-item checklist raises. */}
+      <View style={{ flexDirection: 'row', gap: 5, marginTop: 12, marginBottom: 4 }}>
+        {data.tasks.map((task, i) => (
+          <View
+            key={task.key}
+            style={{
+              flex: 1,
+              height: 6,
+              borderRadius: 999,
+              // Fills left-to-right by COUNT, not per task: ticking off the
+              // fourth item must not light the fourth segment and leave holes.
+              // It is a meter reading "2 of 5", not a row of checkboxes.
+              backgroundColor: i < data.doneCount ? theme.colors.primary : theme.colors.border,
+            }}
+          />
+        ))}
       </View>
       {data.tasks.map((t, i) => {
         const tappable = !t.done && !!t.action;

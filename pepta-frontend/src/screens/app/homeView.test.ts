@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { HomeResponse, MedicationLevelResponse } from '@pepta/shared';
-import { buildHomeView, formatCountdown, medicationBars, medicationStatus } from './homeView';
+import { buildHomeView, formatCountdown, medicationBars, medicationStatus, recentDayLetters } from './homeView';
 
 const ml = {
   compoundId: 'c1',
@@ -29,14 +29,45 @@ describe('formatCountdown', () => {
 });
 
 describe('medicationBars', () => {
+  const now = new Date('2026-08-17T20:00:00Z');
+
   it('normalizes to the peak with a floor', () => {
-    const bars = medicationBars(ml.curve, 3);
+    const bars = medicationBars(ml.curve, now, 3);
     expect(bars).toHaveLength(3);
-    expect(Math.max(...bars)).toBe(1);
-    expect(Math.min(...bars)).toBeGreaterThanOrEqual(0.06);
+    expect(Math.max(...bars.map((b) => b.height))).toBe(1);
+    expect(Math.min(...bars.map((b) => b.height))).toBeGreaterThanOrEqual(0.06);
   });
+
   it('handles an empty curve', () => {
-    expect(medicationBars([], 7)).toEqual([]);
+    expect(medicationBars([], now, 7)).toEqual([]);
+  });
+
+  it('labels each bar with its own local weekday, ending today', () => {
+    const bars = medicationBars(ml.curve, now, 7);
+    expect(bars).toHaveLength(7);
+    expect(bars.map((b) => b.letter)).toEqual(recentDayLetters(now, 7));
+    expect(bars.filter((b) => b.isToday)).toHaveLength(1);
+    expect(bars[bars.length - 1]!.isToday).toBe(true);
+  });
+
+  it('never reads a future sample into a bar', () => {
+    // The curve runs now-7d .. now+7d. A huge spike tomorrow must not show up
+    // in any bar — every bar is a level that has already happened.
+    const spiked = [
+      ...ml.curve,
+      { datetime: new Date(now.getTime() + 36 * 3_600_000).toISOString(), level: 9_999 },
+    ];
+    const bars = medicationBars(spiked, now, 7);
+    expect(Math.max(...bars.map((b) => b.height))).toBe(1);
+    // If the spike leaked in, every real bar would be crushed to the floor.
+    expect(bars.filter((b) => b.height > 0.06).length).toBeGreaterThan(1);
+  });
+});
+
+describe('recentDayLetters', () => {
+  it('returns seven letters ending on today', () => {
+    const wed = new Date(2026, 7, 19); // a Wednesday
+    expect(recentDayLetters(wed, 7)).toEqual(['T', 'F', 'S', 'S', 'M', 'T', 'W']);
   });
 });
 
