@@ -26,7 +26,7 @@ import { useTheme } from "../theme";
 
 interface LogSheetsValue {
   openQuickLog(mode?: QuickLogMode): void;
-  openMeal(seed?: MealSeed | null): void;
+  openMeal(seed?: MealSeed | null, opts?: { keepAsRecipe?: boolean }): void;
 }
 
 interface LogToastMessage {
@@ -59,6 +59,8 @@ export function LogSheetsProvider({ children }: { children: ReactNode }) {
   const mealOpenTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingSeed = useRef<MealSeed | null>(null);
+  const pendingKeepAsRecipe = useRef(false);
+  const [keepAsRecipe, setKeepAsRecipe] = useState(false);
   const [mealSeed, setMealSeed] = useState<MealSeed | null>(null);
 
   useEffect(
@@ -78,7 +80,14 @@ export function LogSheetsProvider({ children }: { children: ReactNode }) {
     setQuickOpen(true);
   }, []);
   const openMeal = useCallback(
-    (seed?: MealSeed | null) => {
+    (seed?: MealSeed | null, opts?: { keepAsRecipe?: boolean }) => {
+      // "Keep the result": the New-recipe routes reuse the meal sheet to
+      // IDENTIFY food, then the commit saves a recipe instead of logging a
+      // meal. Held on a ref for the same reason as the seed — the sheet can
+      // open on a delay, and a flag that re-rendered away in between would
+      // silently log the meal the user meant to save.
+      pendingKeepAsRecipe.current = opts?.keepAsRecipe ?? false;
+      setKeepAsRecipe(opts?.keepAsRecipe ?? false);
       // Held in a ref, not state: the sheet may open on a delay (below) and a
       // seed that re-rendered away in between would silently become a blank
       // manual form — the failure looks like "the tap did nothing".
@@ -106,6 +115,7 @@ export function LogSheetsProvider({ children }: { children: ReactNode }) {
     pendingMealOpen.current = false;
     mealOpenTimer.current = setTimeout(() => {
       setMealSeed(pendingSeed.current);
+      setKeepAsRecipe(pendingKeepAsRecipe.current);
       setMealOpen(true);
     }, 40);
   }, []);
@@ -160,6 +170,7 @@ export function LogSheetsProvider({ children }: { children: ReactNode }) {
       />
       <MealLogSheet
         seed={mealSeed}
+        keepAsRecipe={keepAsRecipe}
         visible={mealOpen}
         onClose={handleMealClose}
         onBack={mealReturnsToQuickLog ? handleMealBack : undefined}

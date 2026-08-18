@@ -1358,3 +1358,58 @@ export type FavouriteKind = z.infer<typeof favouriteKindSchema>;
 export type FavouriteInput = z.infer<typeof favouriteInputSchema>;
 export type FavouriteResponse = z.infer<typeof favouriteResponseSchema>;
 export type FavouritesResponse = z.infer<typeof favouritesResponseSchema>;
+
+// ---------------------------------------------------------------------------
+// Recipes — a combination you eat often, logged in one tap.
+//
+// No method and no steps: this is not a cookbook. It is a saved list of foods
+// whose totals are DERIVED from its ingredients rather than stored beside
+// them. Storing a total invites the two to disagree the moment someone edits a
+// portion, and the number people act on would be the stale one.
+//
+// STARTERS live in the same collection with no owner. They ship seeded so the
+// screen is useful before anyone has saved anything, and being rows rather
+// than a constant in the bundle means they can be corrected or extended
+// without an app release.
+//
+// Logging a recipe writes the same entry a fresh meal log would — a shortcut,
+// not a different kind of record.
+// ---------------------------------------------------------------------------
+
+export const recipeIngredientSchema = z
+  .object({
+    name: z.string().trim().min(1).max(120),
+    /** "1 scoop", "3 large" — free text, shown as written. */
+    amount: z.string().trim().max(60).default(""),
+    protein: z.number().nonnegative(),
+    calories: z.number().nonnegative(),
+    fiber: z.number().nonnegative().optional(),
+  })
+  .strict();
+
+export const recipeInputSchema = z
+  .object({
+    name: z.string().trim().min(1).max(120),
+    ingredients: z.array(recipeIngredientSchema).min(1).max(40),
+  })
+  .strict();
+
+export const recipeResponseSchema = recipeInputSchema.extend({
+  id: idSchema,
+  /** True for the seeded ones, which belong to nobody and cannot be edited. */
+  isStarter: z.boolean(),
+  createdAt: isoDateTimeSchema,
+  updatedAt: isoDateTimeSchema,
+});
+
+export const recipesResponseSchema = z
+  .object({
+    recipes: z.array(recipeResponseSchema),
+    starters: z.array(recipeResponseSchema),
+  })
+  .strict();
+
+export type RecipeIngredient = z.infer<typeof recipeIngredientSchema>;
+export type RecipeInput = z.infer<typeof recipeInputSchema>;
+export type RecipeResponse = z.infer<typeof recipeResponseSchema>;
+export type RecipesResponse = z.infer<typeof recipesResponseSchema>;

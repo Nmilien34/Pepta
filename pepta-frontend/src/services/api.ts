@@ -98,6 +98,11 @@ import {
   type FavouriteInput,
   type FavouriteResponse,
   type FavouritesResponse,
+  recipeResponseSchema,
+  recipesResponseSchema,
+  type RecipeInput,
+  type RecipeResponse,
+  type RecipesResponse,
   type MealLogInput,
   type MealLogResponse,
   type MealBarcodeInput,
@@ -631,6 +636,24 @@ class PeptaApi {
     return this.request("/favourites", favouriteResponseSchema, {
       method: "POST",
       body: JSON.stringify(input),
+    });
+  }
+
+  public getRecipes(): Promise<RecipesResponse> {
+    return this.request("/recipes", recipesResponseSchema);
+  }
+
+  /** Saving a starter as yours comes through here too — it is a copy. */
+  public createRecipe(input: RecipeInput): Promise<RecipeResponse> {
+    return this.request("/recipes", recipeResponseSchema, {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  }
+
+  public deleteRecipe(id: string): Promise<unknown> {
+    return this.request(`/recipes/${encodeURIComponent(id)}`, z.unknown(), {
+      method: "DELETE",
     });
   }
 

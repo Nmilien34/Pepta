@@ -303,6 +303,7 @@ export function NutrientWaysScreen() {
 
           <YoursBlock
             onFavourites={() => navigation.navigate('Favourites', { kind: 'food' })}
+            onRecipes={() => navigation.navigate('Recipes')}
             saved={favourites.filter((f) => f.kind === 'food').length}
             noun="eat"
           />

@@ -88,6 +88,12 @@ export interface MealLogSheetProps {
   onDismissed?: () => void;
   /** Prefills manual entry and opens straight into it. */
   seed?: MealSeed | null;
+  /**
+   * Save the identified food as a RECIPE instead of logging it as a meal.
+   * The New-recipe routes reuse this sheet to identify food; keeping the
+   * result is the only part that differs.
+   */
+  keepAsRecipe?: boolean;
 }
 
 export function MealLogSheet({
@@ -96,6 +102,7 @@ export function MealLogSheet({
   onBack,
   onDismissed,
   seed,
+  keepAsRecipe = false,
 }: MealLogSheetProps) {
   const theme = useTheme();
   const { addMeal, refreshHome, refreshTrack, saveLog } = usePeptaData();
@@ -192,6 +199,27 @@ export function MealLogSheet({
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
       () => undefined,
     );
+    // Keeping it as a recipe is NOT also logging it. The user asked to save a
+    // combination for later; folding it into today's macros as well would put
+    // a meal they have not eaten into their diary.
+    if (keepAsRecipe) {
+      api
+        .createRecipe({
+          name: input.foodName,
+          ingredients: [
+            {
+              name: input.foodName,
+              amount: input.servingSize ?? "",
+              protein: input.protein,
+              calories: input.calories,
+              ...(input.fiber != null ? { fiber: input.fiber } : {}),
+            },
+          ],
+        })
+        .catch(() => undefined);
+      onClose();
+      return;
+    }
     addMeal(input);
     onClose();
     saveLog("meal", input)
