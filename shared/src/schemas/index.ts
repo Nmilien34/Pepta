@@ -1413,3 +1413,36 @@ export type RecipeIngredient = z.infer<typeof recipeIngredientSchema>;
 export type RecipeInput = z.infer<typeof recipeInputSchema>;
 export type RecipeResponse = z.infer<typeof recipeResponseSchema>;
 export type RecipesResponse = z.infer<typeof recipesResponseSchema>;
+
+// ---------------------------------------------------------------------------
+// Recipe composition — the intelligence layer on New recipe.
+//
+// A NEW ENDPOINT rather than a key on mealScanAnalysisSchema. Those response
+// schemas are strict and bundled into shipped builds, so adding a field would
+// make every app already on a phone reject the whole payload. Recipes ask a
+// different question anyway: a meal log wants one set of totals, a recipe
+// wants the PARTS, because its totals are summed from them and the user is
+// invited to adjust the portions.
+// ---------------------------------------------------------------------------
+
+export const recipeComposeInputSchema = z
+  .object({
+    /** What the user said or typed: "two eggs, oats and a scoop of whey". */
+    text: z.string().trim().min(1).max(600),
+    /** A name the user already has in mind; the model may improve on it. */
+    name: z.string().trim().max(120).optional(),
+  })
+  .strict();
+
+/** The proposal. Nothing is saved until the user accepts it. */
+export const recipeComposeResponseSchema = z
+  .object({
+    name: z.string().trim().min(1).max(120),
+    ingredients: z.array(recipeIngredientSchema).min(1).max(40),
+    /** 0..1. Low means the screen should say so rather than imply precision. */
+    confidence: z.number().min(0).max(1),
+  })
+  .strict();
+
+export type RecipeComposeInput = z.infer<typeof recipeComposeInputSchema>;
+export type RecipeComposeResponse = z.infer<typeof recipeComposeResponseSchema>;

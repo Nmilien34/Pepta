@@ -1,4 +1,4 @@
-import { recipeInputSchema } from '@pepta/shared';
+import { recipeComposeInputSchema, recipeInputSchema } from '@pepta/shared';
 import { Router } from 'express';
 import { requireAuth } from '../auth/middleware';
 import { asyncHandler } from '../lib/async-handler';
@@ -9,6 +9,7 @@ import {
   deleteRecipe,
   listRecipes,
 } from '../services/recipe.service';
+import { composeRecipe } from '../services/recipe-compose.service';
 
 const router = Router();
 
@@ -28,6 +29,16 @@ router.post(
   validateBody(recipeInputSchema),
   asyncHandler(async (req, res) => {
     sendData(res, await createRecipe(req.user!.id, req.body));
+  }),
+);
+
+// Proposes a recipe from what the user said or what the scan identified.
+// Saves nothing: the client shows the proposal and the user accepts it.
+router.post(
+  '/compose',
+  validateBody(recipeComposeInputSchema),
+  asyncHandler(async (req, res) => {
+    sendData(res, await composeRecipe(req.body.text, req.body.name));
   }),
 );
 

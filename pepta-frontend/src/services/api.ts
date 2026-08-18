@@ -98,8 +98,11 @@ import {
   type FavouriteInput,
   type FavouriteResponse,
   type FavouritesResponse,
+  recipeComposeResponseSchema,
   recipeResponseSchema,
   recipesResponseSchema,
+  type RecipeComposeInput,
+  type RecipeComposeResponse,
   type RecipeInput,
   type RecipeResponse,
   type RecipesResponse,
@@ -646,6 +649,14 @@ class PeptaApi {
   /** Saving a starter as yours comes through here too — it is a copy. */
   public createRecipe(input: RecipeInput): Promise<RecipeResponse> {
     return this.request("/recipes", recipeResponseSchema, {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  }
+
+  /** Proposes a recipe from what the user said or the scan identified. */
+  public composeRecipe(input: RecipeComposeInput): Promise<RecipeComposeResponse> {
+    return this.request("/recipes/compose", recipeComposeResponseSchema, {
       method: "POST",
       body: JSON.stringify(input),
     });

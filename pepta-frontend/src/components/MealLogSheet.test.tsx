@@ -131,6 +131,8 @@ vi.mock("../services/api", () => ({
     createMealLog: vi.fn(),
     searchFoods: vi.fn(),
     transcribeMealAudio: vi.fn(),
+    composeRecipe: vi.fn(),
+    createRecipe: vi.fn(),
   },
 }));
 
@@ -612,5 +614,87 @@ describe("MealLogSheet", () => {
         source: "barcode",
       }),
     );
+  });
+});
+
+describe("MealLogSheet · keeping the result as a recipe", () => {
+  const apiMock = api as unknown as Record<string, ReturnType<typeof vi.fn>> & {
+    composeRecipe: ReturnType<typeof vi.fn>;
+    createRecipe: ReturnType<typeof vi.fn>;
+  };
+
+  const manualCommit = async (props: Record<string, unknown>) => {
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+    await act(async () => {
+      tree = TestRenderer.create(
+        <MealLogSheet
+          visible={true}
+          onClose={vi.fn()}
+          seed={{ foodName: "Overnight oats", servingSize: "1 bowl", protein: 40, calories: 440 }}
+          {...props}
+        />,
+      );
+    });
+    await act(async () => {
+      const label = (props as { keepAsRecipe?: boolean }).keepAsRecipe
+        ? "Save recipe"
+        : "Add to today";
+      tree!.root.findByProps({ label }).props.onPress();
+    });
+    return tree!;
+  };
+
+  beforeEach(() => {
+    apiMock.composeRecipe.mockReset();
+    apiMock.createRecipe.mockReset().mockResolvedValue({});
+  });
+
+  it("says Save recipe, not Add to today — it is not going into today", async () => {
+    apiMock.composeRecipe.mockResolvedValue({
+      name: "X",
+      ingredients: [{ name: "Y", amount: "1", protein: 1, calories: 1 }],
+      confidence: 0.5,
+    });
+    const tree = await manualCommit({ keepAsRecipe: true });
+    expect(tree.root.findAllByProps({ label: "Add to today" })).toHaveLength(0);
+  });
+
+  it("composes the parts instead of saving one blob", async () => {
+    apiMock.composeRecipe.mockResolvedValue({
+      name: "Overnight oats + whey",
+      ingredients: [
+        { name: "Rolled oats", amount: "1/2 cup dry", protein: 5, calories: 150 },
+        { name: "Whey protein", amount: "1 scoop", protein: 24, calories: 120 },
+      ],
+      confidence: 0.8,
+    });
+
+    await manualCommit({ keepAsRecipe: true });
+
+    expect(apiMock.composeRecipe).toHaveBeenCalled();
+    expect(apiMock.createRecipe).toHaveBeenCalledWith({
+      name: "Overnight oats + whey",
+      ingredients: [
+        { name: "Rolled oats", amount: "1/2 cup dry", protein: 5, calories: 150 },
+        { name: "Whey protein", amount: "1 scoop", protein: 24, calories: 120 },
+      ],
+    });
+  });
+
+  it("still saves the one line it has when composing fails", async () => {
+    apiMock.composeRecipe.mockRejectedValue(new Error("timeout"));
+
+    await manualCommit({ keepAsRecipe: true });
+
+    // Losing what the user just described because a second model call timed
+    // out would be the worse failure.
+    expect(apiMock.createRecipe).toHaveBeenCalledTimes(1);
+    expect(apiMock.createRecipe.mock.calls[0]![0].ingredients).toHaveLength(1);
+  });
+
+  it("does not compose or save a recipe on a normal meal log", async () => {
+    await manualCommit({});
+    expect(apiMock.composeRecipe).not.toHaveBeenCalled();
+    expect(apiMock.createRecipe).not.toHaveBeenCalled();
   });
 });

@@ -133,6 +133,7 @@ export function MealLogSheet({
   const [searchFailed, setSearchFailed] = useState(false);
   const [cameraRequested, setCameraRequested] = useState(false);
   const startRef = useRef<"scan" | "voice" | "search" | null>(null);
+  const saidRef = useRef<string>("");
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraMode, setCameraMode] = useState<CameraMode>("meal");
   const [barcodeRequested, setBarcodeRequested] = useState(false);
@@ -194,6 +195,7 @@ export function MealLogSheet({
       setBarcodeRequested(false);
       setBarcodeOpen(false);
       setPendingAiAction(null);
+      saidRef.current = "";
       // Fired AFTER the reset above, or it would be undone by it. Routed
       // through requestAiAction rather than performAiAction so the AI consent
       // gate still applies — a recipe is not a reason to skip it.
@@ -226,20 +228,37 @@ export function MealLogSheet({
     // combination for later; folding it into today's macros as well would put
     // a meal they have not eaten into their diary.
     if (keepAsRecipe) {
+      // COMPOSE FIRST. What the scan or the sentence produced is one set of
+      // totals — fine for a meal log, useless as a recipe, because a recipe's
+      // figures are summed from its parts and the user is invited to adjust
+      // the portions. A single-ingredient recipe cannot be adjusted.
+      //
+      // If composing fails we still save the recipe, as the one line we have.
+      // Losing what the user just described because a second model call timed
+      // out would be the worse failure.
+      const asOneLine = {
+        name: input.foodName,
+        ingredients: [
+          {
+            name: input.foodName,
+            amount: input.servingSize ?? "",
+            protein: input.protein,
+            calories: input.calories,
+            ...(input.fiber != null ? { fiber: input.fiber } : {}),
+          },
+        ],
+      };
       api
-        .createRecipe({
+        .composeRecipe({
+          text:
+            saidRef.current ||
+            [input.foodName, input.servingSize].filter(Boolean).join(", "),
           name: input.foodName,
-          ingredients: [
-            {
-              name: input.foodName,
-              amount: input.servingSize ?? "",
-              protein: input.protein,
-              calories: input.calories,
-              ...(input.fiber != null ? { fiber: input.fiber } : {}),
-            },
-          ],
         })
-        .catch(() => undefined);
+        .then((proposal) =>
+          api.createRecipe({ name: proposal.name, ingredients: proposal.ingredients }),
+        )
+        .catch(() => api.createRecipe(asOneLine).catch(() => undefined));
       onClose();
       return;
     }
@@ -344,6 +363,10 @@ export function MealLogSheet({
   const analyzeVoice = async (text: string) => {
     const transcript = text.trim();
     if (!transcript) return;
+    // The user's own sentence beats the model's one-line summary of it when
+    // splitting a recipe into parts — "two eggs, oats and a scoop of whey"
+    // names three things; "Breakfast bowl" names none.
+    saidRef.current = transcript;
     Haptics.selectionAsync().catch(() => undefined);
     setSource("voice");
     setView("analyzing");
@@ -640,6 +663,7 @@ export function MealLogSheet({
             manual={manual}
             setManual={setManual}
             onSave={logManual}
+            saveLabel={keepAsRecipe ? "Save recipe" : "Add to today"}
           />
         ) : null}
 
@@ -1333,6 +1357,7 @@ function ManualView({
   manual,
   setManual,
   onSave,
+  saveLabel,
 }: {
   theme: Theme;
   manual: Record<
@@ -1341,6 +1366,8 @@ function ManualView({
   >;
   setManual: (m: typeof manual) => void;
   onSave: () => void;
+  /** "Add to today" normally; a recipe is not going into today. */
+  saveLabel: string;
 }) {
   const set = (key: keyof typeof manual) => (v: string) =>
     setManual({
@@ -1387,7 +1414,7 @@ function ManualView({
         {field("fiber", "Fiber (g)", "decimal-pad")}
       </View>
       <View style={{ marginTop: 6 }}>
-        <Button label="Add to today" disabled={!valid} onPress={onSave} />
+        <Button label={saveLabel} disabled={!valid} onPress={onSave} />
       </View>
     </View>
   );
