@@ -28,6 +28,8 @@ import { SHORTCUT_PHOTOS } from './nutrientPhotos';
 import { buildGettingStarted, buildPlanSummary, type GettingStarted, type LogAction, type PlanSummary } from './planView';
 import { resolveTeachCard, type PepTeachCard, type ResolvedTeachCard } from './pepTeach';
 import { doseCtaState } from './doseCta';
+import { doseCtaExpanded } from './doseCtaFold';
+import { useDoseCtaFold } from './useDoseCtaFold';
 import { localDateOnly } from '../../utils/cycleWindows';
 
 const HOME_RANGES: { key: HomeRangeKey; label: string; short: string }[] = [
@@ -97,6 +99,8 @@ export function HomeScreen() {
   // broken. Do not move hooks back below the guards.
   const companionName = useCompanionName();
   const { seen, markSeen, fold, setFold } = useSeenTeachCards();
+  // ALL hooks stay above the early returns — see the note above.
+  const { fold: doseFold, closeFor: closeDoseCta, reopen: reopenDoseCta } = useDoseCtaFold();
   // One lesson a day at most, about the user's own compounds, and only when
   // the day-one checklist is done — a new user has enough to read already.
   // A card folded today stays that card: resolveTeachCard does not re-pick
@@ -140,6 +144,9 @@ export function HomeScreen() {
     );
   }
 
+  const todayOnly = localDateOnly(new Date());
+  // The section opens itself on dose days unless closed earlier today.
+  const doseCtaOpen = doseCtaExpanded(doseCta.show, doseFold, todayOnly);
   const view = buildHomeView(home);
   const plan = buildPlanSummary(home);
   const gettingStarted = buildGettingStarted(home, track);
@@ -429,10 +436,13 @@ export function HomeScreen() {
                     pulse has done its job the moment a first dose exists, and a
                     long-time user must never have a twitching Home screen. */}
                 {doseCta.show ? (
-                  <LogDoseCta
+                  <DoseCtaSection
                     label={`Log a ${globalDoseNoun(home.activeCompounds)}`}
                     pulse={false}
+                    expanded={doseCtaOpen}
                     onPress={() => openQuickLog('dose')}
+                    onClose={() => closeDoseCta(todayOnly)}
+                    onReopen={reopenDoseCta}
                   />
                 ) : null}
               </Card>
@@ -485,10 +495,13 @@ export function HomeScreen() {
                     covers oral/unmodelled users, who have no curve to collapse
                     to — same due-day rule applies. */}
                 {doseCta.show ? (
-                  <LogDoseCta
+                  <DoseCtaSection
                     label={`Log a ${globalDoseNoun(home.activeCompounds)}`}
                     pulse={doseCta.pulse}
+                    expanded={doseCtaOpen}
                     onPress={() => openQuickLog('dose')}
+                    onClose={() => closeDoseCta(todayOnly)}
+                    onReopen={reopenDoseCta}
                   />
                 ) : null}
               </Card>
@@ -604,13 +617,16 @@ function TeachCard({
             style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-              <AppText variant="caption" color="primary" style={{ fontWeight: '700', flexShrink: 1 }}>
+              {/* Grey, not purple, in both the folded and open states. The
+                  colour pass reserved purple for the gauges; Pep is identified
+                  by the mascot sitting next to the label, not by a tint. */}
+              <AppText variant="caption" color="textSecondary" style={{ fontWeight: '700', flexShrink: 1 }}>
                 {companionName} · 30 seconds?
               </AppText>
               <Icon
                 name={collapsed ? 'chevron-down' : 'chevron-up'}
                 size={16}
-                color={theme.colors.primary}
+                color={theme.colors.textTertiary}
               />
             </View>
             {/* The title survives collapse: a folded card still has to say what
@@ -696,6 +712,103 @@ function PlanCard({ plan }: { plan: PlanSummary }) {
   );
 }
 
+/**
+ * The Log-a-shot section at the foot of the level card.
+ *
+ * Open by default on any day a dose is wanted — the card expands on its own,
+ * which is the point. Close shuts it until tomorrow, and leaves a slim row
+ * that re-opens it: collapsing an action must not destroy it.
+ */
+function DoseCtaSection({
+  label,
+  pulse,
+  expanded,
+  onPress,
+  onClose,
+  onReopen,
+}: {
+  label: string;
+  pulse: boolean;
+  expanded: boolean;
+  onPress(): void;
+  onClose(): void;
+  onReopen(): void;
+}) {
+  const theme = useTheme();
+
+  if (!expanded) {
+    return (
+      <Pressable
+        onPress={() => {
+          Haptics.selectionAsync().catch(() => undefined);
+          onReopen();
+        }}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: false }}
+        accessibilityLabel={label}
+        style={({ pressed }) => ({
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 5,
+          marginTop: 12,
+          paddingTop: 9,
+          borderTopWidth: 0.5,
+          borderTopColor: theme.colors.border,
+          opacity: pressed ? 0.6 : 1,
+        })}
+      >
+        <Icon name="chevron-down" size={13} color={theme.colors.primary} />
+        <AppText variant="caption" style={{ fontSize: 10.5, fontWeight: '700', color: theme.colors.primary }}>
+          {label}
+        </AppText>
+      </Pressable>
+    );
+  }
+
+  return (
+    <>
+      <LogDoseCta label={label} pulse={pulse} onPress={onPress} />
+      <Pressable
+        onPress={() => {
+          Haptics.selectionAsync().catch(() => undefined);
+          onClose();
+        }}
+        hitSlop={{ top: 8, bottom: 10, left: 30, right: 30 }}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: true }}
+        accessibilityLabel="Close"
+        style={({ pressed }) => ({
+          flexDirection: 'row',
+          justifyContent: 'center',
+          marginTop: 12,
+          paddingTop: 9,
+          borderTopWidth: 0.5,
+          borderTopColor: theme.colors.border,
+          opacity: pressed ? 0.6 : 1,
+        })}
+      >
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 5,
+            paddingVertical: 3,
+            paddingHorizontal: 12,
+            borderRadius: theme.radii.pill,
+            backgroundColor: theme.colors.surfaceAlt,
+          }}
+        >
+          <Icon name="chevron-up" size={13} color={theme.colors.textSecondary} />
+          <AppText variant="caption" color="textSecondary" style={{ fontSize: 10.5, fontWeight: '700' }}>
+            Close
+          </AppText>
+        </View>
+      </Pressable>
+    </>
+  );
+}
+
 /** Ghost heights for the empty card — a shape, never a claim about a level. */
 const GHOST_BARS = [20, 26, 22, 30, 26, 24, 32];
 const BAR_MAX = 46;
@@ -727,7 +840,13 @@ function LevelBars({ bars }: { bars: LevelBar[] | null }) {
               opacity: bars ? 1 : 0.45,
             }}
           />
-          <AppText variant="caption" color="textTertiary" style={{ fontSize: 10 }}>
+          {/* Today's letter takes the accent with its bar. On the empty card
+              nothing is accented — there is no level to point at. */}
+          <AppText
+            variant="caption"
+            color={bars && bar.isToday ? 'primary' : 'textTertiary'}
+            style={{ fontSize: 10 }}
+          >
             {bar.letter}
           </AppText>
         </View>

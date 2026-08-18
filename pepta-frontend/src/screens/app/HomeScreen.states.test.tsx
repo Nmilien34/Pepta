@@ -1,10 +1,11 @@
-// The first-run Home, end to end: the Get started checklist and the medication
-// level card in their brand-new-user state.
+// Home in the two states with their own design frames: FIRST RUN (the Get
+// started checklist, the level card with nothing in it) and DOSE DAY (the
+// Log-a-shot section that opens itself, and the Close that shuts it).
 //
-// The view-model is covered in planView.test.ts. What this covers is the part
-// a user actually touches — that the checklist renders every task, that a
-// pending row opens the right sheet, that a completed row is inert, and that
-// the level card admits it has nothing rather than drawing a curve.
+// The view-models are covered in planView / doseCta / doseCtaFold. What this
+// covers is the part a user actually touches — that rows open the right
+// sheets, that a completed row is inert, and that closing a section leaves a
+// way back into it.
 
 import React from "react";
 import { readFileSync } from "node:fs";
@@ -98,7 +99,8 @@ vi.mock("../../components", () => {
     CountUp: passthrough("CountUp"),
     GlassEdge: passthrough("GlassEdge"),
     DataHealthCardView: passthrough("DataHealthCardView"),
-    LogDoseCta: passthrough("LogDoseCta"),
+    // Forwards props: these tests press it.
+    LogDoseCta: (props: { label?: string }) => React.createElement("LogDoseCta", props, props.label),
     Mascot: passthrough("Mascot"),
     ProgressBar: passthrough("ProgressBar"),
     ProgressRing: passthrough("ProgressRing"),
@@ -291,5 +293,76 @@ describe("Home · first run — the medication level card", () => {
       cursor = joined.indexOf(letter, cursor + 1);
       expect(cursor, `missing day letter ${letter}`).toBeGreaterThan(-1);
     }
+  });
+});
+
+/** Someone dosing regularly, with a dose wanted today. */
+function doseDay(): HomeResponse {
+  return {
+    ...prod,
+    setupProgress: { loggedItems: 5, required: 5, unlocked: true },
+  } as HomeResponse;
+}
+
+function cta(tree: TestRenderer.ReactTestRenderer) {
+  return tree.root.findAll((n) => String(n.type) === "LogDoseCta")[0];
+}
+
+/** The slim row that re-opens a closed section. */
+function reopenRow(tree: TestRenderer.ReactTestRenderer) {
+  return tree.root
+    .findAll((n) => String(n.type) === "Pressable")
+    .find((p) => p.props.accessibilityState?.expanded === false && /Log a/.test(String(p.props.accessibilityLabel)));
+}
+
+function closeRow(tree: TestRenderer.ReactTestRenderer) {
+  return tree.root
+    .findAll((n) => String(n.type) === "Pressable")
+    .find((p) => p.props.accessibilityLabel === "Close");
+}
+
+describe("Home · dose day — the Log a shot section", () => {
+  it("opens itself, without being asked", async () => {
+    const tree = render(doseDay());
+    await act(async () => undefined); // let the stored fold hydrate
+    expect(cta(tree)).toBeDefined();
+    expect(closeRow(tree)).toBeDefined();
+    expect(reopenRow(tree)).toBeUndefined();
+  });
+
+  it("logs a dose from the button", async () => {
+    const tree = render(doseDay());
+    await act(async () => undefined);
+    act(() => {
+      cta(tree)!.props.onPress();
+    });
+    expect(mocks.openQuickLog).toHaveBeenCalledWith("dose");
+  });
+
+  it("Close collapses it but leaves a way back — never destroys the action", async () => {
+    const tree = render(doseDay());
+    await act(async () => undefined);
+    await act(async () => {
+      closeRow(tree)!.props.onPress();
+    });
+    expect(cta(tree)).toBeUndefined();
+    const back = reopenRow(tree);
+    expect(back).toBeDefined();
+
+    await act(async () => {
+      back!.props.onPress();
+    });
+    expect(cta(tree)).toBeDefined();
+  });
+
+  it("still shows the level itself while the section is closed", async () => {
+    const tree = render(doseDay());
+    await act(async () => undefined);
+    await act(async () => {
+      closeRow(tree)!.props.onPress();
+    });
+    const all = texts(tree).join("\n");
+    expect(all).toContain("Medication Level");
+    expect(all).toContain("Current estimate");
   });
 });
