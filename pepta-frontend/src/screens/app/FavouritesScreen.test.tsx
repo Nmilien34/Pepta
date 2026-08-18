@@ -262,3 +262,58 @@ describe("FavouritesScreen · Worth saving", () => {
     expect(texts(await render([bottle], "drink"))).not.toContain("Worth saving");
   });
 });
+
+describe("FavouritesScreen · the right row acts, not the first one", () => {
+  const salmon = row({ key: "food:salmon:6-oz", name: "Salmon", portion: "6 oz fillet", protein: 40, calories: 350 });
+  const yogurt = row({ key: "food:greek-yogurt:1-cup", name: "Greek yogurt", portion: "1 cup", protein: 20, calories: 140 });
+  const coffee = row({ key: "drink:morning-coffee:12-oz", kind: "drink", name: "Morning coffee", portion: "Black, large mug", ounces: 12 });
+
+  it("logs the third food, with the third food's numbers", async () => {
+    const tree = await render([chicken, salmon, yogurt], "food");
+    press(tree, "Log Greek yogurt");
+    expect(mocks.openMeal).toHaveBeenCalledTimes(1);
+    expect(mocks.openMeal).toHaveBeenCalledWith(
+      expect.objectContaining({ foodName: "Greek yogurt", protein: 20, calories: 140 }),
+    );
+  });
+
+  it("logs the second drink's own volume", async () => {
+    const tree = await render([bottle, coffee], "drink");
+    press(tree, "Log Morning coffee");
+    expect(mocks.bumpWater).toHaveBeenCalledTimes(1);
+    expect(mocks.bumpWater).toHaveBeenCalledWith(12);
+  });
+
+  it("removes the one whose remove was pressed", async () => {
+    const tree = await render([chicken, salmon, yogurt], "food");
+    press(tree, "Edit");
+    await act(async () => {
+      find(tree, "Remove Salmon from favourites")!.props.onPress();
+    });
+    expect(mocks.removeFavourite).toHaveBeenCalledTimes(1);
+    expect(mocks.removeFavourite).toHaveBeenCalledWith(salmon.key);
+  });
+
+  it("gives every row its own Log, so none is unreachable", async () => {
+    const tree = await render([chicken, salmon, yogurt], "food");
+    for (const name of ["Chicken breast", "Salmon", "Greek yogurt"]) {
+      expect(find(tree, `Log ${name}`), name).toBeDefined();
+    }
+  });
+
+  it("keeps Worth saving offering the row that was starred", async () => {
+    const at = (d: number) => new Date(Date.now() - d * 86_400_000).toISOString();
+    const logs = (name: string, protein: number) =>
+      [1, 3, 5].map((d) => ({
+        id: `${name}${d}`, foodName: name, servingSize: "1 serving",
+        protein, calories: 200, datetime: at(d), deletedAt: null,
+      }));
+    mocks.track = { mealLogs: [...logs("Protein bar", 20), ...logs("Three eggs", 19)] };
+    const tree = await render([], "food");
+    press(tree, "Save Three eggs to favourites");
+    expect(mocks.saveFavourite).toHaveBeenCalledTimes(1);
+    expect(mocks.saveFavourite).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "Three eggs", protein: 19 }),
+    );
+  });
+});

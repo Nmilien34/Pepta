@@ -58,6 +58,8 @@ type AccountNavigationParamList = {
   Sources: undefined;
   DoseSettings: undefined;
   MixCalculator: undefined;
+  Favourites: undefined;
+  Recipes: undefined;
   Library: undefined;
 };
 
@@ -240,6 +242,21 @@ export function AccountScreen() {
           },
         ]
       : []),
+    // Reachable from the star rows on Protein, Fiber and Water too — this is
+    // the way in for someone who wants the whole list rather than the one
+    // they are standing in front of.
+    {
+      icon: "star",
+      label: "Favourites",
+      sub: "Food and drinks you saved",
+      onPress: () => navigation.navigate("Favourites"),
+    },
+    {
+      icon: "restaurant",
+      label: "Recipes",
+      sub: "Combinations you log in one tap",
+      onPress: () => navigation.navigate("Recipes"),
+    },
     {
       icon: "books",
       label: "Peptide library",

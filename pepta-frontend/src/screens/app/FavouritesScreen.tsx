@@ -463,7 +463,9 @@ function KeepButton({ label, onPress }: { label: string; onPress: () => void }) 
         opacity: pressed ? 0.6 : 1,
       })}
     >
-      <Icon name="add" size={16} color={theme.colors.textSecondary} stroke={2.3} />
+      {/* A star, not a plus: this says "I like this", which is what a
+          favourite is. A plus would read as "add one more of these". */}
+      <Icon name="star" size={16} color={theme.colors.warning} stroke={2.3} />
     </Pressable>
   );
 }
