@@ -10,7 +10,7 @@
 // — this screen is a second window onto today, not a static reference page.
 
 import React, { useEffect } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { useNavigation, useRoute, type NavigationProp, type RouteProp } from '@react-navigation/native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -20,6 +20,7 @@ import { usePeptaData } from '../../context/PeptaDataContext';
 import { useLogSheets } from '../../context/LogSheetsContext';
 import { useTheme } from '../../theme';
 import { todayStat } from './homeView';
+import { useTodayRefresh } from './useTodayRefresh';
 import { FOOD_PHOTOS } from './nutrientPhotos';
 import {
   foodsFor,
@@ -53,6 +54,7 @@ export function NutrientWaysScreen() {
   const route = useRoute<RouteProp<Record<string, NutrientWaysParams>, string>>();
   const kind: NutrientKind = route.params?.kind === 'protein' ? 'protein' : 'fiber';
   const { home, refreshHome } = usePeptaData();
+  const todayRefresh = useTodayRefresh();
   const { openMeal } = useLogSheets();
 
   const tint = kind === 'fiber' ? theme.colors.fiber : theme.colors.protein;
@@ -98,7 +100,15 @@ export function NutrientWaysScreen() {
           <AppText variant="screenTitle">{TITLES[kind]}</AppText>
         </View>
 
-        <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 28 }} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 28 }} showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={todayRefresh.refreshing}
+              onRefresh={todayRefresh.onRefresh}
+              tintColor={tint}
+            />
+          }
+        >
           {head ? (
             <Card style={{ marginTop: 12 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>

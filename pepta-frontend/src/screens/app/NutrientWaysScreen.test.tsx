@@ -9,7 +9,12 @@ import React from "react";
 import { describe, expect, it, vi } from "vitest";
 import TestRenderer, { act } from "react-test-renderer";
 
-const mocks = vi.hoisted(() => ({ home: null as unknown, refreshHome: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  home: null as unknown,
+  refreshHome: vi.fn(),
+  pendingLogs: 0,
+  homeRefreshing: false,
+}));
 
 vi.mock("react-native", () => {
   const passthrough = (name: string) =>
@@ -22,7 +27,11 @@ vi.mock("react-native", () => {
     ActivityIndicator: passthrough("ActivityIndicator"),
     Image: passthrough("Image"),
     Pressable: passthrough("Pressable"),
-    ScrollView: passthrough("ScrollView"),
+    RefreshControl: passthrough("RefreshControl"),
+    // RN renders the refreshControl element; the passthrough would drop it on
+    // the floor as a plain prop and the tests could not see it.
+    ScrollView: ({ children, refreshControl, ...props }: { children?: React.ReactNode; refreshControl?: React.ReactNode }) =>
+      React.createElement("ScrollView", props, refreshControl, children),
     Text: passthrough("Text"),
     View: passthrough("View"),
     StyleSheet: { create: (s: unknown) => s, absoluteFill: {}, hairlineWidth: 1 },
@@ -32,6 +41,9 @@ vi.mock("react-native", () => {
 vi.mock("@react-navigation/native", () => ({
   useNavigation: () => ({ navigate: vi.fn(), goBack: vi.fn() }),
   useRoute: () => ({ params: { kind: "protein" } }),
+  // Real enough to exercise the focus refresh: run the callback, honour its
+  // cleanup, exactly as navigation does when the screen comes into view.
+  useFocusEffect: (cb: () => undefined | (() => void)) => React.useEffect(cb, [cb]),
 }));
 vi.mock("react-native-safe-area-context", () => ({
   SafeAreaView: ({ children }: { children?: React.ReactNode }) => React.createElement("SafeAreaView", null, children),
@@ -60,7 +72,12 @@ vi.mock("../../theme", () => ({
   }),
 }));
 vi.mock("../../context/PeptaDataContext", () => ({
-  usePeptaData: () => ({ home: mocks.home, refreshHome: mocks.refreshHome }),
+  usePeptaData: () => ({
+    home: mocks.home,
+    refreshHome: mocks.refreshHome,
+    pendingLogs: mocks.pendingLogs,
+    homeRefreshing: mocks.homeRefreshing,
+  }),
 }));
 vi.mock("../../context/LogSheetsContext", () => ({
   useLogSheets: () => ({ openMeal: vi.fn() }),
@@ -81,6 +98,7 @@ function homeWith(loggedProtein: number, target: number | null = 120, extra: obj
 
 function render(home: unknown) {
   mocks.home = home;
+  mocks.refreshHome.mockClear();
   let tree!: TestRenderer.ReactTestRenderer;
   act(() => {
     tree = TestRenderer.create(<NutrientWaysScreen />);
@@ -165,5 +183,51 @@ describe("NutrientWaysScreen · the numbers are the user's own", () => {
       .map((n) => n.props.name);
     expect(icons).toContain("food-drumstick");
     expect(icons).not.toContain("leaf");
+  });
+});
+
+describe("NutrientWaysScreen · staying current", () => {
+  it("refetches on focus, so arriving shows today rather than the cache", () => {
+    mocks.pendingLogs = 0;
+    render(homeWith(74));
+    expect(mocks.refreshHome).toHaveBeenCalledTimes(1);
+  });
+
+  it("does NOT refetch on top of a queued log", () => {
+    // The server has not seen it yet; refreshing would make the user's own
+    // entry vanish and come back when the queue drains.
+    mocks.pendingLogs = 1;
+    render(homeWith(74));
+    expect(mocks.refreshHome).not.toHaveBeenCalled();
+    mocks.pendingLogs = 0;
+  });
+
+  it("offers pull-to-refresh, wired to the same fetch", () => {
+    mocks.pendingLogs = 0;
+    const tree = render(homeWith(74));
+    const rc = tree.root.findAll((n) => String(n.type) === "RefreshControl")[0];
+    expect(rc).toBeDefined();
+    mocks.refreshHome.mockClear();
+    act(() => {
+      rc!.props.onRefresh();
+    });
+    expect(mocks.refreshHome).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows the spinner state while a refresh is in flight", () => {
+    mocks.homeRefreshing = true;
+    const tree = render(homeWith(74));
+    expect(tree.root.findAll((n) => String(n.type) === "RefreshControl")[0]!.props.refreshing).toBe(true);
+    mocks.homeRefreshing = false;
+  });
+
+  it("refetches only once per visit, not on every re-render", () => {
+    mocks.pendingLogs = 0;
+    const tree = render(homeWith(74));
+    mocks.refreshHome.mockClear();
+    act(() => {
+      tree.update(<NutrientWaysScreen />);
+    });
+    expect(mocks.refreshHome).not.toHaveBeenCalled();
   });
 });

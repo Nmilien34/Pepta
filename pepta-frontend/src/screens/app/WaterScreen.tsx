@@ -15,7 +15,7 @@
 // a tap on this screen and a tap on Home are the same log.
 
 import React, { useEffect } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { useNavigation, type NavigationProp } from '@react-navigation/native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -26,6 +26,7 @@ import { usePeptaData } from '../../context/PeptaDataContext';
 import { useLogSheets } from '../../context/LogSheetsContext';
 import { useTheme } from '../../theme';
 import { todayStat } from './homeView';
+import { useTodayRefresh } from './useTodayRefresh';
 import { DRINK_PHOTOS } from './nutrientPhotos';
 import { HYDRATION_EXAMPLES, goalLine, ouncesLabel, quickAddVessels } from './hydration';
 
@@ -39,6 +40,7 @@ export function WaterScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
   const { home, bumpWater, refreshHome } = usePeptaData();
+  const todayRefresh = useTodayRefresh();
   const { openQuickLog } = useLogSheets();
 
   // A cold entry — deep link, or the cache never hydrated — must not render
@@ -83,7 +85,15 @@ export function WaterScreen() {
           <AppText variant="screenTitle">Water</AppText>
         </View>
 
-        <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 28 }} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 28 }} showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={todayRefresh.refreshing}
+              onRefresh={todayRefresh.onRefresh}
+              tintColor={theme.colors.water}
+            />
+          }
+        >
           {/* The glass, and the ±8 that is already on Home. */}
           <View style={{ paddingHorizontal: 20 }}>
             <Card style={{ marginTop: 12, alignItems: 'center' }}>
