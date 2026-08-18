@@ -22,6 +22,7 @@ export interface FavouriteDocument extends Document<Types.ObjectId> {
   calories?: number;
   fiber?: number;
   ounces?: number;
+  source: "item" | "recipe";
   createdAt: Date;
   updatedAt: Date;
 }
@@ -42,6 +43,7 @@ const favouriteSchema = new Schema<FavouriteDocument>(
     calories: { type: Number },
     fiber: { type: Number },
     ounces: { type: Number },
+    source: { type: String, required: true, enum: ["item", "recipe"], default: "item" },
   },
   { timestamps: true },
 );

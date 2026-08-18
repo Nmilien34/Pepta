@@ -65,9 +65,37 @@ export const CUSTOM_VESSEL: Vessel = {
  * NOTHING IS OFFERED THAT OVERSHOOTS THE GOAL. A gallon jug on a 64 oz target
  * is not a shortcut, it is a wrong number one tap away.
  */
-export function quickAddVessels(target: number | null, current = 0): Vessel[] {
+export function quickAddVessels(
+  target: number | null,
+  current = 0,
+  /**
+   * Drinks the user starred. The design is explicit that a saved drink also
+   * appears in Quick add, so the favourite and the shortcut are one thing
+   * rather than two lists to keep in step.
+   */
+  saved: readonly { name: string; ounces?: number }[] = [],
+): Vessel[] {
   const row: Vessel[] = [...VESSELS];
-  if (target == null || target <= 0) return [...row, CUSTOM_VESSEL];
+
+  for (const drink of saved) {
+    if (drink.ounces == null || drink.ounces <= 0) continue;
+    // Skip one that duplicates an amount already offered — two tiles adding
+    // 16 oz, one called Bottle and one called your bottle, is a choice with no
+    // difference.
+    if (row.some((v) => v.ounces === drink.ounces)) continue;
+    row.push({
+      key: `saved:${drink.name}`,
+      ounces: drink.ounces,
+      label: `+${drink.ounces} oz`,
+      name: drink.name,
+      icon: vesselForOunces(drink.ounces),
+    });
+  }
+
+  if (target == null || target <= 0) {
+    row.sort((a, b) => (a.ounces ?? 0) - (b.ounces ?? 0));
+    return [...row, CUSTOM_VESSEL];
+  }
 
   for (const big of BIG_VESSELS) {
     if (big.ounces != null && big.ounces <= target) row.push(big);
@@ -129,4 +157,25 @@ export function goalLine(target: number | null): string {
 export function ouncesLabel(oz: number): string {
   const rounded = Math.round(oz * 10) / 10;
   return `${rounded % 1 === 0 ? rounded : rounded.toFixed(1)} oz`;
+}
+
+/**
+ * The vessel drawing that best fits a volume.
+ *
+ * A saved drink shows the shape you actually pick up rather than a generic
+ * icon — the same drawings as Quick add, so the favourite and the shortcut
+ * read as the same thing. Nearest by size, never larger than the volume
+ * suggests: a 10 oz drink drawn as a gallon jug would be a worse lie than a
+ * mug.
+ */
+export function vesselForOunces(ounces: number | undefined): string {
+  if (ounces == null) return 'glass';
+  const sized = [...VESSELS, ...BIG_VESSELS].filter(
+    (v): v is Vessel & { ounces: number } => v.ounces != null,
+  );
+  let best = sized[0]!;
+  for (const v of sized) {
+    if (Math.abs(v.ounces - ounces) < Math.abs(best.ounces - ounces)) best = v;
+  }
+  return best.icon;
 }

@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { BIG_VESSELS, HYDRATION_EXAMPLES, VESSELS, goalLine, ouncesLabel, quickAddVessels } from './hydration';
+import {
+  BIG_VESSELS,
+  HYDRATION_EXAMPLES,
+  VESSELS,
+  goalLine,
+  ouncesLabel,
+  quickAddVessels,
+  vesselForOunces,
+} from './hydration';
 
 describe('VESSELS', () => {
   it('runs small to large — the design\'s six', () => {
@@ -143,5 +151,60 @@ describe('quickAddVessels', () => {
 
   it('BIG_VESSELS carry labels matching their amounts', () => {
     for (const v of BIG_VESSELS) expect(v.label).toBe(`+${v.ounces} oz`);
+  });
+});
+
+describe('vesselForOunces', () => {
+  it('picks the nearest familiar shape', () => {
+    expect(vesselForOunces(8)).toBe('glass');
+    expect(vesselForOunces(12)).toBe('mug');
+    expect(vesselForOunces(16)).toBe('bottle');
+    expect(vesselForOunces(64)).toBe('jug');
+  });
+
+  it('rounds to the nearest rather than always up', () => {
+    // 13 is closer to a 12 oz mug than a 16 oz bottle.
+    expect(vesselForOunces(13)).toBe('mug');
+  });
+
+  it('falls back to a glass when there is no volume', () => {
+    expect(vesselForOunces(undefined)).toBe('glass');
+  });
+});
+
+describe('quickAddVessels with saved drinks', () => {
+  const saved = [{ name: 'Desk bottle', ounces: 21 }];
+
+  it('puts a starred drink in Quick add — one idea, not two lists', () => {
+    const row = quickAddVessels(100, 0, saved);
+    const mine = row.find((v) => v.name === 'Desk bottle');
+    expect(mine?.ounces).toBe(21);
+    expect(mine?.label).toBe('+21 oz');
+  });
+
+  it('keeps the row sorted with the saved one in place', () => {
+    const sized = quickAddVessels(100, 0, saved)
+      .filter((v) => v.ounces != null)
+      .map((v) => v.ounces!);
+    expect(sized).toEqual([...sized].sort((a, b) => a - b));
+  });
+
+  it('skips a saved drink that duplicates an amount already offered', () => {
+    const row = quickAddVessels(100, 0, [{ name: 'My bottle', ounces: 16 }]);
+    expect(row.filter((v) => v.ounces === 16)).toHaveLength(1);
+  });
+
+  it('ignores a saved drink with no volume — there is nothing to add', () => {
+    const row = quickAddVessels(100, 0, [{ name: 'Mystery', ounces: undefined }]);
+    expect(row.some((v) => v.name === 'Mystery')).toBe(false);
+  });
+
+  it('still offers saved drinks when no goal is set', () => {
+    expect(quickAddVessels(null, 0, saved).some((v) => v.name === 'Desk bottle')).toBe(true);
+  });
+
+  it('keeps Custom last whatever is saved', () => {
+    const row = quickAddVessels(100, 0, saved);
+    expect(row[row.length - 1]!.key).toBe('custom');
   });
 });

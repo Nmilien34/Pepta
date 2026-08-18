@@ -21,6 +21,7 @@ function toResponse(doc: FavouriteDocument): FavouriteResponse {
     kind: doc.kind,
     name: doc.name,
     portion: doc.portion ?? "",
+    source: doc.source ?? "item",
     ...(doc.protein != null ? { protein: doc.protein } : {}),
     ...(doc.calories != null ? { calories: doc.calories } : {}),
     ...(doc.fiber != null ? { fiber: doc.fiber } : {}),
@@ -48,6 +49,7 @@ export async function saveFavourite(
         kind: input.kind,
         name: input.name,
         portion: input.portion ?? "",
+        source: input.source ?? "item",
         // Unset rather than write undefined: a food re-saved from a screen
         // that does not know its fiber must not keep a stale figure.
         ...(input.protein != null ? { protein: input.protein } : {}),

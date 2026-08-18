@@ -28,6 +28,8 @@ export interface Favourite {
   fiber?: number;
   /** Drinks only — what tapping Log adds. */
   ounces?: number;
+  /** "recipe" earns a badge: it logs several foods at once. */
+  source?: 'item' | 'recipe';
   savedAt: string;
 }
 
@@ -151,4 +153,49 @@ export function favouriteFromOffer(offer: WorthSaving, savedAt: string): Favouri
     fiber: offer.fiber,
     savedAt,
   };
+}
+
+/**
+ * "Start with these" — shown only before anything is saved.
+ *
+ * PEPTA SAVES NONE OF THEM. The list only ever grows from what the user does;
+ * these exist so an empty screen is not a dead end, and each one is saved only
+ * when tapped. Seeding the list on their behalf would make Favourites a
+ * curated set they did not curate.
+ */
+export const STARTING_SUGGESTIONS: readonly Favourite[] = [
+  {
+    id: favouriteId('food', 'Greek yogurt', '1 cup, plain'),
+    kind: 'food',
+    name: 'Greek yogurt',
+    portion: '1 cup, plain',
+    protein: 20,
+    calories: 140,
+    savedAt: '',
+  },
+  {
+    id: favouriteId('food', 'Chicken breast', '6 oz, grilled'),
+    kind: 'food',
+    name: 'Chicken breast',
+    portion: '6 oz, grilled',
+    protein: 54,
+    calories: 280,
+    savedAt: '',
+  },
+  {
+    id: favouriteId('drink', 'Water bottle', '16 oz'),
+    kind: 'drink',
+    name: 'Water bottle',
+    portion: '16 oz',
+    ounces: 16,
+    savedAt: '',
+  },
+];
+
+/** The suggestions for one tab, minus anything already saved. */
+export function suggestionsFor(
+  kind: FavouriteKind,
+  saved: readonly Favourite[],
+): Favourite[] {
+  return STARTING_SUGGESTIONS.filter((s) => s.kind === kind && !isSaved(saved, s.id));
 }

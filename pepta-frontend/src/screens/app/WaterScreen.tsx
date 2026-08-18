@@ -126,7 +126,11 @@ export function WaterScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ gap: 8, paddingHorizontal: 20, paddingVertical: 10 }}
           >
-            {quickAddVessels(target, current).map((vessel) => (
+            {quickAddVessels(
+              target,
+              current,
+              favourites.filter((f) => f.kind === 'drink'),
+            ).map((vessel) => (
               <Pressable
                 key={vessel.key}
                 onPress={() => {

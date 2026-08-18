@@ -1341,6 +1341,12 @@ export const favouriteInputSchema = z
     fiber: z.number().nonnegative().optional(),
     /** Drinks only — what tapping Log adds. */
     ounces: z.number().positive().optional(),
+    /**
+     * Where it came from. Only "recipe" is shown (as a badge) — a favourite
+     * saved from a recipe logs several foods at once, which is worth knowing
+     * before you tap Log.
+     */
+    source: z.enum(["item", "recipe"]).default("item"),
   })
   .strict();
 
@@ -1355,7 +1361,10 @@ export const favouritesResponseSchema = z
   .strict();
 
 export type FavouriteKind = z.infer<typeof favouriteKindSchema>;
-export type FavouriteInput = z.infer<typeof favouriteInputSchema>;
+// z.input, not z.infer: the schema defaults `portion` and `source`, and
+// callers should be free to omit what they do not know. The service reads the
+// PARSED body, where the defaults have already been applied.
+export type FavouriteInput = z.input<typeof favouriteInputSchema>;
 export type FavouriteResponse = z.infer<typeof favouriteResponseSchema>;
 export type FavouritesResponse = z.infer<typeof favouritesResponseSchema>;
 

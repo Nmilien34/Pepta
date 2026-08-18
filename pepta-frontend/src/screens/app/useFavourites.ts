@@ -25,6 +25,7 @@ function fromResponse(row: FavouriteResponse): Favourite {
     calories: row.calories,
     fiber: row.fiber,
     ounces: row.ounces,
+    source: row.source,
     savedAt: row.createdAt,
   };
 }
@@ -81,6 +82,7 @@ export function useFavourites(): {
         ...(next.calories != null ? { calories: next.calories } : {}),
         ...(next.fiber != null ? { fiber: next.fiber } : {}),
         ...(next.ounces != null ? { ounces: next.ounces } : {}),
+        ...(next.source != null ? { source: next.source } : {}),
       })
       .catch(() => {
         if (alive.current) setList(previous);
