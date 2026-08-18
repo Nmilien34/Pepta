@@ -9,8 +9,8 @@
 // The progress figures are the user's own, from the same view-model Home reads
 // — this screen is a second window onto today, not a static reference page.
 
-import React from 'react';
-import { Image, Pressable, ScrollView, View } from 'react-native';
+import React, { useEffect } from 'react';
+import { ActivityIndicator, Image, Pressable, ScrollView, View } from 'react-native';
 import { useNavigation, useRoute, type NavigationProp, type RouteProp } from '@react-navigation/native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -52,10 +52,17 @@ export function NutrientWaysScreen() {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
   const route = useRoute<RouteProp<Record<string, NutrientWaysParams>, string>>();
   const kind: NutrientKind = route.params?.kind === 'protein' ? 'protein' : 'fiber';
-  const { home } = usePeptaData();
+  const { home, refreshHome } = usePeptaData();
   const { openMeal } = useLogSheets();
 
   const tint = kind === 'fiber' ? theme.colors.fiber : theme.colors.protein;
+  // A cold entry — deep link, or the cache never hydrated — must not render
+  // zeros next to "Set a daily target". That reads as "you have no goal" when
+  // the truth is "we have not loaded yet".
+  useEffect(() => {
+    if (!home) void refreshHome();
+  }, [home, refreshHome]);
+
   // Today's own numbers — never the range Home happens to be showing.
   const stat = home ? todayStat(home, kind) : null;
   const target = stat?.target ?? null;
@@ -67,6 +74,14 @@ export function NutrientWaysScreen() {
     // it. A tap that only enlarges a picture would be the weaker door.
     openMeal();
   };
+
+  if (!home) {
+    return (
+      <View style={{ flex: 1, backgroundColor: theme.colors.bg, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator color={tint} />
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.bg }}>

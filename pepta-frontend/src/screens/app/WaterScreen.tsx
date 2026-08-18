@@ -14,8 +14,8 @@
 // Everything here writes through the same bumpWater the Home stepper uses, so
 // a tap on this screen and a tap on Home are the same log.
 
-import React from 'react';
-import { Image, Pressable, ScrollView, View } from 'react-native';
+import React, { useEffect } from 'react';
+import { ActivityIndicator, Image, Pressable, ScrollView, View } from 'react-native';
 import { useNavigation, type NavigationProp } from '@react-navigation/native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -38,8 +38,15 @@ export function WaterScreen() {
   // indicator — a hard 40 leaves it sitting on the bar on every modern iPhone.
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
-  const { home, bumpWater } = usePeptaData();
+  const { home, bumpWater, refreshHome } = usePeptaData();
   const { openQuickLog } = useLogSheets();
+
+  // A cold entry — deep link, or the cache never hydrated — must not render
+  // zeros next to "Set a daily target". That reads as "you have no goal" when
+  // the truth is "we have not loaded yet".
+  useEffect(() => {
+    if (!home) void refreshHome();
+  }, [home, refreshHome]);
 
   // Today's own numbers — never the range Home happens to be showing.
   const stat = home ? todayStat(home, 'water') : null;
@@ -50,6 +57,14 @@ export function WaterScreen() {
     Haptics.selectionAsync().catch(() => undefined);
     bumpWater(oz);
   };
+
+  if (!home) {
+    return (
+      <View style={{ flex: 1, backgroundColor: theme.colors.bg, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator color={theme.colors.water} />
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.bg }}>

@@ -1,0 +1,169 @@
+// The Protein / Fiber screen reads REAL logged data.
+//
+// Every figure on the card — the pill, the bar fill, and the "N g to go" line
+// — has to move when the user's logs move, and has to be today's rather than
+// whatever range Home is displaying. These drive the actual screen with
+// different data and assert the rendered text differs.
+
+import React from "react";
+import { describe, expect, it, vi } from "vitest";
+import TestRenderer, { act } from "react-test-renderer";
+
+const mocks = vi.hoisted(() => ({ home: null as unknown, refreshHome: vi.fn() }));
+
+vi.mock("react-native", () => {
+  const passthrough = (name: string) =>
+    Object.assign(
+      ({ children, ...props }: { children?: React.ReactNode }) =>
+        React.createElement(name, props, children),
+      { displayName: name },
+    );
+  return {
+    ActivityIndicator: passthrough("ActivityIndicator"),
+    Image: passthrough("Image"),
+    Pressable: passthrough("Pressable"),
+    ScrollView: passthrough("ScrollView"),
+    Text: passthrough("Text"),
+    View: passthrough("View"),
+    StyleSheet: { create: (s: unknown) => s, absoluteFill: {}, hairlineWidth: 1 },
+    Platform: { OS: "ios" },
+  };
+});
+vi.mock("@react-navigation/native", () => ({
+  useNavigation: () => ({ navigate: vi.fn(), goBack: vi.fn() }),
+  useRoute: () => ({ params: { kind: "protein" } }),
+}));
+vi.mock("react-native-safe-area-context", () => ({
+  SafeAreaView: ({ children }: { children?: React.ReactNode }) => React.createElement("SafeAreaView", null, children),
+  useSafeAreaInsets: () => ({ top: 0, bottom: 34, left: 0, right: 0 }),
+}));
+vi.mock("../../components", () => {
+  const passthrough = (name: string) =>
+    ({ children }: { children?: React.ReactNode }) => React.createElement(name, null, children);
+  return {
+    AppText: passthrough("AppText"),
+    Card: passthrough("Card"),
+    // Keeps its props so the bar's fill can be asserted.
+    ProgressBar: (props: { pct: number }) => React.createElement("ProgressBar", props),
+  };
+});
+vi.mock("../../components/Icon", () => ({ Icon: (props: { name: string }) => React.createElement("Icon", props) }));
+vi.mock("../../theme", () => ({
+  useTheme: () => ({
+    colors: {
+      bg: "#fff", surface: "#fff", surfaceAlt: "#f4f1ec", border: "#eee",
+      textPrimary: "#000", textSecondary: "#666", textTertiary: "#999",
+      protein: "#FF8A3D", fiber: "#34C759",
+    },
+    spacing: { sm: 8, md: 12, lg: 16 },
+    radii: { pill: 999 },
+  }),
+}));
+vi.mock("../../context/PeptaDataContext", () => ({
+  usePeptaData: () => ({ home: mocks.home, refreshHome: mocks.refreshHome }),
+}));
+vi.mock("../../context/LogSheetsContext", () => ({
+  useLogSheets: () => ({ openMeal: vi.fn() }),
+}));
+
+import { NutrientWaysScreen } from "./NutrientWaysScreen";
+
+function homeWith(loggedProtein: number, target: number | null = 120, extra: object = {}) {
+  return {
+    profile: target == null ? {} : { dailyProteinTargetGrams: target },
+    todayProteinGrams: loggedProtein,
+    todayFiberGrams: 0,
+    todayWaterOz: 0,
+    todayCalories: 0,
+    ...extra,
+  };
+}
+
+function render(home: unknown) {
+  mocks.home = home;
+  let tree!: TestRenderer.ReactTestRenderer;
+  act(() => {
+    tree = TestRenderer.create(<NutrientWaysScreen />);
+  });
+  return tree;
+}
+
+function texts(tree: TestRenderer.ReactTestRenderer): string {
+  const out: string[] = [];
+  const walk = (n: TestRenderer.ReactTestInstance) => {
+    for (const c of n.children) {
+      if (typeof c === "string") out.push(c);
+      else walk(c);
+    }
+  };
+  walk(tree.root);
+  return out.join("");
+}
+
+const barPct = (tree: TestRenderer.ReactTestRenderer) =>
+  tree.root.findAll((n) => String(n.type) === "ProgressBar")[0]?.props.pct;
+
+describe("NutrientWaysScreen · the numbers are the user's own", () => {
+  it("renders what they logged, not a fixture", () => {
+    expect(texts(render(homeWith(74)))).toContain("74 of 120 g");
+    expect(texts(render(homeWith(21)))).toContain("21 of 120 g");
+    expect(texts(render(homeWith(0)))).toContain("0 of 120 g");
+  });
+
+  it("moves the gap line with the logs", () => {
+    expect(texts(render(homeWith(74)))).toContain("46 g to go");
+    expect(texts(render(homeWith(100)))).toContain("20 g to go");
+  });
+
+  it("fills the bar in proportion, and never past full", () => {
+    expect(barPct(render(homeWith(0)))).toBe(0);
+    expect(barPct(render(homeWith(60)))).toBeCloseTo(0.5);
+    expect(barPct(render(homeWith(120)))).toBe(1);
+    expect(barPct(render(homeWith(300)))).toBe(1);
+  });
+
+  it("follows the user's own target, not a hard-coded 120", () => {
+    expect(texts(render(homeWith(74, 160)))).toContain("74 of 160 g");
+    expect(texts(render(homeWith(74, 160)))).toContain("86 g to go");
+  });
+
+  it("congratulates instead of demanding once the target is met", () => {
+    const out = texts(render(homeWith(130)));
+    expect(out).toContain("Target met");
+    expect(out).not.toContain("to go");
+  });
+
+  it("shows TODAY even when Home is displaying a whole week", () => {
+    // rangeTotals is what buildHomeView would have used; this screen must not.
+    const weekly = homeWith(74, 120, {
+      rangeTotals: { label: "This week", dayCount: 7, proteinGrams: 520, calories: 0, fiberGrams: 0, waterOz: 0 },
+    });
+    const out = texts(render(weekly));
+    expect(out).toContain("74 of 120 g");
+    expect(out).not.toContain("520");
+    expect(out).not.toContain("840");
+  });
+
+  it("asks for a loaded state rather than claiming no goal", () => {
+    mocks.refreshHome.mockClear();
+    const tree = render(null);
+    expect(tree.root.findAll((n) => String(n.type) === "ActivityIndicator")).toHaveLength(1);
+    // …and it goes and fetches, rather than sitting on an empty screen.
+    expect(mocks.refreshHome).toHaveBeenCalled();
+    expect(texts(tree)).not.toContain("Set a daily");
+  });
+
+  it("says so plainly when the user genuinely has no target", () => {
+    const out = texts(render(homeWith(74, null)));
+    expect(out).toContain("Set a daily protein target");
+    expect(out).not.toContain("of 0 g");
+  });
+
+  it("uses the meat icon beside Today, as the frame does", () => {
+    const icons = render(homeWith(74)).root
+      .findAll((n) => String(n.type) === "Icon")
+      .map((n) => n.props.name);
+    expect(icons).toContain("food-drumstick");
+    expect(icons).not.toContain("leaf");
+  });
+});
