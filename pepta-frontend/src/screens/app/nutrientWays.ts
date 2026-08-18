@@ -80,7 +80,6 @@ export function waysHeadline(
   current: number,
   target: number,
 ): WaysHeadline {
-  const noun = kind === 'fiber' ? 'fiber' : 'protein';
   const pct = target > 0 ? Math.max(0, Math.min(1, current / target)) : 0;
   const pill = `${Math.round(current)} of ${Math.round(target)} g`;
   const gap = target - current;
@@ -105,8 +104,11 @@ export function waysHeadline(
     names.length === 0
       ? ''
       : names.length === 1
-        ? ` — ${names[0]} covers it.`
-        : ` — ${names[0]} and ${names[1]} covers it.`;
+        ? ` · ${names[0]} covers it.`
+        : ` · ${names[0]} and ${names[1]} covers it.`;
 
-  return { pill, pct, line: `${gramsLabel(Math.round(gap * 10) / 10)} of ${noun} to go${suggestion}` };
+  // The frames read "46 g to go · …" and "18 g to go · …" — no nutrient noun,
+  // and a middot rather than a dash. The section heading above already said
+  // which nutrient this is.
+  return { pill, pct, line: `${gramsLabel(Math.round(gap * 10) / 10)} to go${suggestion}` };
 }

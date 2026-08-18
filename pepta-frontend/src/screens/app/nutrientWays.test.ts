@@ -50,14 +50,24 @@ describe('gramsLabel', () => {
 });
 
 describe('waysHeadline', () => {
+  it('matches the frames\' wording: "N g to go · …", no nutrient noun', () => {
+    expect(waysHeadline('protein', 74, 120).line).toMatch(/^46 g to go · /);
+    expect(waysHeadline('fiber', 12, 30).line).toMatch(/^18 g to go · /);
+    for (const line of [waysHeadline('protein', 74, 120).line, waysHeadline('fiber', 12, 30).line]) {
+      expect(line).not.toContain(' of protein ');
+      expect(line).not.toContain(' of fiber ');
+      expect(line).not.toContain('—');
+    }
+  });
+
   it('states the gap and names foods that actually close it', () => {
     const h = waysHeadline('fiber', 12, 30);
     expect(h.pill).toBe('12 of 30 g');
     expect(h.pct).toBeCloseTo(0.4);
-    expect(h.line).toContain('18 g of fiber to go');
+    expect(h.line).toContain('18 g to go');
     // 13 alone is short of 18, so the second pick is the next biggest — and
     // together they clear the gap, which is what "covers it" claims.
-    expect(h.line).toBe('18 g of fiber to go — oh oh cookie dough and edamame covers it.');
+    expect(h.line).toBe('18 g to go · oh oh cookie dough and edamame covers it.');
   });
 
   it('names only foods on this screen, so the sentence survives a data edit', () => {
@@ -78,7 +88,7 @@ describe('waysHeadline', () => {
   it('still suggests something when the gap is smaller than any single food', () => {
     // 1 g left, smallest fiber food is 3 g — suggest it rather than nothing.
     const h = waysHeadline('fiber', 29, 30);
-    expect(h.line).toContain('1 g of fiber to go');
+    expect(h.line).toContain('1 g to go');
     expect(h.line).toContain('covers it');
   });
 

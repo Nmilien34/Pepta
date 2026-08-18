@@ -92,7 +92,7 @@ export function NutrientWaysScreen() {
                   <AppText variant="cardTitle" style={{ fontSize: 15 }}>Today</AppText>
                 </View>
                 <View style={{ backgroundColor: theme.colors.surfaceAlt, paddingVertical: 4, paddingHorizontal: 10, borderRadius: theme.radii.pill }}>
-                  <AppText variant="caption" color="textSecondary" style={{ fontWeight: '700' }}>{head.pill}</AppText>
+                  <AppText variant="caption" color="textSecondary" style={{ fontWeight: '600', fontSize: 12 }}>{head.pill}</AppText>
                 </View>
               </View>
               <View style={{ marginTop: 12 }}>
@@ -151,7 +151,7 @@ export function NutrientWaysScreen() {
                 >
                   <Image source={FOOD_PHOTOS[food.key]} resizeMode="cover" style={{ width: '100%', height: '100%' }} />
                 </View>
-                <AppText variant="caption" color="textSecondary" align="center" style={{ fontSize: 9.5, fontWeight: '700', lineHeight: 11 }}>
+                <AppText variant="caption" color="textSecondary" align="center" style={{ fontSize: 9, fontWeight: '700', lineHeight: 10.5 }}>
                   {gramsLabel(food.amount)}
                 </AppText>
               </Pressable>
@@ -175,31 +175,46 @@ export function NutrientWaysScreen() {
                   opacity: pressed ? 0.68 : 1,
                 })}
               >
-                <View style={{ width: 52, height: 52, borderRadius: 16, overflow: 'hidden' }}>
+                <View
+                  style={{
+                    width: 52,
+                    height: 52,
+                    borderRadius: 16,
+                    overflow: 'hidden',
+                    shadowColor: '#282018',
+                    shadowOpacity: 0.14,
+                    shadowRadius: 3,
+                    shadowOffset: { width: 0, height: 1 },
+                  }}
+                >
                   <Image source={FOOD_PHOTOS[food.key]} resizeMode="cover" style={{ width: '100%', height: '100%' }} />
                 </View>
                 <View style={{ flex: 1, minWidth: 0 }}>
+                  {/* Brand as written: the frames show "fairlife" and
+                      "GoodSense", not FAIRLIFE and GOODSENSE. */}
                   {food.brand ? (
-                    <AppText variant="caption" color="textTertiary" style={{ fontSize: 10, fontWeight: '800' }}>
-                      {food.brand.toUpperCase()}
+                    <AppText variant="caption" color="textTertiary" style={{ fontSize: 10, fontWeight: '700' }}>
+                      {food.brand}
                     </AppText>
                   ) : null}
                   <AppText variant="cardTitle" style={{ fontSize: 14.5 }} numberOfLines={1}>
                     {food.name}
                   </AppText>
-                  <AppText variant="caption" color="textTertiary" style={{ fontSize: 11, marginTop: 1 }}>
+                  <AppText variant="caption" color="textTertiary" style={{ fontSize: 10.5, marginTop: 1 }}>
                     {food.serving}
                   </AppText>
-                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 5 }}>
-                    <AppText variant="caption" style={{ fontSize: 11, fontWeight: '800', color: tint }}>
+                  <View style={{ flexDirection: 'row', gap: 10, marginTop: 5 }}>
+                    <AppText variant="caption" style={{ fontSize: 10.5, fontWeight: '700', color: tint }}>
                       {gramsLabel(food.amount)} {kind}
                     </AppText>
-                    <AppText variant="caption" color="textTertiary" style={{ fontSize: 11 }}>
+                    <AppText variant="caption" color="textTertiary" style={{ fontSize: 10.5 }}>
                       {food.calories} cal
                     </AppText>
                   </View>
                 </View>
-                <Icon name="chevron-forward" size={17} color={theme.colors.textTertiary} stroke={2.2} />
+                {/* A plus, tinted. The row's action is "add this", and a
+                    chevron would promise a detail screen that does not exist. */}
+                <Icon name="add" size={17} color={tint} stroke={2} />
               </Pressable>
             ))}
           </Card>

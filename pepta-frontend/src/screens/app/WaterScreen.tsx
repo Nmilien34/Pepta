@@ -165,7 +165,19 @@ export function WaterScreen() {
                 >
                   {/* White behind the photo: these are packshots cut out on
                       white, and the warm card would show as a halo. */}
-                  <View style={{ width: 50, height: 50, borderRadius: 15, overflow: 'hidden', backgroundColor: '#fff' }}>
+                  <View
+                    style={{
+                      width: 50,
+                      height: 50,
+                      borderRadius: 15,
+                      overflow: 'hidden',
+                      backgroundColor: '#fff',
+                      shadowColor: '#282018',
+                      shadowOpacity: 0.14,
+                      shadowRadius: 3,
+                      shadowOffset: { width: 0, height: 1 },
+                    }}
+                  >
                     <Image source={DRINK_PHOTOS[drink.key]} resizeMode="cover" style={{ width: '100%', height: '100%' }} />
                   </View>
                   <View style={{ flex: 1, minWidth: 0 }}>
