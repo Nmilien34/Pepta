@@ -149,8 +149,13 @@ export function NutrientWaysScreen() {
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: 8, paddingVertical: 10, paddingRight: 20 }}
-            style={{ marginHorizontal: -20, paddingLeft: 20 }}
+            // Horizontal padding belongs to the CONTENT, not the ScrollView:
+            // padding on the view itself clips the scrolled content, so the
+            // first tile gets cut as you swipe back. The negative margin lets
+            // the strip bleed to the screen edges, which is what says "there
+            // is more to the right".
+            contentContainerStyle={{ gap: 8, paddingVertical: 10, paddingHorizontal: 20 }}
+            style={{ marginHorizontal: -20 }}
           >
             {foodsFor(kind).map((food) => (
               <Pressable

@@ -10,6 +10,7 @@ import { describe, expect, it, vi } from "vitest";
 import TestRenderer, { act } from "react-test-renderer";
 
 const mocks = vi.hoisted(() => ({
+  kind: "protein" as "protein" | "fiber",
   home: null as unknown,
   refreshHome: vi.fn(),
   pendingLogs: 0,
@@ -40,7 +41,7 @@ vi.mock("react-native", () => {
 });
 vi.mock("@react-navigation/native", () => ({
   useNavigation: () => ({ navigate: vi.fn(), goBack: vi.fn() }),
-  useRoute: () => ({ params: { kind: "protein" } }),
+  useRoute: () => ({ params: { kind: mocks.kind } }),
   // Real enough to exercise the focus refresh: run the callback, honour its
   // cleanup, exactly as navigation does when the screen comes into view.
   useFocusEffect: (cb: () => undefined | (() => void)) => React.useEffect(cb, [cb]),
@@ -96,7 +97,8 @@ function homeWith(loggedProtein: number, target: number | null = 120, extra: obj
   };
 }
 
-function render(home: unknown) {
+function render(home: unknown, kind: "protein" | "fiber" = "protein") {
+  mocks.kind = kind;
   mocks.home = home;
   mocks.refreshHome.mockClear();
   let tree!: TestRenderer.ReactTestRenderer;
@@ -229,5 +231,79 @@ describe("NutrientWaysScreen · staying current", () => {
       tree.update(<NutrientWaysScreen />);
     });
     expect(mocks.refreshHome).not.toHaveBeenCalled();
+  });
+});
+
+function fiberHome(loggedFiber: number, target: number | null = 30) {
+  return {
+    profile: target == null ? {} : { dailyFiberTargetGrams: target },
+    todayFiberGrams: loggedFiber,
+    todayProteinGrams: 0,
+    todayWaterOz: 0,
+    todayCalories: 0,
+  };
+}
+
+describe("NutrientWaysScreen · the Fiber side", () => {
+  it("shows every section the frame has", () => {
+    const out = texts(render(fiberHome(12), "fiber"));
+    expect(out).toContain("Fiber");
+    expect(out).toContain("Today");
+    expect(out).toContain("Easy ways to hit fiber");
+    // The one line of why — fiber carries it, protein deliberately does not.
+    expect(out).toContain("Constipation is one of the most common");
+  });
+
+  it("carries no such note on the protein side", () => {
+    expect(texts(render(homeWith(74), "protein"))).not.toContain("Constipation");
+  });
+
+  it("reads the user's logged fiber, not protein and not a fixture", () => {
+    expect(texts(render(fiberHome(12), "fiber"))).toContain("12 of 30 g");
+    expect(texts(render(fiberHome(27), "fiber"))).toContain("27 of 30 g");
+  });
+
+  it("moves the bar and the gap line with those logs", () => {
+    expect(barPct(render(fiberHome(0), "fiber"))).toBe(0);
+    expect(barPct(render(fiberHome(15), "fiber"))).toBeCloseTo(0.5);
+    expect(texts(render(fiberHome(12), "fiber"))).toContain("18 g to go");
+    expect(texts(render(fiberHome(27), "fiber"))).toContain("3 g to go");
+  });
+
+  it("follows the user's own fiber target", () => {
+    expect(texts(render(fiberHome(12, 45), "fiber"))).toContain("12 of 45 g");
+    expect(texts(render(fiberHome(12, 45), "fiber"))).toContain("33 g to go");
+  });
+
+  it("uses the leaf icon beside Today, not the meat one", () => {
+    const icons = render(fiberHome(12), "fiber").root
+      .findAll((n) => String(n.type) === "Icon")
+      .map((n) => n.props.name);
+    expect(icons).toContain("leaf");
+    expect(icons).not.toContain("food-drumstick");
+  });
+
+  it("lists all five examples, in the frame's order, in both the strip and the rows", () => {
+    const out = texts(render(fiberHome(12), "fiber"));
+    for (const name of ["Oh Oh Cookie Dough", "Edamame", "Avocado", "Almonds", "Psyllium fiber powder"]) {
+      expect(out, `missing ${name}`).toContain(name);
+    }
+    // List order, per the frame. Asserted on names, not gram labels: the
+    // labels collide as substrings ("18 g to go" contains "8 g").
+    const order = ["Oh Oh Cookie Dough", "Edamame", "Avocado", "Almonds", "Psyllium fiber powder"]
+      .map((n) => out.indexOf(n));
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+    // Brands as written.
+    expect(out).toContain("TRUBAR");
+    expect(out).toContain("GoodSense");
+  });
+
+  it("scrolls the examples strip rather than clipping them", () => {
+    const tree = render(fiberHome(12), "fiber");
+    const strips = tree.root.findAll((n) => String(n.type) === "ScrollView" && n.props.horizontal);
+    expect(strips).toHaveLength(1);
+    // Padding must live on the content, or swiping back clips the first tile.
+    expect(strips[0]!.props.contentContainerStyle.paddingHorizontal).toBe(20);
+    expect(strips[0]!.props.style.paddingLeft).toBeUndefined();
   });
 });
