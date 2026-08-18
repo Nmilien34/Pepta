@@ -57,6 +57,7 @@ import "./services/complimentary-access.service";
 import { requireActiveAccess } from "./middleware/require-active-access";
 import progressRoutes from "./routes/progress.routes";
 import progressPhotosRoutes from "./routes/progress-photos.routes";
+import favouritesRoutes from "./routes/favourites.routes";
 import trackRoutes from "./routes/track.routes";
 import webhookRoutes from "./routes/webhook.routes";
 import weeklyRetentionRoutes from "./routes/weekly-retention.routes";
@@ -156,6 +157,7 @@ export function createApp(options: CreateAppOptions = {}): Express {
   app.use("/referrals", referralRoutes);
   app.use("/home", ...premium, homeRoutes);
   app.use("/track", ...premium, trackRoutes);
+  app.use("/favourites", ...premium, favouritesRoutes);
   app.use("/progress", ...premium, progressRoutes);
   app.use("/medication-level", ...premium, medicationLevelRoutes);
   app.use("/coach", ...premium, coachRoutes);

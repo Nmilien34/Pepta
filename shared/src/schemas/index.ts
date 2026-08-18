@@ -1311,3 +1311,50 @@ export const accessDecisionSchema = z
       });
     }
   });
+
+// ---------------------------------------------------------------------------
+// Favourites — the foods and drinks the user saved, with the portion.
+//
+// SERVER-BACKED so they follow the account rather than the handset: a
+// favourite is the user's own data, not presentation state, and losing it to a
+// reinstall would be losing something they curated.
+//
+// THE PORTION IS PART OF THE IDENTITY. `key` is kind + name + portion, built
+// on the client and sent up, which makes create idempotent under retry and
+// keeps two sizes of one food as two favourites. Logging one replays the exact
+// numbers that were saved, so a favourite whose portion could drift would be a
+// favourite that logs the wrong thing.
+// ---------------------------------------------------------------------------
+
+export const favouriteKindSchema = z.enum(["food", "drink"]);
+
+export const favouriteInputSchema = z
+  .object({
+    /** kind:name-slug:portion-slug — stable, and the idempotency key. */
+    key: z.string().trim().min(1).max(200),
+    kind: favouriteKindSchema,
+    name: z.string().trim().min(1).max(120),
+    /** May be empty: some drinks carry no portion wording. */
+    portion: z.string().trim().max(120).default(""),
+    protein: z.number().nonnegative().optional(),
+    calories: z.number().nonnegative().optional(),
+    fiber: z.number().nonnegative().optional(),
+    /** Drinks only — what tapping Log adds. */
+    ounces: z.number().positive().optional(),
+  })
+  .strict();
+
+export const favouriteResponseSchema = favouriteInputSchema.extend({
+  id: idSchema,
+  createdAt: isoDateTimeSchema,
+  updatedAt: isoDateTimeSchema,
+});
+
+export const favouritesResponseSchema = z
+  .object({ favourites: z.array(favouriteResponseSchema) })
+  .strict();
+
+export type FavouriteKind = z.infer<typeof favouriteKindSchema>;
+export type FavouriteInput = z.infer<typeof favouriteInputSchema>;
+export type FavouriteResponse = z.infer<typeof favouriteResponseSchema>;
+export type FavouritesResponse = z.infer<typeof favouritesResponseSchema>;

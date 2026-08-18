@@ -82,6 +82,13 @@ vi.mock("../../context/PeptaDataContext", () => ({
     homeRefreshing: mocks.homeRefreshing,
   }),
 }));
+vi.mock("../../services/api", () => ({
+  api: {
+    getFavourites: vi.fn(async () => ({ favourites: [] })),
+    saveFavourite: vi.fn(async () => ({})),
+    removeFavourite: vi.fn(async () => ({})),
+  },
+}));
 vi.mock("@react-native-async-storage/async-storage", () => {
   let store: Record<string, string> = {};
   return {

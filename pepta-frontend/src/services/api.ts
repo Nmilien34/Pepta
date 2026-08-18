@@ -93,6 +93,11 @@ import {
   type HomeResponse,
   type DiscoverySource,
   type UserProfileSettingsPatch,
+  favouriteResponseSchema,
+  favouritesResponseSchema,
+  type FavouriteInput,
+  type FavouriteResponse,
+  type FavouritesResponse,
   type MealLogInput,
   type MealLogResponse,
   type MealBarcodeInput,
@@ -615,6 +620,24 @@ class PeptaApi {
 
   public getTrack(): Promise<TrackResponse> {
     return this.request("/track", trackResponseSchema);
+  }
+
+  public getFavourites(): Promise<FavouritesResponse> {
+    return this.request("/favourites", favouritesResponseSchema);
+  }
+
+  /** Upsert: the server keys on (user, key), so a double tap is one row. */
+  public saveFavourite(input: FavouriteInput): Promise<FavouriteResponse> {
+    return this.request("/favourites", favouriteResponseSchema, {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  }
+
+  public removeFavourite(key: string): Promise<unknown> {
+    return this.request(`/favourites/${encodeURIComponent(key)}`, z.unknown(), {
+      method: "DELETE",
+    });
   }
 
   // The server window defaults to 30 days / 100 rows when the query is empty —
