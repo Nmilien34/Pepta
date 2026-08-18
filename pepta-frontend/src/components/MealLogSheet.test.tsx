@@ -350,6 +350,66 @@ describe("MealLogSheet", () => {
     });
   });
 
+  it("opens straight into voice when the New-recipe route asks for it", async () => {
+    // Skipping the chooser is the whole point: the user already chose on the
+    // New recipe screen, and asking again would be asking twice.
+    await testStorage.setItem(AI_CONSENT_STORAGE_KEY, "accepted");
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+
+    await act(async () => {
+      tree = TestRenderer.create(
+        <MealLogSheet visible={true} onClose={vi.fn()} start="voice" />,
+      );
+    });
+
+    // The voice view's own control is present without anyone tapping through.
+    expect(
+      tree!.root.findAllByProps({
+        accessibilityLabel: "Start voice meal recording",
+      }).length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("opens straight into food search when asked", async () => {
+    await testStorage.setItem(AI_CONSENT_STORAGE_KEY, "accepted");
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+
+    await act(async () => {
+      tree = TestRenderer.create(
+        <MealLogSheet visible={true} onClose={vi.fn()} start="search" />,
+      );
+    });
+
+    // Positively on the search view — its field — and not on the chooser.
+    expect(
+      tree!.root.findAllByProps({ placeholder: "Search foods — e.g. chicken" }).length,
+    ).toBeGreaterThan(0);
+    expect(
+      tree!.root.findAllByProps({ accessibilityLabel: "Voice meal log" }).length,
+    ).toBe(0);
+  });
+
+  it("still asks for AI consent on a recipe route — a recipe is no reason to skip it", async () => {
+    await testStorage.removeItem(AI_CONSENT_STORAGE_KEY);
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+
+    await act(async () => {
+      tree = TestRenderer.create(
+        <MealLogSheet visible={true} onClose={vi.fn()} start="scan" keepAsRecipe />,
+      );
+    });
+
+    const texts: string[] = [];
+    const walk = (n: TestRenderer.ReactTestInstance) => {
+      for (const c of n.children) {
+        if (typeof c === "string") texts.push(c);
+        else walk(c);
+      }
+    };
+    walk(tree!.root);
+    expect(texts.join(" ")).toMatch(/AI|data sharing/i);
+  });
+
   it("records voice meal audio, transcribes it, and shows the transcript in the box", async () => {
     await testStorage.setItem(AI_CONSENT_STORAGE_KEY, "accepted");
     let tree: TestRenderer.ReactTestRenderer | undefined;

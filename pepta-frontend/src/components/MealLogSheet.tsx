@@ -89,6 +89,12 @@ export interface MealLogSheetProps {
   /** Prefills manual entry and opens straight into it. */
   seed?: MealSeed | null;
   /**
+   * Open straight into one of the three ways to identify food, skipping the
+   * chooser. Same camera, same model, same consent gate as logging a meal —
+   * this only picks which one starts.
+   */
+  start?: "scan" | "voice" | "search" | null;
+  /**
    * Save the identified food as a RECIPE instead of logging it as a meal.
    * The New-recipe routes reuse this sheet to identify food; keeping the
    * result is the only part that differs.
@@ -102,6 +108,7 @@ export function MealLogSheet({
   onBack,
   onDismissed,
   seed,
+  start = null,
   keepAsRecipe = false,
 }: MealLogSheetProps) {
   const theme = useTheme();
@@ -125,6 +132,7 @@ export function MealLogSheet({
   const [searching, setSearching] = useState(false);
   const [searchFailed, setSearchFailed] = useState(false);
   const [cameraRequested, setCameraRequested] = useState(false);
+  const startRef = useRef<"scan" | "voice" | "search" | null>(null);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraMode, setCameraMode] = useState<CameraMode>("meal");
   const [barcodeRequested, setBarcodeRequested] = useState(false);
@@ -186,8 +194,23 @@ export function MealLogSheet({
       setBarcodeRequested(false);
       setBarcodeOpen(false);
       setPendingAiAction(null);
+      // Fired AFTER the reset above, or it would be undone by it. Routed
+      // through requestAiAction rather than performAiAction so the AI consent
+      // gate still applies — a recipe is not a reason to skip it.
+      if (start) startRef.current = start;
     }
-  }, [visible, seed]);
+  }, [visible, seed, start]);
+
+  // Separate effect: requestAiAction is async and defined below, and calling
+  // it from the reset effect would run it against the pre-reset state.
+  useEffect(() => {
+    if (!visible || !startRef.current) return;
+    const action = startRef.current;
+    startRef.current = null;
+    void requestAiAction(action);
+    // Runs on the same commit as the reset, which is exactly what we want.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, view]);
 
   const now = () => new Date().toISOString();
 

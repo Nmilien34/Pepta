@@ -19,7 +19,7 @@ import { useLogSheets } from '../../context/LogSheetsContext';
 import { useTheme } from '../../theme';
 
 interface Route {
-  key: string;
+  key: 'scan' | 'voice' | 'search';
   icon: string;
   title: string;
   detail: string;
@@ -76,7 +76,10 @@ export function NewRecipeScreen() {
                   // Back first, so dismissing the sheet returns to the list
                   // rather than to a chooser the user is done with.
                   navigation.goBack();
-                  openMeal(null, { keepAsRecipe: true });
+                  // The real feature, not the chooser: same camera, same
+                  // model, same consent gate as logging a meal. Only the
+                  // result differs — it is kept rather than logged.
+                  openMeal(null, { keepAsRecipe: true, start: r.key });
                 }}
                 accessibilityRole="button"
                 accessibilityLabel={r.title}

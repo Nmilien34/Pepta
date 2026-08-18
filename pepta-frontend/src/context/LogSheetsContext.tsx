@@ -26,7 +26,10 @@ import { useTheme } from "../theme";
 
 interface LogSheetsValue {
   openQuickLog(mode?: QuickLogMode): void;
-  openMeal(seed?: MealSeed | null, opts?: { keepAsRecipe?: boolean }): void;
+  openMeal(
+    seed?: MealSeed | null,
+    opts?: { keepAsRecipe?: boolean; start?: "scan" | "voice" | "search" },
+  ): void;
 }
 
 interface LogToastMessage {
@@ -60,6 +63,8 @@ export function LogSheetsProvider({ children }: { children: ReactNode }) {
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingSeed = useRef<MealSeed | null>(null);
   const pendingKeepAsRecipe = useRef(false);
+  const pendingStart = useRef<"scan" | "voice" | "search" | null>(null);
+  const [mealStart, setMealStart] = useState<"scan" | "voice" | "search" | null>(null);
   const [keepAsRecipe, setKeepAsRecipe] = useState(false);
   const [mealSeed, setMealSeed] = useState<MealSeed | null>(null);
 
@@ -80,7 +85,10 @@ export function LogSheetsProvider({ children }: { children: ReactNode }) {
     setQuickOpen(true);
   }, []);
   const openMeal = useCallback(
-    (seed?: MealSeed | null, opts?: { keepAsRecipe?: boolean }) => {
+    (
+      seed?: MealSeed | null,
+      opts?: { keepAsRecipe?: boolean; start?: "scan" | "voice" | "search" },
+    ) => {
       // "Keep the result": the New-recipe routes reuse the meal sheet to
       // IDENTIFY food, then the commit saves a recipe instead of logging a
       // meal. Held on a ref for the same reason as the seed — the sheet can
@@ -88,6 +96,8 @@ export function LogSheetsProvider({ children }: { children: ReactNode }) {
       // silently log the meal the user meant to save.
       pendingKeepAsRecipe.current = opts?.keepAsRecipe ?? false;
       setKeepAsRecipe(opts?.keepAsRecipe ?? false);
+      pendingStart.current = opts?.start ?? null;
+      setMealStart(opts?.start ?? null);
       // Held in a ref, not state: the sheet may open on a delay (below) and a
       // seed that re-rendered away in between would silently become a blank
       // manual form — the failure looks like "the tap did nothing".
@@ -116,6 +126,7 @@ export function LogSheetsProvider({ children }: { children: ReactNode }) {
     mealOpenTimer.current = setTimeout(() => {
       setMealSeed(pendingSeed.current);
       setKeepAsRecipe(pendingKeepAsRecipe.current);
+      setMealStart(pendingStart.current);
       setMealOpen(true);
     }, 40);
   }, []);
@@ -171,6 +182,7 @@ export function LogSheetsProvider({ children }: { children: ReactNode }) {
       <MealLogSheet
         seed={mealSeed}
         keepAsRecipe={keepAsRecipe}
+        start={mealStart}
         visible={mealOpen}
         onClose={handleMealClose}
         onBack={mealReturnsToQuickLog ? handleMealBack : undefined}
