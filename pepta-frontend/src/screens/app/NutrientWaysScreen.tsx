@@ -12,7 +12,7 @@
 import React from 'react';
 import { Image, Pressable, ScrollView, View } from 'react-native';
 import { useNavigation, useRoute, type NavigationProp, type RouteProp } from '@react-navigation/native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { AppText, Card, ProgressBar } from '../../components';
 import { Icon } from '../../components/Icon';
@@ -46,6 +46,10 @@ const NOTES: Partial<Record<NutrientKind, string>> = {
 
 export function NutrientWaysScreen() {
   const theme = useTheme();
+  // The bottom inset, not a fixed number. This screen is PUSHED over the tabs,
+  // so there is no tab bar underneath to hold the last card clear of the home
+  // indicator — a hard 40 leaves it sitting on the bar on every modern iPhone.
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
   const route = useRoute<RouteProp<Record<string, NutrientWaysParams>, string>>();
   const kind: NutrientKind = route.params?.kind === 'protein' ? 'protein' : 'fiber';
@@ -79,7 +83,7 @@ export function NutrientWaysScreen() {
           <AppText variant="screenTitle">{TITLES[kind]}</AppText>
         </View>
 
-        <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 28 }} showsVerticalScrollIndicator={false}>
           {head ? (
             <Card style={{ marginTop: 12 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>

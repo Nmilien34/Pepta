@@ -17,7 +17,7 @@
 import React from 'react';
 import { Image, Pressable, ScrollView, View } from 'react-native';
 import { useNavigation, type NavigationProp } from '@react-navigation/native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { AppText, Card, WaterCup } from '../../components';
 import { Icon } from '../../components/Icon';
@@ -33,6 +33,10 @@ const STEP_OZ = 8;
 
 export function WaterScreen() {
   const theme = useTheme();
+  // The bottom inset, not a fixed number. This screen is PUSHED over the tabs,
+  // so there is no tab bar underneath to hold the last card clear of the home
+  // indicator — a hard 40 leaves it sitting on the bar on every modern iPhone.
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
   const { home, bumpWater } = usePeptaData();
   const { openQuickLog } = useLogSheets();
@@ -63,7 +67,7 @@ export function WaterScreen() {
           <AppText variant="screenTitle">Water</AppText>
         </View>
 
-        <ScrollView contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 28 }} showsVerticalScrollIndicator={false}>
           {/* The glass, and the ±8 that is already on Home. */}
           <View style={{ paddingHorizontal: 20 }}>
             <Card style={{ marginTop: 12, alignItems: 'center' }}>
