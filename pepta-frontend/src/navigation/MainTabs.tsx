@@ -22,6 +22,7 @@ import { DoseSettingsScreen } from "../screens/app/DoseSettingsScreen";
 import { CycleSetupScreen } from "../screens/app/CycleSetupScreen";
 import { MixCalculatorScreen } from "../screens/app/MixCalculatorScreen";
 import { LibraryScreen } from "../screens/app/LibraryScreen";
+import { NutrientWaysScreen } from "../screens/app/NutrientWaysScreen";
 import { LibraryEntryScreen } from "../screens/app/LibraryEntryScreen";
 import { FoodHistoryScreen } from "../screens/app/FoodHistoryScreen";
 import { WeightDetailScreen } from "../screens/app/WeightDetailScreen";
@@ -43,6 +44,7 @@ export function MainTabs() {
         <Stack.Screen name="MixCalculator" component={MixCalculatorScreen} />
         <Stack.Screen name="Library" component={LibraryScreen} />
         <Stack.Screen name="LibraryEntry" component={LibraryEntryScreen} />
+        <Stack.Screen name="NutrientWays" component={NutrientWaysScreen} />
         <Stack.Screen name="FoodHistory" component={FoodHistoryScreen} />
         <Stack.Screen name="WeightDetail" component={WeightDetailScreen} />
         <Stack.Screen name="WidgetSetup" component={WidgetSetupScreen} />

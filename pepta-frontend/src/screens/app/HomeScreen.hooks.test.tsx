@@ -50,6 +50,8 @@ vi.mock("react-native", () => {
       event: vi.fn(() => vi.fn()),
     },
     Easing: { inOut: (v: unknown) => v, out: (v: unknown) => v, quad: "quad", cubic: "cubic", bezier: () => "bezier" },
+    // The shortcuts grid renders photo tiles.
+    Image: passthrough("Image"),
     Platform: { OS: "ios" },
     StyleSheet: { create: (s: unknown) => s, absoluteFill: {}, hairlineWidth: 1 },
     Dimensions: { get: () => ({ width: 402, height: 874 }) },

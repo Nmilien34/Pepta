@@ -23,6 +23,8 @@ import { useLogSheets } from '../../context/LogSheetsContext';
 import { buildHomeView, type GoalView, type HomeWeightPulseView, type RingStat } from './homeView';
 import { globalDoseNoun, LEVEL_SUPPRESSION_COPY } from './levelSuppression';
 import { buildActivity, buildTodaysLog, type ActivitySummary, type LogChip, type LogKind } from './homeExtras';
+import { HomeShortcuts, type Shortcut } from './HomeShortcuts';
+import { SHORTCUT_PHOTOS } from './nutrientPhotos';
 import { buildGettingStarted, buildPlanSummary, type GettingStarted, type LogAction, type PlanSummary } from './planView';
 import { resolveTeachCard, type PepTeachCard, type ResolvedTeachCard } from './pepTeach';
 import { doseCtaState } from './doseCta';
@@ -145,6 +147,25 @@ export function HomeScreen() {
   const rangeAvailability = home.rangeAvailability ?? { today: true, week: false, month: false, year: false };
   const activity = buildActivity(track, home.profile, new Date(), selectedRange, home.rangeTotals);
   const todaysLog = buildTodaysLog(track, home, new Date(), selectedRange);
+  // Three of the four designed tiles have somewhere to go. Recipes does not —
+  // its screen is designed but unbuilt — so it is left out rather than shipped
+  // as a tile that does nothing.
+  const shortcuts: Shortcut[] = [
+    { key: 'meals', label: 'Meals', photo: SHORTCUT_PHOTOS.meals, onPress: openMeal },
+    {
+      key: 'fiber',
+      label: 'Fiber',
+      photo: SHORTCUT_PHOTOS.fiber,
+      onPress: () => navigation.navigate('NutrientWays', { kind: 'fiber' }),
+    },
+    {
+      key: 'hydration',
+      label: 'Hydration',
+      photo: SHORTCUT_PHOTOS.hydration,
+      onPress: () => openQuickLog('water'),
+    },
+  ];
+
   const selectRange = (range: HomeRangeKey) => {
     if (!rangeAvailability[range]) return;
     Haptics.selectionAsync().catch(() => undefined);
@@ -507,6 +528,12 @@ export function HomeScreen() {
               <WaterCard stat={view.water} onMinus={() => bumpWater(-8)} onPlus={() => bumpWater(8)} />
               <GoalCard goal={view.goal} />
             </View>
+          </Reveal>
+
+          {/* shortcuts — doors to the food surfaces, between the nutrient
+              cards and the weight card (the order Nick landed on) */}
+          <Reveal delay={225} style={{ marginTop: 12 }}>
+            <HomeShortcuts shortcuts={shortcuts} />
           </Reveal>
 
           <Reveal delay={250} style={{ marginTop: 12 }}>
