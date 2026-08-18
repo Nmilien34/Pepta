@@ -522,11 +522,12 @@ export function HomeScreen() {
                 unit="g"
                 color={theme.colors.protein}
                 stepper={<Stepper label="5 g" color={theme.colors.protein} onMinus={() => bumpProtein(-5)} onPlus={() => bumpProtein(5)} />}
+                onExamples={() => navigation.navigate('NutrientWays', { kind: 'protein' })}
               />
             </View>
             <View style={{ flex: 1, gap: 12 }}>
               <WaterCard stat={view.water} onMinus={() => bumpWater(-8)} onPlus={() => bumpWater(8)} />
-              <GoalCard goal={view.goal} />
+              <MealsCard stat={view.calories} onLog={openMeal} />
             </View>
           </Reveal>
 
@@ -892,41 +893,58 @@ function MilestoneTrackView({ goal }: { goal: GoalView }) {
   );
 }
 
-function GoalCard({ goal }: { goal: GoalView | null }) {
+/**
+ * The Meals tile. Calories rather than a fourth stepper: meals are the one
+ * thing on this grid that cannot be logged with a plus button, so the tile's
+ * job is to state the number and open the sheet that can actually take one.
+ */
+function MealsCard({ stat, onLog }: { stat: RingStat; onLog(): void }) {
   const theme = useTheme();
   return (
-    <Card>
+    <Card style={{ flex: 1 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
-        <Icon name="scale" size={18} color={theme.colors.weight} stroke={2.3} />
+        <Icon name="restaurant" size={18} color={theme.colors.textPrimary} stroke={2.3} />
         <AppText variant="cardTitle" style={{ fontSize: 15 }}>
-          Goal
+          Meals
         </AppText>
       </View>
-      {goal ? (
-        <>
-          <View style={{ marginTop: 12, alignSelf: 'flex-start', backgroundColor: WEIGHT_WASH, paddingVertical: 4, paddingHorizontal: 10, borderRadius: theme.radii.pill }}>
-            <AppText variant="caption" style={{ color: theme.colors.weight, fontWeight: '700' }}>
-              {goal.trackLabel}
-            </AppText>
-          </View>
-          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4, marginTop: 12 }}>
-            <CountUp value={goal.value} variant="statBig" />
-            <AppText variant="caption" color="textSecondary">
-              {goal.unit}
-            </AppText>
-          </View>
-          <AppText variant="caption" color="textTertiary" style={{ marginTop: 6 }}>
-            {goal.dateLabel}
-          </AppText>
-        </>
-      ) : (
-        <AppText variant="caption" color="textSecondary" style={{ marginTop: 12 }}>
-          Log your weight to track progress.
+      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4, marginTop: 12 }}>
+        <CountUp value={Math.round(stat.current)} variant="statBig" />
+        <AppText variant="caption" color="textTertiary">
+          {stat.target ? `/ ${Math.round(stat.target).toLocaleString()}` : 'cal'}
         </AppText>
-      )}
+      </View>
+      <View style={{ marginTop: 10 }}>
+        <ProgressBar pct={stat.pct} color={theme.colors.textPrimary} height={6} />
+      </View>
+      <Pressable
+        onPress={() => {
+          Haptics.selectionAsync().catch(() => undefined);
+          onLog();
+        }}
+        accessibilityRole="button"
+        accessibilityLabel="Log a meal"
+        style={({ pressed }) => ({
+          marginTop: 12,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 6,
+          paddingVertical: 8,
+          borderRadius: theme.radii.pill,
+          backgroundColor: theme.colors.surfaceAlt,
+          opacity: pressed ? 0.7 : 1,
+        })}
+      >
+        <Icon name="add" size={14} color={theme.colors.textPrimary} stroke={2.6} />
+        <AppText variant="caption" style={{ fontWeight: '800', fontSize: 11.5 }}>
+          Log a meal
+        </AppText>
+      </Pressable>
     </Card>
   );
 }
+
 
 function HomeWeightPulseCard({
   pulse,
@@ -1156,6 +1174,7 @@ function MacroRingCard({
   unit,
   color,
   stepper,
+  onExamples,
 }: {
   title: string;
   icon: React.ReactNode;
@@ -1163,6 +1182,8 @@ function MacroRingCard({
   unit: string;
   color: string;
   stepper?: React.ReactNode;
+  /** Opens the "ways to hit it" screen. Omitted where there is no such screen. */
+  onExamples?: () => void;
 }) {
   return (
     <Card>
@@ -1183,6 +1204,22 @@ function MacroRingCard({
         </ProgressRing>
       </View>
       {stepper}
+      {onExamples ? (
+        <Pressable
+          onPress={() => {
+            Haptics.selectionAsync().catch(() => undefined);
+            onExamples();
+          }}
+          hitSlop={{ top: 8, bottom: 10, left: 20, right: 20 }}
+          accessibilityRole="button"
+          accessibilityLabel={`See ${title.toLowerCase()} examples`}
+          style={({ pressed }) => ({ marginTop: 10, alignSelf: 'center', opacity: pressed ? 0.6 : 1 })}
+        >
+          <AppText variant="caption" style={{ fontSize: 11, fontWeight: '800', color }}>
+            See examples
+          </AppText>
+        </Pressable>
+      ) : null}
     </Card>
   );
 }
