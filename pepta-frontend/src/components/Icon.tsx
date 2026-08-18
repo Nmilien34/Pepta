@@ -182,6 +182,7 @@ const MAP: Record<string, TablerIcon> = {
   'chevron-up': IconChevronUp,
   stop: IconPlayerStopFilled,
   star: IconStar,
+  'star-outline': IconStar,
   'ellipse-outline': IconCircle,
   'dots-horizontal': IconDots,
   equal: IconEqual,

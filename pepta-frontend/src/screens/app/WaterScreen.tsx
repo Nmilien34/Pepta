@@ -27,6 +27,9 @@ import { useLogSheets } from '../../context/LogSheetsContext';
 import { useTheme } from '../../theme';
 import { todayStat } from './homeView';
 import { useTodayRefresh } from './useTodayRefresh';
+import { useFavourites } from './useFavourites';
+import { favouriteId, isSaved } from './favourites';
+import { YoursBlock } from './YoursBlock';
 import { DRINK_PHOTOS } from './nutrientPhotos';
 import { HYDRATION_EXAMPLES, goalLine, ouncesLabel, quickAddVessels } from './hydration';
 
@@ -41,6 +44,7 @@ export function WaterScreen() {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
   const { home, bumpWater, refreshHome } = usePeptaData();
   const todayRefresh = useTodayRefresh();
+  const { favourites, save, unsave } = useFavourites();
   const { openQuickLog } = useLogSheets();
 
   // A cold entry — deep link, or the cache never hydrated — must not render
@@ -221,10 +225,55 @@ export function WaterScreen() {
                       </AppText>
                     </View>
                   </View>
+                  <Pressable
+                    onPress={() => {
+                      Haptics.selectionAsync().catch(() => undefined);
+                      const id = favouriteId('drink', drink.brand, drink.volume);
+                      if (isSaved(favourites, id)) {
+                        unsave(id);
+                        return;
+                      }
+                      // Saved with its VOLUME: a favourite drink has to know
+                      // what tapping Log adds, or it is just a bookmark.
+                      save({
+                        id,
+                        kind: 'drink',
+                        name: drink.brand,
+                        portion: drink.volume,
+                        ounces: drink.ounces,
+                        savedAt: new Date().toISOString(),
+                      });
+                    }}
+                    hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={
+                      isSaved(favourites, favouriteId('drink', drink.brand, drink.volume))
+                        ? `Remove ${drink.brand} from favourites`
+                        : `Save ${drink.brand} to favourites`
+                    }
+                    style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+                  >
+                    <Icon
+                      name="star"
+                      size={17}
+                      color={
+                        isSaved(favourites, favouriteId('drink', drink.brand, drink.volume))
+                          ? theme.colors.warning
+                          : theme.colors.border
+                      }
+                      stroke={2.2}
+                    />
+                  </Pressable>
                   <Icon name="add" size={17} color={theme.colors.water} stroke={2.5} />
                 </Pressable>
               ))}
             </Card>
+
+            <YoursBlock
+              onFavourites={() => navigation.navigate('Favourites', { kind: 'drink' })}
+              saved={favourites.filter((f) => f.kind === 'drink').length}
+              noun="drink"
+            />
           </View>
         </ScrollView>
       </SafeAreaView>

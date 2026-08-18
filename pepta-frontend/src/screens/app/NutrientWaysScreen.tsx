@@ -21,6 +21,9 @@ import { useLogSheets } from '../../context/LogSheetsContext';
 import { useTheme } from '../../theme';
 import { todayStat } from './homeView';
 import { useTodayRefresh } from './useTodayRefresh';
+import { useFavourites } from './useFavourites';
+import { YoursBlock } from './YoursBlock';
+import { favouriteId, isSaved } from './favourites';
 import { FOOD_PHOTOS } from './nutrientPhotos';
 import {
   foodsFor,
@@ -55,6 +58,7 @@ export function NutrientWaysScreen() {
   const kind: NutrientKind = route.params?.kind === 'protein' ? 'protein' : 'fiber';
   const { home, refreshHome } = usePeptaData();
   const todayRefresh = useTodayRefresh();
+  const { favourites, save, unsave } = useFavourites();
   const { openMeal } = useLogSheets();
 
   const tint = kind === 'fiber' ? theme.colors.fiber : theme.colors.protein;
@@ -250,12 +254,58 @@ export function NutrientWaysScreen() {
                     </AppText>
                   </View>
                 </View>
+                {/* Star saves the PORTION shown, which is what makes a
+                    favourite one tap later rather than a category to fill in. */}
+                <Pressable
+                  onPress={() => {
+                    Haptics.selectionAsync().catch(() => undefined);
+                    const id = favouriteId('food', food.name, food.serving);
+                    if (isSaved(favourites, id)) {
+                      unsave(id);
+                      return;
+                    }
+                    save({
+                      id,
+                      kind: 'food',
+                      name: food.name,
+                      portion: food.serving,
+                      calories: food.calories,
+                      ...(kind === 'protein' ? { protein: food.amount } : { fiber: food.amount }),
+                      savedAt: new Date().toISOString(),
+                    });
+                  }}
+                  hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    isSaved(favourites, favouriteId('food', food.name, food.serving))
+                      ? `Remove ${food.name} from favourites`
+                      : `Save ${food.name} to favourites`
+                  }
+                  style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+                >
+                  <Icon
+                    name="star"
+                    size={17}
+                    color={
+                      isSaved(favourites, favouriteId('food', food.name, food.serving))
+                        ? theme.colors.warning
+                        : theme.colors.border
+                    }
+                    stroke={2.2}
+                  />
+                </Pressable>
                 {/* A plus, tinted. The row's action is "add this", and a
                     chevron would promise a detail screen that does not exist. */}
                 <Icon name="add" size={17} color={tint} stroke={2} />
               </Pressable>
             ))}
           </Card>
+
+          <YoursBlock
+            onFavourites={() => navigation.navigate('Favourites', { kind: 'food' })}
+            saved={favourites.filter((f) => f.kind === 'food').length}
+            noun="eat"
+          />
         </ScrollView>
       </SafeAreaView>
     </View>

@@ -27,22 +27,28 @@ export interface TodayRefresh {
 
 export function useTodayRefresh(): TodayRefresh {
   const { home, homeRefreshing, refreshHome, pendingLogs } = usePeptaData();
-  // One automatic refresh per visit. Without this the effect re-runs whenever
-  // its dependencies change and the screen refetches on every keystroke of
-  // state that passes through.
+
+  // Read through a ref so the focus callback's identity never changes.
+  // useFocusEffect runs its CLEANUP on any dependency change, not only on
+  // blur, so a callback that depended on these values had its "once per visit"
+  // guard reset by any unrelated re-render — a second hook on the screen
+  // hydrating from storage was enough to make it refetch twice.
+  const live = useRef({ home, pendingLogs, refreshHome });
+  live.current = { home, pendingLogs, refreshHome };
   const refreshedThisVisit = useRef(false);
 
   useFocusEffect(
     useCallback(() => {
+      const current = live.current;
       // No cache at all is handled by the screen's own loading branch.
-      if (home && !refreshedThisVisit.current && pendingLogs === 0) {
+      if (current.home && !refreshedThisVisit.current && current.pendingLogs === 0) {
         refreshedThisVisit.current = true;
-        void refreshHome();
+        void current.refreshHome();
       }
       return () => {
         refreshedThisVisit.current = false;
       };
-    }, [home, pendingLogs, refreshHome]),
+    }, []),
   );
 
   const onRefresh = useCallback(() => {

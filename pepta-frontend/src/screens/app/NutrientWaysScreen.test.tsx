@@ -10,6 +10,7 @@ import { describe, expect, it, vi } from "vitest";
 import TestRenderer, { act } from "react-test-renderer";
 
 const mocks = vi.hoisted(() => ({
+  navigate: vi.fn(),
   openMeal: vi.fn(),
   kind: "protein" as "protein" | "fiber",
   home: null as unknown,
@@ -41,7 +42,7 @@ vi.mock("react-native", () => {
   };
 });
 vi.mock("@react-navigation/native", () => ({
-  useNavigation: () => ({ navigate: vi.fn(), goBack: vi.fn() }),
+  useNavigation: () => ({ navigate: mocks.navigate, goBack: vi.fn() }),
   useRoute: () => ({ params: { kind: mocks.kind } }),
   // Real enough to exercise the focus refresh: run the callback, honour its
   // cleanup, exactly as navigation does when the screen comes into view.
@@ -81,6 +82,20 @@ vi.mock("../../context/PeptaDataContext", () => ({
     homeRefreshing: mocks.homeRefreshing,
   }),
 }));
+vi.mock("@react-native-async-storage/async-storage", () => {
+  let store: Record<string, string> = {};
+  return {
+    default: {
+      getItem: vi.fn(async (k: string) => store[k] ?? null),
+      setItem: vi.fn(async (k: string, v: string) => {
+        store[k] = v;
+      }),
+      removeItem: vi.fn(async (k: string) => {
+        delete store[k];
+      }),
+    },
+  };
+});
 vi.mock("../../context/LogSheetsContext", () => ({
   useLogSheets: () => ({ openMeal: mocks.openMeal }),
 }));
@@ -100,6 +115,7 @@ function homeWith(loggedProtein: number, target: number | null = 120, extra: obj
 
 function render(home: unknown, kind: "protein" | "fiber" = "protein") {
   mocks.openMeal.mockClear();
+  mocks.navigate.mockClear();
   mocks.kind = kind;
   mocks.home = home;
   mocks.refreshHome.mockClear();
@@ -371,5 +387,37 @@ describe("NutrientWaysScreen · tapping a food", () => {
     expect(mocks.openMeal).toHaveBeenCalledWith(
       expect.objectContaining({ foodName: "Avocado", fiber: 7 }),
     );
+  });
+});
+
+describe("NutrientWaysScreen · Yours", () => {
+  const press = (tree: TestRenderer.ReactTestRenderer, label: string) => {
+    const p = tree.root
+      .findAll((n) => String(n.type) === "Pressable")
+      .find((x) => x.props.accessibilityLabel === label);
+    expect(p, `no pressable labelled "${label}"`).toBeDefined();
+    act(() => {
+      p!.props.onPress();
+    });
+  };
+
+  it("offers Favourites, and opens it on the food side", () => {
+    const tree = render(fiberHome(12), "fiber");
+    expect(texts(tree)).toContain("Yours");
+    press(tree, "Favourites");
+    expect(mocks.navigate).toHaveBeenCalledWith("Favourites", { kind: "food" });
+  });
+
+  it("invites a first star rather than claiming a count of zero", () => {
+    expect(texts(render(fiberHome(12), "fiber"))).toContain("Star anything to keep it here");
+  });
+
+  it("stars a food with the portion shown, and unstars it again", async () => {
+    const tree = render(fiberHome(12), "fiber");
+    await act(async () => undefined); // let the saved list hydrate
+    press(tree, "Save Edamame to favourites");
+    // The label flips, which is how the row reports it worked.
+    press(tree, "Remove Edamame from favourites");
+    press(tree, "Save Edamame to favourites");
   });
 });
