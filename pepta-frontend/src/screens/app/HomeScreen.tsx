@@ -542,7 +542,7 @@ export function HomeScreen() {
 
           {/* activity */}
           <Reveal delay={280} style={{ marginTop: 12 }}>
-            <ActivityCard activity={activity} />
+            <ActivityCard activity={activity} onLog={() => openQuickLog('activity')} />
           </Reveal>
 
           {/* today's log */}
@@ -827,6 +827,7 @@ function WaterCard({ stat, onMinus, onPlus }: { stat: RingStat; onMinus: () => v
 const WEIGHT_WASH = 'rgba(124,92,252,0.10)';
 const WEIGHT_EDGE = 'rgba(124,92,252,0.18)';
 const WEIGHT_GLOW = 'rgba(124,92,252,0.08)';
+const ACTIVITY_WASH = 'rgba(255,107,90,0.10)';
 
 /**
  * The milestone track: where they stand, the round numbers between here and
@@ -1020,17 +1021,43 @@ function HomeWeightPulseCard({
   );
 }
 
-function ActivityCard({ activity }: { activity: ActivitySummary }) {
+function ActivityCard({ activity, onLog }: { activity: ActivitySummary; onLog(): void }) {
   const theme = useTheme();
   const stepsPct = activity.stepTarget > 0 ? Math.min(1, activity.steps / activity.stepTarget) : 0;
   const workoutPct = activity.workoutTarget > 0 ? Math.min(1, activity.workoutMin / activity.workoutTarget) : 0;
   return (
     <Card>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <Icon name="run" size={18} color={theme.colors.fiber} />
+        <Icon name="run" size={18} color={theme.colors.activity} />
         <AppText variant="cardTitle" style={{ fontSize: 16 }}>
           Activity
         </AppText>
+        {/* The card showed two bars and offered no way to move them. */}
+        <Pressable
+          onPress={() => {
+            Haptics.selectionAsync().catch(() => undefined);
+            onLog();
+          }}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          accessibilityRole="button"
+          accessibilityLabel="Log a workout"
+          style={({ pressed }) => ({
+            marginLeft: 'auto',
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 5,
+            paddingVertical: 5,
+            paddingHorizontal: 10,
+            borderRadius: theme.radii.pill,
+            backgroundColor: ACTIVITY_WASH,
+            opacity: pressed ? 0.7 : 1,
+          })}
+        >
+          <Icon name="add" size={13} color={theme.colors.activity} stroke={2.6} />
+          <AppText variant="caption" style={{ color: theme.colors.activity, fontWeight: '800', fontSize: 11 }}>
+            Log
+          </AppText>
+        </Pressable>
       </View>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 14 }}>
         <AppText variant="caption" color="textSecondary">
@@ -1044,7 +1071,7 @@ function ActivityCard({ activity }: { activity: ActivitySummary }) {
         </AppText>
       </View>
       <View style={{ marginTop: 8 }}>
-        <ProgressBar pct={stepsPct} color={theme.colors.fiber} height={6} />
+        <ProgressBar pct={stepsPct} color={theme.colors.activity} height={6} />
       </View>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 12 }}>
         <AppText variant="caption" color="textSecondary">
@@ -1058,7 +1085,7 @@ function ActivityCard({ activity }: { activity: ActivitySummary }) {
         </AppText>
       </View>
       <View style={{ marginTop: 8 }}>
-        <ProgressBar pct={workoutPct} color={theme.colors.fiber} height={6} />
+        <ProgressBar pct={workoutPct} color={theme.colors.activity} height={6} />
       </View>
     </Card>
   );

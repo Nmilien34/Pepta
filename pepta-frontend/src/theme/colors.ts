@@ -23,6 +23,9 @@ const accents = {
   level: "#7C5CFC",
   weight: "#7C5CFC",
   goal: "#7C5CFC",
+  // Coral — activity is the one metric that is neither medication nor food,
+  // and it was borrowing fiber's green, which made steps read as a nutrient.
+  activity: "#FF6B5A",
   // Status
   warning: "#FFB020", // amber
   danger: "#FF4D4F", // red
@@ -99,6 +102,7 @@ export const dataColors = {
   weight: accents.weight,
   goal: accents.goal,
   streak: accents.streak,
+  activity: accents.activity,
 } as const;
 
 export type ThemeColors = ReturnType<typeof getColors>;
