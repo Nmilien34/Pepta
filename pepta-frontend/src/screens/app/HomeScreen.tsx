@@ -510,7 +510,7 @@ export function HomeScreen() {
           </Reveal>
 
           <Reveal delay={250} style={{ marginTop: 12 }}>
-            <HomeWeightPulseCard pulse={view.weightPulse} onLog={() => openQuickLog('weight')} />
+            <HomeWeightPulseCard pulse={view.weightPulse} goal={view.goal} onLog={() => openQuickLog('weight')} />
           </Reveal>
 
           {/* activity */}
@@ -795,6 +795,75 @@ function WaterCard({ stat, onMinus, onPlus }: { stat: RingStat; onMinus: () => v
   );
 }
 
+// Purple washes for the weight surfaces. Derived from the one accent so the
+// tile, the glow and the pressable edge cannot drift apart.
+const WEIGHT_WASH = 'rgba(124,92,252,0.10)';
+const WEIGHT_EDGE = 'rgba(124,92,252,0.18)';
+const WEIGHT_GLOW = 'rgba(124,92,252,0.08)';
+
+/**
+ * The milestone track: where they stand, the round numbers between here and
+ * the goal, and the flag. Replaces a progress bar whose fill is nearly empty
+ * for the months that matter most.
+ */
+function MilestoneTrackView({ goal }: { goal: GoalView }) {
+  const theme = useTheme();
+  const { track } = goal;
+  const unit = goal.unit;
+
+  if (track.reached) {
+    return (
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 16 }}>
+        <Icon name="flag" size={16} color={theme.colors.weight} stroke={2.4} />
+        <AppText variant="caption" style={{ color: theme.colors.weight, fontWeight: '800' }}>
+          Goal reached — {track.goal} {unit}
+        </AppText>
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ marginTop: 16 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        {/* Where they are now. Filled, because it is the only real number here. */}
+        <View
+          style={{
+            width: 11,
+            height: 11,
+            borderRadius: 6,
+            backgroundColor: theme.colors.weight,
+          }}
+        />
+        {track.markers.map((mark, i) => (
+          <React.Fragment key={mark}>
+            <View style={{ flex: 1, height: 2, backgroundColor: theme.colors.border }} />
+            <View
+              style={{
+                width: 7,
+                height: 7,
+                borderRadius: 4,
+                // Only the next marker is tinted — the rest are still abstract.
+                backgroundColor: i === 0 ? WEIGHT_EDGE : theme.colors.border,
+              }}
+            />
+          </React.Fragment>
+        ))}
+        <View style={{ flex: 1, height: 2, backgroundColor: theme.colors.border }} />
+        <Icon name="flag" size={14} color={theme.colors.textTertiary} stroke={2.2} />
+      </View>
+
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 7 }}>
+        <AppText variant="caption" color="textTertiary" style={{ fontSize: 10 }}>
+          {track.next != null ? `Next marker ${track.next} ${unit}` : `Goal ${track.goal} ${unit}`}
+        </AppText>
+        <AppText variant="caption" style={{ fontSize: 10, color: theme.colors.weight, fontWeight: '800' }}>
+          {goal.trackLabel}
+        </AppText>
+      </View>
+    </View>
+  );
+}
+
 function GoalCard({ goal }: { goal: GoalView | null }) {
   const theme = useTheme();
   return (
@@ -807,9 +876,9 @@ function GoalCard({ goal }: { goal: GoalView | null }) {
       </View>
       {goal ? (
         <>
-          <View style={{ marginTop: 12, alignSelf: 'flex-start', backgroundColor: '#FBEAF6', paddingVertical: 4, paddingHorizontal: 10, borderRadius: theme.radii.pill }}>
-            <AppText variant="caption" style={{ color: '#A8327D', fontWeight: '700' }}>
-              {Math.round(goal.pct * 100)}% of goal
+          <View style={{ marginTop: 12, alignSelf: 'flex-start', backgroundColor: WEIGHT_WASH, paddingVertical: 4, paddingHorizontal: 10, borderRadius: theme.radii.pill }}>
+            <AppText variant="caption" style={{ color: theme.colors.weight, fontWeight: '700' }}>
+              {goal.trackLabel}
             </AppText>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4, marginTop: 12 }}>
@@ -831,7 +900,15 @@ function GoalCard({ goal }: { goal: GoalView | null }) {
   );
 }
 
-function HomeWeightPulseCard({ pulse, onLog }: { pulse: HomeWeightPulseView; onLog(): void }) {
+function HomeWeightPulseCard({
+  pulse,
+  goal,
+  onLog,
+}: {
+  pulse: HomeWeightPulseView;
+  goal: GoalView | null;
+  onLog(): void;
+}) {
   const theme = useTheme();
   const hasWeight = pulse.latestLabel != null;
   return (
@@ -845,7 +922,7 @@ function HomeWeightPulseCard({ pulse, onLog }: { pulse: HomeWeightPulseView; onL
           width: 120,
           height: 120,
           borderRadius: 60,
-          backgroundColor: 'rgba(226,92,196,0.08)',
+          backgroundColor: WEIGHT_GLOW,
         }}
       />
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
@@ -854,7 +931,7 @@ function HomeWeightPulseCard({ pulse, onLog }: { pulse: HomeWeightPulseView; onL
             width: 42,
             height: 42,
             borderRadius: 18,
-            backgroundColor: '#FBEAF6',
+            backgroundColor: WEIGHT_WASH,
             alignItems: 'center',
             justifyContent: 'center',
           }}
@@ -883,6 +960,7 @@ function HomeWeightPulseCard({ pulse, onLog }: { pulse: HomeWeightPulseView; onL
           </View>
         ) : null}
       </View>
+      {goal ? <MilestoneTrackView goal={goal} /> : null}
       <View style={{ marginTop: 14, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
         <Pressable
           onPress={() => {
@@ -896,9 +974,9 @@ function HomeWeightPulseCard({ pulse, onLog }: { pulse: HomeWeightPulseView; onL
             paddingVertical: 9,
             paddingHorizontal: 13,
             borderRadius: theme.radii.pill,
-            backgroundColor: '#FBEAF6',
+            backgroundColor: WEIGHT_WASH,
             borderWidth: 1,
-            borderColor: 'rgba(226,92,196,0.16)',
+            borderColor: WEIGHT_EDGE,
             opacity: pressed ? 0.72 : 1,
           })}
         >

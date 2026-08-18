@@ -16,10 +16,13 @@ const accents = {
   streak: "#FF8A3D",
   fiber: "#34C759", // green — also success
   success: "#34C759",
-  water: "#2FA8FF", // blue — also medication level secondary
-  level: "#2FA8FF",
-  weight: "#E25CC4", // magenta — also goal
-  goal: "#E25CC4",
+  water: "#2FA8FF", // blue
+  // Purple carries medication level AND weight. Level used to share water's
+  // blue, which is the exact collision the colour pass was for: two unrelated
+  // metrics reading as the same thing on one screen.
+  level: "#7C5CFC",
+  weight: "#7C5CFC",
+  goal: "#7C5CFC",
   // Status
   warning: "#FFB020", // amber
   danger: "#FF4D4F", // red

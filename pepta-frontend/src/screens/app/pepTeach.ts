@@ -81,6 +81,70 @@ export function buildPepTeachCard({
   };
 }
 
+/**
+ * Rebuild one specific card by id, bypassing the picker entirely.
+ *
+ * Needed because a folded card has to keep being ITSELF. "Not now" marks the
+ * entry seen, so re-running the picker would hand back a different lesson —
+ * which is exactly the bug: saying "not now" produced a fresh card to say "not
+ * now" to. Returns null if the entry is gone from the library or lost its
+ * citation, in which case the caller falls back to a normal pick.
+ */
+export function teachCardForEntryId(entryId: string): PepTeachCard | null {
+  const entry = LIBRARY_ENTRIES.find((e) => e.id === entryId);
+  if (!entry || !hasCitation(entry)) return null;
+  return {
+    entryId: entry.id,
+    entryName: entry.name,
+    title: `Why ${entry.name} is ${entry.epithet.toLowerCase()}`,
+    body: entry.evidenceNote,
+    cite: firstCitation(entry)!,
+  };
+}
+
+/**
+ * TODAY'S CARD, PINNED. Once the user has touched a lesson — folded it, or said
+ * "not now" — that lesson is the one Home shows for the rest of the day.
+ *
+ * It pins rather than merely hides because "not now" also marks the entry seen,
+ * so an unpinned expand would run the picker again and hand back a DIFFERENT
+ * lesson: the user taps the chevron to reopen what they folded and gets someone
+ * else's card. `collapsed` therefore rides along with the pin instead of
+ * clearing it.
+ */
+export interface TeachFold {
+  entryId: string;
+  /** Local YYYY-MM-DD. The pin lasts the rest of that day, no longer. */
+  day: string;
+  collapsed: boolean;
+}
+
+export interface ResolvedTeachCard {
+  card: PepTeachCard | null;
+  collapsed: boolean;
+}
+
+/**
+ * What Home shows today: the folded card if one was folded today, otherwise a
+ * fresh pick.
+ *
+ * THE WHOLE POINT is that a fold is sticky for the day. "Not now" means "I
+ * don't feel like reading", not "next please" — so nothing is re-picked until
+ * tomorrow, and the folded card stays on screen, folded, where the user can
+ * reopen it if they change their mind.
+ */
+export function resolveTeachCard({
+  fold,
+  today,
+  ...pick
+}: PepTeachInput & { fold?: TeachFold | null; today: string }): ResolvedTeachCard {
+  if (fold && fold.day === today) {
+    const pinned = teachCardForEntryId(fold.entryId);
+    if (pinned) return { card: pinned, collapsed: fold.collapsed };
+  }
+  return { card: buildPepTeachCard(pick), collapsed: false };
+}
+
 function hasCitation(entry: LibraryEntry): boolean {
   return firstCitation(entry) !== null;
 }

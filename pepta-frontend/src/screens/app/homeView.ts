@@ -7,6 +7,7 @@
 import type { HomeResponse, Insight, MedicationLevelResponse } from '@pepta/shared';
 import { formatShortDate } from './progressView';
 import { resolveLevelView, type LevelSuppressionReason } from './levelSuppression';
+import { buildMilestoneTrack, milestoneLabel, type MilestoneTrack } from './weightMilestones';
 
 export interface MedicationView {
   name: string;
@@ -35,6 +36,10 @@ export interface GoalView {
   value: number; // latest weight
   unit: string;
   dateLabel: string;
+  /** The milestone track the card draws — see weightMilestones.ts. */
+  track: MilestoneTrack;
+  /** "4.5 lb to go", or "Goal reached". */
+  trackLabel: string;
 }
 
 export interface HomeWeightPulseView {
@@ -124,7 +129,20 @@ export function buildHomeView(home: HomeResponse): HomeView {
   if (current != null && goalWeight != null && home.latestWeight) {
     let pct = 0;
     if (start != null && start !== goalWeight) pct = Math.max(0, Math.min(1, (start - current) / (start - goalWeight)));
-    goal = { pct, value: home.latestWeight.value, unit: home.latestWeight.unit, dateLabel: formatShortDate(home.latestWeight.datetime) };
+    // The track's grid follows the unit the weight was logged in, so a metric
+    // user gets 2 kg marks rather than 5 kg ones.
+    const trackUnit = home.latestWeight.unit === 'kg' ? 'kg' : 'lb';
+    const track = buildMilestoneTrack(current, goalWeight, trackUnit, {
+      start: start ?? undefined,
+    });
+    goal = {
+      pct,
+      value: home.latestWeight.value,
+      unit: home.latestWeight.unit,
+      dateLabel: formatShortDate(home.latestWeight.datetime),
+      track,
+      trackLabel: milestoneLabel(track, trackUnit),
+    };
   }
   const latestWeight = home.latestWeight;
   const weightPulse: HomeWeightPulseView = latestWeight

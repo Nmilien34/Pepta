@@ -9,7 +9,7 @@ import * as Haptics from 'expo-haptics';
 import { useNavigation, type NavigationProp } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../theme';
-import { AddCompoundSheet, AppText, BodyMap, Button, Card, Mascot, ProgressRing, Reveal, MedicationLevelChart, ScreenHeader, SectionErrorBanner } from '../../components';
+import { AddCompoundSheet, AppText, BodyMap, Button, Card, Mascot, ProgressRing, Reveal, MedicationLevelChart, ScreenHeader, SectionErrorBanner, ShotDetailSheet } from '../../components';
 import { WeekStrip } from '../../components/WeekStrip';
 import { ScheduleSheet } from '../../components/ScheduleSheet';
 import { usePeptaData } from '../../context/PeptaDataContext';
@@ -33,6 +33,7 @@ import {
   type ActivityDay,
   type ActivityKind,
 } from './activityFeed';
+import { buildShotWindow } from './shotDetail';
 import {
   doseNoun,
   globalDoseNoun,
@@ -41,6 +42,12 @@ import {
   type LevelSuppressionReason,
 } from './levelSuppression';
 
+/**
+ * Depth of the expanded "Your log". Comfortably past /track's own 30-day
+ * lookback, so "See all" really does mean every log in the payload rather than
+ * a second, quieter cap the user cannot see.
+ */
+const FEED_MAX_DAYS = 60;
 
 export function TrackScreen() {
   const theme = useTheme();
@@ -83,7 +90,23 @@ export function TrackScreen() {
   // ABOVE EVERY EARLY RETURN — this screen has two. A hook placed after one
   // runs a different number of hooks once data lands, which is exactly what
   // blanked the app on entry in builds 20-22 (see HomeScreen.hooks.test.tsx).
+  // Two windows, both built by buildActivityFeed — NOT one list sliced. The
+  // collapsed view carries the dose guarantee (a weekly injector's last shot is
+  // appended when three days of habit logs would have pushed it out), and
+  // slicing the full list in the card would silently drop it.
   const activityDays = useMemo(() => buildActivityFeed({ track, home }), [track, home]);
+  const allActivityDays = useMemo(
+    () => buildActivityFeed({ track, home, maxDays: FEED_MAX_DAYS }),
+    [track, home],
+  );
+  const [feedExpanded, setFeedExpanded] = useState(false);
+  // Which shot's report is open, by dose id. Held here rather than in the card
+  // so it survives the feed collapsing under it.
+  const [openShotId, setOpenShotId] = useState<string | null>(null);
+  const openShot = useMemo(
+    () => (openShotId ? buildShotWindow({ doseId: openShotId, track, home }) : null),
+    [openShotId, track, home],
+  );
 
   if (!home && !track && (homeError || trackError)) {
     return (
@@ -214,7 +237,16 @@ export function TrackScreen() {
               had just logged something scrolled past four cards to see it. */}
           <View onLayout={(e) => { doseHistoryY.current = e.nativeEvent.layout.y; }}>
             <Reveal delay={100} style={{ marginTop: 12 }}>
-              <ActivityFeedCard days={activityDays} />
+              <ActivityFeedCard
+                days={feedExpanded ? allActivityDays : activityDays}
+                canExpand={allActivityDays.length > activityDays.length}
+                expanded={feedExpanded}
+                onToggle={() => {
+                  Haptics.selectionAsync().catch(() => undefined);
+                  setFeedExpanded((open) => !open);
+                }}
+                onOpenShot={setOpenShotId}
+              />
             </Reveal>
           </View>
 
@@ -416,6 +448,12 @@ export function TrackScreen() {
         </ScrollView>
       </SafeAreaView>
 
+      <ShotDetailSheet
+        visible={openShotId !== null}
+        shot={openShot}
+        onClose={() => setOpenShotId(null)}
+      />
+
       <AddCompoundSheet
         visible={addOpen}
         onClose={() => setAddOpen(false)}
@@ -471,15 +509,45 @@ const ACTIVITY_ICON: Record<ActivityKind, { name: string; bg: string; fg: string
   measurement: { name: 'chart-line', bg: '#F2F3F5', fg: '#52525B' },
 };
 
-function ActivityFeedCard({ days }: { days: ActivityDay[] }) {
+function ActivityFeedCard({
+  days,
+  canExpand,
+  expanded,
+  onToggle,
+  onOpenShot,
+}: {
+  days: ActivityDay[];
+  canExpand: boolean;
+  expanded: boolean;
+  onToggle(): void;
+  onOpenShot(doseId: string): void;
+}) {
   const theme = useTheme();
   return (
     <Card>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <Icon name="history" size={18} color={theme.colors.textSecondary} />
-        <AppText variant="cardTitle" style={{ fontSize: 15 }}>
-          Your log
-        </AppText>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 }}>
+          <Icon name="history" size={18} color={theme.colors.textSecondary} />
+          <AppText variant="cardTitle" style={{ fontSize: 15 }} numberOfLines={1}>
+            Your log
+          </AppText>
+        </View>
+        {/* Expands in place rather than pushing to a screen: everything it
+            would show is already in this payload, and the card is two taps
+            from the top of Track. Hidden when there is nothing more to see, so
+            it never promises a longer history than the user has. */}
+        {canExpand ? (
+          <Pressable
+            onPress={onToggle}
+            accessibilityRole="button"
+            hitSlop={10}
+            style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, flexShrink: 0 })}
+          >
+            <AppText variant="caption" color="primary" style={{ fontWeight: '700' }}>
+              {expanded ? 'Show less' : 'See all'}
+            </AppText>
+          </Pressable>
+        ) : null}
       </View>
       {days.length === 0 ? (
         <AppText variant="body" color="textSecondary" style={{ marginTop: theme.spacing.md }}>
@@ -497,17 +565,31 @@ function ActivityFeedCard({ days }: { days: ActivityDay[] }) {
             </AppText>
             {day.entries.map((entry, index) => {
               const icon = ACTIVITY_ICON[entry.kind];
+              // ONLY DOSES OPEN. Every other row is a single number with
+              // nothing behind it; a chevron on all of them would promise
+              // detail that does not exist.
+              const opens = entry.kind === 'dose';
+              const doseId = opens ? entry.id.replace(/^dose-/, '') : null;
               return (
-                <View
+                <Pressable
                   key={entry.id}
-                  style={{
+                  onPress={() => {
+                    if (!doseId) return;
+                    Haptics.selectionAsync().catch(() => undefined);
+                    onOpenShot(doseId);
+                  }}
+                  disabled={!opens}
+                  accessibilityRole={opens ? 'button' : undefined}
+                  accessibilityLabel={opens ? `${entry.title} — see how this shot went` : undefined}
+                  style={({ pressed }) => ({
                     flexDirection: 'row',
                     alignItems: 'center',
                     gap: 11,
                     paddingVertical: 11,
                     borderBottomWidth: index < day.entries.length - 1 ? 0.5 : 0,
                     borderBottomColor: theme.colors.border,
-                  }}
+                    opacity: pressed && opens ? 0.6 : 1,
+                  })}
                 >
                   <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: icon.bg, alignItems: 'center', justifyContent: 'center' }}>
                     <Icon name={icon.name} size={16} color={icon.fg} />
@@ -525,7 +607,10 @@ function ActivityFeedCard({ days }: { days: ActivityDay[] }) {
                   <AppText variant="caption" color="textTertiary" style={{ fontWeight: '600' }}>
                     {entryTime(entry.datetime)}
                   </AppText>
-                </View>
+                  {opens ? (
+                    <Icon name="chevron-forward" size={14} color={theme.colors.textTertiary} />
+                  ) : null}
+                </Pressable>
               );
             })}
           </View>

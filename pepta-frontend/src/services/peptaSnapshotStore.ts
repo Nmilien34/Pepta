@@ -19,13 +19,18 @@
 // already keeps health answers). Encrypting at rest is a known follow-up.
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { z } from "zod";
 import {
   homeResponseSchema,
   trackResponseSchema,
   progressResponseSchema,
+  scheduleResponseSchema,
+  cycleResponseSchema,
   type HomeResponse,
   type TrackResponse,
   type ProgressResponse,
+  type ScheduleResponse,
+  type CycleResponse,
 } from "@pepta/shared";
 
 /** Bump to invalidate every stored snapshot when the shape changes. */
@@ -35,8 +40,31 @@ export interface PeptaSnapshot {
   home: HomeResponse | null;
   track: TrackResponse | null;
   progress: ProgressResponse | null;
+  /**
+   * Scheduling, cached for the same reason as the rest: Home's "Log a shot"
+   * button and Track's week strip both ask the schedule whether a dose is due
+   * today, and a null schedule reads as "don't know" — which shows the button.
+   * Without this, every cold start flashed the button on and then took it away
+   * a moment later when the fetch landed.
+   */
+  schedules: ScheduleResponse[] | null;
+  cycles: CycleResponse[] | null;
   /** When the snapshot was last written; callers may ignore very old ones. */
   savedAt: string;
+}
+
+/**
+ * Scheduling is a BONUS field: a v1 snapshot (written before it existed) has
+ * none, and a corrupt one must not throw away a perfectly good home/track
+ * cache. Both cases read as null, which is exactly "don't know yet".
+ */
+function optionalList<S extends z.ZodTypeAny>(
+  schema: S,
+  raw: unknown,
+): z.output<S>[] | null {
+  if (raw == null) return null;
+  const parsed = z.array(schema).safeParse(raw);
+  return parsed.success ? (parsed.data as z.output<S>[]) : null;
 }
 
 export function snapshotKey(userId: string): string {
@@ -56,7 +84,14 @@ export function parseSnapshot(raw: string | null): PeptaSnapshot | null {
     const savedAt = typeof candidate.savedAt === "string" ? candidate.savedAt : null;
     if (!home.success || !track.success || !progress.success || !savedAt) return null;
     if (!home.data && !track.data && !progress.data) return null;
-    return { home: home.data, track: track.data, progress: progress.data, savedAt };
+    return {
+      home: home.data,
+      track: track.data,
+      progress: progress.data,
+      schedules: optionalList(scheduleResponseSchema, candidate.schedules),
+      cycles: optionalList(cycleResponseSchema, candidate.cycles),
+      savedAt,
+    };
   } catch {
     return null;
   }
@@ -72,11 +107,22 @@ export async function readSnapshot(userId: string): Promise<PeptaSnapshot | null
 
 export async function writeSnapshot(
   userId: string,
-  data: { home: HomeResponse | null; track: TrackResponse | null; progress: ProgressResponse | null },
+  data: {
+    home: HomeResponse | null;
+    track: TrackResponse | null;
+    progress: ProgressResponse | null;
+    schedules?: ScheduleResponse[] | null;
+    cycles?: CycleResponse[] | null;
+  },
 ): Promise<void> {
   try {
     if (!data.home && !data.track && !data.progress) return;
-    const snapshot: PeptaSnapshot = { ...data, savedAt: new Date().toISOString() };
+    const snapshot: PeptaSnapshot = {
+      ...data,
+      schedules: data.schedules ?? null,
+      cycles: data.cycles ?? null,
+      savedAt: new Date().toISOString(),
+    };
     await AsyncStorage.setItem(snapshotKey(userId), JSON.stringify(snapshot));
   } catch {
     // Best effort — a failed write means one slower cold start, nothing more.

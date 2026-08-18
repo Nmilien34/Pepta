@@ -1,7 +1,9 @@
 // Week strip inside the Track Next-dose card — the design hub's `.wks` idiom:
 // seven equal cells (day letter, day number, 4.5px dot), today's number on a
-// primary 28px rounded square. Purple dot = due, green = logged, none = rest
-// or nothing planned. Pure presentation; days come from scheduleView.weekStrip.
+// primary 28px rounded square. A day the medication was TAKEN gets a light
+// purple fill behind its number; the dot is reserved for what is still COMING
+// (purple = due). No fill and no dot = rest day or nothing planned. Pure
+// presentation; days come from scheduleView.weekStrip.
 
 import React from 'react';
 import { View } from 'react-native';

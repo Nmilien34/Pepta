@@ -715,8 +715,8 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
   // the refreshers take the quiet "refreshing" path: the user reads cached
   // data instead of watching a spinner. The snapshot is never truth — every
   // fresh payload overwrites it via the write-through effect below.
-  const refreshersRef = useRef({ refreshHome, refreshTrack, refreshProgress });
-  refreshersRef.current = { refreshHome, refreshTrack, refreshProgress };
+  const refreshersRef = useRef({ refreshHome, refreshTrack, refreshProgress, refreshScheduling });
+  refreshersRef.current = { refreshHome, refreshTrack, refreshProgress, refreshScheduling };
 
   useEffect(() => {
     if (!userId) return undefined;
@@ -729,30 +729,36 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
       setHome((h) => h ?? snapshot.home);
       setTrack((t) => t ?? snapshot.track);
       setProgress((p) => p ?? snapshot.progress);
+      // Scheduling too: a null schedule means "we don't know if a dose is due",
+      // which is why Home shows the log button. Hydrating it stops the button
+      // flashing on and off on every cold start for a user who isn't due.
+      if (snapshot.schedules) setSchedules((s) => s ?? snapshot.schedules);
+      if (snapshot.cycles) setCycles((c) => c ?? snapshot.cycles);
       if (snapshot.home) hasData.current = true;
       if (snapshot.track) hasTrack.current = true;
       if (snapshot.progress) hasProgress.current = true;
       setLastSyncedAt((at) => at ?? snapshot.savedAt);
       // Hydration makes the screens' fetch-on-null triggers see non-null, so
       // freshness is the provider's job here: kick background refreshes now.
-      const { refreshHome: rh, refreshTrack: rt, refreshProgress: rp } = refreshersRef.current;
+      const { refreshHome: rh, refreshTrack: rt, refreshProgress: rp, refreshScheduling: rs } =
+        refreshersRef.current;
       void rh();
       void rt();
       void rp();
+      void rs();
     });
     return () => {
       alive = false;
     };
     // Depends on userId only: the refreshers are reached through the ref so a
-    // homeRange change cannot re-run hydration and re-kick three fetches.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // homeRange change cannot re-run hydration and re-kick four fetches.
   }, [userId]);
 
   useEffect(() => {
     if (!userId) return;
     if (!home && !track && !progress) return;
-    void writeSnapshot(userId, { home, track, progress });
-  }, [userId, home, track, progress]);
+    void writeSnapshot(userId, { home, track, progress, schedules, cycles });
+  }, [userId, home, track, progress, schedules, cycles]);
 
   const value = useMemo<PeptaDataContextValue>(
     () => ({
