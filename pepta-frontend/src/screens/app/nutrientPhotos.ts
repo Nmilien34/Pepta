@@ -22,6 +22,13 @@ import cottageCheese from '../../../assets/nutrients/cottage-cheese.jpg';
 import eggs from '../../../assets/nutrients/eggs.jpg';
 import peanuts from '../../../assets/nutrients/peanuts.jpg';
 
+import vitaCoco from '../../../assets/nutrients/vita-coco.jpg';
+import lmnt from '../../../assets/nutrients/lmnt.jpg';
+import liquidIv from '../../../assets/nutrients/liquid-iv.jpg';
+import nuun from '../../../assets/nutrients/nuun.jpg';
+import kirklandCoconut from '../../../assets/nutrients/kirkland-coconut.jpg';
+import helenvita from '../../../assets/nutrients/helenvita.jpg';
+
 import shortcutMeals from '../../../assets/shortcuts/meals.jpg';
 import shortcutFiber from '../../../assets/shortcuts/fiber.jpg';
 import shortcutHydration from '../../../assets/shortcuts/hydration.jpg';
@@ -39,6 +46,15 @@ export const FOOD_PHOTOS: Record<string, ImageSourcePropType> = {
   'cottage-cheese': cottageCheese,
   eggs,
   peanuts,
+};
+
+export const DRINK_PHOTOS: Record<string, ImageSourcePropType> = {
+  'vita-coco': vitaCoco,
+  lmnt,
+  'liquid-iv': liquidIv,
+  nuun,
+  'kirkland-coconut': kirklandCoconut,
+  helenvita,
 };
 
 export const SHORTCUT_PHOTOS = {

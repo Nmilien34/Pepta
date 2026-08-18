@@ -169,7 +169,7 @@ export function HomeScreen() {
       key: 'hydration',
       label: 'Hydration',
       photo: SHORTCUT_PHOTOS.hydration,
-      onPress: () => openQuickLog('water'),
+      onPress: () => navigation.navigate('Water'),
     },
   ];
 
@@ -527,7 +527,7 @@ export function HomeScreen() {
               />
             </View>
             <View style={{ flex: 1, gap: 12 }}>
-              <WaterCard stat={view.water} onMinus={() => bumpWater(-8)} onPlus={() => bumpWater(8)} />
+              <WaterCard stat={view.water} onMinus={() => bumpWater(-8)} onPlus={() => bumpWater(8)} onOpen={() => navigation.navigate('Water')} />
               <MealsCard stat={view.calories} onLog={openMeal} />
             </View>
           </Reveal>
@@ -963,22 +963,47 @@ function FiberCard({ stat, onMinus, onPlus }: { stat: RingStat; onMinus: () => v
   );
 }
 
-function WaterCard({ stat, onMinus, onPlus }: { stat: RingStat; onMinus: () => void; onPlus: () => void }) {
+function WaterCard({
+  stat,
+  onMinus,
+  onPlus,
+  onOpen,
+}: {
+  stat: RingStat;
+  onMinus: () => void;
+  onPlus: () => void;
+  onOpen: () => void;
+}) {
   const theme = useTheme();
   return (
     <Card style={{ flex: 1 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
-        <Icon name="water" size={18} color={theme.colors.water} stroke={2.3} />
-        <AppText variant="cardTitle" style={{ fontSize: 15 }}>
-          Water
-        </AppText>
-      </View>
-      <View style={{ alignItems: 'center', marginVertical: 6 }}>
-        <WaterCup value={stat.current} target={stat.target} color={theme.colors.water} size={120} />
-        <AppText variant="caption" color="textTertiary" style={{ fontSize: 11, marginTop: 2 }}>
-          {stat.target ? `/ ${stat.target} oz` : ''}
-        </AppText>
-      </View>
+      {/* Tapping the glass opens the Water screen — the design's own note.
+          The stepper stays for the ±8 you already know about; the glass is
+          the door to a different vessel, a drink with electrolytes in it, or
+          a typed amount. Only the glass is pressable, so a thumb aiming at
+          the stepper never navigates away by accident. */}
+      <Pressable
+        onPress={() => {
+          Haptics.selectionAsync().catch(() => undefined);
+          onOpen();
+        }}
+        accessibilityRole="button"
+        accessibilityLabel="Water. Open hydration"
+        style={({ pressed }) => ({ opacity: pressed ? 0.72 : 1 })}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+          <Icon name="water" size={18} color={theme.colors.water} stroke={2.3} />
+          <AppText variant="cardTitle" style={{ fontSize: 15 }}>
+            Water
+          </AppText>
+        </View>
+        <View style={{ alignItems: 'center', marginVertical: 6 }}>
+          <WaterCup value={stat.current} target={stat.target} color={theme.colors.water} size={120} />
+          <AppText variant="caption" color="textTertiary" style={{ fontSize: 11, marginTop: 2 }}>
+            {stat.target ? `/ ${stat.target} oz` : ''}
+          </AppText>
+        </View>
+      </Pressable>
       <Stepper label="8 oz" color={theme.colors.water} onMinus={onMinus} onPlus={onPlus} />
     </Card>
   );

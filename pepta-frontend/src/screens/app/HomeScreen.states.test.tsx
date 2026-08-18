@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   data: { home: null as unknown, track: null as unknown },
   openQuickLog: vi.fn(),
   openMeal: vi.fn(),
+  navigate: vi.fn(),
 }));
 
 vi.mock("react-native", () => {
@@ -83,7 +84,7 @@ vi.mock("react-native-svg", () => {
   };
 });
 vi.mock("@react-navigation/native", () => ({
-  useNavigation: () => ({ navigate: vi.fn() }),
+  useNavigation: () => ({ navigate: mocks.navigate }),
 }));
 vi.mock("react-native-safe-area-context", () => ({
   SafeAreaView: ({ children }: { children?: React.ReactNode }) => React.createElement("SafeAreaView", null, children),
@@ -220,6 +221,7 @@ function rowWithText(tree: TestRenderer.ReactTestRenderer, needle: string) {
 beforeEach(() => {
   mocks.openQuickLog.mockClear();
   mocks.openMeal.mockClear();
+  mocks.navigate.mockClear();
 });
 
 describe("Home · first run — the Get started checklist", () => {
@@ -364,5 +366,43 @@ describe("Home · dose day — the Log a shot section", () => {
     const all = texts(tree).join("\n");
     expect(all).toContain("Medication Level");
     expect(all).toContain("Current estimate");
+  });
+});
+
+describe("Home · the doors to the Water screen", () => {
+  it("opens it from the water card's glass, not from the stepper", () => {
+    const tree = render(doseDay());
+    const card = tree.root
+      .findAll((n) => String(n.type) === "Pressable")
+      .find((p) => p.props.accessibilityLabel === "Water. Open hydration");
+    expect(card).toBeDefined();
+    act(() => {
+      card!.props.onPress();
+    });
+    expect(mocks.navigate).toHaveBeenCalledWith("Water");
+  });
+
+  it("opens it from the Hydration shortcut tile", () => {
+    const tree = render(doseDay());
+    const tile = tree.root
+      .findAll((n) => String(n.type) === "Pressable")
+      .find((p) => p.props.accessibilityLabel === "Hydration");
+    expect(tile).toBeDefined();
+    act(() => {
+      tile!.props.onPress();
+    });
+    expect(mocks.navigate).toHaveBeenCalledWith("Water");
+  });
+
+  it("keeps the stepper logging rather than navigating", () => {
+    const tree = render(doseDay());
+    const card = tree.root
+      .findAll((n) => String(n.type) === "Pressable")
+      .find((p) => p.props.accessibilityLabel === "Water. Open hydration");
+    // The stepper is a sibling of the pressable glass, never inside it, so a
+    // thumb aiming at +8 can never navigate away.
+    // findAll includes the instance itself, so the glass is the only one.
+    const inside = card!.findAll((n) => String(n.type) === "Pressable");
+    expect(inside).toEqual([card]);
   });
 });
