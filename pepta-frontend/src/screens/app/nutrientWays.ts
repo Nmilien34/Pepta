@@ -46,8 +46,12 @@ export function foodsFor(kind: NutrientKind): readonly NutrientFood[] {
   return kind === 'fiber' ? FIBER_FOODS : PROTEIN_FOODS;
 }
 
-/** The strip runs biggest-first — the photo that closes the gap fastest. */
-export function stripOrder(kind: NutrientKind): readonly NutrientFood[] {
+/**
+ * Biggest first. Used only by waysHeadline's greedy pick — the STRIP renders
+ * in list order, because that is what the design does: the protein frame's
+ * photo row runs 35, 42, 40, 14, 12, 7, which is the list, not a ranking.
+ */
+export function bySize(kind: NutrientKind): NutrientFood[] {
   return [...foodsFor(kind)].sort((a, b) => b.amount - a.amount);
 }
 
@@ -90,7 +94,7 @@ export function waysHeadline(
   // the sentence still says "covers it" — 13 g + 3.5 g is not 18 g.
   const picks: NutrientFood[] = [];
   let covered = 0;
-  for (const food of stripOrder(kind)) {
+  for (const food of bySize(kind)) {
     if (covered >= gap) break;
     picks.push(food);
     covered += food.amount;

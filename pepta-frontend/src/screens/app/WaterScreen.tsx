@@ -25,7 +25,7 @@ import { VesselIcon } from '../../components/VesselIcon';
 import { usePeptaData } from '../../context/PeptaDataContext';
 import { useLogSheets } from '../../context/LogSheetsContext';
 import { useTheme } from '../../theme';
-import { buildHomeView } from './homeView';
+import { todayStat } from './homeView';
 import { DRINK_PHOTOS } from './nutrientPhotos';
 import { HYDRATION_EXAMPLES, goalLine, ouncesLabel, quickAddVessels } from './hydration';
 
@@ -41,7 +41,8 @@ export function WaterScreen() {
   const { home, bumpWater } = usePeptaData();
   const { openQuickLog } = useLogSheets();
 
-  const stat = home ? buildHomeView(home).water : null;
+  // Today's own numbers — never the range Home happens to be showing.
+  const stat = home ? todayStat(home, 'water') : null;
   const current = stat?.current ?? 0;
   const target = stat?.target ?? null;
 

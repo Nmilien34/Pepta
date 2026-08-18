@@ -406,3 +406,52 @@ describe("Home · the doors to the Water screen", () => {
     expect(inside).toEqual([card]);
   });
 });
+
+describe("Home · the doors to the nutrient screens", () => {
+  const doorFor = (tree: TestRenderer.ReactTestRenderer, label: string) =>
+    tree.root
+      .findAll((n) => String(n.type) === "Pressable")
+      .find((p) => p.props.accessibilityLabel === label);
+
+  it("opens Protein from the protein card", () => {
+    const tree = render(doseDay());
+    const door = doorFor(tree, "Protein. See ways to hit it");
+    expect(door).toBeDefined();
+    act(() => {
+      door!.props.onPress();
+    });
+    expect(mocks.navigate).toHaveBeenCalledWith("NutrientWays", { kind: "protein" });
+  });
+
+  it("opens Fiber from the fiber card and from the shortcut tile", () => {
+    const tree = render(doseDay());
+    act(() => {
+      doorFor(tree, "Fiber. See ways to hit it")!.props.onPress();
+    });
+    expect(mocks.navigate).toHaveBeenCalledWith("NutrientWays", { kind: "fiber" });
+
+    mocks.navigate.mockClear();
+    act(() => {
+      doorFor(tree, "Fiber")!.props.onPress();
+    });
+    expect(mocks.navigate).toHaveBeenCalledWith("NutrientWays", { kind: "fiber" });
+  });
+
+  it("keeps the nutrient steppers out of the pressable, so ±1 g never navigates", () => {
+    const tree = render(doseDay());
+    for (const label of ["Fiber. See ways to hit it", "Protein. See ways to hit it"]) {
+      const door = doorFor(tree, label)!;
+      // findAll includes the instance itself; nothing else inside may be pressable.
+      expect(door.findAll((n) => String(n.type) === "Pressable")).toEqual([door]);
+    }
+  });
+
+  it("still logs a meal from the Meals tile — there is no Meals screen", () => {
+    const tree = render(doseDay());
+    act(() => {
+      doorFor(tree, "Meals")!.props.onPress();
+    });
+    expect(mocks.openMeal).toHaveBeenCalledTimes(1);
+    expect(mocks.navigate).not.toHaveBeenCalled();
+  });
+});

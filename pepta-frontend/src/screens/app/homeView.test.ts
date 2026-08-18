@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { HomeResponse, MedicationLevelResponse } from '@pepta/shared';
-import { buildHomeView, formatCountdown, medicationBars, medicationStatus, recentDayLetters } from './homeView';
+import { buildHomeView, formatCountdown, medicationBars, medicationStatus, recentDayLetters, todayStat } from './homeView';
 
 const ml = {
   compoundId: 'c1',
@@ -172,5 +172,41 @@ describe('buildHomeView', () => {
       latestLabel: null,
       actionLabel: 'Add weight',
     });
+  });
+});
+
+describe('todayStat', () => {
+  const weekly = buildHome({
+    todayProteinGrams: 74,
+    todayFiberGrams: 12,
+    todayWaterOz: 42,
+    todayCalories: 1240,
+    // Home is showing a WEEK — buildHomeView scales both sides to it.
+    rangeTotals: { label: 'This week', dayCount: 7, proteinGrams: 520, fiberGrams: 84, waterOz: 294, calories: 8680 },
+  } as unknown as Partial<Parameters<typeof buildHome>[0]>);
+
+  it('reports today even while Home is showing a week', () => {
+    expect(buildHomeView(weekly).protein.current).toBe(520); // the Home card
+    expect(todayStat(weekly, 'protein').current).toBe(74); // the Protein screen
+  });
+
+  it('uses the DAILY target, not the range-scaled one', () => {
+    const daily = weekly.profile?.dailyProteinTargetGrams ?? null;
+    expect(todayStat(weekly, 'protein').target).toBe(daily);
+    // buildHomeView multiplies it by the day count; todayStat must not.
+    expect(buildHomeView(weekly).protein.target).toBe((daily ?? 0) * 7);
+  });
+
+  it('covers every daily key', () => {
+    expect(todayStat(weekly, 'fiber').current).toBe(12);
+    expect(todayStat(weekly, 'water').current).toBe(42);
+    expect(todayStat(weekly, 'calories').current).toBe(1240);
+  });
+
+  it('reports a null target rather than a zero one when none is set', () => {
+    const noTargets = buildHome({ profile: null } as never);
+    const stat = todayStat(noTargets, 'protein');
+    expect(stat.target).toBeNull();
+    expect(stat.pct).toBe(0);
   });
 });

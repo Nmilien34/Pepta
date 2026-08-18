@@ -19,12 +19,11 @@ import { Icon } from '../../components/Icon';
 import { usePeptaData } from '../../context/PeptaDataContext';
 import { useLogSheets } from '../../context/LogSheetsContext';
 import { useTheme } from '../../theme';
-import { buildHomeView } from './homeView';
+import { todayStat } from './homeView';
 import { FOOD_PHOTOS } from './nutrientPhotos';
 import {
   foodsFor,
   gramsLabel,
-  stripOrder,
   waysHeadline,
   type NutrientFood,
   type NutrientKind,
@@ -57,7 +56,8 @@ export function NutrientWaysScreen() {
   const { openMeal } = useLogSheets();
 
   const tint = kind === 'fiber' ? theme.colors.fiber : theme.colors.protein;
-  const stat = home ? buildHomeView(home)[kind] : null;
+  // Today's own numbers — never the range Home happens to be showing.
+  const stat = home ? todayStat(home, kind) : null;
   const target = stat?.target ?? null;
   const head = target != null ? waysHeadline(kind, stat?.current ?? 0, target) : null;
 
@@ -119,14 +119,15 @@ export function NutrientWaysScreen() {
             </AppText>
           ) : null}
 
-          {/* The strip: biggest first, so the fastest way to close the gap leads. */}
+          {/* The strip, in list order — the same order as the rows below it,
+              which is what the design frames show. */}
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ gap: 8, paddingVertical: 10, paddingRight: 20 }}
             style={{ marginHorizontal: -20, paddingLeft: 20 }}
           >
-            {stripOrder(kind).map((food) => (
+            {foodsFor(kind).map((food) => (
               <Pressable
                 key={food.key}
                 onPress={() => openFood(food)}

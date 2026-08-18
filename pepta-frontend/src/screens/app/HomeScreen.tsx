@@ -515,7 +515,7 @@ export function HomeScreen() {
           {/* macros + goal — column-stack grid (fiber/protein | water/goal) */}
           <Reveal delay={200} style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
             <View style={{ flex: 1, gap: 12 }}>
-              <FiberCard stat={view.fiber} onMinus={() => bumpFiber(-1)} onPlus={() => bumpFiber(1)} />
+              <FiberCard stat={view.fiber} onMinus={() => bumpFiber(-1)} onPlus={() => bumpFiber(1)} onOpen={() => navigation.navigate('NutrientWays', { kind: 'fiber' })} />
               <MacroRingCard
                 title="Protein"
                 icon={<Icon name="food-drumstick" size={18} color={theme.colors.protein} stroke={2.3} />}
@@ -937,25 +937,48 @@ function GettingStartedCard({ data, onTask }: { data: GettingStarted; onTask: (a
   );
 }
 
-function FiberCard({ stat, onMinus, onPlus }: { stat: RingStat; onMinus: () => void; onPlus: () => void }) {
+function FiberCard({
+  stat,
+  onMinus,
+  onPlus,
+  onOpen,
+}: {
+  stat: RingStat;
+  onMinus: () => void;
+  onPlus: () => void;
+  onOpen: () => void;
+}) {
   const theme = useTheme();
   return (
     <Card style={{ flex: 1 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
-        <Icon name="leaf" size={18} color={theme.colors.fiber} stroke={2.3} />
-        <AppText variant="cardTitle" style={{ fontSize: 15 }}>
-          Fiber
-        </AppText>
-      </View>
-      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4, marginTop: 12 }}>
-        <CountUp value={stat.current} variant="statBig" />
-        <AppText variant="caption" color="textTertiary">
-          {stat.target ? `/ ${stat.target} g` : 'g'}
-        </AppText>
-      </View>
-      <View style={{ marginTop: 10 }}>
-        <ProgressBar pct={stat.pct} color={theme.colors.fiber} height={6} />
-      </View>
+      {/* Same rule as the water card: the READING area is the door, the
+          stepper stays a stepper. A card where every pixel navigates would
+          make ±1 g a gamble. */}
+      <Pressable
+        onPress={() => {
+          Haptics.selectionAsync().catch(() => undefined);
+          onOpen();
+        }}
+        accessibilityRole="button"
+        accessibilityLabel="Fiber. See ways to hit it"
+        style={({ pressed }) => ({ opacity: pressed ? 0.72 : 1 })}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+          <Icon name="leaf" size={18} color={theme.colors.fiber} stroke={2.3} />
+          <AppText variant="cardTitle" style={{ fontSize: 15 }}>
+            Fiber
+          </AppText>
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4, marginTop: 12 }}>
+          <CountUp value={stat.current} variant="statBig" />
+          <AppText variant="caption" color="textTertiary">
+            {stat.target ? `/ ${stat.target} g` : 'g'}
+          </AppText>
+        </View>
+        <View style={{ marginTop: 10 }}>
+          <ProgressBar pct={stat.pct} color={theme.colors.fiber} height={6} />
+        </View>
+      </Pressable>
       <View style={{ marginTop: 'auto', paddingTop: 14 }}>
         <Stepper label="1 g" color={theme.colors.fiber} onMinus={onMinus} onPlus={onPlus} />
       </View>
@@ -1371,8 +1394,8 @@ function MacroRingCard({
   /** Opens the "ways to hit it" screen. Omitted where there is no such screen. */
   onExamples?: () => void;
 }) {
-  return (
-    <Card>
+  const body = (
+    <>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
         {icon}
         <AppText variant="cardTitle" style={{ fontSize: 15 }}>
@@ -1389,6 +1412,28 @@ function MacroRingCard({
           </View>
         </ProgressRing>
       </View>
+    </>
+  );
+
+  return (
+    <Card>
+      {/* The ring is the door when there is a screen behind it; the stepper
+          below is never inside the pressable. */}
+      {onExamples ? (
+        <Pressable
+          onPress={() => {
+            Haptics.selectionAsync().catch(() => undefined);
+            onExamples();
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={`${title}. See ways to hit it`}
+          style={({ pressed }) => ({ opacity: pressed ? 0.72 : 1 })}
+        >
+          {body}
+        </Pressable>
+      ) : (
+        body
+      )}
       {stepper}
       {onExamples ? (
         <Pressable

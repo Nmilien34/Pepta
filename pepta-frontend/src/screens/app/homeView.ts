@@ -171,6 +171,31 @@ function ring(current: number, target: number | null | undefined): RingStat {
   return { current, target: t, pct: t && t > 0 ? Math.min(1, current / t) : 0 };
 }
 
+export type DailyKey = 'protein' | 'fiber' | 'water' | 'calories';
+
+/**
+ * TODAY's number against TODAY's target, whatever range Home is showing.
+ *
+ * buildHomeView scales both to the selected range — on "Weekly" its protein
+ * stat is a week of grams against a week's worth of target. That is right for
+ * the Home card, which is labelled with the range, and wrong for any screen
+ * whose card says "Today". Those read this instead, so switching Home to
+ * Monthly can never make the Protein screen claim a 3,600 g target.
+ */
+export function todayStat(home: HomeResponse, key: DailyKey): RingStat {
+  const profile = home.profile;
+  switch (key) {
+    case 'protein':
+      return ring(home.todayProteinGrams, profile?.dailyProteinTargetGrams);
+    case 'fiber':
+      return ring(home.todayFiberGrams, profile?.dailyFiberTargetGrams);
+    case 'water':
+      return ring(home.todayWaterOz, profile?.dailyWaterTargetOz);
+    case 'calories':
+      return ring(home.todayCalories, profile?.dailyCalorieTarget);
+  }
+}
+
 export function buildHomeView(home: HomeResponse): HomeView {
   // Suppressed compounds (oral / no half-life) never reach the card: for a
   // mixed user this picks the INJECTABLE's curve rather than the oral's.

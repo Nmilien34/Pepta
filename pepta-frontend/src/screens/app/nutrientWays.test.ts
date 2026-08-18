@@ -4,7 +4,7 @@ import {
   PROTEIN_FOODS,
   foodsFor,
   gramsLabel,
-  stripOrder,
+  bySize,
   waysHeadline,
 } from './nutrientWays';
 
@@ -25,11 +25,20 @@ describe('the food lists', () => {
   });
 });
 
-describe('stripOrder', () => {
+describe('bySize', () => {
   it('runs biggest first, without mutating the source list', () => {
     const before = FIBER_FOODS.map((f) => f.key);
-    expect(stripOrder('fiber').map((f) => f.amount)).toEqual([13, 8, 7, 3.5, 3]);
+    expect(bySize('fiber').map((f) => f.amount)).toEqual([13, 8, 7, 3.5, 3]);
     expect(FIBER_FOODS.map((f) => f.key)).toEqual(before);
+  });
+});
+
+describe('the strip order the screen renders', () => {
+  it('is the LIST order, matching the design frames', () => {
+    // Protein's photo row in the design runs 35, 42, 40, 14, 12, 7 — the list,
+    // not a ranking. Sorting it would silently diverge from the frame.
+    expect(foodsFor('protein').map((f) => f.amount)).toEqual([35, 42, 40, 14, 12, 7]);
+    expect(foodsFor('fiber').map((f) => f.amount)).toEqual([13, 8, 7, 3.5, 3]);
   });
 });
 
