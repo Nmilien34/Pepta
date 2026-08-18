@@ -623,7 +623,17 @@ describe("MealLogSheet · keeping the result as a recipe", () => {
     createRecipe: ReturnType<typeof vi.fn>;
   };
 
-  const manualCommit = async (props: Record<string, unknown>) => {
+  const composed = {
+    name: "Overnight oats + whey",
+    ingredients: [
+      { name: "Rolled oats", amount: "1/2 cup dry", protein: 5, calories: 150 },
+      { name: "Whey protein", amount: "1 scoop", protein: 24, calories: 120 },
+    ],
+    confidence: 0.85,
+  };
+
+  /** Fills manual entry and commits, which is what triggers composing. */
+  const commit = async (props: Record<string, unknown>) => {
     let tree: TestRenderer.ReactTestRenderer | undefined;
     await act(async () => {
       tree = TestRenderer.create(
@@ -644,56 +654,88 @@ describe("MealLogSheet · keeping the result as a recipe", () => {
     return tree!;
   };
 
+  const texts = (tree: TestRenderer.ReactTestRenderer) => {
+    const out: string[] = [];
+    const walk = (n: TestRenderer.ReactTestInstance) => {
+      for (const c of n.children) {
+        if (typeof c === "string") out.push(c);
+        else walk(c);
+      }
+    };
+    walk(tree.root);
+    // Joined with nothing: React splits "{n} g protein" into two children, and
+    // a space here would render it as "29  g protein".
+    return out.join("");
+  };
+
   beforeEach(() => {
-    apiMock.composeRecipe.mockReset();
+    apiMock.composeRecipe.mockReset().mockResolvedValue(composed);
     apiMock.createRecipe.mockReset().mockResolvedValue({});
   });
 
-  it("says Save recipe, not Add to today — it is not going into today", async () => {
-    apiMock.composeRecipe.mockResolvedValue({
-      name: "X",
-      ingredients: [{ name: "Y", amount: "1", protein: 1, calories: 1 }],
-      confidence: 0.5,
-    });
-    const tree = await manualCommit({ keepAsRecipe: true });
-    expect(tree.root.findAllByProps({ label: "Add to today" })).toHaveLength(0);
-  });
-
-  it("composes the parts instead of saving one blob", async () => {
-    apiMock.composeRecipe.mockResolvedValue({
-      name: "Overnight oats + whey",
-      ingredients: [
-        { name: "Rolled oats", amount: "1/2 cup dry", protein: 5, calories: 150 },
-        { name: "Whey protein", amount: "1 scoop", protein: 24, calories: 120 },
-      ],
-      confidence: 0.8,
-    });
-
-    await manualCommit({ keepAsRecipe: true });
+  it("composes the parts and shows them for review — nothing is saved yet", async () => {
+    const tree = await commit({ keepAsRecipe: true });
 
     expect(apiMock.composeRecipe).toHaveBeenCalled();
+    // The user has not agreed to anything at this point.
+    expect(apiMock.createRecipe).not.toHaveBeenCalled();
+    const shown = texts(tree);
+    expect(shown).toContain("Rolled oats");
+    expect(shown).toContain("Whey protein");
+  });
+
+  it("states its confidence rather than showing bare estimates", async () => {
+    const tree = await commit({ keepAsRecipe: true });
+    expect(texts(tree)).toMatch(/Adjust anything that looks off/);
+  });
+
+  it("says so more firmly when the model was unsure", async () => {
+    apiMock.composeRecipe.mockResolvedValue({ ...composed, confidence: 0.2 });
+    const tree = await commit({ keepAsRecipe: true });
+    expect(texts(tree)).toMatch(/Low confidence/);
+  });
+
+  it("saves what the user confirmed, once they confirm it", async () => {
+    const tree = await commit({ keepAsRecipe: true });
+    await act(async () => {
+      tree.root.findByProps({ label: "Save recipe" }).props.onPress();
+    });
     expect(apiMock.createRecipe).toHaveBeenCalledWith({
-      name: "Overnight oats + whey",
-      ingredients: [
-        { name: "Rolled oats", amount: "1/2 cup dry", protein: 5, calories: 150 },
-        { name: "Whey protein", amount: "1 scoop", protein: 24, calories: 120 },
-      ],
+      name: composed.name,
+      ingredients: composed.ingredients,
     });
   });
 
-  it("still saves the one line it has when composing fails", async () => {
-    apiMock.composeRecipe.mockRejectedValue(new Error("timeout"));
+  it("drops a row the model invented, and the total follows", async () => {
+    const tree = await commit({ keepAsRecipe: true });
+    expect(texts(tree)).toContain("29 g protein"); // 5 + 24
 
-    await manualCommit({ keepAsRecipe: true });
+    await act(async () => {
+      tree.root.findByProps({ accessibilityLabel: "Remove Whey protein" }).props.onPress();
+    });
+
+    expect(texts(tree)).toContain("5 g protein");
+    await act(async () => {
+      tree.root.findByProps({ label: "Save recipe" }).props.onPress();
+    });
+    expect(apiMock.createRecipe.mock.calls[0]![0].ingredients).toHaveLength(1);
+  });
+
+  it("still offers the one line it has when composing fails", async () => {
+    apiMock.composeRecipe.mockRejectedValue(new Error("timeout"));
+    const tree = await commit({ keepAsRecipe: true });
 
     // Losing what the user just described because a second model call timed
-    // out would be the worse failure.
-    expect(apiMock.createRecipe).toHaveBeenCalledTimes(1);
+    // out would be the worse failure — they review it and can still save.
+    expect(texts(tree)).toContain("Overnight oats");
+    await act(async () => {
+      tree.root.findByProps({ label: "Save recipe" }).props.onPress();
+    });
     expect(apiMock.createRecipe.mock.calls[0]![0].ingredients).toHaveLength(1);
   });
 
   it("does not compose or save a recipe on a normal meal log", async () => {
-    await manualCommit({});
+    await commit({});
     expect(apiMock.composeRecipe).not.toHaveBeenCalled();
     expect(apiMock.createRecipe).not.toHaveBeenCalled();
   });

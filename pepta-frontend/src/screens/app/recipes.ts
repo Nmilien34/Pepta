@@ -71,3 +71,23 @@ export function recipeAsMealSeed(recipe: RecipeResponse): {
     ...(totals.fiber > 0 ? { fiber: totals.fiber } : {}),
   };
 }
+
+/**
+ * What to say about a proposal the model estimated.
+ *
+ * ALWAYS SAYS SOMETHING. These portions were guessed from a sentence or a
+ * photograph, and a screen that shows numbers with no caveat implies a
+ * precision nobody has. The wording sharpens as confidence drops rather than
+ * appearing only when it is bad — a note that shows up sometimes reads as an
+ * error, one that is always there reads as a habit.
+ */
+export function confidenceNote(confidence: number): string {
+  if (confidence >= 0.8) return 'Estimated from what you described. Adjust anything that looks off.';
+  if (confidence >= 0.5) return 'Best guess at the portions — worth a check before you save.';
+  return 'Low confidence on these portions. Check them, or remove what does not belong.';
+}
+
+/** Drops one ingredient by index, for the review step. */
+export function withoutIngredient<T>(list: readonly T[], index: number): T[] {
+  return list.filter((_, i) => i !== index);
+}

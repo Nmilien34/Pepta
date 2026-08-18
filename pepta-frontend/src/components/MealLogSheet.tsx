@@ -35,6 +35,8 @@ import { BarcodeScanner } from "./BarcodeScanner";
 import { MealCamera } from "./MealCamera";
 import { usePeptaData } from "../context/PeptaDataContext";
 import { api } from "../services/api";
+import { RecipeReviewView } from "./RecipeReviewView";
+import { withoutIngredient } from "../screens/app/recipes";
 import {
   hasAIDataSharingConsent,
   saveAIDataSharingConsent,
@@ -48,7 +50,7 @@ import {
   type FoodSearchResult,
   type MealSource,
 } from "../screens/app/mealLog";
-import type { MealLogInput, MealScanResponse } from "@pepta/shared";
+import type { RecipeIngredient, MealLogInput, MealScanResponse } from "@pepta/shared";
 
 type View_ =
   | "chooser"
@@ -58,6 +60,7 @@ type View_ =
   | "aiConsent"
   | "analyzing"
   | "result"
+  | "recipeReview"
   | "error";
 
 type AiMealAction =
@@ -133,6 +136,12 @@ export function MealLogSheet({
   const [searchFailed, setSearchFailed] = useState(false);
   const [cameraRequested, setCameraRequested] = useState(false);
   const startRef = useRef<"scan" | "voice" | "search" | null>(null);
+  const [proposal, setProposal] = useState<{
+    name: string;
+    ingredients: RecipeIngredient[];
+    confidence: number;
+  } | null>(null);
+  const [savingRecipe, setSavingRecipe] = useState(false);
   const saidRef = useRef<string>("");
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraMode, setCameraMode] = useState<CameraMode>("meal");
@@ -196,6 +205,8 @@ export function MealLogSheet({
       setBarcodeOpen(false);
       setPendingAiAction(null);
       saidRef.current = "";
+      setProposal(null);
+      setSavingRecipe(false);
       // Fired AFTER the reset above, or it would be undone by it. Routed
       // through requestAiAction rather than performAiAction so the AI consent
       // gate still applies — a recipe is not a reason to skip it.
@@ -248,6 +259,7 @@ export function MealLogSheet({
           },
         ],
       };
+      setView("analyzing");
       api
         .composeRecipe({
           text:
@@ -255,11 +267,19 @@ export function MealLogSheet({
             [input.foodName, input.servingSize].filter(Boolean).join(", "),
           name: input.foodName,
         })
-        .then((proposal) =>
-          api.createRecipe({ name: proposal.name, ingredients: proposal.ingredients }),
-        )
-        .catch(() => api.createRecipe(asOneLine).catch(() => undefined));
-      onClose();
+        .then((composed) => {
+          setProposal({
+            name: composed.name,
+            ingredients: [...composed.ingredients],
+            confidence: composed.confidence,
+          });
+        })
+        // Composing failed: fall back to the one line we already have rather
+        // than losing what the user just described. They still review it.
+        .catch(() => {
+          setProposal({ ...asOneLine, ingredients: [...asOneLine.ingredients], confidence: 0.4 });
+        })
+        .finally(() => setView("recipeReview"));
       return;
     }
     addMeal(input);
@@ -438,6 +458,21 @@ export function MealLogSheet({
     };
     if (!isManualMealValid(meal)) return;
     commit(toManualMealLog(meal, now()));
+  };
+
+  const saveProposedRecipe = () => {
+    if (!proposal || savingRecipe) return;
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
+      () => undefined,
+    );
+    setSavingRecipe(true);
+    api
+      .createRecipe({ name: proposal.name.trim(), ingredients: proposal.ingredients })
+      .catch(() => undefined)
+      .finally(() => {
+        setSavingRecipe(false);
+        onClose();
+      });
   };
 
   const back = () => {
@@ -657,6 +692,23 @@ export function MealLogSheet({
           />
         ) : null}
 
+        {view === "recipeReview" && proposal ? (
+          <RecipeReviewView
+            theme={theme}
+            name={proposal.name}
+            onName={(next) => setProposal((p) => (p ? { ...p, name: next } : p))}
+            ingredients={proposal.ingredients}
+            onRemove={(index) =>
+              setProposal((p) =>
+                p ? { ...p, ingredients: withoutIngredient(p.ingredients, index) } : p,
+              )
+            }
+            confidence={proposal.confidence}
+            saving={savingRecipe}
+            onSave={saveProposedRecipe}
+          />
+        ) : null}
+
         {view === "manual" ? (
           <ManualView
             theme={theme}
@@ -758,6 +810,10 @@ const HEADINGS: Record<View_, { title: string; sub: string }> = {
   },
   voice: { title: "Say what you ate", sub: "Tap the mic, or type a sentence." },
   manual: { title: "Enter a meal", sub: "Food name + macros." },
+  recipeReview: {
+    title: "Save as a recipe",
+    sub: "Check the parts, drop anything wrong, then save.",
+  },
   search: { title: "Search foods", sub: "Find a food and add it." },
   aiConsent: {
     title: "AI data sharing",
