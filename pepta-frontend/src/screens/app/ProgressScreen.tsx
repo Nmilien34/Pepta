@@ -263,9 +263,7 @@ export function ProgressScreen() {
                     </AppText>
                     <Icon name="information-circle-outline" size={14} color={theme.colors.textTertiary} />
                   </View>
-                  <View style={{ width: 34, height: 34, borderRadius: theme.radii.pill, backgroundColor: theme.colors.surfaceAlt, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-                    <Mascot pose="idle" size={26} />
-                  </View>
+                  <Mascot pose="idle" size={32} />
                 </View>
                 <View style={{ marginTop: theme.spacing.md, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <VerdictPill tone={s.retention.tone} label={s.retention.label} />

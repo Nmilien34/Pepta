@@ -207,8 +207,12 @@ export function HomeScreen() {
           {/* header */}
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 4, zIndex: 20 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
-              <View style={{ width: 34, height: 34, borderRadius: theme.radii.pill, backgroundColor: '#EFEBFF', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-                <Mascot pose="idle" size={29} />
+              {/* Flush to the ground — no disc, no ring. Pep is the logo here,
+                  and a tinted circle behind him made the wordmark read as an
+                  app icon pasted onto the screen. The lavender was a leftover
+                  from the cool palette too: it never moved to the warm ground. */}
+              <View style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}>
+                <Mascot pose="idle" size={40} />
               </View>
               <View>
                 <AppText variant="screenTitle" style={{ fontSize: 21 }}>
@@ -552,9 +556,7 @@ export function HomeScreen() {
           {view.insight ? (
             <Reveal delay={460} style={{ marginTop: 12 }}>
               <Card style={{ flexDirection: 'row', gap: 12 }}>
-                <View style={{ width: 44, height: 44, borderRadius: theme.radii.pill, backgroundColor: theme.colors.surfaceAlt, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-                  <Mascot pose="idle" size={32} />
-                </View>
+                <Mascot pose="idle" size={40} />
                 <View style={{ flex: 1 }}>
                   <AppText variant="bodyStrong" style={{ fontWeight: '700' }}>
                     {view.insight.headline}
@@ -604,7 +606,7 @@ function TeachCard({
     <GlassEdge radius={theme.radii.card} backgroundColor={theme.colors.surfaceAlt}>
       <View style={{ padding: theme.spacing.lg }}>
       <View style={{ flexDirection: 'row', gap: 11, alignItems: 'flex-start' }}>
-        <LivingMascot pose="idle" size={44} bobSeconds={3.8} />
+        <LivingMascot pose="idle" size={50} bobSeconds={3.8} />
         <View style={{ flex: 1 }}>
           <Pressable
             onPress={() => {
