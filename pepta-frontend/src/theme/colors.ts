@@ -47,8 +47,12 @@ const lightColors: SemanticColors = {
   // handoff out of onboarding carries no temperature shift.
   bg: "#F7F5F2",
   surface: "#FFFFFF",
-  surfaceAlt: "#F2F3F5",
-  border: "#ECECEF",
+  // Warm siblings of bg, from the redesign. These were cool greys (#F2F3F5 /
+  // #ECECEF) chosen against the old near-white ground; on #F7F5F2 they read
+  // blue. Every pill, chip, inset row and hairline in the app keys off these,
+  // which is why the ground change is not finished until they move too.
+  surfaceAlt: "#F4F1EC",
+  border: "#E9E4DB",
   textPrimary: "#0E0E12",
   textSecondary: "#6B6B76",
   textTertiary: "#A1A1AC",
@@ -56,7 +60,7 @@ const lightColors: SemanticColors = {
   fillPrimary: "rgba(14,14,18,0.06)",
   fillSecondary: "rgba(14,14,18,0.04)",
   // Soft shadow color (large blur, low opacity).
-  shadow: "rgba(17,17,26,0.06)",
+  shadow: "rgba(40,32,24,0.10)",
   // Color on top of the primary gradient / colored buttons.
   onPrimary: "#FFFFFF",
 } as const;

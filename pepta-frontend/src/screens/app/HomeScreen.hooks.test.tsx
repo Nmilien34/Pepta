@@ -107,6 +107,7 @@ vi.mock("../../components", () => {
     Button: passthrough("Button"),
     Card: passthrough("Card"),
     CountUp: passthrough("CountUp"),
+    GlassEdge: passthrough("GlassEdge"),
     // Renders null for users whose data is healthy, which is this fixture —
     // but it owns hooks, so it must exist as a real component or the hook-order
     // assertion below is measuring a crash instead of the order.
@@ -154,6 +155,9 @@ vi.mock("../../context/PeptaDataContext", () => ({
   usePeptaData: () => ({
     home: mocks.data.home,
     track: mocks.data.track,
+    // Scheduling drives whether the level card's log button is on screen
+    // (doseCta.ts); null reads as "don't know yet", which shows it.
+    schedules: null,
     cycles: [],
     homeLoading: false,
     homeError: null,
@@ -161,6 +165,7 @@ vi.mock("../../context/PeptaDataContext", () => ({
     homeRange: "today",
     refreshHome: vi.fn(),
     refreshTrack: vi.fn(),
+    refreshScheduling: vi.fn(),
     bumpProtein: vi.fn(),
     bumpWater: vi.fn(),
     bumpFiber: vi.fn(),

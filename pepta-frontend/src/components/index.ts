@@ -9,6 +9,7 @@ export { Card, InsetCard, type CardProps } from "./Card";
 export { Button, type ButtonProps, type ButtonVariant } from "./Button";
 export { Mascot, type MascotProps, type MascotPose } from "./Mascot";
 export { GlassButton, type GlassButtonProps } from "./GlassButton";
+export { GlassEdge, type GlassEdgeProps } from "./GlassEdge";
 export { UserAvatar } from "./UserAvatar";
 export { EditableAvatar } from "./EditableAvatar";
 export { Reveal, type RevealProps } from "./Reveal";

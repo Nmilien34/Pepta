@@ -6,7 +6,7 @@
 import React from 'react';
 import { Pressable, View } from 'react-native';
 import IconHome2 from '@tabler/icons-react-native/IconHome2';
-import IconVaccine from '@tabler/icons-react-native/IconVaccine';
+import IconListDetails from '@tabler/icons-react-native/IconListDetails';
 import IconChartLine from '@tabler/icons-react-native/IconChartLine';
 import IconUserCircle from '@tabler/icons-react-native/IconUserCircle';
 import IconPlus from '@tabler/icons-react-native/IconPlus';
@@ -17,11 +17,16 @@ import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useTheme } from '../theme';
 import { AppText } from '../components';
 
-// Exact Tabler icons from the design lab (ti-home-2 / ti-vaccine / ti-chart-line /
-// ti-user-circle). Focused = a slightly heavier stroke + brand purple.
+// Exact Tabler icons from the design lab (ti-home-2 / ti-list-details /
+// ti-chart-line / ti-user-circle). Focused = a slightly heavier stroke + brand
+// purple.
+//
+// Track was ti-vaccine. A syringe is what you log, not where you log it — and
+// at 24px it read as a pen, which is why the tab looked like an edit button.
+// The log icon says "your record", which is what the screen is.
 const ICONS: Record<string, (focused: boolean, color: string) => React.ReactNode> = {
   Home: (f, c) => <IconHome2 size={24} color={c} strokeWidth={f ? 2.4 : 1.9} />,
-  Track: (f, c) => <IconVaccine size={24} color={c} strokeWidth={f ? 2.4 : 1.9} />,
+  Track: (f, c) => <IconListDetails size={24} color={c} strokeWidth={f ? 2.4 : 1.9} />,
   Progress: (f, c) => <IconChartLine size={24} color={c} strokeWidth={f ? 2.4 : 1.9} />,
   Account: (f, c) => <IconUserCircle size={25} color={c} strokeWidth={f ? 2.4 : 1.9} />,
 };

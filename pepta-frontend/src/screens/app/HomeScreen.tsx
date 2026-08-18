@@ -14,7 +14,7 @@ import { useNavigation, type NavigationProp } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { HomeRangeKey } from '@pepta/shared';
 import { useTheme } from '../../theme';
-import { AppText, Button, Card, CountUp, DataHealthCardView, LogDoseCta, Mascot, ProgressBar, ProgressRing, Reveal, SectionErrorBanner, WaterCup } from '../../components';
+import { AppText, Button, Card, CountUp, GlassEdge, DataHealthCardView, LogDoseCta, Mascot, ProgressBar, ProgressRing, Reveal, SectionErrorBanner, WaterCup } from '../../components';
 import { useCompanionName } from '../../components/useCompanionName';
 import { LivingMascot } from '../../components/LivingMascot';
 import { useSeenTeachCards } from './useSeenTeachCards';
@@ -24,7 +24,9 @@ import { buildHomeView, type GoalView, type HomeWeightPulseView, type RingStat }
 import { globalDoseNoun, LEVEL_SUPPRESSION_COPY } from './levelSuppression';
 import { buildActivity, buildTodaysLog, type ActivitySummary, type LogChip, type LogKind } from './homeExtras';
 import { buildGettingStarted, buildPlanSummary, type GettingStarted, type LogAction, type PlanSummary } from './planView';
-import { buildPepTeachCard, type PepTeachCard } from './pepTeach';
+import { resolveTeachCard, type PepTeachCard, type ResolvedTeachCard } from './pepTeach';
+import { doseCtaState } from './doseCta';
+import { localDateOnly } from '../../utils/cycleWindows';
 
 const HOME_RANGES: { key: HomeRangeKey; label: string; short: string }[] = [
   { key: 'today', label: 'Today', short: 'Day' },
@@ -54,13 +56,19 @@ function formatSyncTime(iso: string): string {
 export function HomeScreen() {
   const theme = useTheme();
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
-  const { home, track, homeLoading, homeError, homeRefreshing, homeRange, refreshHome, refreshTrack, bumpProtein, bumpWater, bumpFiber, pendingLogs, lastSyncedAt } = usePeptaData();
+  const { home, track, homeLoading, homeError, homeRefreshing, homeRange, refreshHome, refreshTrack, schedules, cycles, refreshScheduling, bumpProtein, bumpWater, bumpFiber, pendingLogs, lastSyncedAt } = usePeptaData();
   const { openQuickLog, openMeal } = useLogSheets();
-  // Dose LOGS, not medicationLevels — the level list excludes unmodelled and
-  // oral compounds, so reading it here would leave those users pulsing forever
-  // no matter how much they logged (same trap as the 2026-08-11 audit's
+  // When "Log a shot" is on the level card, and whether it beats. Dose LOGS,
+  // not medicationLevels — the level list excludes unmodelled and oral
+  // compounds, so reading it here would leave those users pulsing forever no
+  // matter how much they logged (same trap as the 2026-08-11 audit's
   // getting-started task).
-  const hasLoggedDose = (track?.doseLogs ?? []).some((dose) => dose.deletedAt == null);
+  const doseCta = doseCtaState({
+    schedules,
+    cycles,
+    doseLogs: track?.doseLogs ?? null,
+    today: new Date(),
+  });
   const [rangeOpen, setRangeOpen] = useState(false);
 
   const onTask = (action: LogAction | null) => {
@@ -73,7 +81,10 @@ export function HomeScreen() {
   useEffect(() => {
     if (!home) void refreshHome();
     if (!track) void refreshTrack();
-  }, [home, track, refreshHome, refreshTrack]);
+    // Home needs the schedule now too: it is what says whether a dose is due
+    // today, and therefore whether the log button belongs on the level card.
+    if (!schedules) void refreshScheduling();
+  }, [home, track, schedules, refreshHome, refreshTrack, refreshScheduling]);
 
   // EVERY hook lives above the early returns. The crash this guards against:
   // while `home` was null this component returned early, so the render where
@@ -83,18 +94,23 @@ export function HomeScreen() {
   // way in builds 20–22 because the react-hooks lint plugin was silently
   // broken. Do not move hooks back below the guards.
   const companionName = useCompanionName();
-  const { seen, markSeen } = useSeenTeachCards();
+  const { seen, markSeen, fold, setFold } = useSeenTeachCards();
   // One lesson a day at most, about the user's own compounds, and only when
   // the day-one checklist is done — a new user has enough to read already.
-  const teach = useMemo(() => {
-    if (!home) return null;
-    if (buildGettingStarted(home, track).show) return null;
-    return buildPepTeachCard({
+  // A card folded today stays that card: resolveTeachCard does not re-pick
+  // while a fold is live, which is what stops "Not now" from behaving like
+  // "next please".
+  const teach = useMemo<ResolvedTeachCard>(() => {
+    if (!home) return { card: null, collapsed: false };
+    if (buildGettingStarted(home, track).show) return { card: null, collapsed: false };
+    return resolveTeachCard({
       compoundNames: home.activeCompounds.map((c) => c.name),
       seenEntryIds: seen,
       dayIndex: Math.floor(Date.now() / 86_400_000),
+      fold,
+      today: localDateOnly(new Date()),
     });
-  }, [home, seen]);
+  }, [home, seen, fold]);
 
   if (!home && homeError) {
     return (
@@ -268,12 +284,14 @@ export function HomeScreen() {
                 ) : null}
               </View>
               {view.streakDays > 0 ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 7, paddingHorizontal: 11, borderRadius: theme.radii.pill, backgroundColor: '#FFF1E8' }}>
-                  <Icon name="fire" size={14} color={theme.colors.streak} />
-                  <AppText variant="caption" style={{ fontWeight: '700', color: theme.colors.streak }}>
-                    {view.streakDays}
-                  </AppText>
-                </View>
+                <GlassEdge radius={theme.radii.pill} backgroundColor="#FFF1E8">
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 6, paddingHorizontal: 10 }}>
+                    <Icon name="fire" size={14} color={theme.colors.streak} />
+                    <AppText variant="caption" style={{ fontWeight: '700', color: theme.colors.streak }}>
+                      {view.streakDays}
+                    </AppText>
+                  </View>
+                </GlassEdge>
               ) : null}
               <View style={{ width: 34, height: 34, borderRadius: theme.radii.pill, backgroundColor: theme.colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
                 <Icon name="sparkles" size={18} color={theme.colors.primary} />
@@ -303,16 +321,40 @@ export function HomeScreen() {
           {/* Pep's daily lesson. Sits BELOW the day-one checklist and only
               appears once that checklist is gone, so a brand-new user is never
               handed reading material and a to-do list at the same time. */}
-          {teach ? (
+          {teach.card ? (
             <Reveal delay={90} style={{ marginTop: 12 }}>
               <TeachCard
-                card={teach}
+                card={teach.card}
                 companionName={companionName}
+                collapsed={teach.collapsed}
+                // The chevron folds and unfolds the SAME card: both directions
+                // keep it pinned for today, so reopening what you folded gives
+                // you back that lesson rather than a fresh one.
+                onToggle={() =>
+                  setFold({
+                    entryId: teach.card!.entryId,
+                    day: localDateOnly(new Date()),
+                    collapsed: !teach.collapsed,
+                  })
+                }
                 onRead={() => {
-                  markSeen(teach.entryId);
-                  navigation.navigate('LibraryEntry', { entryId: teach.entryId });
+                  markSeen(teach.card!.entryId);
+                  setFold(null);
+                  navigation.navigate('LibraryEntry', { entryId: teach.card!.entryId });
                 }}
-                onDismiss={() => markSeen(teach.entryId)}
+                // "NOT NOW" MEANS NOT TODAY, NOT "NEXT ONE". It folds this card
+                // and leaves it folded; the lesson is marked seen so tomorrow
+                // brings a different one, but nothing is re-picked today —
+                // which is what used to make one tap produce a fresh card to
+                // decline all over again.
+                onDismiss={() => {
+                  markSeen(teach.card!.entryId);
+                  setFold({
+                    entryId: teach.card!.entryId,
+                    day: localDateOnly(new Date()),
+                    collapsed: true,
+                  });
+                }}
               />
             </Reveal>
           ) : null}
@@ -322,15 +364,17 @@ export function HomeScreen() {
             {view.medication ? (
               <Card>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 }}>
                     <Icon name="needle" size={18} color={theme.colors.primary} />
-                    <AppText variant="cardTitle" style={{ fontSize: 15 }}>
+                    <AppText variant="cardTitle" style={{ fontSize: 15 }} numberOfLines={1}>
                       Medication Level
                     </AppText>
                     <Icon name="information-circle-outline" size={14} color={theme.colors.textTertiary} />
                   </View>
-                  <View style={{ backgroundColor: theme.colors.surfaceAlt, paddingVertical: 5, paddingHorizontal: 11, borderRadius: theme.radii.pill }}>
-                    <AppText variant="caption" color="textSecondary" style={{ fontWeight: '600' }}>
+                  {/* The pill is one line, always. flexShrink 0 + numberOfLines
+                      keeps it a single row; the title truncates first. */}
+                  <View style={{ backgroundColor: theme.colors.surfaceAlt, paddingVertical: 5, paddingHorizontal: 11, borderRadius: theme.radii.pill, flexShrink: 0 }}>
+                    <AppText variant="caption" color="textSecondary" style={{ fontWeight: '600' }} numberOfLines={1}>
                       {view.medication.status}
                     </AppText>
                   </View>
@@ -369,27 +413,36 @@ export function HomeScreen() {
                     </AppText>
                   </View>
                 ) : null}
-                {/* Same button, no heartbeat: the pulse has done its job the
-                    moment a dose exists, and a long-time user must never have a
-                    twitching Home screen. */}
-                <LogDoseCta
-                  label={`Log a ${globalDoseNoun(home.activeCompounds)}`}
-                  pulse={false}
-                  onPress={() => openQuickLog('dose')}
-                />
+                {/* Only on the days a dose is actually wanted (doseCta.ts).
+                    Once today's dose is logged the button goes and the card
+                    collapses back to level + bars — a permanent CTA on a status
+                    card reads as an unfinished task. No heartbeat here: the
+                    pulse has done its job the moment a first dose exists, and a
+                    long-time user must never have a twitching Home screen. */}
+                {doseCta.show ? (
+                  <LogDoseCta
+                    label={`Log a ${globalDoseNoun(home.activeCompounds)}`}
+                    pulse={false}
+                    onPress={() => openQuickLog('dose')}
+                  />
+                ) : null}
               </Card>
             ) : (
               <Card>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 }}>
                     <Icon name="needle" size={18} color={theme.colors.primary} />
-                    <AppText variant="cardTitle" style={{ fontSize: 15 }}>
+                    <AppText variant="cardTitle" style={{ fontSize: 15 }} numberOfLines={1}>
                       Medication Level
                     </AppText>
                     <Icon name="information-circle-outline" size={14} color={theme.colors.textTertiary} />
                   </View>
-                  <View style={{ backgroundColor: theme.colors.surfaceAlt, paddingVertical: 5, paddingHorizontal: 11, borderRadius: theme.radii.pill }}>
-                    <AppText variant="caption" color="textTertiary" style={{ fontWeight: '600' }}>
+                  {/* "No doses yet" is the longest label this pill ever carries
+                      — the populated card only ever says Steady/Peaking/Low —
+                      so it is the one that wrapped, dropping "yet" onto a second
+                      line and making the pill two rows tall. */}
+                  <View style={{ backgroundColor: theme.colors.surfaceAlt, paddingVertical: 5, paddingHorizontal: 11, borderRadius: theme.radii.pill, flexShrink: 0 }}>
+                    <AppText variant="caption" color="textTertiary" style={{ fontWeight: '600' }} numberOfLines={1}>
                       {view.levelSuppressed ? 'Not tracked' : 'No doses yet'}
                     </AppText>
                   </View>
@@ -423,12 +476,16 @@ export function HomeScreen() {
                   </AppText>
                 </View>
                 {/* The card states the problem; this is the fix. It beats only
-                    while there is genuinely nothing logged. */}
-                <LogDoseCta
-                  label={`Log a ${globalDoseNoun(home.activeCompounds)}`}
-                  pulse={!hasLoggedDose}
-                  onPress={() => openQuickLog('dose')}
-                />
+                    while there is genuinely nothing logged. This branch also
+                    covers oral/unmodelled users, who have no curve to collapse
+                    to — same due-day rule applies. */}
+                {doseCta.show ? (
+                  <LogDoseCta
+                    label={`Log a ${globalDoseNoun(home.activeCompounds)}`}
+                    pulse={doseCta.pulse}
+                    onPress={() => openQuickLog('dose')}
+                  />
+                ) : null}
               </Card>
             )}
           </Reveal>
@@ -493,29 +550,69 @@ export function HomeScreen() {
 // Pep's 30-second lesson. Tinted like PlanCard so it reads as part of the app
 // rather than an ad, and the citation is never optional — a card without a
 // source is indistinguishable from a Reddit comment.
+//
+// COLLAPSIBLE, because it is the tallest thing on Home: title + body + citation
+// + two buttons pushed the medication level below the fold on a real account.
+// Collapsing keeps the header — who is talking and what about — so it reads as
+// a folded lesson, not a stray line. It is a lighter action than "Not now",
+// which dismisses the card for good.
 function TeachCard({
   card,
   companionName,
+  collapsed,
+  onToggle,
   onRead,
   onDismiss,
 }: {
   card: PepTeachCard;
   companionName: string;
+  collapsed: boolean;
+  onToggle(): void;
   onRead(): void;
   onDismiss(): void;
 }) {
   const theme = useTheme();
   return (
-    <Card style={{ backgroundColor: '#F3EFFF', borderWidth: 0 }}>
+    // Same material as the plan card: warm alt behind a glass rim. Pep's voice
+    // no longer needs a purple wash to be recognisable — the mascot is right
+    // there — and purple is now reserved for the gauges.
+    <GlassEdge radius={theme.radii.card} backgroundColor={theme.colors.surfaceAlt}>
+      <View style={{ padding: theme.spacing.lg }}>
       <View style={{ flexDirection: 'row', gap: 11, alignItems: 'flex-start' }}>
         <LivingMascot pose="idle" size={44} bobSeconds={3.8} />
         <View style={{ flex: 1 }}>
-          <AppText variant="caption" color="primary" style={{ fontWeight: '700' }}>
-            {companionName} · 30 seconds?
-          </AppText>
-          <AppText variant="cardTitle" style={{ fontSize: 15, marginTop: 4, lineHeight: 20 }}>
-            {card.title}
-          </AppText>
+          <Pressable
+            onPress={() => {
+              Haptics.selectionAsync().catch(() => undefined);
+              onToggle();
+            }}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: !collapsed }}
+            accessibilityLabel={collapsed ? `Expand: ${card.title}` : `Collapse: ${card.title}`}
+            style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+              <AppText variant="caption" color="primary" style={{ fontWeight: '700', flexShrink: 1 }}>
+                {companionName} · 30 seconds?
+              </AppText>
+              <Icon
+                name={collapsed ? 'chevron-down' : 'chevron-up'}
+                size={16}
+                color={theme.colors.primary}
+              />
+            </View>
+            {/* The title survives collapse: a folded card still has to say what
+                it is, or it is just a name and a chevron. */}
+            <AppText
+              variant="cardTitle"
+              style={{ fontSize: 15, marginTop: 4, lineHeight: 20 }}
+              numberOfLines={collapsed ? 2 : undefined}
+            >
+              {card.title}
+            </AppText>
+          </Pressable>
+          {collapsed ? null : (
+            <>
           <AppText variant="caption" color="textSecondary" style={{ marginTop: 6, lineHeight: 18 }}>
             {card.body}
           </AppText>
@@ -556,16 +653,24 @@ function TeachCard({
               </AppText>
             </Pressable>
           </View>
+            </>
+          )}
         </View>
       </View>
-    </Card>
+    </View>
+    </GlassEdge>
   );
 }
 
 function PlanCard({ plan }: { plan: PlanSummary }) {
+  const theme = useTheme();
+  // Was a purple wash. Purple now means a gauge (medication level, weight), so
+  // the plan reads as chrome: the warm alt with a glass rim, which is what
+  // separates it from the ground rather than a tint.
   return (
-    <Card style={{ backgroundColor: '#EFEBFF', borderWidth: 0 }}>
-      <AppText variant="caption" color="primary" style={{ fontWeight: '700' }}>
+    <GlassEdge radius={theme.radii.card} backgroundColor={theme.colors.surfaceAlt}>
+      <View style={{ padding: theme.spacing.lg }}>
+      <AppText variant="caption" color="textSecondary" style={{ fontWeight: '700' }}>
         Your plan
       </AppText>
       <AppText variant="cardTitle" style={{ fontSize: 18, marginTop: 4 }}>
@@ -574,7 +679,8 @@ function PlanCard({ plan }: { plan: PlanSummary }) {
       <AppText variant="caption" color="textSecondary" style={{ marginTop: 4 }}>
         {plan.detail}
       </AppText>
-    </Card>
+      </View>
+    </GlassEdge>
   );
 }
 
