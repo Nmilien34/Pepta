@@ -1,11 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { HYDRATION_EXAMPLES, VESSELS, goalLine, ouncesLabel } from './hydration';
+import { BIG_VESSELS, HYDRATION_EXAMPLES, VESSELS, goalLine, ouncesLabel, quickAddVessels } from './hydration';
 
 describe('VESSELS', () => {
-  it('runs small to large, with Custom last', () => {
-    const sized = VESSELS.filter((v) => v.ounces != null);
-    expect(sized.map((v) => v.ounces)).toEqual([8, 12, 16, 24, 34, 40]);
-    expect(VESSELS[VESSELS.length - 1]!.ounces).toBeNull();
+  it('runs small to large — the design\'s six', () => {
+    expect(VESSELS.map((v) => v.ounces)).toEqual([8, 12, 16, 24, 34, 40]);
   });
 
   it('labels every sized vessel with the amount it actually adds', () => {
@@ -64,5 +62,86 @@ describe('ouncesLabel', () => {
 
   it('does not render floating-point noise', () => {
     expect(ouncesLabel(0.1 + 0.2)).toBe('0.3 oz');
+  });
+});
+
+describe('quickAddVessels', () => {
+  it('keeps the design\'s six, and ends on Custom', () => {
+    const row = quickAddVessels(100, 0);
+    expect(row.slice(0, 6).map((v) => v.ounces)).toEqual([8, 12, 16, 24, 34, 40]);
+    expect(row[row.length - 1]!.key).toBe('custom');
+    expect(row[row.length - 1]!.ounces).toBeNull();
+  });
+
+  it('stays sorted by size all the way along', () => {
+    for (const [target, current] of [[100, 0], [100, 42], [128, 3], [64, 10]] as const) {
+      const sized = quickAddVessels(target, current)
+        .filter((v) => v.ounces != null)
+        .map((v) => v.ounces!);
+      expect(sized, `goal ${target}, logged ${current}`).toEqual([...sized].sort((a, b) => a - b));
+    }
+  });
+
+  it('reaches far enough to fill the cup — the point of extending it', () => {
+    // The named vessels stop at 40, so a 100 oz goal must offer more than 40.
+    const row = quickAddVessels(100, 0);
+    const biggest = Math.max(...row.map((v) => v.ounces ?? 0));
+    expect(biggest).toBe(100);
+    expect(row.find((v) => v.name === 'Fill the cup')?.ounces).toBe(100);
+  });
+
+  it('fills only what is LEFT once some is logged', () => {
+    const row = quickAddVessels(100, 42);
+    const fill = row.find((v) => v.name === 'Fill the cup');
+    expect(fill?.ounces).toBe(58);
+    expect(fill?.label).toBe('+58 oz');
+  });
+
+  it('never offers an amount that overshoots the goal', () => {
+    for (const target of [40, 64, 100, 128]) {
+      for (const v of quickAddVessels(target, 0)) {
+        if (v.ounces == null) continue;
+        expect(v.ounces, `${v.name} on a ${target} oz goal`).toBeLessThanOrEqual(target);
+      }
+    }
+  });
+
+  it('withholds a gallon jug from a small goal', () => {
+    expect(quickAddVessels(64, 0).some((v) => v.key === 'gallon')).toBe(false);
+    expect(quickAddVessels(128, 0).some((v) => v.key === 'gallon')).toBe(true);
+  });
+
+  it('stops offering a fill once the goal is met or passed', () => {
+    for (const current of [100, 140]) {
+      expect(quickAddVessels(100, current).some((v) => v.name === 'Fill the cup')).toBe(false);
+    }
+  });
+
+  it('does not duplicate an amount a named vessel already offers', () => {
+    // 60 remaining of a 64 goal would be new; 24 remaining is already a Shaker.
+    const row = quickAddVessels(64, 40);
+    const amounts = row.map((v) => v.ounces).filter((o): o is number => o != null);
+    expect(new Set(amounts).size).toBe(amounts.length);
+  });
+
+  it('falls back to the plain row when no goal is set', () => {
+    for (const target of [null, 0]) {
+      const row = quickAddVessels(target, 0);
+      expect(row.map((v) => v.key)).toEqual([...VESSELS.map((v) => v.key), 'custom']);
+      expect(row.some((v) => v.name === 'Fill the cup')).toBe(false);
+    }
+  });
+
+  it('handles a fractional remainder without floating-point noise', () => {
+    expect(quickAddVessels(100, 57.9).find((v) => v.name === 'Fill the cup')?.label).toBe('+42.1 oz');
+  });
+
+  it('keeps every key unique so the row can be rendered by key', () => {
+    const row = quickAddVessels(128, 3);
+    expect(new Set(row.map((v) => v.key)).size).toBe(row.length);
+  });
+
+  it('BIG_VESSELS carry labels matching their amounts', () => {
+    for (const v of BIG_VESSELS) expect(v.label).toBe(`+${v.ounces} oz`);
   });
 });

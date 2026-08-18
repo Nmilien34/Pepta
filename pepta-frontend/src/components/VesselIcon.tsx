@@ -28,10 +28,17 @@ const VESSELS: Record<string, { d: string; fillY: number }> = {
   sports: { d: 'M9.6 2h4.8v3.6l1.6 2.4v19a3 3 0 0 1-3 3h-2a3 3 0 0 1-3-3V8l1.6-2.4Z', fillY: 11 },
   // Tumbler — straw and handle.
   tumbler: { d: 'M7 7 L8.6 27.5a2.6 2.6 0 0 0 2.6 2.5h1.6a2.6 2.6 0 0 0 2.6-2.5L17 7Z M13.6 1.4v5 M17 11a4.4 4.4 0 0 1 0 8', fillY: 10.5 },
+  // Jug — wide body, short neck, side handle. Drawn in the design's language
+  // rather than lifted from it: the design's row stops at the tumbler.
+  jug: { d: 'M9 3h6v3l3 4v16a3 3 0 0 1-3 3H9a3 3 0 0 1-3-3V10l3-4Z M18 14a4 4 0 0 1 0 8', fillY: 11 },
+  // "Fill the cup" — the glass, brim-full. The tile adds what is left of the
+  // day, so the icon has to be the finished state, not another part-full one.
+  full: { d: 'M6 12 L7.6 27 a2.2 2.2 0 0 0 2.2 2h4.4a2.2 2.2 0 0 0 2.2-2L18 12Z', fillY: 12 },
 };
 
 /** Only the closed body takes the water — handles and straws must not fill. */
 const BODY_ONLY: Record<string, string> = {
+  jug: 'M9 3h6v3l3 4v16a3 3 0 0 1-3 3H9a3 3 0 0 1-3-3V10l3-4Z',
   mug: 'M5.5 8h10.5v18a3 3 0 0 1-3 3H8.5a3 3 0 0 1-3-3Z',
   shaker: 'M6 8h12v18a3 3 0 0 1-3 3H9a3 3 0 0 1-3-3Z',
   tumbler: 'M7 7 L8.6 27.5a2.6 2.6 0 0 0 2.6 2.5h1.6a2.6 2.6 0 0 0 2.6-2.5L17 7Z',

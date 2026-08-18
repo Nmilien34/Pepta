@@ -27,7 +27,7 @@ import { useLogSheets } from '../../context/LogSheetsContext';
 import { useTheme } from '../../theme';
 import { buildHomeView } from './homeView';
 import { DRINK_PHOTOS } from './nutrientPhotos';
-import { HYDRATION_EXAMPLES, VESSELS, goalLine, ouncesLabel } from './hydration';
+import { HYDRATION_EXAMPLES, goalLine, ouncesLabel, quickAddVessels } from './hydration';
 
 const STEP_OZ = 8;
 
@@ -58,7 +58,8 @@ export function WaterScreen() {
           >
             <Icon name="chevron-back" size={25} color={theme.colors.textSecondary} stroke={2.4} />
           </Pressable>
-          <Icon name="water" size={20} color={theme.colors.water} stroke={2.3} />
+          {/* Chevron then title — the design carries no droplet here, and the
+              glass right below already says what the screen is about. */}
           <AppText variant="screenTitle">Water</AppText>
         </View>
 
@@ -91,7 +92,7 @@ export function WaterScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ gap: 8, paddingHorizontal: 20, paddingVertical: 10 }}
           >
-            {VESSELS.map((vessel) => (
+            {quickAddVessels(target, current).map((vessel) => (
               <Pressable
                 key={vessel.key}
                 onPress={() => {
@@ -121,7 +122,7 @@ export function WaterScreen() {
                   opacity: pressed ? 0.62 : 1,
                 })}
               >
-                <VesselIcon vessel={vessel.key} water={theme.colors.water} />
+                <VesselIcon vessel={vessel.icon} water={theme.colors.water} />
                 <AppText variant="caption" style={{ fontSize: 11.5, fontWeight: '800' }}>
                   {vessel.label}
                 </AppText>
