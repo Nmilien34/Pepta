@@ -141,6 +141,8 @@ export function numbersView(input: {
   heightUnit: string;
   eating: EatingView | null;
   profile: UserProfileResponse | null;
+  /** Shown only to fill a thin row — it has its own card above. */
+  bmi?: { value: number; category: string } | null;
 }): NumbersView | null {
   const stats: NumberStat[] = [];
   const { currentWeight, weightUnit, weightThirtyDaysAgo, height, heightUnit, eating, profile } =
@@ -185,13 +187,27 @@ export function numbersView(input: {
     });
   }
 
+  // BMI IS A FILLER, not a fifth stat. It has its own card two rows up, so it
+  // only repeats here when something else is missing and the row would
+  // otherwise be one lonely figure — which is exactly the empty-state frame.
+  const complete = stats.length === 4;
+  if (!complete && input.bmi != null) {
+    stats.push({ value: input.bmi.value.toFixed(1), unit: 'BMI', note: input.bmi.category });
+  }
+
   if (stats.length === 0) return null;
 
   const parts: string[] = [];
   if (healthy) {
     parts.push(`Healthy range ${Math.round(healthy.min)}–${Math.round(healthy.max)} ${weightUnit}`);
   }
-  if (eating?.calorieTarget != null) parts.push(`calories ${eating.calorieTarget} a day`);
+  // Says how to fill the gaps rather than restating a target, when there are
+  // gaps to fill.
+  parts.push(
+    complete && eating?.calorieTarget != null
+      ? `calories ${eating.calorieTarget} a day`
+      : 'log meals and weigh-ins for the rest',
+  );
 
   return { stats, footer: parts.join(' · ') };
 }

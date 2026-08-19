@@ -71,7 +71,7 @@ export function ProgressScreen() {
   const { home, track, progress, progressLoading, progressRefreshing, progressError, refreshProgress, refreshHome, refreshTrack } =
     usePeptaData();
   const [scope, setScope] = useState<ProgressScopeKey>('start');
-  const { openQuickLog } = useLogSheets();
+  const { openQuickLog, openMeal } = useLogSheets();
   const [scopeOpen, setScopeOpen] = useState(false);
   const [showOpen, setShowOpen] = useState(false);
   const { sections, toggle: toggleSectionPref } = useProgressSections();
@@ -146,6 +146,7 @@ export function ProgressScreen() {
     heightUnit: profile?.heightUnit ?? 'in',
     eating,
     profile,
+    bmi: s.bmi,
   });
   const lastWeighIn = sortedW[sortedW.length - 1]?.datetime ?? null;
   // The three inputs the retention engine will use, from real logs, so the
@@ -388,9 +389,13 @@ export function ProgressScreen() {
               <Card>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <Icon name="shield-check" size={18} color={theme.colors.textTertiary} />
-                  <AppText variant="cardTitle" style={{ fontSize: 15 }}>
+                  <AppText variant="cardTitle" style={{ fontSize: 15, flex: 1 }}>
                     Muscle protection
                   </AppText>
+                  {/* Dimmed, per the frame — present but not yet awake. */}
+                  <View style={{ opacity: 0.5 }}>
+                    <Mascot pose="idle" size={34} />
+                  </View>
                 </View>
                 <AppText variant="caption" color="textTertiary" style={{ fontSize: 10.5, marginTop: 6, lineHeight: 15 }}>
                   From your protein, training and pace — not a body scan.
@@ -523,6 +528,9 @@ export function ProgressScreen() {
                   <EmptyState
                     title="Nothing scanned yet"
                     line="Start scanning your meals and we’ll keep track of your calories and protein here — and how they line up with your targets."
+                    action="Scan a meal"
+                    // Straight into the scanner, which is what the button says.
+                    onAction={() => openMeal(null, { start: 'scan' })}
                   />
                 ) : (
                 <>

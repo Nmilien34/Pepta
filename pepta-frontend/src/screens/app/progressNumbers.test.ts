@@ -191,6 +191,40 @@ describe('what your numbers say', () => {
     expect(over!.stats.find((s) => s.unit === 'cal')!.note).toBe('a day over');
   });
 
+  it('adds BMI only to fill a thin row — it has its own card above', () => {
+    // The full frame shows four stats and NO BMI; the empty-state frame shows
+    // "to Normal" and BMI, because everything else is missing.
+    const thin = numbersView({
+      currentWeight: 184, weightUnit: 'lbs', weightThirtyDaysAgo: null,
+      height: 70, heightUnit: 'in', eating: null, profile,
+      bmi: { value: 25.7, category: 'Overweight range' },
+    });
+    expect(thin!.stats.map((stat) => stat.unit)).toEqual(['lbs', 'BMI']);
+
+    const full = numbersView({
+      currentWeight: 184, weightUnit: 'lbs', weightThirtyDaysAgo: 188.7,
+      height: 70, heightUnit: 'in', eating, profile,
+      bmi: { value: 25.7, category: 'Overweight range' },
+    });
+    expect(full!.stats.some((stat) => stat.unit === 'BMI')).toBe(false);
+  });
+
+  it('tells them how to fill the gaps instead of restating a target', () => {
+    const thin = numbersView({
+      currentWeight: 184, weightUnit: 'lbs', weightThirtyDaysAgo: null,
+      height: 70, heightUnit: 'in', eating: null, profile,
+      bmi: { value: 25.7, category: 'Overweight range' },
+    });
+    expect(thin!.footer).toBe('Healthy range 129–174 lbs · log meals and weigh-ins for the rest');
+
+    const full = numbersView({
+      currentWeight: 184, weightUnit: 'lbs', weightThirtyDaysAgo: 188.7,
+      height: 70, heightUnit: 'in', eating, profile,
+      bmi: null,
+    });
+    expect(full!.footer).toMatch(/calories 1800 a day/);
+  });
+
   it('omits every figure whose inputs are missing, rather than inventing one', () => {
     const view = numbersView({
       currentWeight: 184,
