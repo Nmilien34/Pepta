@@ -174,3 +174,24 @@ describe('foodsFor', () => {
     expect(foodsFor('protein')).toBe(PROTEIN_FOODS);
   });
 });
+
+describe("Pep's note", () => {
+  it('is present on every food, since the card only renders when there is one', () => {
+    for (const [key, panel] of Object.entries(FOOD_PANELS)) {
+      expect(panel.note, `${key} has no note`).toBeTruthy();
+    }
+  });
+
+  it('stays practical — no medical claims dressed as advice', () => {
+    const medical = /\b(cure|treat|diagnos|prevent disease|prescrib|dose of|medical advice)\b/i;
+    for (const [key, panel] of Object.entries(FOOD_PANELS)) {
+      expect(panel.note!, key).not.toMatch(medical);
+    }
+  });
+
+  it('is short enough to read on a card', () => {
+    for (const [key, panel] of Object.entries(FOOD_PANELS)) {
+      expect(panel.note!.length, key).toBeLessThan(240);
+    }
+  });
+});

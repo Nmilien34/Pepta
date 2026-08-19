@@ -185,3 +185,37 @@ export function vesselNameForExactOunces(ounces: number): string | null {
   const match = [...VESSELS, ...BIG_VESSELS].find((v) => v.ounces === ounces);
   return match?.name ?? null;
 }
+
+/**
+ * The panel behind the item-detail screen for a drink.
+ *
+ * MANUFACTURER LABELS, and they say so. These products are branded, so there
+ * is no SR Legacy record to cite; USDA's Branded Foods entries for several of
+ * them disagree with the makers' own labels on potassium by a wide margin, so
+ * citing a USDA id here would attach a checkable-looking reference to figures
+ * that do not match it. The label is the honest source, and `fdcId` stays
+ * absent rather than pointing at a lookalike.
+ *
+ * Electrolytes, not macros: on a GLP-1 the sodium and potassium are the reason
+ * these are on the screen at all.
+ */
+export interface DrinkPanel {
+  source: string;
+  /** Pep's note — the only judgement on the detail screen, labelled as one. */
+  note?: string;
+  calories?: number;
+  carbs?: number;
+  sodium?: number;
+  potassium?: number;
+  magnesium?: number;
+}
+
+/** Keyed by HydrationExample.key. */
+export const DRINK_PANELS: Record<string, DrinkPanel> = {
+  'vita-coco': { source: 'Vita Coco label, 16.9 fl oz', calories: 60, carbs: 15, sodium: 30, potassium: 470, note: 'Potassium without the sodium. Good alongside an electrolyte, not instead of one.' },
+  lmnt: { source: 'LMNT label, one stick', calories: 10, carbs: 2, sodium: 1000, potassium: 200, magnesium: 60, note: '1,000 mg of sodium is a lot in one stick — that is the point on a GLP-1, but it is not an all-day drink.' },
+  'liquid-iv': { source: 'Liquid I.V. label, one stick', calories: 45, carbs: 11, sodium: 500, potassium: 370, note: 'Carries real sugar, which is what makes it absorb quickly. Worth knowing if you are counting.' },
+  nuun: { source: 'Nuun Sport label, one tablet', calories: 15, carbs: 4, sodium: 300, potassium: 150, magnesium: 25, note: 'Low sodium next to the others. Fine for a normal day, light if you have been struggling.' },
+  'kirkland-coconut': { source: 'Kirkland Signature label, 14 fl oz', calories: 60, carbs: 15, sodium: 40, potassium: 590, note: 'The most potassium per dollar on this list. Barely any sodium though.' },
+  helenvita: { source: 'Helenvita label, one tablet', calories: 10, carbs: 2, sodium: 180, potassium: 100, magnesium: 56, note: 'A middle option — some of everything rather than a lot of sodium.' },
+};

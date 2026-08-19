@@ -93,6 +93,7 @@ export function NutrientWaysScreen() {
               fiber: panel.fiber,
               sodium: panel.sodium,
               source: panel.source,
+              note: panel.note,
             }
           : {}),
       },

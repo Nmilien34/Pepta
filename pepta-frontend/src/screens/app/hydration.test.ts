@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   BIG_VESSELS,
+  DRINK_PANELS,
   HYDRATION_EXAMPLES,
   VESSELS,
   goalLine,
@@ -206,5 +207,47 @@ describe('quickAddVessels with saved drinks', () => {
   it('keeps Custom last whatever is saved', () => {
     const row = quickAddVessels(100, 0, saved);
     expect(row[row.length - 1]!.key).toBe('custom');
+  });
+});
+
+describe('DRINK_PANELS', () => {
+  it('has one for every example on the screen', () => {
+    for (const drink of HYDRATION_EXAMPLES) {
+      expect(DRINK_PANELS[drink.key], `no panel for ${drink.key}`).toBeDefined();
+    }
+  });
+
+  it('names its source on every one', () => {
+    for (const [key, panel] of Object.entries(DRINK_PANELS)) {
+      expect(panel.source.length, key).toBeGreaterThan(0);
+    }
+  });
+
+  it('cites a label, never a USDA record it cannot back', () => {
+    // USDA's Branded entries for several of these disagree with the makers'
+    // own labels on potassium, so a USDA id here would look checkable and
+    // not be.
+    for (const [key, panel] of Object.entries(DRINK_PANELS)) {
+      expect(panel.source, key).not.toMatch(/USDA/);
+      expect(panel).not.toHaveProperty('fdcId');
+    }
+  });
+
+  it('carries the electrolyte the row already claims', () => {
+    // The list row states a headline fact; the panel must not contradict it.
+    for (const drink of HYDRATION_EXAMPLES) {
+      const panel = DRINK_PANELS[drink.key]!;
+      const stated = drink.fact.match(/([\d,]+)\s*mg/);
+      if (!stated) continue;
+      const value = Number(stated[1]!.replace(/,/g, ''));
+      const onPanel = /Sodium/i.test(drink.fact) ? panel.sodium : panel.potassium;
+      expect(onPanel, `${drink.key} — row says ${drink.fact}`).toBe(value);
+    }
+  });
+
+  it('carries no macros a drink does not have', () => {
+    for (const panel of Object.values(DRINK_PANELS)) {
+      expect(panel).not.toHaveProperty('protein');
+    }
   });
 });

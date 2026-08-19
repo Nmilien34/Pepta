@@ -32,7 +32,7 @@ import { itemFromDrink } from './itemDetail';
 import { favouriteId, isSaved } from './favourites';
 import { YoursBlock } from './YoursBlock';
 import { DRINK_PHOTOS } from './nutrientPhotos';
-import { HYDRATION_EXAMPLES, goalLine, ouncesLabel, quickAddVessels } from './hydration';
+import { DRINK_PANELS, HYDRATION_EXAMPLES, goalLine, ouncesLabel, quickAddVessels } from './hydration';
 
 const STEP_OZ = 8;
 
@@ -186,7 +186,10 @@ export function WaterScreen() {
                   key={drink.key}
                   onPress={() => {
                     Haptics.selectionAsync().catch(() => undefined);
-                    navigation.navigate('ItemDetail', { item: itemFromDrink(drink) });
+                    const panel = DRINK_PANELS[drink.key];
+                    navigation.navigate('ItemDetail', {
+                      item: { ...itemFromDrink(drink), ...(panel ?? {}) },
+                    });
                   }}
                   accessibilityRole="button"
                   accessibilityLabel={`${drink.brand}, ${drink.volume}. ${drink.fact}. Adds ${drink.ounces} ounces`}

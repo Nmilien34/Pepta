@@ -36,9 +36,17 @@ export interface FoodPanel {
   protein: number;
   carbs: number;
   fat: number;
-  satFat: number;
-  fiber: number;
-  sodium: number;
+  /** Often absent from a branded record — omitted rather than guessed. */
+  satFat?: number;
+  fiber?: number;
+  sodium?: number;
+  /**
+   * Pep's note — the ONLY judgement on the detail screen, and rendered under a
+   * label saying so. Everything else there is a lookup with its source named.
+   * Practical, never medical: what to do about the number, not what it means
+   * for anyone's health.
+   */
+  note?: string;
 }
 
 const USDA = (id: number, desc: string) =>
@@ -47,26 +55,29 @@ const USDA = (id: number, desc: string) =>
 /** Keyed by NutrientFood.key. */
 export const FOOD_PANELS: Record<string, FoodPanel> = {
   // 171477 per 100 g: 165 kcal / 31 P / 3.57 F / 1.01 SF / 0 C / 0 Fi / 74 Na
-  chicken: { fdcId: 171477, source: USDA(171477, 'Chicken breast, meat only, roasted'), calories: 185, protein: 34.7, carbs: 0, fat: 4, satFat: 1.1, fiber: 0, sodium: 83 },
+  chicken: { fdcId: 171477, source: USDA(171477, 'Chicken breast, meat only, roasted'), calories: 185, protein: 34.7, carbs: 0, fat: 4, satFat: 1.1, fiber: 0, sodium: 83, note: 'Cheapest way to move your protein number without touching your calories. Cook a few at once — the reason people miss the target is not appetite, it is that nothing is ready.' },
   // 175168 per 100 g × 1.70 (6 oz)
-  salmon: { fdcId: 175168, source: USDA(175168, 'Salmon, Atlantic, farmed, cooked'), calories: 350, protein: 37.6, carbs: 0, fat: 21.1, satFat: 4.1, fiber: 0, sodium: 104 },
+  salmon: { fdcId: 175168, source: USDA(175168, 'Salmon, Atlantic, farmed, cooked'), calories: 350, protein: 37.6, carbs: 0, fat: 21.1, satFat: 4.1, fiber: 0, sodium: 104, note: 'Half your protein target in one fillet, and it does not need appetite to go down the way chicken does.' },
   // 172182 per 100 g × 1.13 (1/2 cup)
-  'cottage-cheese': { fdcId: 172182, source: USDA(172182, 'Cottage cheese, lowfat, 2% milkfat'), calories: 92, protein: 11.8, carbs: 5.4, fat: 2.6, satFat: 1.4, fiber: 0, sodium: 348 },
+  'cottage-cheese': { fdcId: 172182, source: USDA(172182, 'Cottage cheese, lowfat, 2% milkfat'), calories: 92, protein: 11.8, carbs: 5.4, fat: 2.6, satFat: 1.4, fiber: 0, sodium: 348, note: 'Lower protein per cup than it feels like, and high in sodium. Good as a base, not as the whole target.' },
   // 173424 per 100 g × 1.00 (2 large ≈ 100 g)
-  eggs: { fdcId: 173424, source: USDA(173424, 'Egg, whole, cooked, hard-boiled'), calories: 155, protein: 12.6, carbs: 1.1, fat: 10.6, satFat: 3.3, fiber: 0, sodium: 124 },
+  eggs: { fdcId: 173424, source: USDA(173424, 'Egg, whole, cooked, hard-boiled'), calories: 155, protein: 12.6, carbs: 1.1, fat: 10.6, satFat: 3.3, fiber: 0, sodium: 124, note: 'Two boiled eggs is the lowest-effort protein there is. Boil six on a Sunday and the decision disappears for three days.' },
   // 173806 per 100 g × 0.28 (1 oz)
-  peanuts: { fdcId: 173806, source: USDA(173806, 'Peanuts, dry-roasted, without salt'), calories: 164, protein: 6.8, carbs: 6, fat: 13.9, satFat: 2.2, fiber: 2.4, sodium: 1.7 },
+  peanuts: { fdcId: 173806, source: USDA(173806, 'Peanuts, dry-roasted, without salt'), calories: 164, protein: 6.8, carbs: 6, fat: 13.9, satFat: 2.2, fiber: 2.4, sodium: 1.7, note: 'Mostly fat, and easy to eat far more than an ounce of. Portion it out rather than eating from the jar.' },
   // 168411 per 100 g × 1.55 (1 cup shelled)
-  edamame: { fdcId: 168411, source: USDA(168411, 'Edamame, frozen, prepared'), calories: 188, protein: 18.4, carbs: 13.8, fat: 8.1, satFat: 1, fiber: 8.1, sodium: 9.3 },
+  edamame: { fdcId: 168411, source: USDA(168411, 'Edamame, frozen, prepared'), calories: 188, protein: 18.4, carbs: 13.8, fat: 8.1, satFat: 1, fiber: 8.1, sodium: 9.3, note: 'Fiber and protein in the same cup, which is rare. Frozen works and takes five minutes.' },
   // 171706 per 100 g × 1.00 (1/2 medium)
-  avocado: { fdcId: 171706, source: USDA(171706, 'Avocados, raw, California'), calories: 167, protein: 2, carbs: 8.6, fat: 15.4, satFat: 2.1, fiber: 6.8, sodium: 8 },
+  avocado: { fdcId: 171706, source: USDA(171706, 'Avocados, raw, California'), calories: 167, protein: 2, carbs: 8.6, fat: 15.4, satFat: 2.1, fiber: 6.8, sodium: 8, note: 'Fiber that comes with real calories — useful when you are struggling to eat enough, less so when you are not.' },
   // 170158 per 100 g × 0.28 (1 oz, about 23)
-  almonds: { fdcId: 170158, source: USDA(170158, 'Almonds, dry roasted, without salt'), calories: 167, protein: 5.9, carbs: 5.9, fat: 14.7, satFat: 1.1, fiber: 3.1, sodium: 0.8 },
+  almonds: { fdcId: 170158, source: USDA(170158, 'Almonds, dry roasted, without salt'), calories: 167, protein: 5.9, carbs: 5.9, fat: 14.7, satFat: 1.1, fiber: 3.1, sodium: 0.8, note: 'An ounce is about 23, and it is easy to eat three. Count them out once and you will know what it looks like.' },
 
   // Branded — no USDA record, so the manufacturer's panel and no fake id.
-  'core-power': { source: 'fairlife Core Power Elite label', calories: 230, protein: 42, carbs: 9, fat: 3.5, satFat: 2, fiber: 0, sodium: 250 },
-  'cookie-bar': { source: 'TRUBAR label', calories: 190, protein: 8, carbs: 22, fat: 10, satFat: 3.5, fiber: 13, sodium: 65 },
-  psyllium: { source: 'GoodSense psyllium fiber powder label', calories: 45, protein: 0, carbs: 11, fat: 0, satFat: 0, fiber: 3, sodium: 5 },
+  // 2742751 per 100 mL: 56 kcal / 10.1 P / 0.85 F / 2.17 C / 63 Na, x4.14 for
+  // the 414 mL (14 fl oz) bottle. Saturated fat is absent from the record, so
+  // it is absent here.
+  'core-power': { fdcId: 2742751, source: USDA(2742751, 'Core Power Elite 42 g, 14 fl oz'), calories: 232, protein: 41.8, carbs: 9, fat: 3.5, fiber: 0, sodium: 261, note: 'Drinkable protein is the one that survives a bad appetite day. Keep one cold for the days food is not happening.' },
+  'cookie-bar': { source: 'TRUBAR label', calories: 190, protein: 8, carbs: 22, fat: 10, satFat: 3.5, fiber: 13, sodium: 65, note: '13 g of fiber in one bar is a lot — introduce it slowly. Going from nothing to this overnight is how people end up more uncomfortable, not less.' },
+  psyllium: { source: 'GoodSense psyllium fiber powder label', calories: 45, protein: 0, carbs: 11, fat: 0, satFat: 0, fiber: 3, sodium: 5, note: 'Take it with a full glass, not a sip. Psyllium without enough water is the one thing that makes constipation worse rather than better.' },
 };
 
 export interface NutrientFood {
@@ -92,7 +103,7 @@ export const FIBER_FOODS: readonly NutrientFood[] = [
 
 export const PROTEIN_FOODS: readonly NutrientFood[] = [
   { key: 'chicken', name: 'Chicken breast', serving: '4 oz, cooked', amount: 34.7, calories: 185 },
-  { key: 'core-power', brand: 'fairlife', name: 'Core Power Elite', serving: '14 fl oz bottle', amount: 42, calories: 230 },
+  { key: 'core-power', brand: 'fairlife', name: 'Core Power Elite', serving: '14 fl oz bottle', amount: 41.8, calories: 232 },
   { key: 'salmon', name: 'Salmon', serving: '6 oz fillet', amount: 37.6, calories: 350 },
   { key: 'cottage-cheese', name: 'Cottage cheese', serving: '1/2 cup, low-fat', amount: 11.8, calories: 92 },
   { key: 'eggs', name: 'Eggs', serving: '2 large, boiled', amount: 12.6, calories: 155 },
