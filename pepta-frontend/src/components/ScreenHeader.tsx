@@ -13,9 +13,20 @@ export interface ScreenHeaderProps {
   title: string;
   // When provided, the round adjustments button becomes tappable.
   onAdjust?: () => void;
+  /**
+   * The scope this screen is showing. A LABEL, not a picker — the frame draws
+   * it as bare text in a pill, with no chevron, because Track and Progress
+   * show current state rather than a chosen day.
+   *
+   * It used to carry a calendar icon and a chevron-down over an onPress that
+   * fired haptics and did nothing else: a control that promised a picker
+   * nobody had built. Screens that really do scope (Your log) own their own
+   * pill, with a chevron, because theirs opens something.
+   */
+  scopeLabel?: string;
 }
 
-export function ScreenHeader({ title, onAdjust }: ScreenHeaderProps) {
+export function ScreenHeader({ title, onAdjust, scopeLabel = 'Today' }: ScreenHeaderProps) {
   const theme = useTheme();
   return (
     <View
@@ -23,13 +34,9 @@ export function ScreenHeader({ title, onAdjust }: ScreenHeaderProps) {
     >
       <AppText variant="screenTitle">{title}</AppText>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
-        <Pressable
-          onPress={() => Haptics.selectionAsync().catch(() => undefined)}
+        <View
           style={[
             {
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 5,
               paddingVertical: 7,
               paddingHorizontal: 11,
               borderRadius: theme.radii.pill,
@@ -40,12 +47,10 @@ export function ScreenHeader({ title, onAdjust }: ScreenHeaderProps) {
             theme.shadows.card,
           ]}
         >
-          <Icon name="calendar" size={14} color={theme.colors.textSecondary} stroke={2.1} />
-          <AppText variant="caption" style={{ fontWeight: '700', fontSize: 13 }}>
-            Today
+          <AppText variant="caption" style={{ fontWeight: '700', fontSize: 13 }} numberOfLines={1}>
+            {scopeLabel}
           </AppText>
-          <Icon name="chevron-down" size={13} color={theme.colors.textTertiary} stroke={2.2} />
-        </Pressable>
+        </View>
         <Pressable
           onPress={
             onAdjust

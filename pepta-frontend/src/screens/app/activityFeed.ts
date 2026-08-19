@@ -39,6 +39,12 @@ export interface ActivityEntry {
   /** Quieter line: the detail that makes it legible. Empty when there is none. */
   detail: string;
   datetime: string;
+  /**
+   * Overrides the clock time on the right. Set only where a single time would
+   * be a lie — a day's water is a dozen pours, not a thing that happened at
+   * 10:04.
+   */
+  timeLabel?: string;
 }
 
 export interface ActivityDay {
@@ -211,13 +217,34 @@ export function buildActivityFeed({
     });
   }
 
+  // WATER IS ONE ROW PER DAY, not one per pour — the frame's "64 oz water ·
+  // All day". It is the only log people record in a dozen small increments,
+  // and a dozen rows of it would bury the dose this screen is anchored on.
+  // Everything else keeps its own timestamp: a meal happened at a time, a
+  // glass of water did not.
+  const waterByDay = new Map<string, { total: number; latest: string }>();
   for (const water of live(track.waterLogs)) {
+    const day = localDay(water.datetime);
+    if (!day) continue;
+    const running = waterByDay.get(day);
+    if (running) {
+      running.total += water.amountOz;
+      if (water.datetime > running.latest) running.latest = water.datetime;
+    } else {
+      waterByDay.set(day, { total: water.amountOz, latest: water.datetime });
+    }
+  }
+  for (const [day, { total, latest }] of waterByDay) {
     entries.push({
-      id: `water-${water.id}`,
+      id: `water-${day}`,
       kind: 'water',
-      title: `${water.amountOz} oz water`,
-      detail: targetFor(home?.profile?.dailyWaterTargetOz, water.datetime, 'oz'),
-      datetime: water.datetime,
+      // Rounded to a tenth: summing floats gives 63.99999999999999.
+      title: `${Math.round(total * 10) / 10} oz water`,
+      detail: targetFor(home?.profile?.dailyWaterTargetOz, latest, 'oz'),
+      // Sorted by the day's last pour so it lands where it belongs in the
+      // day, while reading as what it is.
+      datetime: latest,
+      timeLabel: 'All day',
     });
   }
 

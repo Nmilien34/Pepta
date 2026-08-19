@@ -72,16 +72,18 @@ describe('grouping and order', () => {
     const feed = buildActivityFeed({
       home: home(),
       now: NOW,
+      // Protein, not water: water is deliberately one row per day now, so it
+      // cannot demonstrate the ordering of several entries within a day.
       track: track({
-        waterLogs: [
-          { id: 'a', amountOz: 8, datetime: at(11, 9), deletedAt: null },
-          { id: 'b', amountOz: 8, datetime: at(13, 9), deletedAt: null },
-          { id: 'c', amountOz: 8, datetime: at(13, 17), deletedAt: null },
+        proteinLogs: [
+          { id: 'a', grams: 20, datetime: at(11, 9), deletedAt: null },
+          { id: 'b', grams: 20, datetime: at(13, 9), deletedAt: null },
+          { id: 'c', grams: 20, datetime: at(13, 17), deletedAt: null },
         ],
       }),
     });
     expect(feed.map((d) => d.label)).toEqual(['Today', 'Tue, Aug 11']);
-    expect(feed[0]!.entries.map((e) => e.id)).toEqual(['water-c', 'water-b']);
+    expect(feed[0]!.entries.map((e) => e.id)).toEqual(['protein-c', 'protein-b']);
   });
 
   it('labels today and yesterday by name', () => {
@@ -99,13 +101,13 @@ describe('grouping and order', () => {
   });
 
   it('caps DAYS, never truncating a busy day', () => {
-    const waterLogs = [
-      ...Array.from({ length: 9 }, (_, i) => ({ id: `t${i}`, amountOz: 8, datetime: at(13, 8 + i), deletedAt: null })),
-      { id: 'y', amountOz: 8, datetime: at(12, 9), deletedAt: null },
-      { id: 'x', amountOz: 8, datetime: at(11, 9), deletedAt: null },
-      { id: 'w', amountOz: 8, datetime: at(10, 9), deletedAt: null },
+    const proteinLogs = [
+      ...Array.from({ length: 9 }, (_, i) => ({ id: `t${i}`, grams: 20, datetime: at(13, 8 + i), deletedAt: null })),
+      { id: 'y', grams: 20, datetime: at(12, 9), deletedAt: null },
+      { id: 'x', grams: 20, datetime: at(11, 9), deletedAt: null },
+      { id: 'w', grams: 20, datetime: at(10, 9), deletedAt: null },
     ];
-    const feed = buildActivityFeed({ home: home(), now: NOW, track: track({ waterLogs }), maxDays: 2 });
+    const feed = buildActivityFeed({ home: home(), now: NOW, track: track({ proteinLogs }), maxDays: 2 });
     expect(feed).toHaveLength(2);
     expect(feed[0]!.entries).toHaveLength(9);
   });
@@ -345,5 +347,92 @@ describe('every row says what it means, not just what it was', () => {
     });
 
     expect(find(feed, 'sideEffect')!.title).toBe('Nausea');
+  });
+});
+
+describe('water is a day, not a moment', () => {
+  const day = (logs: { id: string; amountOz: number; datetime: string }[]) =>
+    buildActivityFeed({
+      home: makeHome({ profile: { dailyWaterTargetOz: 100 } as never }),
+      now: NOW,
+      track: track({ waterLogs: logs.map((log) => ({ ...log, deletedAt: null })) }),
+    });
+
+  it('adds a day\'s pours into one row', () => {
+    const feed = day([
+      { id: 'a', amountOz: 8, datetime: at(13, 8) },
+      { id: 'b', amountOz: 16, datetime: at(13, 12) },
+      { id: 'c', amountOz: 40, datetime: at(13, 17) },
+    ]);
+    const water = feed[0]!.entries.filter((entry) => entry.kind === 'water');
+
+    expect(water).toHaveLength(1);
+    expect(water[0]!.title).toBe('64 oz water');
+  });
+
+  it('says "All day" rather than picking one pour\'s clock time', () => {
+    const feed = day([
+      { id: 'a', amountOz: 8, datetime: at(13, 8) },
+      { id: 'b', amountOz: 8, datetime: at(13, 17) },
+    ]);
+
+    expect(feed[0]!.entries[0]!.timeLabel).toBe('All day');
+  });
+
+  it('keeps each day separate — yesterday is not folded into today', () => {
+    const feed = day([
+      { id: 'a', amountOz: 8, datetime: at(13, 8) },
+      { id: 'b', amountOz: 24, datetime: at(12, 8) },
+    ]);
+
+    expect(feed.map((d) => d.entries[0]!.title)).toEqual(['8 oz water', '24 oz water']);
+  });
+
+  it('rounds the sum — adding floats gives 63.99999999999999', () => {
+    const feed = day([
+      { id: 'a', amountOz: 21.3, datetime: at(13, 8) },
+      { id: 'b', amountOz: 21.3, datetime: at(13, 9) },
+      { id: 'c', amountOz: 21.4, datetime: at(13, 10) },
+    ]);
+
+    expect(feed[0]!.entries[0]!.title).toBe('64 oz water');
+  });
+
+  it('still measures the day against the target', () => {
+    const feed = day([{ id: 'a', amountOz: 64, datetime: at(13, 8) }]);
+
+    expect(feed[0]!.entries[0]!.detail).toBe('Of 100 oz today');
+  });
+
+  it('leaves out a pour the user deleted', () => {
+    const feed = buildActivityFeed({
+      home: home(),
+      now: NOW,
+      track: track({
+        waterLogs: [
+          { id: 'a', amountOz: 8, datetime: at(13, 8), deletedAt: null },
+          { id: 'b', amountOz: 500, datetime: at(13, 9), deletedAt: '2026-08-13T10:00:00.000Z' },
+        ],
+      }),
+    });
+
+    expect(feed[0]!.entries[0]!.title).toBe('8 oz water');
+  });
+
+  it('gives every other kind its own row and its own time', () => {
+    const feed = buildActivityFeed({
+      home: home(),
+      now: NOW,
+      track: track({
+        proteinLogs: [
+          { id: 'p1', grams: 20, datetime: at(13, 8), deletedAt: null },
+          { id: 'p2', grams: 22, datetime: at(13, 12), deletedAt: null },
+        ],
+      }),
+    });
+    const protein = feed[0]!.entries.filter((entry) => entry.kind === 'protein');
+
+    expect(protein).toHaveLength(2);
+    expect(protein.every((entry) => entry.timeLabel == null)).toBe(true);
   });
 });

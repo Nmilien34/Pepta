@@ -136,7 +136,7 @@ export function ActivityFeedCard({
                     ) : null}
                   </View>
                   <AppText variant="caption" color="textTertiary" style={{ fontWeight: '600' }}>
-                    {entryTime(entry.datetime)}
+                    {entry.timeLabel ?? entryTime(entry.datetime)}
                   </AppText>
                   {opens ? (
                     <Icon name="chevron-forward" size={14} color={theme.colors.textTertiary} />
