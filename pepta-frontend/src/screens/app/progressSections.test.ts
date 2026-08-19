@@ -8,18 +8,19 @@ import {
 } from './progressSections';
 
 describe('what the sheet offers', () => {
-  it('lists only sections the screen actually renders', () => {
-    // The frame lists a Side effects row; that card is not built. A toggle
-    // governing nothing is the decoration this screen keeps shedding.
+  it('lists every section the screen renders, in screen order', () => {
+    // Side effects was held out while its card did not exist — a toggle
+    // governing nothing is the decoration this screen keeps shedding. The
+    // card is built, so the row is here.
     expect(PROGRESS_SECTIONS.map((s) => s.key)).toEqual([
       'weight',
+      'sideEffects',
       'eating',
       'muscle',
       'timeline',
       'numbers',
       'photos',
     ]);
-    expect(PROGRESS_SECTIONS.some((s) => s.key === ('sideEffects' as never))).toBe(false);
   });
 
   it('gives every row a label and an icon', () => {

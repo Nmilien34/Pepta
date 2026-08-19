@@ -83,7 +83,7 @@ describe('useProgressSections', () => {
     // "everything else unset".
     const sent = apiMocks.putUiPreferences.mock.calls[0]![0].progressSections;
     expect(Object.keys(sent).sort()).toEqual(
-      ['eating', 'muscle', 'numbers', 'photos', 'timeline', 'weight'],
+      ['eating', 'muscle', 'numbers', 'photos', 'sideEffects', 'timeline', 'weight'],
     );
   });
 
@@ -174,7 +174,8 @@ describe('useProgressSections', () => {
     // Wrong in the recoverable direction: too much on screen, not a card
     // missing for a reason the user never chose.
     expect(handle.sections).toEqual({
-      weight: true, eating: true, muscle: true, timeline: true, numbers: true, photos: true,
+      weight: true, sideEffects: true, eating: true, muscle: true,
+      timeline: true, numbers: true, photos: true,
     });
     expect(handle.hydrated).toBe(true);
   });

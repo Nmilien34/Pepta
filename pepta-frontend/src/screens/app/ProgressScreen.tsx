@@ -26,7 +26,9 @@ import {
 } from '../../components';
 
 import { ProgressScopeMenu } from '../../components/ProgressScopeMenu';
+import { SideEffectsCard } from '../../components/SideEffectsCard';
 import { WhatToShowSheet } from '../../components/WhatToShowSheet';
+import { sideEffectTrend } from './sideEffectTrend';
 import { useProgressSections } from './useProgressSections';
 import { useLogSheets } from '../../context/LogSheetsContext';
 import { usePeptaData } from '../../context/PeptaDataContext';
@@ -72,6 +74,7 @@ export function ProgressScreen() {
     usePeptaData();
   const [scope, setScope] = useState<ProgressScopeKey>('start');
   const { openQuickLog, openMeal } = useLogSheets();
+  const [effectType, setEffectType] = useState<string | null>(null);
   const [scopeOpen, setScopeOpen] = useState(false);
   const [showOpen, setShowOpen] = useState(false);
   const { sections, toggle: toggleSectionPref } = useProgressSections();
@@ -147,6 +150,12 @@ export function ProgressScreen() {
     eating,
     profile,
     bmi: s.bmi,
+  });
+  const sideEffects = sideEffectTrend({
+    logs: track?.sideEffectLogs,
+    doses: track?.doseLogs,
+    type: effectType,
+    now: nowDate,
   });
   const lastWeighIn = sortedW[sortedW.length - 1]?.datetime ?? null;
   // The three inputs the retention engine will use, from real logs, so the
@@ -509,6 +518,19 @@ export function ProgressScreen() {
                   ))}
                 </View>
               </Card>
+            </Reveal>
+          ) : null}
+
+          {/* side effects — between the goal trio and What you're eating,
+              per the frame */}
+          {sections.sideEffects ? (
+            <Reveal delay={180} style={{ marginTop: 12 }}>
+              <SideEffectsCard
+                trend={sideEffects}
+                type={effectType}
+                onPickType={setEffectType}
+                onLog={() => openQuickLog('sideEffect')}
+              />
             </Reveal>
           ) : null}
 

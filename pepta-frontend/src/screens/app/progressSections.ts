@@ -4,10 +4,11 @@
 // Account; the frame's note puts it plainly — WHEN lives in the pill, WHAT
 // lives here.
 //
-// ONLY SECTIONS THAT EXIST ARE OFFERED. The frame lists a Side effects row,
-// and that card has not been built yet; a toggle governing nothing is the same
-// decoration as the dead range control and the dead scope pill this screen
-// keeps shedding. It goes in the list the day the card does.
+// ONLY SECTIONS THAT EXIST ARE OFFERED — a toggle governing nothing is the
+// same decoration as the dead range control and the dead scope pill this
+// screen keeps shedding. Side effects was held out for exactly that reason
+// until its card was built; it is in the list now because there is something
+// for it to govern.
 //
 // NOTHING IS DELETED, which is why hiding is a display choice held on the
 // device rather than a profile field: turning Weight off must never look like
@@ -17,6 +18,7 @@
 
 export type ProgressSectionKey =
   | 'weight'
+  | 'sideEffects'
   | 'eating'
   | 'muscle'
   | 'timeline'
@@ -32,6 +34,7 @@ export interface ProgressSection {
 /** In the order they appear on the screen, so the sheet reads as a map of it. */
 export const PROGRESS_SECTIONS: readonly ProgressSection[] = [
   { key: 'weight', label: 'Weight', icon: 'scale' },
+  { key: 'sideEffects', label: 'Side effects', icon: 'alert-circle-outline' },
   { key: 'eating', label: 'What you’re eating', icon: 'nutrition' },
   { key: 'muscle', label: 'Muscle protection', icon: 'shield-check' },
   { key: 'timeline', label: 'Timeline', icon: 'flag' },
@@ -44,6 +47,7 @@ export type ProgressSectionPrefs = Record<ProgressSectionKey, boolean>;
 /** Everything on. Someone who has never opened this sheet sees their whole screen. */
 export const ALL_SECTIONS_ON: ProgressSectionPrefs = {
   weight: true,
+  sideEffects: true,
   eating: true,
   muscle: true,
   timeline: true,
