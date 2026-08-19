@@ -1,0 +1,212 @@
+// "What you're eating" and "What your numbers say" — the two cards on the
+// frame that the screen never had.
+//
+// BOTH READ A FIXED 30-DAY WINDOW, not the header scope, and the frame agrees:
+// its own labels say "last 30 days" and "this week". The reason is data, not
+// preference — /progress carries weights, measurements, photos and retention,
+// no nutrition at all, so calories and protein come from /track, which looks
+// back 30 days. Binding these to a "This year" scope would mean showing a
+// month of meals under a label promising twelve.
+//
+// NOTHING IS SHOWN WITHOUT THE LOGS BEHIND IT. Every figure returns null when
+// its inputs are missing, so a user who has never logged a meal gets no card
+// rather than a card full of zeroes reading like a failed week.
+//
+// Pure and RN-free.
+
+import type { MealLogResponse, ProteinLogResponse, UserProfileResponse } from '@pepta/shared';
+
+const DAY = 86_400_000;
+export const NUTRITION_WINDOW_DAYS = 30;
+
+interface Deletable {
+  deletedAt?: string | null;
+}
+
+function live<T extends Deletable & { datetime: string }>(
+  rows: readonly T[] | undefined,
+  from: number,
+): T[] {
+  return (rows ?? []).filter(
+    (row) => row.deletedAt == null && new Date(row.datetime).getTime() >= from,
+  );
+}
+
+/** Local calendar day, so a 9pm log is not filed under tomorrow. */
+function dayOf(iso: string): string {
+  const at = new Date(iso);
+  return `${at.getFullYear()}-${at.getMonth()}-${at.getDate()}`;
+}
+
+export interface EatingView {
+  /** Average per DAY THEY LOGGED, not per calendar day. */
+  caloriesPerDay: number | null;
+  proteinPerDay: number | null;
+  calorieTarget: number | null;
+  proteinTarget: number | null;
+  /** Days in the last seven where protein met its target. */
+  proteinHitDays: number;
+  proteinHitOf: number;
+  /** Per-day protein for the last seven days, oldest first — the bars. */
+  weekBars: { day: string; grams: number; hit: boolean }[];
+}
+
+/**
+ * AVERAGED OVER DAYS WITH LOGS, not over the window. Dividing a week of meals
+ * by 30 would report someone eating 400 calories a day and call it a deficit;
+ * the honest average of what they recorded is what they recorded.
+ */
+export function eatingView(
+  meals: readonly (MealLogResponse & Deletable)[] | undefined,
+  proteinLogs: readonly (ProteinLogResponse & Deletable)[] | undefined,
+  profile: UserProfileResponse | null,
+  now = new Date(),
+): EatingView | null {
+  const from = now.getTime() - NUTRITION_WINDOW_DAYS * DAY;
+  const mealRows = live(meals, from);
+  const proteinRows = live(proteinLogs, from);
+  if (mealRows.length === 0 && proteinRows.length === 0) return null;
+
+  const calorieByDay = new Map<string, number>();
+  const proteinByDay = new Map<string, number>();
+  for (const meal of mealRows) {
+    const day = dayOf(meal.datetime);
+    calorieByDay.set(day, (calorieByDay.get(day) ?? 0) + meal.calories);
+    proteinByDay.set(day, (proteinByDay.get(day) ?? 0) + meal.protein);
+  }
+  // Standalone protein logs count too — someone logging a shake without a meal
+  // is still eating protein, and leaving it out understates every average.
+  for (const row of proteinRows) {
+    const day = dayOf(row.datetime);
+    proteinByDay.set(day, (proteinByDay.get(day) ?? 0) + row.grams);
+  }
+
+  const mean = (values: number[]) =>
+    values.length === 0 ? null : Math.round(values.reduce((a, b) => a + b, 0) / values.length);
+
+  const proteinTarget = profile?.dailyProteinTargetGrams ?? null;
+  const weekFrom = now.getTime() - 7 * DAY;
+  const weekBars = [...proteinByDay.entries()]
+    .filter(([day]) => dayKeyToTime(day) >= weekFrom)
+    .sort(([left], [right]) => dayKeyToTime(left) - dayKeyToTime(right))
+    .map(([day, grams]) => ({
+      day,
+      grams: Math.round(grams),
+      hit: proteinTarget != null && grams >= proteinTarget,
+    }));
+
+  return {
+    caloriesPerDay: mean([...calorieByDay.values()]),
+    proteinPerDay: mean([...proteinByDay.values()]),
+    calorieTarget: profile?.dailyCalorieTarget ?? null,
+    proteinTarget,
+    proteinHitDays: weekBars.filter((bar) => bar.hit).length,
+    proteinHitOf: weekBars.length,
+    weekBars,
+  };
+}
+
+function dayKeyToTime(key: string): number {
+  const [y, m, d] = key.split('-').map(Number);
+  return new Date(y!, m!, d!).getTime();
+}
+
+export interface NumberStat {
+  value: string;
+  unit: string;
+  /** The quiet line under it: "last 30 days", "aim 1.4". */
+  note: string;
+}
+
+export interface NumbersView {
+  stats: NumberStat[];
+  /** The footer: healthy weight range and the calorie target. */
+  footer: string;
+}
+
+const KG_PER_LB = 0.45359237;
+
+/**
+ * The four figures under "What your numbers say", each omitted when its inputs
+ * are not there. A card with two real stats is worth more than four where two
+ * are invented.
+ */
+export function numbersView(input: {
+  currentWeight: number | null;
+  weightUnit: string;
+  /** Weight this far back, for the weekly rate. */
+  weightThirtyDaysAgo: number | null;
+  /** As stored: cm or inches, with its unit — same contract as computeBmi. */
+  height: number | null;
+  heightUnit: string;
+  eating: EatingView | null;
+  profile: UserProfileResponse | null;
+}): NumbersView | null {
+  const stats: NumberStat[] = [];
+  const { currentWeight, weightUnit, weightThirtyDaysAgo, height, heightUnit, eating, profile } =
+    input;
+
+  if (currentWeight != null && weightThirtyDaysAgo != null) {
+    const perWeek = ((weightThirtyDaysAgo - currentWeight) / 30) * 7;
+    stats.push({
+      value: Math.abs(perWeek).toFixed(1),
+      unit: `${weightUnit}/wk`,
+      note: 'last 30 days',
+    });
+  }
+
+  // Distance to the top of the healthy BMI band, in the user's own unit.
+  const healthy = healthyRange(height, heightUnit, weightUnit);
+  if (currentWeight != null && healthy && currentWeight > healthy.max) {
+    stats.push({
+      value: (currentWeight - healthy.max).toFixed(1),
+      unit: weightUnit,
+      note: 'to Normal',
+    });
+  }
+
+  if (eating?.proteinPerDay != null && currentWeight != null) {
+    const kg = weightUnit === 'kg' ? currentWeight : currentWeight * KG_PER_LB;
+    const perKg = eating.proteinPerDay / kg;
+    const aim = profile?.proteinGramsPerKg;
+    stats.push({
+      value: perKg.toFixed(1),
+      unit: 'g/kg',
+      note: aim ? `aim ${aim.toFixed(1)}` : 'of body weight',
+    });
+  }
+
+  if (eating?.caloriesPerDay != null && eating.calorieTarget != null) {
+    const gap = eating.calorieTarget - eating.caloriesPerDay;
+    stats.push({
+      value: String(Math.abs(Math.round(gap))),
+      unit: 'cal',
+      note: gap >= 0 ? 'a day under' : 'a day over',
+    });
+  }
+
+  if (stats.length === 0) return null;
+
+  const parts: string[] = [];
+  if (healthy) {
+    parts.push(`Healthy range ${Math.round(healthy.min)}–${Math.round(healthy.max)} ${weightUnit}`);
+  }
+  if (eating?.calorieTarget != null) parts.push(`calories ${eating.calorieTarget} a day`);
+
+  return { stats, footer: parts.join(' · ') };
+}
+
+/** BMI 18.5–24.9 in the user's own unit. Null without a height to compute from. */
+export function healthyRange(
+  height: number | null,
+  heightUnit: string,
+  weightUnit: string,
+): { min: number; max: number } | null {
+  if (!height || height <= 0) return null;
+  const cm = heightUnit === 'cm' ? height : height * 2.54;
+  const metres = cm / 100;
+  const minKg = 18.5 * metres * metres;
+  const maxKg = 24.9 * metres * metres;
+  if (weightUnit === 'kg') return { min: minKg, max: maxKg };
+  return { min: minKg / KG_PER_LB, max: maxKg / KG_PER_LB };
+}

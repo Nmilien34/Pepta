@@ -24,9 +24,49 @@ export interface ScreenHeaderProps {
    * pill, with a chevron, because theirs opens something.
    */
   scopeLabel?: string;
+  /**
+   * Makes the pill a control: it grows a chevron and becomes pressable.
+   * Without it the pill stays a label, which is what Track and Progress-
+   * before-the-scope-pill need — a chevron over nothing was the decoration
+   * this replaced.
+   */
+  onScopePress?: () => void;
 }
 
-export function ScreenHeader({ title, onAdjust, scopeLabel = 'Today' }: ScreenHeaderProps) {
+/** The scope pill's shell: a Pressable only when it has somewhere to go. */
+function Pill({ onPress, children }: { onPress?: () => void; children: React.ReactNode }) {
+  const theme = useTheme();
+  const style = [
+    {
+      flexDirection: 'row' as const,
+      alignItems: 'center' as const,
+      gap: 5,
+      paddingVertical: 7,
+      paddingHorizontal: 11,
+      borderRadius: theme.radii.pill,
+      backgroundColor: theme.colors.surface,
+      borderWidth: 0.5,
+      borderColor: theme.colors.border,
+    },
+    theme.shadows.card,
+  ];
+  if (!onPress) return <View style={style}>{children}</View>;
+  return (
+    <Pressable
+      onPress={() => {
+        Haptics.selectionAsync().catch(() => undefined);
+        onPress();
+      }}
+      accessibilityRole="button"
+      accessibilityLabel="Change what this screen covers"
+      style={({ pressed }) => [...style, { opacity: pressed ? 0.7 : 1 }]}
+    >
+      {children}
+    </Pressable>
+  );
+}
+
+export function ScreenHeader({ title, onAdjust, scopeLabel = 'Today', onScopePress }: ScreenHeaderProps) {
   const theme = useTheme();
   return (
     <View
@@ -34,23 +74,14 @@ export function ScreenHeader({ title, onAdjust, scopeLabel = 'Today' }: ScreenHe
     >
       <AppText variant="screenTitle">{title}</AppText>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
-        <View
-          style={[
-            {
-              paddingVertical: 7,
-              paddingHorizontal: 11,
-              borderRadius: theme.radii.pill,
-              backgroundColor: theme.colors.surface,
-              borderWidth: 0.5,
-              borderColor: theme.colors.border,
-            },
-            theme.shadows.card,
-          ]}
-        >
+        <Pill onPress={onScopePress}>
           <AppText variant="caption" style={{ fontWeight: '700', fontSize: 13 }} numberOfLines={1}>
             {scopeLabel}
           </AppText>
-        </View>
+          {onScopePress ? (
+            <Icon name="chevron-down" size={13} color={theme.colors.textTertiary} stroke={2.2} />
+          ) : null}
+        </Pill>
         <Pressable
           onPress={
             onAdjust

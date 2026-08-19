@@ -25,10 +25,15 @@ import {
   WeightChart,
 } from '../../components';
 
+import { ProgressScopeMenu } from '../../components/ProgressScopeMenu';
 import { usePeptaData } from '../../context/PeptaDataContext';
+import { eatingView, numbersView } from './progressNumbers';
+import {
+  scopePillLabel,
+  type ProgressScopeKey,
+} from './progressScope';
 import {
   RANGE_DAYS,
-  RANGE_KEYS,
   formatShortDate,
   mergeWeightsWithLatest,
   sortWeights,
@@ -38,20 +43,37 @@ import {
   type RetentionTone,
 } from './progressView';
 
+/**
+ * The scope pill in the app's vocabulary and the weight series' vocabulary are
+ * not the same list — "Since you started" is All, and there is no 7d scope.
+ * Mapped in one place rather than teaching weightSeries a second enum.
+ */
+const SCOPE_RANGE: Record<ProgressScopeKey, RangeKey> = {
+  start: 'All',
+  '30d': '30d',
+  '90d': '90d',
+  year: '1y',
+};
+
 export function ProgressScreen() {
   const theme = useTheme();
   const navigation = useNavigation<NavigationProp<Record<string, undefined>>>();
-  const { home, progress, progressLoading, progressRefreshing, progressError, refreshProgress, refreshHome } =
+  const { home, track, progress, progressLoading, progressRefreshing, progressError, refreshProgress, refreshHome, refreshTrack } =
     usePeptaData();
-  const [range, setRange] = useState<RangeKey>('90d');
+  const [scope, setScope] = useState<ProgressScopeKey>('start');
+  const [scopeOpen, setScopeOpen] = useState(false);
   const [photoOpen, setPhotoOpen] = useState(false);
 
   useEffect(() => {
     if (!progress) void refreshProgress();
     if (!home) void refreshHome();
-  }, [progress, home, refreshProgress, refreshHome]);
+    // Nutrition for the eating and numbers cards. /progress has none, and this
+    // screen used never to need /track at all.
+    if (!track) void refreshTrack();
+  }, [progress, home, track, refreshProgress, refreshHome, refreshTrack]);
 
-  const refreshAll = () => Promise.all([refreshProgress(), refreshHome()]).then(() => undefined);
+  const refreshAll = () =>
+    Promise.all([refreshProgress(), refreshHome(), refreshTrack()]).then(() => undefined);
 
   if (!progress && progressError) {
     return (
@@ -86,7 +108,10 @@ export function ProgressScreen() {
   const weights = mergeWeightsWithLatest(progress.weights, home?.latestWeight ?? null);
   const progressForView = { ...progress, weights };
   const s = summary(progressForView, profile);
-  const series = weightSeries(weights, range, nowDate);
+  // Scope is the SCREEN's now, not the weight card's. The old toggle lived
+  // inside that card and moved only its chart, so the rest of the screen sat
+  // at "all time" while the user believed they had picked 30 days.
+  const series = weightSeries(weights, SCOPE_RANGE[scope], nowDate);
   const sortedW = sortWeights(weights);
   const startDate = sortedW[0]?.datetime ?? null;
   const sectionErrors = { ...(progress.sectionErrors ?? {}), ...(home?.sectionErrors ?? {}) };
@@ -94,17 +119,30 @@ export function ProgressScreen() {
     .filter((p) => p.status !== 'deleted')
     .sort((a, b) => b.captureDate.localeCompare(a.captureDate))
     .slice(0, 3);
+  // Nutrition lives on /track, not /progress — see progressNumbers for why
+  // these two read a fixed 30-day window rather than the header scope.
+  const eating = eatingView(track?.mealLogs, track?.proteinLogs, profile, nowDate);
+  const thirtyAgo = sortedW.find(
+    (w) => new Date(w.datetime).getTime() >= nowDate.getTime() - 31 * 86_400_000,
+  );
+  const numbers = numbersView({
+    currentWeight: s.weight.current,
+    weightUnit: s.weight.unit,
+    weightThirtyDaysAgo: thirtyAgo?.value ?? null,
+    height: profile?.height ?? null,
+    heightUnit: profile?.heightUnit ?? 'in',
+    eating,
+    profile,
+  });
   const everythingEmpty =
     weights.length === 0 && progress.measurements.length === 0 && photos.length === 0 && !s.retention;
 
-  const pickRange = (r: RangeKey) => {
-    Haptics.selectionAsync().catch(() => undefined);
-    setRange(r);
-    // The buttons used to only filter the already-downloaded 30-day payload,
-    // so 90d/1y/All showed a month of data at best and older logs looked
-    // deleted. Widening the range now re-queries the server for the real
-    // window; the client-side filter stays as the display cut.
-    void refreshProgress(RANGE_DAYS[r]);
+  const pickScope = (next: ProgressScopeKey) => {
+    setScope(next);
+    // Still re-queries: the buttons this replaces used to filter an already
+    // downloaded 30-day payload, so anything wider showed a month at best and
+    // older logs looked deleted. The client-side cut stays as the display cut.
+    void refreshProgress(RANGE_DAYS[SCOPE_RANGE[next]]);
   };
 
   return (
@@ -115,7 +153,12 @@ export function ProgressScreen() {
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={progressRefreshing} onRefresh={refreshAll} tintColor={theme.colors.primary} />}
         >
-          <ScreenHeader title="Progress" onAdjust={() => navigation.navigate('Account')} />
+          <ScreenHeader
+            title="Progress"
+            scopeLabel={scopePillLabel(scope, startDate)}
+            onScopePress={() => setScopeOpen(true)}
+            onAdjust={() => navigation.navigate('Account')}
+          />
 
           <SectionErrorBanner errors={sectionErrors} style={{ marginTop: theme.spacing.md }} />
 
@@ -144,23 +187,10 @@ export function ProgressScreen() {
                       Weight ({s.weight.unit})
                     </AppText>
                   </View>
+                  {/* The 7d/30d/90d/1y/All strip that sat here is now the
+                      header pill: it governs the whole screen rather than one
+                      chart, which is what someone picking a window means. */}
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
-                    <View style={{ flexDirection: 'row', backgroundColor: theme.colors.surfaceAlt, borderRadius: theme.radii.pill, padding: 3 }}>
-                      {RANGE_KEYS.map((r) => {
-                        const active = r === range;
-                        return (
-                          <Pressable
-                            key={r}
-                            onPress={() => pickRange(r)}
-                            style={[{ paddingVertical: 5, paddingHorizontal: 9, borderRadius: theme.radii.pill }, active ? { backgroundColor: theme.colors.surface, ...theme.shadows.card } : null]}
-                          >
-                            <AppText variant="caption" color={active ? 'textPrimary' : 'textSecondary'} style={{ fontWeight: '700', fontSize: 11 }}>
-                              {r}
-                            </AppText>
-                          </Pressable>
-                        );
-                      })}
-                    </View>
                     <Pressable
                       onPress={() => {
                         Haptics.selectionAsync().catch(() => undefined);
@@ -172,7 +202,7 @@ export function ProgressScreen() {
                     </Pressable>
                   </View>
                 </View>
-                <WeightChart key={range} points={series} color={theme.colors.weight} unit={s.weight.unit} formatDate={formatShortDate} />
+                <WeightChart key={scope} points={series} color={theme.colors.weight} unit={s.weight.unit} formatDate={formatShortDate} />
               </Card>
             </Reveal>
           ) : null}
@@ -290,6 +320,66 @@ export function ProgressScreen() {
             </Reveal>
           ) : null}
 
+          {/* what you're eating — the frame's card, from /track's 30 days */}
+          {eating ? (
+            <Reveal delay={200} style={{ marginTop: 12 }}>
+              <Card>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Icon name="nutrition" size={18} color={theme.colors.protein} />
+                  <AppText variant="cardTitle" style={{ fontSize: 15 }}>
+                    What you’re eating
+                  </AppText>
+                </View>
+                <View style={{ flexDirection: 'row', gap: 18, marginTop: 14 }}>
+                  <BigStat
+                    value={eating.caloriesPerDay?.toLocaleString() ?? '—'}
+                    unit="cal"
+                    note={eating.calorieTarget ? `a day · of ${eating.calorieTarget.toLocaleString()}` : 'a day'}
+                  />
+                  <BigStat
+                    value={eating.proteinPerDay != null ? String(eating.proteinPerDay) : '—'}
+                    unit="g"
+                    note={eating.proteinTarget ? `protein · of ${eating.proteinTarget}` : 'protein'}
+                  />
+                </View>
+                {/* One bar per day THEY LOGGED in the last week — a bar for a
+                    day with no logs would read as a day they ate nothing. */}
+                {eating.weekBars.length > 0 ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 6, height: 64, marginTop: 14 }}>
+                    {eating.weekBars.map((bar) => {
+                      const ceiling = Math.max(eating.proteinTarget ?? 0, ...eating.weekBars.map((b) => b.grams));
+                      return (
+                        <View
+                          key={bar.day}
+                          accessible
+                          accessibilityLabel={`${bar.grams} g protein${bar.hit ? ', target hit' : ''}`}
+                          style={{ flex: 1, height: '100%', justifyContent: 'flex-end' }}
+                        >
+                          <View
+                            style={{
+                              height: `${Math.max(6, ceiling > 0 ? (bar.grams / ceiling) * 100 : 0)}%`,
+                              borderRadius: 6,
+                              backgroundColor: bar.hit ? theme.colors.fiber : theme.colors.surfaceAlt,
+                            }}
+                          />
+                        </View>
+                      );
+                    })}
+                  </View>
+                ) : null}
+                {eating.proteinHitOf > 0 ? (
+                  <AppText
+                    variant="caption"
+                    color="textSecondary"
+                    style={{ marginTop: 10, paddingTop: 9, borderTopWidth: 0.5, borderTopColor: theme.colors.border }}
+                  >
+                    Protein target hit on {eating.proteinHitDays} of {eating.proteinHitOf} days this week
+                  </AppText>
+                ) : null}
+              </Card>
+            </Reveal>
+          ) : null}
+
           {/* timeline */}
           {s.weight.goalWeight != null && s.weight.start != null ? (
             <Reveal delay={300} style={{ marginTop: 12 }}>
@@ -347,6 +437,47 @@ export function ProgressScreen() {
             </Reveal>
           ) : null}
 
+
+          {/* what your numbers say */}
+          {numbers ? (
+            <Reveal delay={340} style={{ marginTop: 12 }}>
+              <Card>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Icon name="chart-line" size={18} color={theme.colors.primary} />
+                  <AppText variant="cardTitle" style={{ fontSize: 15 }}>
+                    What your numbers say
+                  </AppText>
+                </View>
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+                  {numbers.stats.map((stat) => (
+                    <View key={`${stat.value}${stat.unit}${stat.note}`} style={{ flex: 1, minWidth: 0 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+                        <AppText variant="bodyStrong" style={{ fontSize: 16, fontWeight: '700' }}>
+                          {stat.value}
+                        </AppText>
+                        <AppText variant="caption" color="textTertiary" style={{ fontSize: 10, fontWeight: '600' }}>
+                          {' '}{stat.unit}
+                        </AppText>
+                      </View>
+                      <AppText variant="caption" color="textSecondary" style={{ fontSize: 10, marginTop: 3 }} numberOfLines={1}>
+                        {stat.note}
+                      </AppText>
+                    </View>
+                  ))}
+                </View>
+                {numbers.footer ? (
+                  <AppText
+                    variant="caption"
+                    color="textSecondary"
+                    style={{ marginTop: 10, paddingTop: 8, borderTopWidth: 0.5, borderTopColor: theme.colors.border, fontSize: 10.5, lineHeight: 15 }}
+                  >
+                    {numbers.footer}
+                  </AppText>
+                ) : null}
+              </Card>
+            </Reveal>
+          ) : null}
+
           {/* progress photos */}
           <Reveal delay={420} style={{ marginTop: 12 }}>
             <Card>
@@ -388,6 +519,14 @@ export function ProgressScreen() {
           </Reveal>
         </ScrollView>
       </SafeAreaView>
+
+      <ProgressScopeMenu
+        visible={scopeOpen}
+        scope={scope}
+        startedAt={startDate}
+        onPick={pickScope}
+        onClose={() => setScopeOpen(false)}
+      />
 
       <ProgressPhotoCapture
         visible={photoOpen}
@@ -437,6 +576,25 @@ function Centered({ children }: { children: React.ReactNode }) {
       <SafeAreaView style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: theme.spacing['2xl'] }}>
         {children}
       </SafeAreaView>
+    </View>
+  );
+}
+
+/** The frame's big-number-with-unit, used by both new cards. */
+function BigStat({ value, unit, note }: { value: string; unit: string; note: string }) {
+  return (
+    <View>
+      <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+        <AppText variant="statMedium" style={{ fontSize: 22 }}>
+          {value}
+        </AppText>
+        <AppText variant="caption" color="textSecondary" style={{ fontSize: 12, fontWeight: '700' }}>
+          {' '}{unit}
+        </AppText>
+      </View>
+      <AppText variant="caption" color="textSecondary" style={{ marginTop: 5 }}>
+        {note}
+      </AppText>
     </View>
   );
 }
