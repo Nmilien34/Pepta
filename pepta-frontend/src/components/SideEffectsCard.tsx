@@ -4,7 +4,7 @@
 // one waiting for the first log. Splitting them would let the two drift.
 
 import React, { useState } from 'react';
-import { Pressable, View, type LayoutChangeEvent } from 'react-native';
+import { Animated, Pressable, View, type LayoutChangeEvent } from 'react-native';
 import Svg, { Circle, Line, Path } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import { AppText } from './AppText';
@@ -12,6 +12,7 @@ import { Card } from './Card';
 import { Icon } from './Icon';
 import { Mascot } from './Mascot';
 import { useTheme } from '../theme';
+import { useChartEntrance } from './entranceMotion';
 import {
   effectLabel,
   severityChartModel,
@@ -31,6 +32,7 @@ export interface SideEffectsCardProps {
 export function SideEffectsCard({ trend, type, onPickType, onLog }: SideEffectsCardProps) {
   const theme = useTheme();
   const [width, setWidth] = useState(0);
+  const entrance = useChartEntrance({ delay: 60 });
   const model = severityChartModel(trend.weeks, trend.doseIncreases, width, PLOT_HEIGHT);
 
   return (
@@ -146,7 +148,18 @@ export function SideEffectsCard({ trend, type, onPickType, onLog }: SideEffectsC
 
           <View onLayout={(event: LayoutChangeEvent) => setWidth(Math.round(event.nativeEvent.layout.width))}>
             {model ? (
-              <Svg width={width} height={PLOT_HEIGHT} style={{ marginTop: 12 }}>
+              <Animated.View
+                style={{
+                  marginTop: 12,
+                  opacity: entrance.opacity,
+                  transform: [
+                    { translateY: PLOT_HEIGHT / 2 },
+                    { scaleY: entrance.scaleY },
+                    { translateY: -PLOT_HEIGHT / 2 },
+                  ],
+                }}
+              >
+              <Svg width={width} height={PLOT_HEIGHT}>
                 {model.gridlines.map((line) => (
                   <Line
                     key={line.value}
@@ -186,6 +199,7 @@ export function SideEffectsCard({ trend, type, onPickType, onLog }: SideEffectsC
                   <Circle key={`p${index}`} cx={point.x} cy={point.y} r={3} fill={theme.colors.primary} />
                 ))}
               </Svg>
+              </Animated.View>
             ) : (
               <View style={{ height: PLOT_HEIGHT }} />
             )}

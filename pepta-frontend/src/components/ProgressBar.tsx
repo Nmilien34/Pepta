@@ -1,8 +1,9 @@
 // ProgressBar — a track + fill that animates its width on mount and whenever the
 // percentage changes (Easing.bezier, non-native since width interpolates).
 
-import React, { useEffect, useRef } from 'react';
-import { Animated, Easing, View, type ColorValue } from 'react-native';
+import React from 'react';
+import { Animated, View, type ColorValue } from 'react-native';
+import { useSettleValue } from './entranceMotion';
 import { useTheme } from '../theme';
 
 export interface ProgressBarProps {
@@ -15,20 +16,10 @@ export interface ProgressBarProps {
 
 export function ProgressBar({ pct, color, trackColor, height = 8, delay = 0 }: ProgressBarProps) {
   const theme = useTheme();
-  const anim = useRef(new Animated.Value(0)).current;
-  const target = Math.max(0, Math.min(1, pct));
-
-  useEffect(() => {
-    const animation = Animated.timing(anim, {
-      toValue: target,
-      duration: 750,
-      delay,
-      easing: Easing.bezier(0.2, 0.8, 0.2, 1),
-      useNativeDriver: false,
-    });
-    animation.start();
-    return () => animation.stop();
-  }, [target, delay, anim]);
+  // Same rule as the rings: part-way in, then settle. A bar that refills from
+  // zero every time you come back to the screen is a lie for a beat and a
+  // wait for the rest of it.
+  const anim = useSettleValue(pct, { delay });
 
   const width = anim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
 

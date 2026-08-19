@@ -17,11 +17,12 @@
 // landed on the top gridline with the curve's peak running through it.
 
 import { useState } from 'react';
-import { View, type LayoutChangeEvent } from 'react-native';
+import { Animated, View, type LayoutChangeEvent } from 'react-native';
 import Svg, { Circle, Line, Path, Text as SvgText, TSpan } from 'react-native-svg';
 import { AppText } from './AppText';
 import { useTheme } from '../theme';
 import { buildLevelChartModel, shortTick, type LevelPoint } from '../screens/app/levelChart';
+import { useChartEntrance } from './entranceMotion';
 
 const PLOT_HEIGHT = 132;
 /** Room on the right for the value scale, inside the card's own padding. */
@@ -51,6 +52,8 @@ export function MedicationLevelChart({
 }: MedicationLevelChartProps) {
   const theme = useTheme();
   const [width, setWidth] = useState(0);
+  // Grows off its own baseline on the first screen of the launch.
+  const entrance = useChartEntrance();
   const onLayout = (event: LayoutChangeEvent) =>
     setWidth(Math.round(event.nativeEvent.layout.width));
 
@@ -91,11 +94,18 @@ export function MedicationLevelChart({
             ) : null}
           </View>
 
-          <Svg
-            width={width}
-            height={PLOT_HEIGHT + AXIS_HEIGHT}
-            style={{ marginTop: theme.spacing.md }}
+          <Animated.View
+            style={{
+              marginTop: theme.spacing.md,
+              opacity: entrance.opacity,
+              transform: [
+                { translateY: PLOT_HEIGHT / 2 },
+                { scaleY: entrance.scaleY },
+                { translateY: -PLOT_HEIGHT / 2 },
+              ],
+            }}
           >
+          <Svg width={width} height={PLOT_HEIGHT + AXIS_HEIGHT}>
             {model.gridlines.map((line) => (
               <Line
                 key={line.value}
@@ -220,6 +230,7 @@ export function MedicationLevelChart({
               </SvgText>
             ))}
           </Svg>
+          </Animated.View>
 
           <View
             style={{

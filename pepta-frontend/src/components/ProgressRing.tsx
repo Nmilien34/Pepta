@@ -1,8 +1,9 @@
 // ProgressRing — an SVG ring that fills on mount / when its percentage changes.
 // Center content (number, label) is passed as children.
 
-import React, { useEffect, useRef, type ReactNode } from 'react';
-import { Animated, Easing, View } from 'react-native';
+import React, { type ReactNode } from 'react';
+import { Animated, View } from 'react-native';
+import { useSettleValue } from './entranceMotion';
 import Svg, { Circle } from 'react-native-svg';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
@@ -13,24 +14,17 @@ export interface ProgressRingProps {
   color: string;
   trackColor?: string;
   strokeWidth?: number;
+  /** Staggers this gauge behind its neighbours on the entrance. */
+  delay?: number;
   children?: ReactNode;
 }
 
-export function ProgressRing({ size, pct, color, trackColor = '#EFEFF2', strokeWidth = 9, children }: ProgressRingProps) {
-  const anim = useRef(new Animated.Value(0)).current;
+export function ProgressRing({ size, pct, color, trackColor = '#EFEFF2', strokeWidth = 9, delay = 0, children }: ProgressRingProps) {
+  // Settles from part-way rather than sweeping from zero on every mount — see
+  // entranceMotion for why arriving on a screen is not worth a full fill.
+  const anim = useSettleValue(pct, { delay });
   const r = 50 - strokeWidth / 2;
   const circumference = 2 * Math.PI * r;
-
-  useEffect(() => {
-    const animation = Animated.timing(anim, {
-      toValue: Math.max(0, Math.min(1, pct)),
-      duration: 700,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: false,
-    });
-    animation.start();
-    return () => animation.stop();
-  }, [anim, pct]);
 
   const offset = anim.interpolate({ inputRange: [0, 1], outputRange: [circumference, 0] });
 

@@ -15,7 +15,22 @@ vi.mock('react-native', () => {
         React.createElement(name, props, children),
       { displayName: name },
     );
-  return { View: passthrough('View'), Text: passthrough('Text') };
+  return {
+    View: passthrough('View'),
+    Text: passthrough('Text'),
+    // The chart's entrance wrapper.
+    Animated: {
+      View: passthrough('Animated.View'),
+      Value: class {
+        constructor(public value: number) {}
+        setValue() {}
+        interpolate() { return 0; }
+      },
+      timing: () => ({ start: () => undefined, stop: () => undefined }),
+      parallel: () => ({ start: () => undefined, stop: () => undefined }),
+    },
+    Easing: { out: (v: unknown) => v, quad: 'quad', cubic: 'cubic' },
+  };
 });
 
 vi.mock('react-native-svg', () => {
