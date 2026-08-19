@@ -56,6 +56,7 @@ export { Confetti, type ConfettiProps } from "./Confetti";
 export { LogDoseCta, type LogDoseCtaProps } from "./LogDoseCta";
 export { ActivityFeedCard, ACTIVITY_ICON } from "./ActivityFeedCard";
 export { LogFilterSheet } from "./LogFilterSheet";
+export { WhatToShowSheet } from "./WhatToShowSheet";
 export { MedicationLevelCard } from "./MedicationLevelCard";
 export { MedicationLevelChart, type MedicationLevelChartProps } from "./MedicationLevelChart";
 export { ShotDetailSheet, type ShotDetailSheetProps } from "./ShotDetailSheet";

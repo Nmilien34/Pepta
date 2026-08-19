@@ -26,6 +26,8 @@ import {
 } from '../../components';
 
 import { ProgressScopeMenu } from '../../components/ProgressScopeMenu';
+import { WhatToShowSheet } from '../../components/WhatToShowSheet';
+import { useProgressSections } from './useProgressSections';
 import { usePeptaData } from '../../context/PeptaDataContext';
 import { eatingView, nextMilestone, numbersView, weighInDate } from './progressNumbers';
 import {
@@ -62,6 +64,8 @@ export function ProgressScreen() {
     usePeptaData();
   const [scope, setScope] = useState<ProgressScopeKey>('start');
   const [scopeOpen, setScopeOpen] = useState(false);
+  const [showOpen, setShowOpen] = useState(false);
+  const { sections, toggle: toggleSectionPref } = useProgressSections();
   const [photoOpen, setPhotoOpen] = useState(false);
 
   useEffect(() => {
@@ -159,7 +163,9 @@ export function ProgressScreen() {
             title="Progress"
             scopeLabel={scopePillLabel(scope, startDate)}
             onScopePress={() => setScopeOpen(true)}
-            onAdjust={() => navigation.navigate('Account')}
+            // The frame's note: the glyph promised a filter and opened
+            // Account. WHEN lives in the pill, WHAT lives in this sheet.
+            onAdjust={() => setShowOpen(true)}
           />
 
           <SectionErrorBanner errors={sectionErrors} style={{ marginTop: theme.spacing.md }} />
@@ -179,7 +185,7 @@ export function ProgressScreen() {
           ) : null}
 
           {/* weight trend */}
-          {weights.length > 0 ? (
+          {sections.weight && weights.length > 0 ? (
             <Reveal delay={60} style={{ marginTop: theme.spacing.lg }}>
               <Card>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -351,7 +357,7 @@ export function ProgressScreen() {
           </Reveal>
 
           {/* muscle protection (weekly retention engine) */}
-          {s.retention ? (
+          {sections.muscle && s.retention ? (
             <Reveal delay={220} style={{ marginTop: 12 }}>
               <Card>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -402,7 +408,7 @@ export function ProgressScreen() {
           ) : null}
 
           {/* what you're eating — the frame's card, from /track's 30 days */}
-          {eating ? (
+          {sections.eating && eating ? (
             <Reveal delay={200} style={{ marginTop: 12 }}>
               <Card>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -462,7 +468,7 @@ export function ProgressScreen() {
           ) : null}
 
           {/* timeline */}
-          {s.weight.goalWeight != null && s.weight.start != null ? (
+          {sections.timeline && s.weight.goalWeight != null && s.weight.start != null ? (
             <Reveal delay={300} style={{ marginTop: 12 }}>
               <Card>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -520,7 +526,7 @@ export function ProgressScreen() {
 
 
           {/* what your numbers say */}
-          {numbers ? (
+          {sections.numbers && numbers ? (
             <Reveal delay={340} style={{ marginTop: 12 }}>
               <Card>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -560,6 +566,7 @@ export function ProgressScreen() {
           ) : null}
 
           {/* progress photos */}
+          {sections.photos ? (
           <Reveal delay={420} style={{ marginTop: 12 }}>
             <Card>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -598,8 +605,16 @@ export function ProgressScreen() {
               </View>
             </Card>
           </Reveal>
+          ) : null}
         </ScrollView>
       </SafeAreaView>
+
+      <WhatToShowSheet
+        visible={showOpen}
+        sections={sections}
+        onToggle={toggleSectionPref}
+        onClose={() => setShowOpen(false)}
+      />
 
       <ProgressScopeMenu
         visible={scopeOpen}
