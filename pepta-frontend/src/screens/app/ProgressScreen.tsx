@@ -27,7 +27,7 @@ import {
 
 import { ProgressScopeMenu } from '../../components/ProgressScopeMenu';
 import { usePeptaData } from '../../context/PeptaDataContext';
-import { eatingView, numbersView } from './progressNumbers';
+import { eatingView, nextMilestone, numbersView, weighInDate } from './progressNumbers';
 import {
   scopePillLabel,
   type ProgressScopeKey,
@@ -134,6 +134,8 @@ export function ProgressScreen() {
     eating,
     profile,
   });
+  const lastWeighIn = sortedW[sortedW.length - 1]?.datetime ?? null;
+  const milestone = nextMilestone(s.weight.start, s.weight.current, s.weight.unit);
   const everythingEmpty =
     weights.length === 0 && progress.measurements.length === 0 && photos.length === 0 && !s.retention;
 
@@ -202,7 +204,46 @@ export function ProgressScreen() {
                     </Pressable>
                   </View>
                 </View>
+                {/* The readout above the plot, per the frame — the last real
+                    weigh-in and when it was, so the chart is anchored to a
+                    fact rather than floating above an axis. */}
+                <View style={{ marginTop: 14 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+                    <AppText variant="statMedium" style={{ fontSize: 22 }}>
+                      {s.weight.current != null ? s.weight.current.toFixed(1) : '—'}
+                    </AppText>
+                    <AppText variant="caption" color="textSecondary" style={{ fontSize: 12, fontWeight: '700' }}>
+                      {' '}{s.weight.unit}
+                    </AppText>
+                  </View>
+                  <AppText variant="caption" color="textTertiary" style={{ marginTop: 5 }}>
+                    {lastWeighIn ? `Last weigh-in · ${weighInDate(lastWeighIn)}` : 'No weigh-in yet'}
+                  </AppText>
+                </View>
                 <WeightChart key={scope} points={series} color={theme.colors.weight} unit={s.weight.unit} formatDate={formatShortDate} />
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginTop: 8,
+                    paddingTop: 9,
+                    borderTopWidth: 0.5,
+                    borderTopColor: theme.colors.border,
+                  }}
+                >
+                  <ChartKey color={theme.colors.weight} label="From your logs" />
+                  {/* Only when the profile actually carries a projection —
+                      "Projected" with no date would be a legend for a line
+                      that is not on the chart. */}
+                  {s.estimatedGoalDate ? (
+                    <ChartKey
+                      color={theme.colors.weight}
+                      dashed
+                      label={`Projected · ${formatShortDate(s.estimatedGoalDate)}`}
+                    />
+                  ) : null}
+                </View>
               </Card>
             </Reveal>
           ) : null}
@@ -226,6 +267,34 @@ export function ProgressScreen() {
                   </View>
                 </ProgressRing>
               </View>
+              {milestone ? (
+                <View
+                  style={{
+                    width: '100%',
+                    backgroundColor: theme.colors.surfaceAlt,
+                    borderRadius: 12,
+                    padding: 8,
+                    alignItems: 'center',
+                    marginTop: 10,
+                  }}
+                >
+                  <AppText
+                    variant="caption"
+                    color="textTertiary"
+                    style={{ fontSize: 9.5, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase' }}
+                  >
+                    Next milestone
+                  </AppText>
+                  <AppText variant="bodyStrong" style={{ fontSize: 13, marginTop: 3, fontWeight: '700' }}>
+                    {milestone.label}
+                  </AppText>
+                  {milestone.remaining ? (
+                    <AppText variant="caption" style={{ fontSize: 12, fontWeight: '800', color: theme.colors.weight, marginTop: 2 }}>
+                      {milestone.remaining}
+                    </AppText>
+                  ) : null}
+                </View>
+              ) : null}
             </Card>
 
             <View style={{ flex: 1, gap: 12 }}>
@@ -293,12 +362,24 @@ export function ProgressScreen() {
                     </AppText>
                     <Icon name="information-circle-outline" size={14} color={theme.colors.textTertiary} />
                   </View>
-                  <Mascot pose="idle" size={32} />
+                  {/* The score as a ring, per the frame — it was a Mascot
+                      beside "62/100" in text, which put the number people are
+                      reading in the quietest place on the card. */}
+                  <View style={{ width: 46, height: 46 }}>
+                    <ProgressRing size={46} pct={s.retention.score / 100} color={toneColor(theme, s.retention.tone)}>
+                      <AppText variant="caption" style={{ fontSize: 13, fontWeight: '800' }}>
+                        {s.retention.score}
+                      </AppText>
+                    </ProgressRing>
+                  </View>
                 </View>
+                <AppText variant="caption" color="textTertiary" style={{ fontSize: 10.5, marginTop: 6, lineHeight: 15 }}>
+                  From your protein, training and pace — not a body scan.
+                </AppText>
                 <View style={{ marginTop: theme.spacing.md, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <VerdictPill tone={s.retention.tone} label={s.retention.label} />
                   <AppText variant="caption" color="textTertiary">
-                    {s.retention.score}/100 this week
+                    this week
                   </AppText>
                 </View>
                 <AppText variant="body" color="textPrimary" style={{ marginTop: 10 }}>
@@ -594,6 +675,18 @@ function BigStat({ value, unit, note }: { value: string; unit: string; note: str
       </View>
       <AppText variant="caption" color="textSecondary" style={{ marginTop: 5 }}>
         {note}
+      </AppText>
+    </View>
+  );
+}
+
+/** A legend swatch and its label — the chart keys under Weight. */
+function ChartKey({ color, label, dashed }: { color: string; label: string; dashed?: boolean }) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+      <View style={{ width: 13, height: 2.5, borderRadius: 2, backgroundColor: color, opacity: dashed ? 0.45 : 1 }} />
+      <AppText variant="caption" color="textSecondary" style={{ fontSize: 11 }}>
+        {label}
       </AppText>
     </View>
   );

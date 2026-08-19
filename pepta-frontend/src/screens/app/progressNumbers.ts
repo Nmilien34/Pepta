@@ -210,3 +210,56 @@ export function healthyRange(
   if (weightUnit === 'kg') return { min: minKg, max: maxKg };
   return { min: minKg / KG_PER_LB, max: maxKg / KG_PER_LB };
 }
+
+
+export interface MilestoneView {
+  /** "10% of your start" — what the next round number actually is. */
+  label: string;
+  /** "7.6 lb to go", or null once it is behind them. */
+  remaining: string | null;
+}
+
+/**
+ * The tinted box under the goal ring: the next round loss milestone.
+ *
+ * ROUND FRACTIONS OF THE STARTING WEIGHT, because that is how the clinical
+ * literature and every doctor talks about it — 5% and 10% are the thresholds
+ * that mean something, not "12 lb". Past 10% it counts whole tens so the box
+ * still has something to aim at rather than going blank on the people doing
+ * best.
+ */
+export function nextMilestone(
+  start: number | null,
+  current: number | null,
+  unit: string,
+): MilestoneView | null {
+  if (start == null || current == null || start <= 0) return null;
+  const lostPct = ((start - current) / start) * 100;
+  // The next multiple of five above where they are, computed rather than
+  // looked up in a list: a fixed table runs out, and the box would go blank on
+  // the people furthest along. Someone who has gained is below zero, so the
+  // first threshold is still 5%.
+  const next = Math.max(5, Math.floor(lostPct / 5) * 5 + 5);
+  const targetWeight = start * (1 - next / 100);
+  const remaining = Math.round((current - targetWeight) * 10) / 10;
+  return {
+    label: `${next}% of your start`,
+    remaining: remaining > 0 ? `${remaining} ${unit} to go` : null,
+  };
+}
+
+/** "Sun, Jun 21" — the weigh-in date under the Weight card's readout. */
+export function weighInDate(iso: string | null): string {
+  if (!iso) return '';
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return '';
+  try {
+    return new Intl.DateTimeFormat('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+    }).format(at);
+  } catch {
+    return iso.slice(0, 10);
+  }
+}
