@@ -31,11 +31,18 @@ function toResponse(doc: FavouriteDocument): FavouriteResponse {
   };
 }
 
-export async function listFavourites(userId: string): Promise<FavouriteResponse[]> {
-  const docs = await FavouriteModel.find({ userId: new Types.ObjectId(userId) })
-    .sort({ createdAt: -1 })
-    .exec();
-  return docs.map(toResponse);
+export async function listFavourites(
+  userId: string,
+): Promise<{ favourites: FavouriteResponse[]; suggestions: FavouriteResponse[] }> {
+  const [mine, seeded] = await Promise.all([
+    FavouriteModel.find({ userId: new Types.ObjectId(userId) })
+      .sort({ createdAt: -1 })
+      .exec(),
+    // Oldest first: the seed order is the order they were written in, and
+    // shuffling a fixed set of three between visits makes it feel unstable.
+    FavouriteModel.find({ userId: null }).sort({ createdAt: 1 }).exec(),
+  ]);
+  return { favourites: mine.map(toResponse), suggestions: seeded.map(toResponse) };
 }
 
 export async function saveFavourite(

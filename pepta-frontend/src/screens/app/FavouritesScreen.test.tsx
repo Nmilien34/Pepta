@@ -49,6 +49,12 @@ vi.mock("../../components", () => {
   const p = (n: string) => ({ children }: { children?: React.ReactNode }) => React.createElement(n, null, children);
   return { AppText: p("AppText"), Card: p("Card") };
 });
+vi.mock("react-native-gesture-handler/ReanimatedSwipeable", () => ({
+  // Renders the row AND its right action, so the swipe target is reachable in
+  // tests without simulating a gesture.
+  default: ({ children, renderRightActions }: { children?: React.ReactNode; renderRightActions?: () => React.ReactNode }) =>
+    React.createElement("Swipeable", null, renderRightActions?.(), children),
+}));
 vi.mock("../../components/Icon", () => ({ Icon: () => null }));
 vi.mock("../../components/VesselIcon", () => ({
   VesselIcon: (props: { vessel: string }) => React.createElement("VesselIcon", props),
@@ -204,7 +210,10 @@ describe("FavouritesScreen · Edit", () => {
 
   it("swaps Log for a remove, and removes", async () => {
     const tree = await render([chicken], "food");
+    // The Edit control appears only in edit mode; the swipe action is always
+    // there and carries its own label.
     expect(find(tree, "Remove Chicken breast from favourites")).toBeUndefined();
+    expect(find(tree, "Remove Chicken breast")).toBeDefined();
     press(tree, "Edit");
     expect(find(tree, "Log Chicken breast")).toBeUndefined();
     await act(async () => {
@@ -480,5 +489,37 @@ describe("FavouritesScreen · the tabs partition, everywhere", () => {
   it("only offers Add your own on the drinks side", async () => {
     expect(texts(await render([chicken], "food"))).not.toContain("Name it, set the volume");
     expect(texts(await render([bottle], "drink"))).toContain("Name it, set the volume");
+  });
+});
+
+describe("FavouritesScreen · swipe to remove", () => {
+  it("offers a swipe action on every saved row", async () => {
+    const salmon = row({ key: "food:salmon:6-oz", name: "Salmon", portion: "6 oz fillet", protein: 40, calories: 350 });
+    const tree = await render([chicken, salmon], "food");
+    expect(find(tree, "Remove Chicken breast")).toBeDefined();
+    expect(find(tree, "Remove Salmon")).toBeDefined();
+  });
+
+  it("removes the row that was swiped, not the first", async () => {
+    const salmon = row({ key: "food:salmon:6-oz", name: "Salmon", portion: "6 oz fillet", protein: 40, calories: 350 });
+    const tree = await render([chicken, salmon], "food");
+    await act(async () => {
+      find(tree, "Remove Salmon")!.props.onPress();
+    });
+    expect(mocks.removeFavourite).toHaveBeenCalledTimes(1);
+    expect(mocks.removeFavourite).toHaveBeenCalledWith(salmon.key);
+  });
+
+  it("works on drinks too", async () => {
+    const tree = await render([bottle], "drink");
+    await act(async () => {
+      find(tree, "Remove Water bottle")!.props.onPress();
+    });
+    expect(mocks.removeFavourite).toHaveBeenCalledWith(bottle.key);
+  });
+
+  it("does not wrap the suggestions — there is nothing saved to remove", async () => {
+    const tree = await render([], "food");
+    expect(find(tree, "Remove Greek yogurt")).toBeUndefined();
   });
 });

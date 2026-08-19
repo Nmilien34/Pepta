@@ -163,6 +163,11 @@ export function favouriteFromOffer(offer: WorthSaving, savedAt: string): Favouri
  * when tapped. Seeding the list on their behalf would make Favourites a
  * curated set they did not curate.
  */
+/**
+ * The bundled fallback. The real set is seeded server-side and arrives with
+ * the list — this only covers a failed fetch, so an offline first run still
+ * offers something rather than a dead end.
+ */
 export const STARTING_SUGGESTIONS: readonly Favourite[] = [
   {
     id: favouriteId('food', 'Greek yogurt', '1 cup, plain'),
@@ -210,9 +215,12 @@ export const STARTING_SUGGESTIONS: readonly Favourite[] = [
 export function startingSuggestions(
   saved: readonly Favourite[],
   kind: FavouriteKind,
+  /** From the server. Falls back to the bundled set if the fetch failed. */
+  seeded: readonly Favourite[] = STARTING_SUGGESTIONS,
 ): Favourite[] {
   if (saved.length > 0) return [];
-  return STARTING_SUGGESTIONS.filter((s) => s.kind === kind);
+  const source = seeded.length > 0 ? seeded : STARTING_SUGGESTIONS;
+  return source.filter((s) => s.kind === kind);
 }
 
 export interface WorthSavingDrink {

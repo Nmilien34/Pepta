@@ -32,11 +32,14 @@ function fromResponse(row: FavouriteResponse): Favourite {
 
 export function useFavourites(): {
   favourites: Favourite[];
+  /** The seeded first-run offers. Server-owned, so they can change without a build. */
+  suggestions: Favourite[];
   hydrated: boolean;
   save: (next: Favourite) => void;
   unsave: (id: string) => void;
 } {
   const [favourites, setFavourites] = useState<Favourite[]>([]);
+  const [suggestions, setSuggestions] = useState<Favourite[]>([]);
   const [hydrated, setHydrated] = useState(false);
   const alive = useRef(true);
 
@@ -56,7 +59,9 @@ export function useFavourites(): {
     api
       .getFavourites()
       .then((res) => {
-        if (alive.current) setList(res.favourites.map(fromResponse));
+        if (!alive.current) return;
+        setList(res.favourites.map(fromResponse));
+        setSuggestions((res.suggestions ?? []).map(fromResponse));
       })
       // A failed load reads as "nothing saved yet", which is a real state.
       // The alternative — a spinner that never resolves — is worse.
@@ -97,5 +102,5 @@ export function useFavourites(): {
     });
   }, [setList]);
 
-  return { favourites, hydrated, save, unsave };
+  return { favourites, suggestions, hydrated, save, unsave };
 }

@@ -19,6 +19,7 @@ import {
   removeFavourite,
   saveFavourite,
 } from "../../services/favourite.service";
+import { STARTER_FAVOURITES } from "../../seeds/starter-favourites.seed";
 
 const USER = "507f1f77bcf86cd799439011";
 
@@ -52,7 +53,7 @@ describe("listFavourites", () => {
     const out = await listFavourites(USER);
 
     expect(sort).toHaveBeenCalledWith({ createdAt: -1 });
-    expect(out[0]).toMatchObject({
+    expect(out.favourites[0]).toMatchObject({
       id: "row1",
       key: "food:chicken-breast:6-oz",
       name: "Chicken breast",
@@ -60,7 +61,7 @@ describe("listFavourites", () => {
       protein: 54,
     });
     // Dates cross the wire as ISO strings.
-    expect(out[0]!.createdAt).toBe("2026-08-17T12:00:00.000Z");
+    expect(out.favourites[0]!.createdAt).toBe("2026-08-17T12:00:00.000Z");
   });
 
   it("omits macros it does not have rather than sending nulls", async () => {
@@ -69,8 +70,8 @@ describe("listFavourites", () => {
 
     const out = await listFavourites(USER);
 
-    expect(out[0]).not.toHaveProperty("protein");
-    expect(out[0]).not.toHaveProperty("calories");
+    expect(out.favourites[0]).not.toHaveProperty("protein");
+    expect(out.favourites[0]).not.toHaveProperty("calories");
   });
 });
 
@@ -155,5 +156,37 @@ describe("removeFavourite", () => {
   it("is idempotent — removing something already gone is not an error", async () => {
     mocks.deleteOne.mockReturnValue({ exec: vi.fn().mockResolvedValue({ deletedCount: 0 }) });
     await expect(removeFavourite(USER, "nope")).resolves.toBeUndefined();
+  });
+});
+
+describe("the seeded first-run offers", () => {
+  it("come back separately from the user's own, scoped to nobody", async () => {
+    const mine = doc({ name: "Chicken breast" });
+    const seeded = doc({ userId: null, name: "Greek yogurt" });
+    mocks.find
+      .mockReturnValueOnce({ sort: () => ({ exec: vi.fn().mockResolvedValue([mine]) }) })
+      .mockReturnValueOnce({ sort: () => ({ exec: vi.fn().mockResolvedValue([seeded]) }) });
+
+    const out = await listFavourites(USER);
+
+    expect(out.favourites.map((f) => f.name)).toEqual(["Chicken breast"]);
+    expect(out.suggestions.map((f) => f.name)).toEqual(["Greek yogurt"]);
+    expect(String(mocks.find.mock.calls[0]![0].userId)).toBe(USER);
+    expect(mocks.find.mock.calls[1]![0]).toEqual({ userId: null });
+  });
+
+  it("ships the three the design lists, each with a stable key", () => {
+    expect(STARTER_FAVOURITES).toHaveLength(3);
+    expect(new Set(STARTER_FAVOURITES.map((f) => f.key)).size).toBe(3);
+    expect(STARTER_FAVOURITES.filter((f) => f.kind === "drink")).toHaveLength(1);
+  });
+
+  it("carries what each one needs to be saved and logged", () => {
+    for (const f of STARTER_FAVOURITES) {
+      expect(f.name.length).toBeGreaterThan(0);
+      expect(f.portion.length).toBeGreaterThan(0);
+      if (f.kind === "drink") expect(f.ounces).toBeGreaterThan(0);
+      else expect(f.protein).toBeGreaterThan(0);
+    }
   });
 });

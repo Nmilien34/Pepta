@@ -17,7 +17,7 @@ router.use(requireAuth);
 router.get(
   '/',
   asyncHandler(async (req, res) => {
-    sendData(res, { favourites: await listFavourites(req.user!.id) });
+    sendData(res, await listFavourites(req.user!.id));
   }),
 );
 

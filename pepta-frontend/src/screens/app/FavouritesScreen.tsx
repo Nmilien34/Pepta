@@ -20,6 +20,7 @@ import { Pressable, ScrollView, View } from 'react-native';
 import { useNavigation, useRoute, type NavigationProp, type RouteProp } from '@react-navigation/native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import ReanimatedSwipeable from 'react-native-gesture-handler/ReanimatedSwipeable';
 import { AppText, Card } from '../../components';
 import { Icon } from '../../components/Icon';
 import { VesselIcon } from '../../components/VesselIcon';
@@ -54,7 +55,7 @@ export function FavouritesScreen() {
   const route = useRoute<RouteProp<Record<string, FavouritesParams>, string>>();
   const { track, bumpWater } = usePeptaData();
   const { openMeal, openQuickLog } = useLogSheets();
-  const { favourites, save, unsave } = useFavourites();
+  const { favourites, suggestions: seededSuggestions, save, unsave } = useFavourites();
 
   // Opens on the side you came from: the star row on Protein and Fiber lands
   // on Food, the one on Water lands on Drinks.
@@ -76,7 +77,7 @@ export function FavouritesScreen() {
         : [],
     [tab, track, favourites],
   );
-  const suggestions = startingSuggestions(favourites, tab);
+  const suggestions = startingSuggestions(favourites, tab, seededSuggestions);
   const tint = tab === 'food' ? FOOD_TINT : DRINK_TINT;
   const accent = tab === 'food' ? theme.colors.protein : theme.colors.water;
 
@@ -201,8 +202,12 @@ export function FavouritesScreen() {
           {rows.length > 0 ? (
             <Card style={{ marginTop: 12, paddingVertical: 0 }}>
               {rows.map((fav, i) => (
-                <View
+                <SwipeToRemove
                   key={fav.id}
+                  label={`Remove ${fav.name}`}
+                  onRemove={() => unsave(fav.id)}
+                >
+                <View
                   style={{
                     flexDirection: 'row',
                     alignItems: 'center',
@@ -246,6 +251,7 @@ export function FavouritesScreen() {
                     </Pressable>
                   )}
                 </View>
+                </SwipeToRemove>
               ))}
             </Card>
           ) : (
@@ -434,12 +440,61 @@ export function FavouritesScreen() {
 
           <AppText variant="caption" color="textTertiary" style={{ fontSize: 10.5, marginTop: 14, lineHeight: 15 }}>
             {tab === 'food'
-              ? 'A favourite logs the portion you saved — not a category. Use Edit to remove one.'
+              ? 'A favourite logs the portion you saved — not a category. Swipe a row to remove it, or use Edit.'
               : 'A saved drink also appears in Quick add on the Water screen, so the favourite and the shortcut are the same thing.'}
           </AppText>
         </ScrollView>
       </SafeAreaView>
     </View>
+  );
+}
+
+/**
+ * Swipe a saved row to remove it — the frame's own gesture, alongside Edit.
+ *
+ * Two ways to the same thing on purpose: swiping is faster once you know it,
+ * and Edit is the one a first-time user will find. Removing is reversible by
+ * re-starring, so neither needs a confirmation step.
+ */
+function SwipeToRemove({
+  label,
+  onRemove,
+  children,
+}: {
+  label: string;
+  onRemove: () => void;
+  children: React.ReactNode;
+}) {
+  const theme = useTheme();
+  return (
+    <ReanimatedSwipeable
+      friction={2}
+      rightThreshold={44}
+      overshootRight={false}
+      renderRightActions={() => (
+        <Pressable
+          onPress={() => {
+            Haptics.selectionAsync().catch(() => undefined);
+            onRemove();
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={label}
+          style={({ pressed }) => ({
+            width: 84,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: theme.colors.danger,
+            opacity: pressed ? 0.8 : 1,
+          })}
+        >
+          <AppText variant="caption" style={{ color: '#fff', fontWeight: '800', fontSize: 12 }}>
+            Remove
+          </AppText>
+        </Pressable>
+      )}
+    >
+      {children}
+    </ReanimatedSwipeable>
   );
 }
 

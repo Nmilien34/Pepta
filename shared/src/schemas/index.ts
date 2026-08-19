@@ -1357,7 +1357,16 @@ export const favouriteResponseSchema = favouriteInputSchema.extend({
 });
 
 export const favouritesResponseSchema = z
-  .object({ favourites: z.array(favouriteResponseSchema) })
+  .object({
+    favourites: z.array(favouriteResponseSchema),
+    /**
+     * The first-run offers, seeded server-side and owned by nobody — the same
+     * shape as a favourite so saving one is a copy rather than a translation.
+     * Rows rather than a constant in the bundle, so they can be corrected or
+     * extended without an app release.
+     */
+    suggestions: z.array(favouriteResponseSchema).default([]),
+  })
   .strict();
 
 export type FavouriteKind = z.infer<typeof favouriteKindSchema>;

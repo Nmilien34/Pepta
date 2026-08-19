@@ -13,8 +13,10 @@ import mongoose, { Schema } from "mongoose";
 import type { Document, Types } from "mongoose";
 
 export interface FavouriteDocument extends Document<Types.ObjectId> {
-  userId: Types.ObjectId;
+  /** Null for the seeded first-run offers, which belong to everybody. */
+  userId: Types.ObjectId | null;
   key: string;
+  starterKey?: string;
   kind: "food" | "drink";
   name: string;
   portion: string;
@@ -32,9 +34,11 @@ const favouriteSchema = new Schema<FavouriteDocument>(
     userId: {
       type: Schema.Types.ObjectId,
       ref: "User",
-      required: true,
+      default: null,
       index: true,
     },
+    /** Set only on seeded offers, so re-seeding updates rather than duplicates. */
+    starterKey: { type: String },
     key: { type: String, required: true },
     kind: { type: String, required: true, enum: ["food", "drink"] },
     name: { type: String, required: true },
@@ -49,6 +53,7 @@ const favouriteSchema = new Schema<FavouriteDocument>(
 );
 
 favouriteSchema.index({ userId: 1, key: 1 }, { unique: true });
+favouriteSchema.index({ starterKey: 1 }, { unique: true, sparse: true });
 // The list is read newest-first every time it is opened.
 favouriteSchema.index({ userId: 1, createdAt: -1 });
 
