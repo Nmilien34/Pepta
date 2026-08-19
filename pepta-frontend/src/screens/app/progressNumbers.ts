@@ -263,3 +263,75 @@ export function weighInDate(iso: string | null): string {
     return iso.slice(0, 10);
   }
 }
+
+
+export interface DriverPreview {
+  label: string;
+  /** "2 of 7 days" · "not logged yet" · "on track" */
+  status: string;
+  /** Green when it is already going well, quiet otherwise. Never red. */
+  tone: 'good' | 'quiet';
+}
+
+/**
+ * The Muscle protection card BEFORE there is a score.
+ *
+ * A QUIET WEEK IS NOT A BAD ONE, so this never scores and never scolds. It
+ * reports the three inputs the engine will use, each from real logs, so
+ * someone can see what the score is waiting on instead of an empty card that
+ * looks broken.
+ */
+export function retentionPreview(input: {
+  eating: EatingView | null;
+  /** Any workout minutes logged this week. */
+  trainedDays: number;
+  /** Weight change per week, negative for loss. Null without two weigh-ins. */
+  weeklyChange: number | null;
+  /** The plan's intended weekly loss, from the profile. */
+  targetWeeklyLoss: number | null;
+}): DriverPreview[] {
+  const { eating, trainedDays, weeklyChange, targetWeeklyLoss } = input;
+
+  const protein: DriverPreview =
+    eating && eating.proteinHitOf > 0
+      ? {
+          label: 'Protein',
+          status: `${eating.proteinHitDays} of ${eating.proteinHitOf} days`,
+          tone: eating.proteinHitDays >= Math.ceil(eating.proteinHitOf / 2) ? 'good' : 'quiet',
+        }
+      : { label: 'Protein', status: 'not logged yet', tone: 'quiet' };
+
+  const training: DriverPreview =
+    trainedDays > 0
+      ? { label: 'Training', status: `${trainedDays} ${trainedDays === 1 ? 'day' : 'days'}`, tone: 'good' }
+      : { label: 'Training', status: 'not logged yet', tone: 'quiet' };
+
+  // Losing FASTER than planned is the case worth flagging quietly — it is what
+  // costs muscle — so "on track" means at or under the intended pace.
+  const pace: DriverPreview =
+    weeklyChange == null
+      ? { label: 'Pace', status: 'not enough weigh-ins', tone: 'quiet' }
+      : targetWeeklyLoss == null
+        ? { label: 'Pace', status: 'no target set', tone: 'quiet' }
+        : Math.abs(weeklyChange) <= targetWeeklyLoss * 1.25
+          ? { label: 'Pace', status: 'on track', tone: 'good' }
+          : { label: 'Pace', status: 'faster than planned', tone: 'quiet' };
+
+  return [protein, training, pace];
+}
+
+/** Days this week with any workout logged. */
+export function trainedDaysThisWeek(
+  activity: readonly ({ datetime: string; workoutMinutes?: number | null } & Deletable)[] | undefined,
+  now = new Date(),
+): number {
+  const from = now.getTime() - 7 * DAY;
+  const days = new Set<string>();
+  for (const row of activity ?? []) {
+    if (row.deletedAt != null) continue;
+    if (!row.workoutMinutes) continue;
+    if (new Date(row.datetime).getTime() < from) continue;
+    days.add(dayOf(row.datetime));
+  }
+  return days.size;
+}

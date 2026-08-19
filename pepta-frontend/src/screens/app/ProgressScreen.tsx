@@ -28,8 +28,16 @@ import {
 import { ProgressScopeMenu } from '../../components/ProgressScopeMenu';
 import { WhatToShowSheet } from '../../components/WhatToShowSheet';
 import { useProgressSections } from './useProgressSections';
+import { useLogSheets } from '../../context/LogSheetsContext';
 import { usePeptaData } from '../../context/PeptaDataContext';
-import { eatingView, nextMilestone, numbersView, weighInDate } from './progressNumbers';
+import {
+  eatingView,
+  nextMilestone,
+  numbersView,
+  retentionPreview,
+  trainedDaysThisWeek,
+  weighInDate,
+} from './progressNumbers';
 import {
   scopePillLabel,
   type ProgressScopeKey,
@@ -63,6 +71,7 @@ export function ProgressScreen() {
   const { home, track, progress, progressLoading, progressRefreshing, progressError, refreshProgress, refreshHome, refreshTrack } =
     usePeptaData();
   const [scope, setScope] = useState<ProgressScopeKey>('start');
+  const { openQuickLog } = useLogSheets();
   const [scopeOpen, setScopeOpen] = useState(false);
   const [showOpen, setShowOpen] = useState(false);
   const { sections, toggle: toggleSectionPref } = useProgressSections();
@@ -139,6 +148,20 @@ export function ProgressScreen() {
     profile,
   });
   const lastWeighIn = sortedW[sortedW.length - 1]?.datetime ?? null;
+  // The three inputs the retention engine will use, from real logs, so the
+  // card can say what it is waiting on.
+  const retentionRows = retentionPreview({
+    eating,
+    trainedDays: trainedDaysThisWeek(track?.activityLogs, nowDate),
+    weeklyChange:
+      s.weight.current != null && thirtyAgo?.value != null
+        ? ((s.weight.current - thirtyAgo.value) / 30) * 7
+        : null,
+    targetWeeklyLoss:
+      profile?.targetWeeklyLossPercent && s.weight.current
+        ? (profile.targetWeeklyLossPercent / 100) * s.weight.current
+        : null,
+  });
   const milestone = nextMilestone(s.weight.start, s.weight.current, s.weight.unit);
   const everythingEmpty =
     weights.length === 0 && progress.measurements.length === 0 && photos.length === 0 && !s.retention;
@@ -357,6 +380,83 @@ export function ProgressScreen() {
           </Reveal>
 
           {/* muscle protection (weekly retention engine) */}
+          {/* Muscle protection with no score yet: the frame keeps the card and
+              reports the three inputs, because a quiet week is not a bad one
+              and an absent card looks broken. */}
+          {sections.muscle && !s.retention ? (
+            <Reveal delay={220} style={{ marginTop: 12 }}>
+              <Card>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Icon name="shield-check" size={18} color={theme.colors.textTertiary} />
+                  <AppText variant="cardTitle" style={{ fontSize: 15 }}>
+                    Muscle protection
+                  </AppText>
+                </View>
+                <AppText variant="caption" color="textTertiary" style={{ fontSize: 10.5, marginTop: 6, lineHeight: 15 }}>
+                  From your protein, training and pace — not a body scan.
+                </AppText>
+                <AppText variant="bodyStrong" style={{ fontSize: 14, marginTop: 12, fontWeight: '700' }}>
+                  Not enough logged this week
+                </AppText>
+                <AppText variant="caption" color="textSecondary" style={{ marginTop: 6, lineHeight: 17 }}>
+                  No score yet — a quiet week is not the same as a bad one.
+                </AppText>
+                <View style={{ marginTop: 12 }}>
+                  {retentionRows.map((row, i) => (
+                    <View
+                      key={row.label}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        paddingVertical: 8,
+                        borderTopWidth: i === 0 ? 0 : 0.5,
+                        borderTopColor: theme.colors.border,
+                      }}
+                    >
+                      <AppText variant="caption" style={{ fontWeight: '600' }}>
+                        {row.label}
+                      </AppText>
+                      <AppText
+                        variant="caption"
+                        style={{
+                          fontSize: 11,
+                          color: row.tone === 'good' ? theme.colors.fiber : theme.colors.textTertiary,
+                        }}
+                      >
+                        {row.status}
+                      </AppText>
+                    </View>
+                  ))}
+                </View>
+                <Pressable
+                  onPress={() => {
+                    Haptics.selectionAsync().catch(() => undefined);
+                    openQuickLog('protein');
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Log today’s protein"
+                  style={({ pressed }) => ({
+                    marginTop: 14,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 7,
+                    paddingVertical: 11,
+                    borderRadius: theme.radii.pill,
+                    backgroundColor: theme.colors.surfaceAlt,
+                    opacity: pressed ? 0.7 : 1,
+                  })}
+                >
+                  <Icon name="add" size={15} color={theme.colors.primary} />
+                  <AppText variant="caption" color="primary" style={{ fontWeight: '800' }}>
+                    Log today’s protein
+                  </AppText>
+                </Pressable>
+              </Card>
+            </Reveal>
+          ) : null}
+
           {sections.muscle && s.retention ? (
             <Reveal delay={220} style={{ marginTop: 12 }}>
               <Card>
@@ -408,7 +508,7 @@ export function ProgressScreen() {
           ) : null}
 
           {/* what you're eating — the frame's card, from /track's 30 days */}
-          {sections.eating && eating ? (
+          {sections.eating ? (
             <Reveal delay={200} style={{ marginTop: 12 }}>
               <Card>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -417,6 +517,15 @@ export function ProgressScreen() {
                     What you’re eating
                   </AppText>
                 </View>
+                {!eating ? (
+                  // The card stays, and says what would fill it. Hiding it
+                  // entirely leaves a new user with no idea the feature exists.
+                  <EmptyState
+                    title="Nothing scanned yet"
+                    line="Start scanning your meals and we’ll keep track of your calories and protein here — and how they line up with your targets."
+                  />
+                ) : (
+                <>
                 <View style={{ flexDirection: 'row', gap: 18, marginTop: 14 }}>
                   <BigStat
                     value={eating.caloriesPerDay?.toLocaleString() ?? '—'}
@@ -463,6 +572,8 @@ export function ProgressScreen() {
                     Protein target hit on {eating.proteinHitDays} of {eating.proteinHitOf} days this week
                   </AppText>
                 ) : null}
+                </>
+                )}
               </Card>
             </Reveal>
           ) : null}
@@ -703,6 +814,63 @@ function ChartKey({ color, label, dashed }: { color: string; label: string; dash
       <AppText variant="caption" color="textSecondary" style={{ fontSize: 11 }}>
         {label}
       </AppText>
+    </View>
+  );
+}
+
+/**
+ * A card that has nothing in it yet — the frame's mascot, a headline, and one
+ * sentence saying what would fill it. Never a bare "No data": that reads as
+ * something broken rather than something not started.
+ */
+function EmptyState({
+  title,
+  line,
+  action,
+  onAction,
+}: {
+  title: string;
+  line: string;
+  action?: string;
+  onAction?: () => void;
+}) {
+  const theme = useTheme();
+  return (
+    <View style={{ alignItems: 'center', paddingTop: 20, paddingHorizontal: 6, paddingBottom: 6 }}>
+      <Mascot pose="idle" size={64} />
+      <AppText variant="bodyStrong" align="center" style={{ fontSize: 15, marginTop: 10, fontWeight: '700' }}>
+        {title}
+      </AppText>
+      <AppText
+        variant="caption"
+        color="textSecondary"
+        align="center"
+        style={{ marginTop: 6, lineHeight: 17, maxWidth: 250 }}
+      >
+        {line}
+      </AppText>
+      {action && onAction ? (
+        <Pressable
+          onPress={() => {
+            Haptics.selectionAsync().catch(() => undefined);
+            onAction();
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={action}
+          style={({ pressed }) => ({
+            marginTop: 14,
+            paddingVertical: 9,
+            paddingHorizontal: 16,
+            borderRadius: theme.radii.pill,
+            backgroundColor: theme.colors.surfaceAlt,
+            opacity: pressed ? 0.7 : 1,
+          })}
+        >
+          <AppText variant="caption" color="primary" style={{ fontWeight: '800' }}>
+            {action}
+          </AppText>
+        </Pressable>
+      ) : null}
     </View>
   );
 }

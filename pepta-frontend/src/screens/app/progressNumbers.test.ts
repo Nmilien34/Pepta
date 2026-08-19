@@ -4,6 +4,8 @@ import {
   healthyRange,
   nextMilestone,
   numbersView,
+  retentionPreview,
+  trainedDaysThisWeek,
   weighInDate,
 } from './progressNumbers';
 
@@ -252,5 +254,104 @@ describe('the weigh-in date', () => {
   it('is empty rather than "Invalid Date" when there is none', () => {
     expect(weighInDate(null)).toBe('');
     expect(weighInDate('nonsense')).toBe('');
+  });
+});
+
+describe('muscle protection before there is a score', () => {
+  const week = eatingView(
+    [meal(0, 1000, 130), meal(1, 1000, 90), meal(2, 1000, 125)] as never,
+    [],
+    profile,
+    NOW,
+  );
+
+  it('reports the three inputs the engine is waiting on', () => {
+    const rows = retentionPreview({
+      eating: week,
+      trainedDays: 0,
+      weeklyChange: -1.1,
+      targetWeeklyLoss: 1.5,
+    });
+
+    expect(rows.map((row) => row.label)).toEqual(['Protein', 'Training', 'Pace']);
+    expect(rows[0]!.status).toBe('2 of 3 days');
+    expect(rows[1]!.status).toBe('not logged yet');
+    expect(rows[2]!.status).toBe('on track');
+  });
+
+  it('never scores and never scolds — the worst tone is quiet', () => {
+    const rows = retentionPreview({
+      eating: null,
+      trainedDays: 0,
+      weeklyChange: null,
+      targetWeeklyLoss: null,
+    });
+
+    expect(rows.every((row) => row.tone === 'quiet')).toBe(true);
+    expect(rows.map((row) => row.status)).toEqual([
+      'not logged yet',
+      'not logged yet',
+      'not enough weigh-ins',
+    ]);
+  });
+
+  it('calls losing FASTER than planned out — that is what costs muscle', () => {
+    const fast = retentionPreview({
+      eating: null, trainedDays: 0, weeklyChange: -3, targetWeeklyLoss: 1.5,
+    });
+    expect(fast[2]!.status).toBe('faster than planned');
+
+    // A quarter over the plan is still on track — nobody hits a rate exactly.
+    const near = retentionPreview({
+      eating: null, trainedDays: 0, weeklyChange: -1.8, targetWeeklyLoss: 1.5,
+    });
+    expect(near[2]!.status).toBe('on track');
+  });
+
+  it('counts training days when there are any', () => {
+    const rows = retentionPreview({
+      eating: null, trainedDays: 1, weeklyChange: null, targetWeeklyLoss: null,
+    });
+
+    expect(rows[1]).toMatchObject({ status: '1 day', tone: 'good' });
+  });
+
+  it('says so when there is no target to judge pace against', () => {
+    const rows = retentionPreview({
+      eating: null, trainedDays: 0, weeklyChange: -1, targetWeeklyLoss: null,
+    });
+
+    expect(rows[2]!.status).toBe('no target set');
+  });
+});
+
+describe('training days this week', () => {
+  const activity = (daysAgo: number, minutes: number | null, deleted = false) => ({
+    id: `a${daysAgo}`,
+    datetime: at(daysAgo),
+    workoutMinutes: minutes,
+    deletedAt: deleted ? at(0) : null,
+  });
+
+  it('counts distinct days with a workout', () => {
+    expect(trainedDaysThisWeek([activity(0, 30), activity(2, 45)] as never, NOW)).toBe(2);
+  });
+
+  it('counts a day once however many sessions it holds', () => {
+    const two = [
+      { ...activity(1, 30), id: 'a-am' },
+      { ...activity(1, 30), id: 'a-pm' },
+    ];
+    expect(trainedDaysThisWeek(two as never, NOW)).toBe(1);
+  });
+
+  it('ignores a log with no minutes — steps alone are not training', () => {
+    expect(trainedDaysThisWeek([activity(0, null), activity(1, 0)] as never, NOW)).toBe(0);
+  });
+
+  it('ignores anything deleted or older than the week', () => {
+    expect(
+      trainedDaysThisWeek([activity(0, 30, true), activity(20, 60)] as never, NOW),
+    ).toBe(0);
   });
 });
