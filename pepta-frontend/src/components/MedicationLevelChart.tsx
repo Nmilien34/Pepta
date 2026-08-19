@@ -18,7 +18,7 @@
 
 import { useState } from 'react';
 import { View, type LayoutChangeEvent } from 'react-native';
-import Svg, { Circle, Line, Path, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, Line, Path, Text as SvgText, TSpan } from 'react-native-svg';
 import { AppText } from './AppText';
 import { useTheme } from '../theme';
 import { buildLevelChartModel, shortTick, type LevelPoint } from '../screens/app/levelChart';
@@ -72,7 +72,7 @@ export function MedicationLevelChart({
     <View onLayout={onLayout}>
       {model ? (
         <>
-          <View style={{ marginTop: theme.spacing.md }}>
+          <View style={{ marginTop: 14 }}>
             <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 3 }}>
               <AppText variant="statMedium" style={{ fontSize: 22 }}>
                 {model.now!.level.toFixed(decimals)}
@@ -131,27 +131,27 @@ export function MedicationLevelChart({
               strokeWidth={1}
             />
 
+            {/* Every gridline carries the unit, a size and a shade down from
+                the number: the frame's "0.4mg". Without it the scale is five
+                bare decimals, and mg against mcg is exactly the difference
+                that matters on this screen. */}
             {model.gridlines.map((line) => (
-              <SvgText
+              <ScaleLabel
                 key={`l${line.value}`}
                 x={plotWidth + 6}
                 y={line.y + 3.5}
-                fontSize={9}
-                fontWeight="600"
-                fill={theme.colors.textTertiary}
-              >
-                {line.value < 1 ? line.value.toFixed(2) : line.value.toFixed(1)}
-              </SvgText>
+                value={line.value < 1 ? line.value.toFixed(2) : line.value.toFixed(1)}
+                unit={unit}
+                color={theme.colors.textTertiary}
+              />
             ))}
-            <SvgText
+            <ScaleLabel
               x={plotWidth + 6}
               y={model.baselineY + 3.5}
-              fontSize={9}
-              fontWeight="600"
-              fill={theme.colors.textTertiary}
-            >
-              0
-            </SvgText>
+              value="0"
+              unit={unit}
+              color={theme.colors.textTertiary}
+            />
 
             {/* Measured: computed from doses the user actually logged. */}
             <Path d={model.pastArea} fill={theme.colors.primary} fillOpacity={0.14} />
@@ -225,9 +225,11 @@ export function MedicationLevelChart({
             style={{
               flexDirection: 'row',
               alignItems: 'center',
-              gap: 14,
-              marginTop: theme.spacing.sm,
-              paddingTop: theme.spacing.sm,
+              // Spread, per the frame — the three read as one row of facts
+              // rather than a legend with a number tacked on the end.
+              justifyContent: 'space-between',
+              marginTop: 8,
+              paddingTop: 9,
               borderTopWidth: 0.5,
               borderTopColor: theme.colors.border,
             }}
@@ -235,7 +237,7 @@ export function MedicationLevelChart({
             <Legend color={theme.colors.primary} label="From your logs" />
             <Legend color={theme.colors.primary} label="Projected" dashed />
             {peak != null && peak > 0 ? (
-              <AppText variant="caption" color="textSecondary" style={{ marginLeft: 'auto' }}>
+              <AppText variant="caption" color="textSecondary">
                 Peak {peak.toFixed(decimals)}
               </AppText>
             ) : null}
@@ -243,6 +245,31 @@ export function MedicationLevelChart({
         </>
       ) : null}
     </View>
+  );
+}
+
+/** A value on the right-hand scale: the number, then the unit smaller and
+ *  fainter so the column still reads as numbers at a glance. */
+function ScaleLabel({
+  x,
+  y,
+  value,
+  unit,
+  color,
+}: {
+  x: number;
+  y: number;
+  value: string;
+  unit: string;
+  color: string;
+}) {
+  return (
+    <SvgText x={x} y={y} fontSize={9} fontWeight="600" fill={color}>
+      {value}
+      <TSpan fontSize={7.5} fillOpacity={0.65}>
+        {unit}
+      </TSpan>
+    </SvgText>
   );
 }
 
