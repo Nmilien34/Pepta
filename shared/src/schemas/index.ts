@@ -783,6 +783,60 @@ export const medicationLevelResponseSchema = z
   })
   .strict();
 
+/**
+ * Windows for the medication-level chart.
+ *
+ * Shared rather than duplicated because the label and the span have to agree:
+ * a control that says "90d" over a 7-day curve is the bug this replaces — the
+ * old segmented control was decoration, hardcoded to its first option, above a
+ * chart the backend only ever drew +/-7 days.
+ *
+ * "all" has no fixed span: it runs from the user's first logged dose, so the
+ * server resolves it against their data.
+ */
+export const levelRangeKeySchema = z.enum(["week", "month", "quarter", "all"]);
+
+export const LEVEL_RANGE_DAYS: Record<
+  Exclude<z.infer<typeof levelRangeKeySchema>, "all">,
+  number
+> = { week: 7, month: 30, quarter: 90 };
+
+/**
+ * How far past `now` each window projects. It does not scale with the window:
+ * the projection is decay plus the schedule, and a year of it would be a year
+ * of guesswork drawn at the same weight as the fortnight anyone can act on.
+ */
+export const LEVEL_RANGE_DAYS_AFTER = 14;
+
+/**
+ * Optional, NOT defaulted. Its absence is the signal that the caller is a
+ * build shipped before ranges existed, which must keep receiving the bare
+ * array it parses — the same gating the timezone param uses.
+ */
+export const levelRangeQuerySchema = z
+  .object({ range: levelRangeKeySchema.optional() })
+  .strict();
+
+export const medicationLevelsResponseSchema = z
+  .object({
+    range: levelRangeKeySchema,
+    /** What the server actually drew — "all" resolves to a real span. */
+    daysBefore: z.number().positive(),
+    daysAfter: z.number().positive(),
+    levels: z.array(medicationLevelResponseSchema),
+    /**
+     * Every dose inside the window, so each rise on the curve can be marked.
+     *
+     * Carried here rather than read from /track, which looks back 30 days: on
+     * a 90-day or all-time chart the curve would run three months while the
+     * markers explaining it stopped a third of the way in.
+     */
+    doses: z
+      .array(z.object({ compoundId: idSchema, datetime: isoDateTimeSchema }).strict())
+      .default([]),
+  })
+  .strict();
+
 export const insightSchema = z
   .object({
     id: idSchema,
@@ -1499,4 +1553,7 @@ export const favouritePhotoIntentResponseSchema = z
 
 export type FavouritePhotoIntentInput = z.infer<typeof favouritePhotoIntentInputSchema>;
 export type FavouritePhotoDiscardInput = z.infer<typeof favouritePhotoDiscardInputSchema>;
+export type LevelRangeKey = z.infer<typeof levelRangeKeySchema>;
+export type LevelRangeQuery = z.input<typeof levelRangeQuerySchema>;
+export type MedicationLevelsResponse = z.infer<typeof medicationLevelsResponseSchema>;
 export type FavouritePhotoIntentResponse = z.infer<typeof favouritePhotoIntentResponseSchema>;

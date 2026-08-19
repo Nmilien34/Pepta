@@ -94,11 +94,14 @@ import {
   type DiscoverySource,
   type UserProfileSettingsPatch,
   favouritePhotoIntentResponseSchema,
+  medicationLevelsResponseSchema,
   favouriteResponseSchema,
   favouritesResponseSchema,
   type FavouriteInput,
   type FavouritePhotoIntentInput,
   type FavouritePhotoIntentResponse,
+  type LevelRangeKey,
+  type MedicationLevelsResponse,
   type FavouriteResponse,
   type FavouritesResponse,
   recipeComposeResponseSchema,
@@ -661,6 +664,17 @@ class PeptaApi {
       method: "POST",
       body: JSON.stringify({ photoS3Key }),
     });
+  }
+
+  /**
+   * The level curve over a chosen window. Separate from /home, which keeps its
+   * own +/-7 day levels: this call must never move the next-dose ring.
+   */
+  public getMedicationLevels(range: LevelRangeKey): Promise<MedicationLevelsResponse> {
+    return this.request(
+      `/medication-levels?range=${encodeURIComponent(range)}`,
+      medicationLevelsResponseSchema,
+    );
   }
 
   public getRecipes(): Promise<RecipesResponse> {

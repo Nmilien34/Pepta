@@ -9,7 +9,7 @@ import * as Haptics from 'expo-haptics';
 import { useNavigation, type NavigationProp } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../theme';
-import { AddCompoundSheet, AppText, BodyMap, Button, Card, Mascot, ProgressRing, Reveal, MedicationLevelChart, ScreenHeader, SectionErrorBanner, ShotDetailSheet } from '../../components';
+import { AddCompoundSheet, AppText, BodyMap, Button, Card, Mascot, ProgressRing, Reveal, MedicationLevelCard, ScreenHeader, SectionErrorBanner, ShotDetailSheet } from '../../components';
 import { WeekStrip } from '../../components/WeekStrip';
 import { ScheduleSheet } from '../../components/ScheduleSheet';
 import { usePeptaData } from '../../context/PeptaDataContext';
@@ -34,13 +34,8 @@ import {
   type ActivityKind,
 } from './activityFeed';
 import { buildShotWindow } from './shotDetail';
-import {
-  doseNoun,
-  globalDoseNoun,
-  LEVEL_SUPPRESSION_COPY,
-  resolveLevelView,
-  type LevelSuppressionReason,
-} from './levelSuppression';
+import { useLevelRange } from './useLevelRange';
+import { doseNoun, globalDoseNoun, resolveLevelView } from './levelSuppression';
 
 /**
  * Depth of the expanded "Your log". Comfortably past /track's own 30-day
@@ -100,6 +95,8 @@ export function TrackScreen() {
     [track, home],
   );
   const [feedExpanded, setFeedExpanded] = useState(false);
+  // ALSO above the early returns, for the same reason as the feed memos.
+  const levelRange = useLevelRange();
   // Which shot's report is open, by dose id. Held here rather than in the card
   // so it survives the feed collapsing under it.
   const [openShotId, setOpenShotId] = useState<string | null>(null);
@@ -312,8 +309,9 @@ export function TrackScreen() {
           {ml || compounds.length > 0 ? (
             <Reveal delay={300} style={{ marginTop: 12 }}>
               <Card>
-                <MedicationLevelCardContent
+                <MedicationLevelCard
                   ml={ml}
+                  range={levelRange}
                   compoundName={ml?.compoundName ?? compounds[0]?.name ?? 'Medication'}
                   doseTimes={(track?.doseLogs ?? [])
                     .filter((d) => d.deletedAt == null && (!ml || d.compoundId === ml.compoundId))
@@ -617,132 +615,6 @@ function ActivityFeedCard({
         ))
       )}
     </Card>
-  );
-}
-
-function MedicationLevelCardContent({
-  ml,
-  compoundName,
-  doseTimes,
-  levelUnit,
-  doseWord,
-  suppressed,
-  onLogDose,
-  onOpenSettings,
-}: {
-  ml: NonNullable<ReturnType<typeof usePeptaData>['home']>['medicationLevels'][number] | null;
-  compoundName: string;
-  /** Logged doses for THIS compound — each one marks a rise on the curve. */
-  doseTimes: { datetime: string }[];
-  levelUnit: string;
-  /** This compound's own noun — the card is about one medication. */
-  doseWord: string;
-  /** Oral route or no half-life: the curve is suppressed, not pending. */
-  suppressed: LevelSuppressionReason | null;
-  onLogDose: () => void;
-  onOpenSettings: () => void;
-}) {
-  const theme = useTheme();
-  const hasCurve = !!ml && ml.curve.length > 1;
-
-  return (
-    <>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Icon name="chart-line" size={18} color={theme.colors.primary} />
-          <AppText variant="cardTitle" style={{ fontSize: 15 }}>
-            Medication level
-          </AppText>
-        </View>
-        {ml ? (
-          <Pressable
-            onPress={() => {
-              Haptics.selectionAsync().catch(() => undefined);
-              onOpenSettings();
-            }}
-            style={({ pressed }) => ({
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 5,
-              backgroundColor: theme.colors.surfaceAlt,
-              paddingVertical: 4,
-              paddingHorizontal: 9,
-              borderRadius: theme.radii.pill,
-              opacity: pressed ? 0.7 : 1,
-            })}
-          >
-            <AppText variant="caption" color="primary" style={{ fontWeight: '800' }}>
-              {Math.round((ml.currentEstimate / Math.max(ml.peakEstimate, 1)) * 100)}%
-            </AppText>
-            <Icon name="chevron-forward" size={13} color={theme.colors.primary} stroke={2.3} />
-          </Pressable>
-        ) : null}
-      </View>
-
-      {hasCurve ? (
-        <>
-          {/* The 7d/30d/90d/1y control that used to sit here was a View, not a
-              Pressable: no onPress, no state, `i === 0` hardcoded so "7d" was
-              always lit. It never did anything, and the backend only ever
-              serves +/-7 days (curveDaysBefore/After default to 7), so three of
-              its four options had neither wiring nor data. Removed rather than
-              left as decoration above a chart that now tells the truth — the
-              dated axis already says what window this is. Restore it when
-              computeMedicationLevel takes a window parameter. */}
-          {/* The whole curve, with its timestamps — not curve.map(p => p.level).
-              Dropping datetime is what turned a real time series into a shape:
-              no axis, no now-marker, and a dot on the LAST point, six days into
-              the future, beside a caption that read "Current". */}
-          <MedicationLevelChart curve={ml.curve} doses={doseTimes} unit={levelUnit} />
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
-            <AppText variant="caption" color="textSecondary">
-              Peak {ml.peakEstimate}
-            </AppText>
-            <AppText variant="caption" color="textSecondary">
-              Trough {ml.troughEstimate}
-            </AppText>
-          </View>
-        </>
-      ) : (
-        <View style={{ marginTop: theme.spacing.md, backgroundColor: theme.colors.surfaceAlt, borderRadius: theme.radii.card, padding: 14, gap: 10 }}>
-          <AppText variant="bodyStrong" style={{ fontWeight: '800' }}>
-            {compoundName}
-          </AppText>
-          <AppText variant="body" color="textSecondary">
-            {suppressed
-              ? LEVEL_SUPPRESSION_COPY[suppressed]
-              : `Log your first ${doseWord} to start building your medication level curve.`}
-          </AppText>
-          {suppressed ? null : (
-          <Pressable
-            onPress={() => {
-              Haptics.selectionAsync().catch(() => undefined);
-              onLogDose();
-            }}
-            style={({ pressed }) => ({
-              alignSelf: 'flex-start',
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 7,
-              paddingVertical: 8,
-              paddingHorizontal: 12,
-              borderRadius: theme.radii.pill,
-              backgroundColor: 'rgba(126, 87, 194, 0.08)',
-              borderWidth: 0.5,
-              borderColor: 'rgba(126, 87, 194, 0.16)',
-              opacity: pressed ? 0.72 : 1,
-            })}
-            accessibilityRole="button"
-          >
-            <Icon name="add" size={14} color={theme.colors.primary} />
-            <AppText variant="caption" color="primary" style={{ fontWeight: '800' }}>
-              Log shot
-            </AppText>
-          </Pressable>
-          )}
-        </View>
-      )}
-    </>
   );
 }
 

@@ -1,4 +1,11 @@
-import { hasPattern, medicationLevelResponseSchema } from "@pepta/shared";
+import {
+  hasPattern,
+  LEVEL_RANGE_DAYS,
+  LEVEL_RANGE_DAYS_AFTER,
+  medicationLevelResponseSchema,
+  type LevelRangeKey,
+  type MedicationLevelsResponse,
+} from "@pepta/shared";
 import {
   computeMedicationLevel,
   latestDose,
@@ -124,7 +131,17 @@ export async function getNextDoseCandidates(
   return candidates.filter((candidate) => candidate != null);
 }
 
-export async function getMedicationLevels(userId: string, now = new Date()) {
+export interface LevelCurveWindow {
+  daysBefore: number;
+  daysAfter: number;
+  sampleHours: number;
+}
+
+export async function getMedicationLevels(
+  userId: string,
+  now = new Date(),
+  window?: LevelCurveWindow,
+) {
   const [compounds, cycles, profile] = await Promise.all([
     CompoundModel.find({ userId, status: "active" }).sort({ createdAt: 1 }),
     // Newest active pattern-bearing cycle wins — same rule as the app's
@@ -191,6 +208,10 @@ export async function getMedicationLevels(userId: string, now = new Date()) {
               }
             : undefined,
           timeZone: profile?.timezone ?? undefined,
+          // Omitted for /home, which keeps the engine's own +/-7 default.
+          curveDaysBefore: window?.daysBefore,
+          curveDaysAfter: window?.daysAfter,
+          curveSampleHours: window?.sampleHours,
           cyclePattern:
             cycle && hasPattern(cycle)
               ? {
@@ -206,4 +227,81 @@ export async function getMedicationLevels(userId: string, now = new Date()) {
   );
 
   return levels.filter((level) => level != null);
+}
+
+
+/**
+ * Samples per curve, whatever the window. 90 days at the 6-hour spacing a week
+ * uses would be 360 points per compound of the same smooth decay, and "all"
+ * on a year-old account far more than that. Spacing is chosen to land under
+ * this; doses still get their own samples, so no logged rise is lost to it.
+ */
+const MAX_CURVE_POINTS = 180;
+
+function sampleHoursFor(totalDays: number): number {
+  const ideal = (totalDays * 24) / MAX_CURVE_POINTS;
+  // Round up to a divisor of a day, so samples land on the same clock times
+  // every day rather than drifting across the axis.
+  for (const hours of [6, 8, 12, 24]) if (ideal <= hours) return hours;
+  return 24;
+}
+
+/**
+ * The medication-level curve over a window the user chose.
+ *
+ * SEPARATE FROM /home ON PURPOSE. Home's levels stay +/-7 days: it feeds the
+ * next-dose ring and the reminder, and widening the window would move
+ * peakEstimate (the ring's denominator) as a side effect of someone tapping a
+ * chart control. This endpoint draws, and only draws.
+ */
+export async function getMedicationLevelsForRange(
+  userId: string,
+  range: LevelRangeKey,
+  now = new Date(),
+): Promise<MedicationLevelsResponse> {
+  const daysBefore = range === "all" ? await daysSinceFirstDose(userId, now) : LEVEL_RANGE_DAYS[range];
+  const daysAfter = LEVEL_RANGE_DAYS_AFTER;
+  const from = new Date(now.getTime() - daysBefore * 24 * MS_PER_HOUR);
+  const [levels, doseLogs] = await Promise.all([
+    getMedicationLevels(userId, now, {
+      daysBefore,
+      daysAfter,
+      sampleHours: sampleHoursFor(daysBefore + daysAfter),
+    }),
+    DoseLogModel.find({ userId, deletedAt: null, datetime: { $gte: from } })
+      .sort({ datetime: 1 })
+      .select({ compoundId: 1, datetime: 1 })
+      .exec(),
+  ]);
+  return {
+    range,
+    daysBefore,
+    daysAfter,
+    levels,
+    doses: doseLogs.map((log) => ({
+      compoundId: log.compoundId.toString(),
+      datetime: log.datetime.toISOString(),
+    })),
+  };
+}
+
+/**
+ * "All" means since the first dose they ever logged — the honest reading of
+ * the word, and the only one that does not need a number in the label.
+ *
+ * Floored at a week so a brand-new account gets a chart rather than a sliver,
+ * and capped so a user who backdated a dose to 2019 does not get an axis where
+ * this year is one pixel wide.
+ */
+const ALL_MIN_DAYS = 7;
+const ALL_MAX_DAYS = 730;
+
+async function daysSinceFirstDose(userId: string, now: Date): Promise<number> {
+  const first = await DoseLogModel.findOne({ userId, deletedAt: null })
+    .sort({ datetime: 1 })
+    .select({ datetime: 1 })
+    .exec();
+  if (!first) return ALL_MIN_DAYS;
+  const days = Math.ceil((now.getTime() - first.datetime.getTime()) / (24 * MS_PER_HOUR));
+  return Math.min(ALL_MAX_DAYS, Math.max(ALL_MIN_DAYS, days));
 }

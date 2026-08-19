@@ -33,6 +33,8 @@ export interface MedicationLevelChartProps {
   /** Doses actually logged, so each rise can be marked. */
   doses?: readonly { datetime: string }[];
   unit: string;
+  /** Highest level in THIS window — the design's third legend item. */
+  peak?: number;
   now?: Date;
 }
 
@@ -40,6 +42,7 @@ export function MedicationLevelChart({
   curve,
   doses = [],
   unit,
+  peak,
   now = new Date(),
 }: MedicationLevelChartProps) {
   const theme = useTheme();
@@ -222,6 +225,11 @@ export function MedicationLevelChart({
           >
             <Legend color={theme.colors.primary} label="From your logs" />
             <Legend color={theme.colors.primary} label="Projected" dashed />
+            {peak != null && peak > 0 ? (
+              <AppText variant="caption" color="textSecondary" style={{ marginLeft: 'auto' }}>
+                Peak {peak.toFixed(decimals)}
+              </AppText>
+            ) : null}
           </View>
         </>
       ) : null}

@@ -54,6 +54,12 @@ export interface MedicationLevelInput {
   timeZone?: string;
   curveDaysBefore?: number;
   curveDaysAfter?: number;
+  /**
+   * Spacing between curve samples. 6h is right for a week; a 90-day window at
+   * 6h would be 360 points per compound, most of them redrawing the same
+   * smooth decay. Callers widening the window coarsen this to match.
+   */
+  curveSampleHours?: number;
 }
 
 export interface MedicationLevelPoint {
@@ -125,24 +131,42 @@ function buildCurve(
     doses: MedicationDose[];
     halfLifeDays: number;
     now: Date;
+    sampleHours?: number;
   },
 ): MedicationLevelPoint[] {
   const points: MedicationLevelPoint[] = [];
+  const sampleHours = input.sampleHours ?? CURVE_SAMPLE_HOURS;
   const start = new Date(input.now);
   start.setUTCDate(start.getUTCDate() - input.curveDaysBefore);
   start.setUTCHours(0, 0, 0, 0);
 
   const totalDays = input.curveDaysBefore + input.curveDaysAfter;
-  const totalSteps = Math.floor(
-    (totalDays * HOURS_PER_DAY) / CURVE_SAMPLE_HOURS,
-  );
+  const totalSteps = Math.floor((totalDays * HOURS_PER_DAY) / sampleHours);
+  const sampleTimes: number[] = [];
   for (let index = 0; index <= totalSteps; index += 1) {
-    const at = new Date(
-      start.getTime() + index * CURVE_SAMPLE_HOURS * MS_PER_HOUR,
-    );
+    sampleTimes.push(start.getTime() + index * sampleHours * MS_PER_HOUR);
+  }
+
+  // EVERY DOSE GETS ITS OWN SAMPLE PAIR, whatever the spacing. A dose is an
+  // instant jump, and on a coarse grid one can land between samples — the
+  // curve then draws a gentle slope through the step and the rise the user
+  // logged disappears. The pair is the instant before and the instant of, so
+  // the polyline still renders a vertical edge at 90 days as it does at 7.
+  const window = { from: sampleTimes[0]!, to: sampleTimes[sampleTimes.length - 1]! };
+  for (const dose of input.doses) {
+    const at = new Date(dose.datetime).getTime();
+    if (!Number.isFinite(at) || at < window.from || at > window.to) continue;
+    // Clamped to the window: the pair sharpens the step, it must not widen
+    // the span the axis is drawn from.
+    if (at - 1000 >= window.from) sampleTimes.push(at - 1000);
+    sampleTimes.push(at);
+  }
+
+  for (const at of [...new Set(sampleTimes)].sort((left, right) => left - right)) {
+    const when = new Date(at);
     points.push({
-      datetime: at.toISOString(),
-      level: levelAt(input.doses, input.halfLifeDays, at),
+      datetime: when.toISOString(),
+      level: levelAt(input.doses, input.halfLifeDays, when),
     });
   }
 
@@ -397,6 +421,7 @@ export function computeMedicationLevel(
     now,
     curveDaysBefore,
     curveDaysAfter,
+    sampleHours: input.curveSampleHours,
   });
   const latest = latestDose(input.doses);
   const nextDose = projectNextDoseAt({
