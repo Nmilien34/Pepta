@@ -157,6 +157,7 @@ vi.mock("../../context/LogSheetsContext", () => ({
 
 import { homeResponseSchema, trackResponseSchema, type HomeResponse } from "@pepta/shared";
 import { HomeScreen } from "./HomeScreen";
+import { duplicateLabels } from "../../tests/byLabel";
 import { recentDayLetters } from "./homeView";
 
 const prod = homeResponseSchema.parse(
@@ -453,5 +454,12 @@ describe("Home · the doors to the nutrient screens", () => {
     });
     expect(mocks.openMeal).toHaveBeenCalledTimes(1);
     expect(mocks.navigate).not.toHaveBeenCalled();
+  });
+});
+
+describe("Home · no two controls answer to one label", () => {
+  it("holds on the first run and on a dose day", () => {
+    expect(duplicateLabels(render(firstRun()))).toEqual([]);
+    expect(duplicateLabels(render(doseDay()))).toEqual([]);
   });
 });

@@ -65,6 +65,7 @@ vi.mock("../../context/LogSheetsContext", () => ({
 }));
 
 import { RecipesScreen } from "./RecipesScreen";
+import { duplicateLabels } from "../../tests/byLabel";
 
 const recipe = (name: string, ingredients: { name: string; amount: string; protein: number; calories: number; fiber?: number }[], id = name) => ({
   id,
@@ -203,5 +204,20 @@ describe("RecipesScreen · the actions", () => {
     });
     expect(tree.root.findAll((n) => String(n.type) === "ActivityIndicator")).toHaveLength(0);
     expect(texts(tree)).toContain("Starters could not be loaded");
+  });
+});
+
+describe("RecipesScreen · no two controls answer to one label", () => {
+  it("holds with both yours and starters on screen", async () => {
+    const starter = { ...recipe("Tuna salad", [{ name: "Tuna", amount: "5 oz can", protein: 30, calories: 165 }], "s1"), isStarter: true };
+    expect(duplicateLabels(await render({ recipes: [shake], starters: [starter] }))).toEqual([]);
+  });
+
+  it("holds when a starter shares its name with one of yours", async () => {
+    // Saving a starter copies it, so both lists can carry the same name — the
+    // two rows must still be distinguishable by label.
+    const mine = recipe("Tuna salad", [{ name: "Tuna", amount: "5 oz can", protein: 30, calories: 165 }], "mine");
+    const starter = { ...recipe("Tuna salad", [{ name: "Tuna", amount: "5 oz can", protein: 30, calories: 165 }], "s1"), isStarter: true };
+    expect(duplicateLabels(await render({ recipes: [mine], starters: [starter] }))).toEqual([]);
   });
 });

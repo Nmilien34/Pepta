@@ -47,6 +47,7 @@ vi.mock("../../context/LogSheetsContext", () => ({
 }));
 
 import { NewRecipeScreen } from "./NewRecipeScreen";
+import { duplicateLabels } from "../../tests/byLabel";
 
 function render() {
   let tree!: TestRenderer.ReactTestRenderer;
@@ -119,5 +120,11 @@ describe("NewRecipeScreen · connects to the features that already exist", () =>
     expect(all).toContain("Say it or type it");
     expect(all).toContain("Search foods");
     expect(all).toContain("two eggs, oats and a scoop of whey");
+  });
+});
+
+describe("NewRecipeScreen · no two controls answer to one label", () => {
+  it("holds across the three routes", () => {
+    expect(duplicateLabels(render())).toEqual([]);
   });
 });

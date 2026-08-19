@@ -84,6 +84,7 @@ vi.mock("../../context/LogSheetsContext", () => ({
 }));
 
 import { FavouritesScreen } from "./FavouritesScreen";
+import { duplicateLabels, maybeOne, one } from "../../tests/byLabel";
 
 const row = (over: Record<string, unknown>) => ({
   id: "r", key: "k", kind: "food", name: "N", portion: "P", source: "item",
@@ -116,13 +117,12 @@ function texts(tree: TestRenderer.ReactTestRenderer): string {
   return out.join("");
 }
 
-const find = (tree: TestRenderer.ReactTestRenderer, label: string) =>
-  tree.root.findAll((n) => String(n.type) === "Pressable").find((x) => x.props.accessibilityLabel === label);
+// Strict lookups: two controls sharing a label throws rather than silently
+// matching the first. See src/tests/byLabel.ts.
+const find = (tree: TestRenderer.ReactTestRenderer, label: string) => maybeOne(tree, label);
 
 const press = (tree: TestRenderer.ReactTestRenderer, label: string) => {
-  const p = find(tree, label);
-  expect(p, `no pressable labelled "${label}"`).toBeDefined();
-  act(() => p!.props.onPress());
+  act(() => one(tree, label).props.onPress());
 };
 
 beforeEach(() => {
@@ -521,5 +521,43 @@ describe("FavouritesScreen · swipe to remove", () => {
   it("does not wrap the suggestions — there is nothing saved to remove", async () => {
     const tree = await render([], "food");
     expect(find(tree, "Remove Greek yogurt")).toBeUndefined();
+  });
+});
+
+describe("FavouritesScreen · no two controls answer to one label", () => {
+  const coffee = row({ key: "drink:morning-coffee:12-oz", kind: "drink", name: "Morning coffee", portion: "Black, large mug", ounces: 12 });
+  const salmon = row({ key: "food:salmon:6-oz", name: "Salmon", portion: "6 oz fillet", protein: 40, calories: 350 });
+
+  const mixedTrack = () => {
+    const at = (d: number) => new Date(Date.now() - d * 86_400_000).toISOString();
+    return {
+      mealLogs: [1, 2, 3].map((d) => ({
+        id: `m${d}`, foodName: "Protein bar", servingSize: "1 bar",
+        protein: 20, calories: 210, datetime: at(d), deletedAt: null,
+      })),
+      waterLogs: [1, 2, 3].map((d) => ({ id: `w${d}`, amountOz: 34, datetime: at(d), deletedAt: null })),
+    };
+  };
+
+  it("holds on a busy food tab — saved rows, Worth saving, Edit", async () => {
+    mocks.track = mixedTrack();
+    const tree = await render([chicken, salmon], "food");
+    expect(duplicateLabels(tree)).toEqual([]);
+    press(tree, "Edit");
+    expect(duplicateLabels(tree)).toEqual([]);
+  });
+
+  it("holds on a busy drinks tab", async () => {
+    mocks.track = mixedTrack();
+    const tree = await render([bottle, coffee], "drink");
+    expect(duplicateLabels(tree)).toEqual([]);
+    press(tree, "Edit");
+    expect(duplicateLabels(tree)).toEqual([]);
+  });
+
+  it("holds on the first run, where the suggestions appear", async () => {
+    for (const side of ["food", "drink"] as const) {
+      expect(duplicateLabels(await render([], side)), side).toEqual([]);
+    }
   });
 });

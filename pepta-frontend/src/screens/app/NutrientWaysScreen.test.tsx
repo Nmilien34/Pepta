@@ -108,6 +108,7 @@ vi.mock("../../context/LogSheetsContext", () => ({
 }));
 
 import { NutrientWaysScreen } from "./NutrientWaysScreen";
+import { duplicateLabels } from "../../tests/byLabel";
 
 function homeWith(loggedProtein: number, target: number | null = 120, extra: object = {}) {
   return {
@@ -426,5 +427,12 @@ describe("NutrientWaysScreen · Yours", () => {
     // The label flips, which is how the row reports it worked.
     press(tree, "Remove Edamame from favourites");
     press(tree, "Save Edamame to favourites");
+  });
+});
+
+describe("NutrientWaysScreen · no two controls answer to one label", () => {
+  it("holds on both nutrients — strip photos, list rows, stars, Yours", () => {
+    expect(duplicateLabels(render(homeWith(74), "protein"))).toEqual([]);
+    expect(duplicateLabels(render(fiberHome(12), "fiber"))).toEqual([]);
   });
 });
