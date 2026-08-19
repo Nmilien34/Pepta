@@ -159,7 +159,29 @@ export function ItemDetailScreen() {
         <View style={{ height: HERO_HEIGHT, backgroundColor: theme.colors.bg }}>
           {item.photo ? (
             <Image source={item.photo} resizeMode="contain" style={{ width: '100%', height: '100%' }} />
-          ) : null}
+          ) : (
+            // No photo — an item the user typed and did not photograph. A blank
+            // 212pt band reads as a failed image load, so the hero holds its
+            // initial instead: deliberate, and still recognisable at a glance.
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+              <View
+                accessible
+                accessibilityLabel={`${item.name}, no photo`}
+                style={{
+                  width: 96,
+                  height: 96,
+                  borderRadius: 32,
+                  backgroundColor: theme.colors.surfaceAlt,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <AppText variant="cardTitle" style={{ fontSize: 38, color: theme.colors.textTertiary }}>
+                  {item.name.trim().charAt(0).toUpperCase()}
+                </AppText>
+              </View>
+            </View>
+          )}
           {/* Fades the photo into the sheet rather than cutting it off. */}
           <View
             pointerEvents="none"

@@ -93,9 +93,12 @@ import {
   type HomeResponse,
   type DiscoverySource,
   type UserProfileSettingsPatch,
+  favouritePhotoIntentResponseSchema,
   favouriteResponseSchema,
   favouritesResponseSchema,
   type FavouriteInput,
+  type FavouritePhotoIntentInput,
+  type FavouritePhotoIntentResponse,
   type FavouriteResponse,
   type FavouritesResponse,
   recipeComposeResponseSchema,
@@ -637,6 +640,16 @@ class PeptaApi {
   /** Upsert: the server keys on (user, key), so a double tap is one row. */
   public saveFavourite(input: FavouriteInput): Promise<FavouriteResponse> {
     return this.request("/favourites", favouriteResponseSchema, {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  }
+
+  /** Step 1 of the favourite-photo upload: somewhere to PUT the bytes. */
+  public createFavouritePhotoIntent(
+    input: FavouritePhotoIntentInput,
+  ): Promise<FavouritePhotoIntentResponse> {
+    return this.request("/favourites/photo-intent", favouritePhotoIntentResponseSchema, {
       method: "POST",
       body: JSON.stringify(input),
     });

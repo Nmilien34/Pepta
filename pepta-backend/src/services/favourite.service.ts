@@ -11,10 +11,12 @@
 // would make the list's own count wrong for no benefit.
 
 import type { FavouriteInput, FavouriteResponse } from "@pepta/shared";
+import { createPresignedGetUrl, createPresignedPutUrl, signedUrlExpiresAt } from "./s3.service";
+import { randomUUID } from "node:crypto";
 import { Types } from "mongoose";
 import { FavouriteModel, type FavouriteDocument } from "../models/favourite.model";
 
-function toResponse(doc: FavouriteDocument): FavouriteResponse {
+function toResponse(doc: FavouriteDocument, photoUrl: string | null = null): FavouriteResponse {
   return {
     id: doc._id.toString(),
     key: doc.key,
@@ -22,6 +24,8 @@ function toResponse(doc: FavouriteDocument): FavouriteResponse {
     name: doc.name,
     portion: doc.portion ?? "",
     source: doc.source ?? "item",
+    ...(doc.photoS3Key ? { photoS3Key: doc.photoS3Key } : {}),
+    photoUrl,
     ...(doc.protein != null ? { protein: doc.protein } : {}),
     ...(doc.calories != null ? { calories: doc.calories } : {}),
     ...(doc.fiber != null ? { fiber: doc.fiber } : {}),
@@ -42,7 +46,19 @@ export async function listFavourites(
     // shuffling a fixed set of three between visits makes it feel unstable.
     FavouriteModel.find({ userId: null }).sort({ createdAt: 1 }).exec(),
   ]);
-  return { favourites: mine.map(toResponse), suggestions: seeded.map(toResponse) };
+  // Signed on read, never stored: a URL saved in the row would expire in the
+  // database and there would be no way to tell a stale one from a real miss.
+  const sign = async (docs: FavouriteDocument[]) =>
+    Promise.all(
+      docs.map(async (doc) =>
+        toResponse(
+          doc,
+          doc.photoS3Key ? await createPresignedGetUrl({ key: doc.photoS3Key }).catch(() => null) : null,
+        ),
+      ),
+    );
+  const [favourites, suggestions] = await Promise.all([sign(mine), sign(seeded)]);
+  return { favourites, suggestions };
 }
 
 export async function saveFavourite(
@@ -57,6 +73,9 @@ export async function saveFavourite(
         name: input.name,
         portion: input.portion ?? "",
         source: input.source ?? "item",
+        // Set only when supplied, and never unset: re-saving from a screen
+        // that does not carry the photo must not wipe one the user attached.
+        ...(input.photoS3Key ? { photoS3Key: input.photoS3Key } : {}),
         // Unset rather than write undefined: a food re-saved from a screen
         // that does not know its fiber must not keep a stale figure.
         ...(input.protein != null ? { protein: input.protein } : {}),
@@ -73,7 +92,11 @@ export async function saveFavourite(
     },
     { new: true, upsert: true, setDefaultsOnInsert: true },
   ).exec();
-  return toResponse(doc as FavouriteDocument);
+  const saved = doc as FavouriteDocument;
+  const photoUrl = saved.photoS3Key
+    ? await createPresignedGetUrl({ key: saved.photoS3Key }).catch(() => null)
+    : null;
+  return toResponse(saved, photoUrl);
 }
 
 /** Idempotent: removing something already gone is not an error. */
@@ -82,4 +105,22 @@ export async function removeFavourite(userId: string, key: string): Promise<void
     userId: new Types.ObjectId(userId),
     key,
   }).exec();
+}
+
+/**
+ * Somewhere to put a photo, before the favourite exists.
+ *
+ * Keyed under the user, so one account can never presign a write into
+ * another's prefix. The row is saved afterwards carrying the key, which means
+ * an abandoned upload leaves an orphaned object rather than a broken row —
+ * the cheaper of the two failures.
+ */
+export async function createFavouritePhotoIntent(
+  userId: string,
+  contentType: string,
+): Promise<{ uploadUrl: string; photoS3Key: string; expiresAt: string }> {
+  const ext = contentType === "image/png" ? "png" : contentType === "image/webp" ? "webp" : "jpg";
+  const photoS3Key = `favourites/${userId}/${randomUUID()}.${ext}`;
+  const uploadUrl = await createPresignedPutUrl({ key: photoS3Key, contentType });
+  return { uploadUrl, photoS3Key, expiresAt: signedUrlExpiresAt() };
 }

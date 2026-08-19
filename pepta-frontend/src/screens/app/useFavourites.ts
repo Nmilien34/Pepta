@@ -26,6 +26,8 @@ function fromResponse(row: FavouriteResponse): Favourite {
     fiber: row.fiber,
     ounces: row.ounces,
     source: row.source,
+    photoS3Key: row.photoS3Key,
+    photoUrl: row.photoUrl,
     savedAt: row.createdAt,
   };
 }
@@ -88,6 +90,7 @@ export function useFavourites(): {
         ...(next.fiber != null ? { fiber: next.fiber } : {}),
         ...(next.ounces != null ? { ounces: next.ounces } : {}),
         ...(next.source != null ? { source: next.source } : {}),
+        ...(next.photoS3Key != null ? { photoS3Key: next.photoS3Key } : {}),
       })
       .catch(() => {
         if (alive.current) setList(previous);

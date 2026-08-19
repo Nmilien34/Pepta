@@ -317,3 +317,35 @@ describe("ItemDetailScreen · the drink side", () => {
     expect(out).not.toContain("Protein");
   });
 });
+
+describe("an item the user made themselves", () => {
+  const own = {
+    key: "fav:own", kind: "food" as const, name: "desk lunch",
+    servingLabel: "1 box", servingNoun: "serving", protein: 30, calories: 420,
+  };
+
+  it("shows the photo they uploaded", async () => {
+    const tree = await render({ ...own, photo: { uri: "https://s3/x.jpg" } });
+    const imgs = tree.root.findAll((n) => String(n.type) === "Image");
+    expect(imgs.some((i) => (i.props.source as { uri?: string })?.uri === "https://s3/x.jpg")).toBe(true);
+    expect(maybeOne(tree, "desk lunch, no photo", null)).toBeUndefined();
+  });
+
+  it("holds its initial rather than a blank band when there is none", async () => {
+    const tree = await render(own);
+    expect(one(tree, "desk lunch, no photo", null)).toBeTruthy();
+    expect(texts(tree)).toContain("D");
+    expect(tree.root.findAll((n) => String(n.type) === "Image")).toHaveLength(0);
+  });
+
+  it("still logs what it is worth, photo or not", async () => {
+    const tree = await render(own);
+    await act(async () => { button(tree).props.onPress(); });
+    expect(mocks.addMeal).toHaveBeenCalled();
+  });
+
+  it("keeps every label unique on the photoless variant", async () => {
+    const tree = await render(own);
+    expect(duplicateLabels(tree)).toEqual([]);
+  });
+});

@@ -125,6 +125,35 @@ describe('useFavourites', () => {
     expect(sent).not.toHaveProperty('calories');
   });
 
+  it('sends the photo key, and reads back the signed URL the server signs', async () => {
+    mocks.getFavourites.mockResolvedValue({
+      favourites: [{ ...row, photoS3Key: 'favourites/u1/a.jpg', photoUrl: 'https://s3/signed' }],
+    });
+    const hook = await mount();
+    expect(hook().favourites[0]!.photoUrl).toBe('https://s3/signed');
+
+    await act(async () => {
+      hook().save({ ...chicken, photoS3Key: 'favourites/u1/b.jpg' });
+    });
+    expect(mocks.saveFavourite.mock.calls[0]![0]).toMatchObject({ photoS3Key: 'favourites/u1/b.jpg' });
+  });
+
+  it('does not send a photo key for an item saved without one', async () => {
+    const hook = await mount();
+    await act(async () => {
+      hook().save(chicken);
+    });
+    expect(mocks.saveFavourite.mock.calls[0]![0]).not.toHaveProperty('photoS3Key');
+  });
+
+  it('never sends the signed URL back — it expires, the key does not', async () => {
+    const hook = await mount();
+    await act(async () => {
+      hook().save({ ...chicken, photoS3Key: 'k', photoUrl: 'https://s3/signed' });
+    });
+    expect(mocks.saveFavourite.mock.calls[0]![0]).not.toHaveProperty('photoUrl');
+  });
+
   it('removes immediately and restores on failure', async () => {
     mocks.getFavourites.mockResolvedValue({ favourites: [row] });
     mocks.removeFavourite.mockRejectedValue(new Error('offline'));

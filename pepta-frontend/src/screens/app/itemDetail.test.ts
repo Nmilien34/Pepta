@@ -8,6 +8,7 @@ import {
   stepServings,
   todayProjection,
   type DetailItem,
+  itemFromFavourite,
 } from './itemDetail';
 
 const chicken: DetailItem = {
@@ -114,5 +115,32 @@ describe('the labels', () => {
   it('leaves a food to its servings', () => {
     expect(logButtonLabel(chicken, 1)).toBe('Log 1 serving');
     expect(logButtonLabel(chicken, 3)).toBe('Log 3 servings');
+  });
+});
+
+describe('opening a favourite the user made themselves', () => {
+  const base = {
+    id: 'food:desk-lunch:1-box',
+    kind: 'food' as const,
+    name: 'Desk lunch',
+    portion: '1 box',
+    protein: 30,
+    savedAt: '2026-08-19T12:00:00.000Z',
+  };
+
+  it('carries their photo onto the detail screen', () => {
+    expect(itemFromFavourite({ ...base, photoUrl: 'https://s3/signed' }).photo).toEqual({
+      uri: 'https://s3/signed',
+    });
+  });
+
+  it('leaves the hero empty rather than pointing at nothing', () => {
+    expect(itemFromFavourite(base).photo).toBeUndefined();
+    expect(itemFromFavourite({ ...base, photoUrl: null }).photo).toBeUndefined();
+  });
+
+  it('scales what it logs the same either way — a photo changes no number', () => {
+    const withPhoto = itemFromFavourite({ ...base, photoUrl: 'https://s3/signed' });
+    expect(scaleItem(withPhoto, 2)).toEqual(scaleItem(itemFromFavourite(base), 2));
   });
 });

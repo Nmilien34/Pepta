@@ -30,6 +30,9 @@ export interface Favourite {
   ounces?: number;
   /** "recipe" earns a badge: it logs several foods at once. */
   source?: 'item' | 'recipe';
+  /** The user's own photo. Stored as a key, read back as a signed URL. */
+  photoS3Key?: string;
+  photoUrl?: string | null;
   savedAt: string;
 }
 
@@ -357,6 +360,10 @@ export interface NewItemDraft {
   kind: FavouriteKind;
   name: string;
   portion: string;
+  /** Optional — an item with no photo is still a perfectly good item. */
+  photoS3Key?: string;
+  /** Local URI, so the row can show it before the upload has been read back. */
+  photoUri?: string;
   protein?: number;
   calories?: number;
   fiber?: number;
@@ -402,6 +409,10 @@ export function favouriteFromDraft(draft: NewItemDraft, savedAt: string): Favour
       ? { ounces: draft.ounces }
       : { protein: draft.protein, calories: draft.calories, fiber: draft.fiber }),
     source: 'item',
+    ...(draft.photoS3Key ? { photoS3Key: draft.photoS3Key } : {}),
+    // Shown immediately from the local file; replaced by the signed URL on the
+    // next read. Without it the item the user just photographed appears blank.
+    ...(draft.photoUri ? { photoUrl: draft.photoUri } : {}),
     savedAt,
   };
 }

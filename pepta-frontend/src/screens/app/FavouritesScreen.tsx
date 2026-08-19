@@ -16,7 +16,7 @@
 // tapped.
 
 import React, { useMemo, useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Image, Pressable, ScrollView, View } from 'react-native';
 import { useNavigation, useRoute, type NavigationProp, type RouteProp } from '@react-navigation/native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -557,8 +557,17 @@ function SwipeToRemove({
   );
 }
 
-/** The vessel drawing for a drink; a tinted tile for food. */
+/** The user's photo when there is one; otherwise the vessel or the food tile. */
 function Leading({ fav, tint, accent }: { fav: Favourite; tint: string; accent: string }) {
+  // A photo the user took beats any drawing we could pick for them, and it is
+  // the fastest thing to recognise in a list of near-identical rows.
+  if (fav.photoUrl) {
+    return (
+      <View style={{ width: 40, height: 40, borderRadius: 13, overflow: 'hidden', backgroundColor: tint }}>
+        <Image source={{ uri: fav.photoUrl }} resizeMode="cover" style={{ width: '100%', height: '100%' }} />
+      </View>
+    );
+  }
   if (fav.kind === 'drink') {
     return (
       <View style={{ width: 40, alignItems: 'center', justifyContent: 'center' }}>

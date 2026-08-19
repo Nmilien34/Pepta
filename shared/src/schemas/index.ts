@@ -1347,11 +1347,19 @@ export const favouriteInputSchema = z
      * before you tap Log.
      */
     source: z.enum(["item", "recipe"]).default("item"),
+    /**
+     * A photo the user took of their own item. Stored as an S3 key; the list
+     * response carries a short-lived view URL rather than the key, so the
+     * client never has to sign anything.
+     */
+    photoS3Key: z.string().trim().min(1).max(300).optional(),
   })
   .strict();
 
 export const favouriteResponseSchema = favouriteInputSchema.extend({
   id: idSchema,
+  /** Signed, short-lived. Absent when the item has no photo. */
+  photoUrl: z.string().nullable().default(null),
   createdAt: isoDateTimeSchema,
   updatedAt: isoDateTimeSchema,
 });
@@ -1464,3 +1472,21 @@ export const recipeComposeResponseSchema = z
 
 export type RecipeComposeInput = z.infer<typeof recipeComposeInputSchema>;
 export type RecipeComposeResponse = z.infer<typeof recipeComposeResponseSchema>;
+
+/** Asking for somewhere to put a favourite's photo. */
+export const favouritePhotoIntentInputSchema = z
+  .object({
+    contentType: z.enum(["image/jpeg", "image/png", "image/webp"]),
+  })
+  .strict();
+
+export const favouritePhotoIntentResponseSchema = z
+  .object({
+    uploadUrl: z.string().min(1),
+    photoS3Key: z.string().min(1),
+    expiresAt: isoDateTimeSchema,
+  })
+  .strict();
+
+export type FavouritePhotoIntentInput = z.infer<typeof favouritePhotoIntentInputSchema>;
+export type FavouritePhotoIntentResponse = z.infer<typeof favouritePhotoIntentResponseSchema>;

@@ -25,6 +25,7 @@ vi.mock("react-native", () => {
       { displayName: name },
     );
   return {
+    Image: passthrough("Image"),
     Pressable: passthrough("Pressable"),
     ScrollView: passthrough("ScrollView"),
     Text: passthrough("Text"),
@@ -685,5 +686,37 @@ describe("FavouritesScreen · adding an item of your own", () => {
     await act(async () => sheet(tree)!.props.onCancel());
     expect(mocks.saveFavourite).not.toHaveBeenCalled();
     expect(sheet(tree)).toBeUndefined();
+  });
+});
+
+describe("a row with the user's own photo", () => {
+  const photoUrl = "https://s3/signed.jpg";
+
+  it("shows the photo instead of the stock food tile", async () => {
+    const tree = await render([row({ key: "food:desk-lunch:1-box", name: "Desk lunch", portion: "1 box", protein: 30, photoUrl })]);
+    const imgs = tree.root.findAll((n) => String(n.type) === "Image");
+    expect(imgs.some((i) => (i.props.source as { uri?: string })?.uri === photoUrl)).toBe(true);
+  });
+
+  it("shows it on a drink too, in place of the vessel drawing", async () => {
+    const tree = await render(
+      [row({ key: "drink:desk-bottle:21-oz", kind: "drink", name: "Desk bottle", portion: "21 oz", ounces: 21, photoUrl })],
+      "drink",
+    );
+    const imgs = tree.root.findAll((n) => String(n.type) === "Image");
+    expect(imgs.some((i) => (i.props.source as { uri?: string })?.uri === photoUrl)).toBe(true);
+    expect(tree.root.findAll((n) => String(n.type) === "VesselIcon")).toHaveLength(0);
+  });
+
+  it("falls back to the drawing when there is no photo", async () => {
+    const tree = await render([bottle], "drink");
+    expect(tree.root.findAll((n) => String(n.type) === "Image")).toHaveLength(0);
+    expect(tree.root.findAll((n) => String(n.type) === "VesselIcon").length).toBeGreaterThan(0);
+  });
+
+  it("adds no new label, so the row is still one target", async () => {
+    const tree = await render([row({ key: "food:desk-lunch:1-box", name: "Desk lunch", portion: "1 box", protein: 30, photoUrl })]);
+    expect(duplicateLabels(tree)).toEqual([]);
+    expect(one(tree, "Desk lunch details")).toBeTruthy();
   });
 });

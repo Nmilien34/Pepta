@@ -4,6 +4,14 @@ const mocks = vi.hoisted(() => ({
   find: vi.fn(),
   findOneAndUpdate: vi.fn(),
   deleteOne: vi.fn(),
+  createPresignedGetUrl: vi.fn(),
+  createPresignedPutUrl: vi.fn(),
+}));
+
+vi.mock("../../services/s3.service", () => ({
+  createPresignedGetUrl: mocks.createPresignedGetUrl,
+  createPresignedPutUrl: mocks.createPresignedPutUrl,
+  signedUrlExpiresAt: () => "2026-08-19T12:15:00.000Z",
 }));
 
 vi.mock("../../models/favourite.model", () => ({
@@ -15,6 +23,7 @@ vi.mock("../../models/favourite.model", () => ({
 }));
 
 import {
+  createFavouritePhotoIntent,
   listFavourites,
   removeFavourite,
   saveFavourite,
@@ -27,6 +36,8 @@ beforeEach(() => {
   mocks.find.mockReset();
   mocks.findOneAndUpdate.mockReset();
   mocks.deleteOne.mockReset();
+  mocks.createPresignedGetUrl.mockReset().mockResolvedValue("https://s3/signed-get");
+  mocks.createPresignedPutUrl.mockReset().mockResolvedValue("https://s3/signed-put");
 });
 
 function doc(over: Record<string, unknown> = {}) {
@@ -188,5 +199,125 @@ describe("the seeded first-run offers", () => {
       if (f.kind === "drink") expect(f.ounces).toBeGreaterThan(0);
       else expect(f.protein).toBeGreaterThan(0);
     }
+  });
+});
+
+describe("photos on an item the user made themselves", () => {
+  it("signs a fresh URL on every read — a stored one would expire in the database", async () => {
+    const exec = vi.fn().mockResolvedValue([doc({ photoS3Key: "favourites/u1/a.jpg" })]);
+    mocks.find.mockReturnValue({ sort: vi.fn(() => ({ exec })) });
+
+    const out = await listFavourites(USER);
+
+    expect(mocks.createPresignedGetUrl).toHaveBeenCalledWith({ key: "favourites/u1/a.jpg" });
+    expect(out.favourites[0]!.photoUrl).toBe("https://s3/signed-get");
+  });
+
+  it("sends null rather than failing the whole list when signing fails", async () => {
+    mocks.createPresignedGetUrl.mockRejectedValue(new Error("s3 down"));
+    const exec = vi.fn().mockResolvedValue([doc({ photoS3Key: "favourites/u1/a.jpg" })]);
+    mocks.find.mockReturnValue({ sort: vi.fn(() => ({ exec })) });
+
+    const out = await listFavourites(USER);
+
+    expect(out.favourites[0]!.photoUrl).toBeNull();
+    expect(out.favourites[0]!.name).toBe("Chicken breast");
+  });
+
+  it("signs nothing for an item saved without a photo", async () => {
+    const exec = vi.fn().mockResolvedValue([doc()]);
+    mocks.find.mockReturnValue({ sort: vi.fn(() => ({ exec })) });
+
+    const out = await listFavourites(USER);
+
+    expect(mocks.createPresignedGetUrl).not.toHaveBeenCalled();
+    expect(out.favourites[0]!.photoUrl).toBeNull();
+  });
+
+  it("stores the key the client uploaded to", async () => {
+    mocks.findOneAndUpdate.mockReturnValue({
+      exec: vi.fn().mockResolvedValue(doc({ photoS3Key: "favourites/u1/a.jpg" })),
+    });
+
+    await saveFavourite(USER, {
+      key: "food:desk-lunch:1-box",
+      kind: "food",
+      name: "Desk lunch",
+      portion: "1 box",
+      source: "item",
+      photoS3Key: "favourites/u1/a.jpg",
+    });
+
+    const update = mocks.findOneAndUpdate.mock.calls[0]![1] as {
+      $set: Record<string, unknown>;
+      $unset: Record<string, unknown>;
+    };
+    expect(update.$set).toMatchObject({ photoS3Key: "favourites/u1/a.jpg" });
+  });
+
+  it("leaves an existing photo alone when a save does not carry one", async () => {
+    mocks.findOneAndUpdate.mockReturnValue({ exec: vi.fn().mockResolvedValue(doc()) });
+
+    await saveFavourite(USER, {
+      key: "food:desk-lunch:1-box",
+      kind: "food",
+      name: "Desk lunch",
+      portion: "1 box",
+      source: "item",
+    });
+
+    const update = mocks.findOneAndUpdate.mock.calls[0]![1] as {
+      $set: Record<string, unknown>;
+      $unset: Record<string, unknown>;
+    };
+    expect(update.$set).not.toHaveProperty("photoS3Key");
+    expect(update.$unset).not.toHaveProperty("photoS3Key");
+  });
+
+  it("hands back a usable URL on save, not just on the next read", async () => {
+    mocks.findOneAndUpdate.mockReturnValue({
+      exec: vi.fn().mockResolvedValue(doc({ photoS3Key: "favourites/u1/a.jpg" })),
+    });
+
+    const out = await saveFavourite(USER, {
+      key: "food:desk-lunch:1-box",
+      kind: "food",
+      name: "Desk lunch",
+      portion: "1 box",
+      source: "item",
+      photoS3Key: "favourites/u1/a.jpg",
+    });
+
+    expect(out.photoUrl).toBe("https://s3/signed-get");
+  });
+
+  it("keys an upload under the owner, so one user cannot write over another", async () => {
+    const a = await createFavouritePhotoIntent(USER, "image/jpeg");
+    const b = await createFavouritePhotoIntent("507f1f77bcf86cd799439012", "image/jpeg");
+
+    expect(a.photoS3Key.startsWith(`favourites/${USER}/`)).toBe(true);
+    expect(b.photoS3Key.startsWith("favourites/507f1f77bcf86cd799439012/")).toBe(true);
+  });
+
+  it("never reuses a key, so a second photo cannot overwrite the first", async () => {
+    const a = await createFavouritePhotoIntent(USER, "image/jpeg");
+    const b = await createFavouritePhotoIntent(USER, "image/jpeg");
+    expect(a.photoS3Key).not.toBe(b.photoS3Key);
+  });
+
+  it("gives the file the extension its type says it has", async () => {
+    expect((await createFavouritePhotoIntent(USER, "image/png")).photoS3Key.endsWith(".png")).toBe(true);
+    expect((await createFavouritePhotoIntent(USER, "image/webp")).photoS3Key.endsWith(".webp")).toBe(true);
+    expect((await createFavouritePhotoIntent(USER, "image/jpeg")).photoS3Key.endsWith(".jpg")).toBe(true);
+  });
+
+  it("signs the PUT for that exact key and type", async () => {
+    const out = await createFavouritePhotoIntent(USER, "image/webp");
+    expect(mocks.createPresignedPutUrl).toHaveBeenCalledWith({
+      key: out.photoS3Key,
+      contentType: "image/webp",
+    });
+    expect(out.uploadUrl).toBe("https://s3/signed-put");
+    expect(out.expiresAt).toBe("2026-08-19T12:15:00.000Z");
   });
 });

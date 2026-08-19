@@ -11,7 +11,9 @@
 // with no figures records nothing.
 
 import React, { useEffect, useState } from 'react';
-import { Modal, Pressable, TextInput, View } from 'react-native';
+import { ActivityIndicator, Image, Modal, Pressable, TextInput, View } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import { api } from '../services/api';
 import * as Haptics from 'expo-haptics';
 import { AppText, Button } from './index';
 import { useTheme } from '../theme';
@@ -43,6 +45,10 @@ export function NewItemSheet({ visible, initialKind, onCancel, onSave }: NewItem
   const [protein, setProtein] = useState('');
   const [calories, setCalories] = useState('');
   const [ounces, setOunces] = useState('');
+  const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [photoS3Key, setPhotoS3Key] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [photoError, setPhotoError] = useState('');
 
   // Cleared on every open, or the next item starts as a copy of the last.
   useEffect(() => {
@@ -53,7 +59,46 @@ export function NewItemSheet({ visible, initialKind, onCancel, onSave }: NewItem
     setProtein('');
     setCalories('');
     setOunces('');
+    setPhotoUri(null);
+    setPhotoS3Key(null);
+    setUploading(false);
+    setPhotoError('');
   }, [visible, initialKind]);
+
+  /**
+   * Picks, then uploads to a presigned URL. The local URI is shown the moment
+   * it is chosen — waiting on a round trip to show a photo the user is already
+   * looking at feels broken — and the key it resolves to is what gets saved.
+   */
+  const pickPhoto = async () => {
+    Haptics.selectionAsync().catch(() => undefined);
+    setPhotoError('');
+    try {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        setPhotoError('Pepta needs photos access to add one. You can save without it.');
+        return;
+      }
+      const res = await ImagePicker.launchImageLibraryAsync({ quality: 0.6, mediaTypes: ['images'] });
+      const asset = res.canceled ? null : res.assets[0];
+      if (!asset?.uri) return;
+      setPhotoUri(asset.uri);
+      setUploading(true);
+      const contentType =
+        asset.mimeType === 'image/png' || asset.mimeType === 'image/webp' ? asset.mimeType : 'image/jpeg';
+      const intent = await api.createFavouritePhotoIntent({ contentType });
+      await api.uploadToPresignedUrl(intent.uploadUrl, asset.uri, contentType);
+      setPhotoS3Key(intent.photoS3Key);
+    } catch {
+      // The item is still saveable — the photo is the optional part, and
+      // losing what they typed because an upload failed would be the worse
+      // outcome.
+      setPhotoS3Key(null);
+      setPhotoError('That photo did not upload. You can save without it, or try another.');
+    } finally {
+      setUploading(false);
+    }
+  };
 
   if (!visible) return null;
 
@@ -61,6 +106,7 @@ export function NewItemSheet({ visible, initialKind, onCancel, onSave }: NewItem
     kind,
     name,
     portion,
+    ...(photoS3Key ? { photoS3Key, photoUri: photoUri ?? undefined } : {}),
     ...(kind === 'drink'
       ? { ounces: num(ounces) }
       : { protein: num(protein), calories: num(calories) }),
@@ -167,6 +213,40 @@ export function NewItemSheet({ visible, initialKind, onCancel, onSave }: NewItem
             ))}
           </View>
 
+          {/* The photo. Optional, and never blocks saving. */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 14 }}>
+            <Pressable
+              onPress={pickPhoto}
+              accessibilityRole="button"
+              accessibilityLabel={photoUri ? 'Change the photo' : 'Add a photo'}
+              style={({ pressed }) => ({
+                width: 64,
+                height: 64,
+                borderRadius: 16,
+                overflow: 'hidden',
+                backgroundColor: theme.colors.surfaceAlt,
+                alignItems: 'center',
+                justifyContent: 'center',
+                opacity: pressed ? 0.7 : 1,
+              })}
+            >
+              {photoUri ? (
+                <Image source={{ uri: photoUri }} resizeMode="cover" style={{ width: '100%', height: '100%' }} />
+              ) : (
+                <AppText variant="caption" color="textTertiary" style={{ fontSize: 20 }}>+</AppText>
+              )}
+            </Pressable>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <AppText variant="caption" color="textSecondary" style={{ fontSize: 12, fontWeight: '700' }}>
+                {photoUri ? 'Photo added' : 'Add a photo'}
+              </AppText>
+              <AppText variant="caption" color="textTertiary" style={{ fontSize: 10.5, marginTop: 2, lineHeight: 14 }}>
+                {uploading ? 'Uploading…' : photoError || 'Optional. It shows on the item’s own screen.'}
+              </AppText>
+            </View>
+            {uploading ? <ActivityIndicator color={theme.colors.textTertiary} /> : null}
+          </View>
+
           <View style={{ marginTop: 12 }}>{field('Name', name, setName, 'default', 'Desk bottle')}</View>
           <View style={{ marginTop: 12 }}>
             {field('How much one is', portion, setPortion, 'default', kind === 'drink' ? '21 oz' : '1 scoop, milk')}
@@ -188,8 +268,8 @@ export function NewItemSheet({ visible, initialKind, onCancel, onSave }: NewItem
 
           <View style={{ marginTop: 14 }}>
             <Button
-              label="Save it"
-              disabled={!isNewItemValid(draft)}
+              label={uploading ? 'Uploading photo…' : 'Save it'}
+              disabled={!isNewItemValid(draft) || uploading}
               onPress={() => {
                 Haptics.selectionAsync().catch(() => undefined);
                 onSave(draft);

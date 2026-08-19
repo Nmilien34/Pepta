@@ -214,5 +214,6 @@ export function itemFromFavourite(fav: Favourite): DetailItem {
     protein: fav.protein,
     fiber: fav.fiber,
     ounces: fav.ounces,
+    ...(fav.photoUrl ? { photo: { uri: fav.photoUrl } } : {}),
   };
 }

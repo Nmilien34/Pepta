@@ -1,10 +1,11 @@
-import { favouriteInputSchema } from '@pepta/shared';
+import { favouriteInputSchema, favouritePhotoIntentInputSchema } from '@pepta/shared';
 import { Router } from 'express';
 import { requireAuth } from '../auth/middleware';
 import { asyncHandler } from '../lib/async-handler';
 import { sendData } from '../lib/responses';
 import { validateBody } from '../middleware/validate.middleware';
 import {
+  createFavouritePhotoIntent,
   listFavourites,
   removeFavourite,
   saveFavourite,
@@ -27,6 +28,14 @@ router.post(
   validateBody(favouriteInputSchema),
   asyncHandler(async (req, res) => {
     sendData(res, await saveFavourite(req.user!.id, req.body));
+  }),
+);
+
+router.post(
+  '/photo-intent',
+  validateBody(favouritePhotoIntentInputSchema),
+  asyncHandler(async (req, res) => {
+    sendData(res, await createFavouritePhotoIntent(req.user!.id, req.body.contentType));
   }),
 );
 
