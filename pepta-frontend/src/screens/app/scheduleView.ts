@@ -84,9 +84,19 @@ export function patternOf(cycle: CycleResponse | null): CyclePattern | null {
 }
 
 /** Days with at least one logged shot, as local date-onlys. */
+/**
+ * Days a dose was actually taken.
+ *
+ * FILTERS deletedAt HERE, not at the call sites. It was filtered at exactly
+ * one of the three — doseCta, which says why: "deletedAt is the only delete
+ * this app performs". The other two, the week strip and the month calendar,
+ * kept drawing a check and a green dot on a day whose dose the user had
+ * removed. Doing it inside means a fourth caller cannot get it wrong.
+ */
 export function loggedDays(doseLogs: DoseLogResponse[]): Set<string> {
   const days = new Set<string>();
   for (const log of doseLogs) {
+    if (log.deletedAt != null) continue;
     days.add(localDateOnly(new Date(log.datetime)));
   }
   return days;
@@ -172,6 +182,18 @@ export function weekStrip(
   schedules: ScheduleResponse[] | null,
   doseLogs: DoseLogResponse[],
   pattern: CyclePattern | null,
+  /**
+   * The authoritative next dose, straight from /home — the same value the
+   * countdown above the strip counts down to.
+   *
+   * The ring is derived from the schedule, which anchors on the schedule's own
+   * stored nextDoseAt; the countdown comes from the backend, which recomputes
+   * after every logged dose and skips cycle rest days. Those two can drift,
+   * and when they do the card reads "Sat, Jun 27" over a ring on Friday.
+   * Adding the real day means the day the user is being counted down to
+   * always carries a ring.
+   */
+  nextDoseAt?: string | null,
 ): StripDay[] {
   const todayOnly = localDateOnly(today);
   const dow = dayOfWeek(todayOnly);
@@ -179,6 +201,10 @@ export function weekStrip(
   const sunday = addDays(monday, 6);
   const logged = loggedDays(doseLogs);
   const planned = plannedDays(schedules, monday, sunday);
+  if (nextDoseAt) {
+    const nextDay = localDateOnly(new Date(nextDoseAt));
+    if (nextDay >= monday && nextDay <= sunday) planned.add(nextDay);
+  }
 
   return Array.from({ length: 7 }, (_, i) => {
     const date = addDays(monday, i);

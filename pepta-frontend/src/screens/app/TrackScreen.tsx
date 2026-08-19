@@ -65,8 +65,8 @@ export function TrackScreen() {
   const cycle = useMemo(() => activeCycleOf(cycles), [cycles]);
   const pattern = useMemo(() => patternOf(cycle), [cycle]);
   const stripDays = useMemo(
-    () => weekStrip(new Date(), schedules, track?.doseLogs ?? [], pattern),
-    [schedules, track?.doseLogs, pattern],
+    () => weekStrip(new Date(), schedules, track?.doseLogs ?? [], pattern, home?.nextDose?.nextDoseAt),
+    [schedules, track?.doseLogs, pattern, home?.nextDose?.nextDoseAt],
   );
   const cyclePill = useMemo(() => cyclePillFor(pattern, new Date()), [pattern]);
   const cycleToday = useMemo(() => todayCycleStatus(pattern, new Date()), [pattern]);

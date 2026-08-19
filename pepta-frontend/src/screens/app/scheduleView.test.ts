@@ -201,3 +201,73 @@ describe('isLastDoseOfCycle', () => {
     expect(isLastDoseOfCycle('2026-07-25T12:00:00.000Z', schedules, null)).toBe(false);
   });
 });
+
+describe('the marks are the user’s real doses, not a drawing', () => {
+  const pattern = { startDate: '2026-06-01', weeksOn: 8, weeksOff: 2, repeats: true };
+
+  it('checks a day only when a dose was logged on it', () => {
+    const strip = weekStrip(
+      TODAY,
+      [schedule({ daysOfWeek: [6] })],
+      [dose('2026-06-22T12:00:00.000Z')],
+      pattern,
+    );
+
+    expect(strip[0]!.mark).toBe('logged'); // Mon 22, logged
+    expect(strip[1]!.mark).toBe('none'); // Tue 23, nothing
+  });
+
+  it('takes the check away when the user deletes that dose', () => {
+    // deletedAt is the only delete this app performs. It was filtered in
+    // doseCta and nowhere else, so a removed shot kept its check here.
+    const deleted = { ...dose('2026-06-22T12:00:00.000Z'), deletedAt: '2026-06-23T09:00:00.000Z' };
+    const strip = weekStrip(TODAY, [schedule({ daysOfWeek: [6] })], [deleted as never], pattern);
+
+    expect(strip[0]!.mark).not.toBe('logged');
+  });
+
+  it('rings the day the countdown above it is counting down to', () => {
+    // The ring comes from the schedule, the countdown from /home. When those
+    // drift, the card reads one day over a ring on another.
+    const strip = weekStrip(
+      TODAY,
+      [schedule({ daysOfWeek: [] })], // no explicit days: nothing to derive from
+      [],
+      pattern,
+      '2026-06-26T20:00:00.000Z', // Friday
+    );
+
+    expect(strip[4]!.mark).toBe('due'); // Fri 26
+  });
+
+  it('ignores a next dose that falls outside this week', () => {
+    const strip = weekStrip(
+      TODAY,
+      [schedule({ daysOfWeek: [] })],
+      [],
+      pattern,
+      '2026-07-04T20:00:00.000Z',
+    );
+
+    expect(strip.every((day) => day.mark === 'none')).toBe(true);
+  });
+
+  it('does not let a next dose overrule a day already logged', () => {
+    const strip = weekStrip(
+      TODAY,
+      [schedule({ daysOfWeek: [] })],
+      [dose('2026-06-24T08:00:00.000Z')],
+      pattern,
+      '2026-06-24T20:00:00.000Z',
+    );
+
+    expect(strip[2]!.mark).toBe('logged'); // Wed 24 — taken beats due
+  });
+
+  it('marks every planned day on a daily schedule, not just one', () => {
+    const strip = weekStrip(TODAY, [schedule({ frequency: 'daily' })], [], pattern);
+    const ahead = strip.slice(2); // Wed 24 onward
+
+    expect(ahead.every((day) => day.mark === 'due')).toBe(true);
+  });
+});
