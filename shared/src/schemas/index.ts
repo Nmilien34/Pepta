@@ -1480,6 +1480,15 @@ export const favouritePhotoIntentInputSchema = z
   })
   .strict();
 
+/**
+ * Throwing away a photo that was uploaded but never attached to anything —
+ * the user picked a second one, or closed the sheet without saving. Without
+ * it those bytes sit in the bucket forever with nothing referencing them.
+ */
+export const favouritePhotoDiscardInputSchema = z
+  .object({ photoS3Key: z.string().trim().min(1).max(300) })
+  .strict();
+
 export const favouritePhotoIntentResponseSchema = z
   .object({
     uploadUrl: z.string().min(1),
@@ -1489,4 +1498,5 @@ export const favouritePhotoIntentResponseSchema = z
   .strict();
 
 export type FavouritePhotoIntentInput = z.infer<typeof favouritePhotoIntentInputSchema>;
+export type FavouritePhotoDiscardInput = z.infer<typeof favouritePhotoDiscardInputSchema>;
 export type FavouritePhotoIntentResponse = z.infer<typeof favouritePhotoIntentResponseSchema>;

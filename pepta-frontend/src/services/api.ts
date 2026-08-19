@@ -655,6 +655,14 @@ class PeptaApi {
     });
   }
 
+  /** Throws away a photo that was uploaded and then never attached. */
+  public discardFavouritePhoto(photoS3Key: string): Promise<unknown> {
+    return this.request("/favourites/photo-discard", z.unknown(), {
+      method: "POST",
+      body: JSON.stringify({ photoS3Key }),
+    });
+  }
+
   public getRecipes(): Promise<RecipesResponse> {
     return this.request("/recipes", recipesResponseSchema);
   }

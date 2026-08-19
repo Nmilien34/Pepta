@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   find: vi.fn(),
   findOneAndUpdate: vi.fn(),
   findOneAndDelete: vi.fn(),
+  exists: vi.fn(),
   deleteS3Object: vi.fn(),
   createPresignedGetUrl: vi.fn(),
   createPresignedPutUrl: vi.fn(),
@@ -21,11 +22,13 @@ vi.mock("../../models/favourite.model", () => ({
     find: mocks.find,
     findOneAndUpdate: mocks.findOneAndUpdate,
     findOneAndDelete: mocks.findOneAndDelete,
+    exists: mocks.exists,
   },
 }));
 
 import {
   createFavouritePhotoIntent,
+  discardFavouritePhoto,
   listFavourites,
   removeFavourite,
   saveFavourite,
@@ -39,6 +42,7 @@ beforeEach(() => {
   mocks.findOneAndUpdate.mockReset();
   mocks.findOneAndDelete.mockReset().mockReturnValue({ exec: vi.fn().mockResolvedValue(null) });
   mocks.deleteS3Object.mockReset().mockResolvedValue(undefined);
+  mocks.exists.mockReset().mockReturnValue({ exec: vi.fn().mockResolvedValue(null) });
   mocks.createPresignedGetUrl.mockReset().mockResolvedValue("https://s3/signed-get");
   mocks.createPresignedPutUrl.mockReset().mockResolvedValue("https://s3/signed-put");
 });
@@ -347,5 +351,43 @@ describe("photos on an item the user made themselves", () => {
     });
     expect(out.uploadUrl).toBe("https://s3/signed-put");
     expect(out.expiresAt).toBe("2026-08-19T12:15:00.000Z");
+  });
+});
+
+describe("throwing away a photo nothing ended up using", () => {
+  const KEY = `favourites/${USER}/a.jpg`;
+
+  it("deletes the file when nothing references it", async () => {
+    await discardFavouritePhoto(USER, KEY);
+    expect(mocks.deleteS3Object).toHaveBeenCalledWith(KEY);
+  });
+
+  it("refuses a key under another user, however it was obtained", async () => {
+    await expect(
+      discardFavouritePhoto(USER, "favourites/507f1f77bcf86cd799439012/a.jpg"),
+    ).rejects.toThrow(/not found/i);
+    expect(mocks.deleteS3Object).not.toHaveBeenCalled();
+  });
+
+  it("refuses a key outside the favourites prefix", async () => {
+    await expect(discardFavouritePhoto(USER, "progress/other/a.jpg")).rejects.toThrow(/not found/i);
+    await expect(discardFavouritePhoto(USER, `../favourites/${USER}/a.jpg`)).rejects.toThrow(
+      /not found/i,
+    );
+    expect(mocks.deleteS3Object).not.toHaveBeenCalled();
+  });
+
+  it("refuses a photo a saved item is still showing", async () => {
+    mocks.exists.mockReturnValue({ exec: vi.fn().mockResolvedValue({ _id: "row1" }) });
+
+    await expect(discardFavouritePhoto(USER, KEY)).rejects.toThrow(/saved item/i);
+    expect(mocks.deleteS3Object).not.toHaveBeenCalled();
+  });
+
+  it("checks that reference against the caller's own rows", async () => {
+    await discardFavouritePhoto(USER, KEY);
+    const filter = mocks.exists.mock.calls[0]![0] as { userId: unknown; photoS3Key: string };
+    expect(String(filter.userId)).toBe(USER);
+    expect(filter.photoS3Key).toBe(KEY);
   });
 });

@@ -1,4 +1,8 @@
-import { favouriteInputSchema, favouritePhotoIntentInputSchema } from '@pepta/shared';
+import {
+  favouriteInputSchema,
+  favouritePhotoDiscardInputSchema,
+  favouritePhotoIntentInputSchema,
+} from '@pepta/shared';
 import { Router } from 'express';
 import { requireAuth } from '../auth/middleware';
 import { asyncHandler } from '../lib/async-handler';
@@ -6,6 +10,7 @@ import { sendData } from '../lib/responses';
 import { validateBody } from '../middleware/validate.middleware';
 import {
   createFavouritePhotoIntent,
+  discardFavouritePhoto,
   listFavourites,
   removeFavourite,
   saveFavourite,
@@ -36,6 +41,17 @@ router.post(
   validateBody(favouritePhotoIntentInputSchema),
   asyncHandler(async (req, res) => {
     sendData(res, await createFavouritePhotoIntent(req.user!.id, req.body.contentType));
+  }),
+);
+
+// A photo that was uploaded and then not used. POST rather than DELETE: the
+// key contains slashes, and a body carries it without a round of encoding.
+router.post(
+  '/photo-discard',
+  validateBody(favouritePhotoDiscardInputSchema),
+  asyncHandler(async (req, res) => {
+    await discardFavouritePhoto(req.user!.id, req.body.photoS3Key);
+    sendData(res, { ok: true });
   }),
 );
 

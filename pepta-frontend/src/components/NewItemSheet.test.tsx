@@ -33,6 +33,7 @@ vi.mock("../services/api", () => ({
   api: {
     createFavouritePhotoIntent: vi.fn(),
     uploadToPresignedUrl: vi.fn(),
+    discardFavouritePhoto: vi.fn(),
   },
 }));
 
@@ -110,7 +111,29 @@ beforeEach(() => {
     expiresAt: "2026-08-19T12:00:00.000Z",
   } as never);
   apiMock.uploadToPresignedUrl.mockResolvedValue(undefined as never);
+  apiMock.discardFavouritePhoto.mockResolvedValue(undefined as never);
 });
+
+/** Second and later picks land on distinct keys, as the server's would. */
+function pickReturns(uri: string, key: string) {
+  picker.launchImageLibraryAsync.mockResolvedValue({
+    canceled: false,
+    assets: [{ uri, mimeType: "image/jpeg" }],
+  } as never);
+  apiMock.createFavouritePhotoIntent.mockResolvedValue({
+    uploadUrl: "https://s3/put",
+    photoS3Key: key,
+    expiresAt: "2026-08-19T12:00:00.000Z",
+  } as never);
+}
+
+const hide = async (tree: TestRenderer.ReactTestRenderer) => {
+  await act(async () => {
+    tree.update(
+      <NewItemSheet visible={false} initialKind="food" onCancel={vi.fn()} onSave={onSave} />,
+    );
+  });
+};
 
 describe("attaching a photo to an item the user typed", () => {
   it("uploads what was picked and saves the key it came back with", async () => {
@@ -228,5 +251,102 @@ describe("attaching a photo to an item the user typed", () => {
     });
     expect(tree.root.findAll((n) => String(n.type) === "Image")).toHaveLength(0);
     expect(one(tree, "Add a photo")).toBeTruthy();
+  });
+});
+
+describe("photos that end up attached to nothing", () => {
+  it("throws away the one it replaced when a second is picked", async () => {
+    const tree = await render();
+    await act(async () => {
+      one(tree, "Add a photo").props.onPress();
+    });
+
+    pickReturns("file:///tmp/b.jpg", "favourites/u1/b.jpg");
+    await act(async () => {
+      one(tree, "Change the photo").props.onPress();
+    });
+
+    expect(apiMock.discardFavouritePhoto).toHaveBeenCalledWith("favourites/u1/a.jpg");
+    expect(apiMock.discardFavouritePhoto).not.toHaveBeenCalledWith("favourites/u1/b.jpg");
+  });
+
+  it("throws away the pending one when the sheet closes unsaved", async () => {
+    const tree = await render();
+    await act(async () => {
+      one(tree, "Add a photo").props.onPress();
+    });
+    await hide(tree);
+
+    expect(apiMock.discardFavouritePhoto).toHaveBeenCalledWith("favourites/u1/a.jpg");
+  });
+
+  it("keeps the photo of an item that was actually saved", async () => {
+    const tree = await render();
+    await fillFood(tree);
+    await act(async () => {
+      one(tree, "Add a photo").props.onPress();
+    });
+    await act(async () => {
+      saveButton(tree).props.onPress();
+    });
+    await hide(tree);
+
+    expect(onSave).toHaveBeenCalled();
+    expect(apiMock.discardFavouritePhoto).not.toHaveBeenCalled();
+  });
+
+  it("throws away only the last one when several were picked and none saved", async () => {
+    const tree = await render();
+    await act(async () => {
+      one(tree, "Add a photo").props.onPress();
+    });
+    pickReturns("file:///tmp/b.jpg", "favourites/u1/b.jpg");
+    await act(async () => {
+      one(tree, "Change the photo").props.onPress();
+    });
+    await hide(tree);
+
+    expect(apiMock.discardFavouritePhoto.mock.calls.map((c) => c[0])).toEqual([
+      "favourites/u1/a.jpg",
+      "favourites/u1/b.jpg",
+    ]);
+  });
+
+  it("throws away the pending one when the screen unmounts under it", async () => {
+    const tree = await render();
+    await act(async () => {
+      one(tree, "Add a photo").props.onPress();
+    });
+    await act(async () => {
+      tree.unmount();
+    });
+
+    expect(apiMock.discardFavouritePhoto).toHaveBeenCalledWith("favourites/u1/a.jpg");
+  });
+
+  it("discards nothing when no photo was ever picked", async () => {
+    const tree = await render();
+    await fillFood(tree);
+    await hide(tree);
+    expect(apiMock.discardFavouritePhoto).not.toHaveBeenCalled();
+  });
+
+  it("discards nothing when the upload never landed a key", async () => {
+    apiMock.uploadToPresignedUrl.mockRejectedValue(new Error("network"));
+    const tree = await render();
+    await act(async () => {
+      one(tree, "Add a photo").props.onPress();
+    });
+    await hide(tree);
+    expect(apiMock.discardFavouritePhoto).not.toHaveBeenCalled();
+  });
+
+  it("survives a cleanup that fails — it is housekeeping, not the user's problem", async () => {
+    apiMock.discardFavouritePhoto.mockRejectedValue(new Error("s3 down"));
+    const tree = await render();
+    await act(async () => {
+      one(tree, "Add a photo").props.onPress();
+    });
+    await expect(hide(tree)).resolves.toBeUndefined();
   });
 });

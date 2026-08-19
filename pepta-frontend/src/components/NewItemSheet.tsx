@@ -10,7 +10,7 @@
 // than leaving a dead button — a drink with no volume adds nothing, a food
 // with no figures records nothing.
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Modal, Pressable, TextInput, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { api } from '../services/api';
@@ -49,10 +49,35 @@ export function NewItemSheet({ visible, initialKind, onCancel, onSave }: NewItem
   const [photoS3Key, setPhotoS3Key] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [photoError, setPhotoError] = useState('');
+  /**
+   * The uploaded key nothing points at yet. A ref, not state, because the
+   * cleanup below has to read it at the moment the sheet closes — a stale
+   * closure would strand exactly the photo it is there to collect.
+   */
+  const pending = useRef<string | null>(null);
+
+  /**
+   * An upload nothing ended up pointing at. Best-effort — a failed cleanup
+   * leaves one stray file, and there is nothing useful to tell the user about
+   * a photo they had already walked away from.
+   */
+  const discard = (key: string | null) => {
+    if (key) void api.discardFavouritePhoto(key).catch(() => undefined);
+  };
 
   // Cleared on every open, or the next item starts as a copy of the last.
+  //
+  // The close half is where stranded photos get collected. Keying it on the
+  // sheet closing rather than on the Cancel button means the backdrop, the
+  // hardware back gesture and a parent that simply hides the sheet are all
+  // covered by the same line — saving clears `pending` first, so an attached
+  // photo is never swept up.
   useEffect(() => {
-    if (!visible) return;
+    if (!visible) {
+      discard(pending.current);
+      pending.current = null;
+      return;
+    }
     setKind(initialKind);
     setName('');
     setPortion('');
@@ -64,6 +89,11 @@ export function NewItemSheet({ visible, initialKind, onCancel, onSave }: NewItem
     setUploading(false);
     setPhotoError('');
   }, [visible, initialKind]);
+
+  // Navigating away with the sheet open never trips the effect above — React
+  // runs cleanups on unmount, not effect bodies. Its own effect, so it fires
+  // once at the end rather than on every dependency change.
+  useEffect(() => () => discard(pending.current), []);
 
   /**
    * Picks, then uploads to a presigned URL. The local URI is shown the moment
@@ -88,6 +118,10 @@ export function NewItemSheet({ visible, initialKind, onCancel, onSave }: NewItem
         asset.mimeType === 'image/png' || asset.mimeType === 'image/webp' ? asset.mimeType : 'image/jpeg';
       const intent = await api.createFavouritePhotoIntent({ contentType });
       await api.uploadToPresignedUrl(intent.uploadUrl, asset.uri, contentType);
+      // The one this replaces is now referenced by nothing. Fire and forget:
+      // it is housekeeping, and the photo they just picked is what matters.
+      discard(pending.current);
+      pending.current = intent.photoS3Key;
       setPhotoS3Key(intent.photoS3Key);
     } catch {
       // The item is still saveable — the photo is the optional part, and
@@ -272,6 +306,8 @@ export function NewItemSheet({ visible, initialKind, onCancel, onSave }: NewItem
               disabled={!isNewItemValid(draft) || uploading}
               onPress={() => {
                 Haptics.selectionAsync().catch(() => undefined);
+                // The item owns the photo now, so the cleanup must not take it.
+                pending.current = null;
                 onSave(draft);
               }}
             />

@@ -20,6 +20,7 @@ import {
 import { randomUUID } from "node:crypto";
 import { Types } from "mongoose";
 import { FavouriteModel, type FavouriteDocument } from "../models/favourite.model";
+import { NotFoundError, ValidationError } from "../lib/errors";
 
 function toResponse(doc: FavouriteDocument, photoUrl: string | null = null): FavouriteResponse {
   return {
@@ -118,6 +119,34 @@ export async function removeFavourite(userId: string, key: string): Promise<void
   // when it did.
   const photoS3Key = (removed as FavouriteDocument | null)?.photoS3Key;
   if (photoS3Key) await deleteS3Object(photoS3Key).catch(() => undefined);
+}
+
+/**
+ * Throws away a photo that was uploaded and then never attached — a second
+ * pick, or a sheet closed without saving.
+ *
+ * TWO GUARDS, because the client names the key it wants gone. The prefix check
+ * is what stops one account deleting another's file; the reference check is
+ * what stops a confused client deleting a photo that a saved item is still
+ * showing. Neither is a check the caller can be trusted to have done.
+ */
+export async function discardFavouritePhoto(
+  userId: string,
+  photoS3Key: string,
+): Promise<void> {
+  if (!photoS3Key.startsWith(`favourites/${userId}/`)) {
+    throw new NotFoundError("Photo not found");
+  }
+
+  const inUse = await FavouriteModel.exists({
+    userId: new Types.ObjectId(userId),
+    photoS3Key,
+  }).exec();
+  if (inUse) {
+    throw new ValidationError("That photo belongs to a saved item");
+  }
+
+  await deleteS3Object(photoS3Key);
 }
 
 /**
