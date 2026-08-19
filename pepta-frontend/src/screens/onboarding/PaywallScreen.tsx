@@ -28,7 +28,6 @@ import {
   type ViewStyle,
 } from "react-native";
 import * as Haptics from "expo-haptics";
-import { LinearGradient } from "expo-linear-gradient";
 import { Icon } from "../../components/Icon";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "../../theme";

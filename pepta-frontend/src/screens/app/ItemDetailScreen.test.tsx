@@ -4,7 +4,7 @@
 import React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import TestRenderer, { act } from "react-test-renderer";
-import { duplicateLabels, maybeOne, one } from "../../tests/byLabel";
+import { duplicateLabels, one } from "../../tests/byLabel";
 
 const mocks = vi.hoisted(() => ({
   item: null as unknown,

@@ -23,7 +23,6 @@ import {
   Easing,
   Image,
   Linking,
-  Platform,
   Pressable,
   StatusBar,
   StyleSheet,
@@ -32,7 +31,6 @@ import {
   type ImageSourcePropType,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
 import { ConvoGround, GlassButton, Mascot, convo } from '../../components';
 import { PRIVACY_URL, TERMS_URL } from '../../config';
 import { typography } from '../../theme/typography';

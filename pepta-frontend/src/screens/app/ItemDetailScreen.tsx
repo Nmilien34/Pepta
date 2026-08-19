@@ -361,7 +361,6 @@ function Headline({
   caption: string;
   accent: string;
 }) {
-  const theme = useTheme();
   if (value == null) return null;
   return (
     <View>
@@ -380,7 +379,6 @@ function Headline({
 
 /** The secondary figures. A food shows macros; a drink shows electrolytes. */
 function Micros({ scaled, isDrink }: { scaled: ReturnType<typeof scaleItem>; isDrink: boolean }) {
-  const theme = useTheme();
   const rows: [string, string][] = [];
   const add = (label: string, value: number | undefined, unit: string) => {
     if (value != null) rows.push([label, `${value} ${unit}`]);

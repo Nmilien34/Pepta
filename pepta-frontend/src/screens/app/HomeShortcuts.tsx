@@ -13,7 +13,6 @@ import { Image, Pressable, View } from 'react-native';
 import type { ImageSourcePropType } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { AppText, Card } from '../../components';
-import { useTheme } from '../../theme';
 
 export interface Shortcut {
   key: string;
@@ -51,7 +50,6 @@ function Tile({ shortcut }: { shortcut: Shortcut }) {
  * missing.
  */
 export function HomeShortcuts({ shortcuts }: { shortcuts: readonly Shortcut[] }) {
-  const theme = useTheme();
   const rows: Shortcut[][] = [];
   for (let i = 0; i < shortcuts.length; i += 2) rows.push(shortcuts.slice(i, i + 2));
 

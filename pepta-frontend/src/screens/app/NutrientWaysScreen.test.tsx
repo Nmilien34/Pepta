@@ -90,7 +90,7 @@ vi.mock("../../services/api", () => ({
   },
 }));
 vi.mock("@react-native-async-storage/async-storage", () => {
-  let store: Record<string, string> = {};
+  const store: Record<string, string> = {};
   return {
     default: {
       getItem: vi.fn(async (k: string) => store[k] ?? null),
@@ -108,7 +108,7 @@ vi.mock("../../context/LogSheetsContext", () => ({
 }));
 
 import { NutrientWaysScreen } from "./NutrientWaysScreen";
-import { FIBER_FOODS, PROTEIN_FOODS, gramsLabel } from "./nutrientWays";
+import { FIBER_FOODS, gramsLabel } from "./nutrientWays";
 import { duplicateLabels, maybeOne, one } from "../../tests/byLabel";
 
 function homeWith(loggedProtein: number, target: number | null = 120, extra: object = {}) {
