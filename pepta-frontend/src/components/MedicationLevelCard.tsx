@@ -83,7 +83,13 @@ export function MedicationLevelCard({
             })}
           >
             <AppText variant="caption" color="primary" style={{ fontWeight: '800' }}>
-              {Math.round((ml.currentEstimate / Math.max(ml.peakEstimate, 1)) * 100)}%
+              {/* Against the WINDOW's peak, so the pill answers the chart the
+                  user is looking at: 40% of a week's high and 12% of a
+                  90-day high are both true and are different sentences. The
+                  Next-dose ring above stays on home's +/-7 days — it feeds the
+                  reminder, and a reminder-facing number must not move because
+                  someone browsed a chart. */}
+              {Math.round((ml.currentEstimate / Math.max(view.peak || ml.peakEstimate, 1)) * 100)}%
             </AppText>
             <Icon name="chevron-forward" size={13} color={theme.colors.primary} stroke={2.3} />
           </Pressable>
@@ -153,6 +159,12 @@ export function MedicationLevelCard({
                 doses={view.doses}
                 unit={levelUnit}
                 peak={view.peak}
+                // Forward-looking, and deliberately NOT window-scoped: it is
+                // the low point before the next dose, which is the same
+                // number whichever history is on screen. Labelled as that,
+                // rather than sat next to Peak where it would read as this
+                // window's minimum.
+                troughBeforeNextDose={ml.troughEstimate}
               />
               {/* Peak now sits in the chart's own legend row, per the frame.
                   Trough went with the duplicate: troughEstimate is forward-
@@ -163,7 +175,21 @@ export function MedicationLevelCard({
             // A window with nothing in it yet. Never the week curve as a
             // stand-in: seven days under a control reading 90 is the lie this
             // whole change exists to remove.
-            <View style={{ height: 190, alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+            <View style={{ height: 190, justifyContent: 'center' }}>
+              {/* A skeleton at the chart's own height, not an empty box: the
+                  card must not change height when a window lands, or the page
+                  jumps under whoever is reading it. */}
+              <View
+                pointerEvents="none"
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants"
+                style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, justifyContent: 'space-evenly' }}
+              >
+                {[0, 1, 2, 3].map((line) => (
+                  <View key={line} style={{ height: 1, backgroundColor: theme.colors.border }} />
+                ))}
+              </View>
+              <View style={{ alignItems: 'center', gap: 10 }}>
               {range.failed ? (
                 <>
                   <AppText variant="caption" color="textSecondary" align="center">
@@ -186,6 +212,7 @@ export function MedicationLevelCard({
               ) : (
                 <ActivityIndicator color={theme.colors.primary} />
               )}
+              </View>
             </View>
           )}
         </>

@@ -221,3 +221,76 @@ describe('the markers under a wide window', () => {
     ]);
   });
 });
+
+const texts = (tree: TestRenderer.ReactTestRenderer): string => {
+  const out: string[] = [];
+  const walk = (n: TestRenderer.ReactTestInstance) => {
+    for (const c of n.children) {
+      if (typeof c === 'string') out.push(c);
+      else walk(c);
+    }
+  };
+  walk(tree.root);
+  // Joined bare: "{pct}%" renders as two children, and a separator between
+  // them would hide exactly the string under test.
+  return out.join('');
+};
+
+describe('the percentage pill', () => {
+  it('reads against the window on screen, not a frozen week', async () => {
+    // 0.8 of a 1.0 week peak is 80%; of a 4.2 quarter peak it is 19%. Both
+    // true, different sentences — and the pill sits on the chart, so it
+    // answers the chart.
+    const week = await render(rangeState());
+    expect(texts(week)).toContain('80%');
+
+    const quarter = await render(rangeState({ range: 'quarter', fetched: { quarter: wide } }));
+    expect(texts(quarter)).toContain('19%');
+  });
+
+  it('falls back to home\'s peak while a window has nothing yet', async () => {
+    const tree = await render(rangeState({ range: 'quarter', loading: true }));
+
+    // Not 0%, and not a division by zero.
+    expect(texts(tree)).toContain('80%');
+  });
+});
+
+describe('trough', () => {
+  it('is handed to the chart as the pre-next-dose figure, whatever the window', async () => {
+    const week = await render(rangeState());
+    expect(chart(week)!.props.troughBeforeNextDose).toBe(0.2);
+
+    const quarter = await render(rangeState({ range: 'quarter', fetched: { quarter: wide } }));
+    // Window-independent on purpose: it is the low before the next dose, not
+    // this window's minimum.
+    expect(chart(quarter)!.props.troughBeforeNextDose).toBe(0.2);
+  });
+
+  it('is not printed beside Peak, where it would read as the window minimum', async () => {
+    const tree = await render(rangeState({ range: 'quarter', fetched: { quarter: wide } }));
+
+    expect(texts(tree)).not.toContain('Trough');
+  });
+});
+
+describe('the loading frame', () => {
+  it('holds the chart\'s height, so the card does not jump when a window lands', async () => {
+    const loading = await render(rangeState({ range: 'quarter', loading: true }));
+    const frame = loading.root
+      .findAll((n) => String(n.type) === 'View')
+      .find((n) => (n.props.style as { height?: number })?.height === 190);
+
+    expect(frame).toBeTruthy();
+  });
+
+  it('keeps the skeleton out of the accessibility tree', async () => {
+    const tree = await render(rangeState({ range: 'quarter', loading: true }));
+    const skeleton = tree.root
+      .findAll((n) => String(n.type) === 'View')
+      .find((n) => n.props.accessibilityElementsHidden === true);
+
+    expect(skeleton).toBeTruthy();
+    expect(skeleton!.props.importantForAccessibility).toBe('no-hide-descendants');
+  });
+});

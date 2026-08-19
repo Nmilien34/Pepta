@@ -1,11 +1,22 @@
 // Fetching for the medication-level range control.
 //
-// Cached per range, so a user comparing Month against 90d pays for each once.
-// Week is never fetched — /home already carries it.
+// PREFETCHED, so tapping a window is instant. The alternative was a spinner on
+// every first tap of Month, 90d and All — and because a half-loaded window
+// must never draw the week's curve under a wider label, that spinner sat over
+// an empty frame. Three small requests on arrival buy all four windows.
+//
+// A background fetch is deliberately quieter than a chosen one: it never sets
+// `loading` (there is nothing the user is waiting for) and never sets `failed`
+// (there is nothing to tell them about a window they have not asked for). If
+// it failed and they then tap that window, the tap fetches it properly and
+// reports properly.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { LevelRangeKey, MedicationLevelsResponse } from '@pepta/shared';
 import { api } from '../../services/api';
+
+/** Everything except week, which /home already carries. */
+const PREFETCHED: readonly LevelRangeKey[] = ['month', 'quarter', 'all'];
 
 export interface UseLevelRange {
   range: LevelRangeKey;
@@ -17,7 +28,7 @@ export interface UseLevelRange {
   retry: () => void;
 }
 
-export function useLevelRange(): UseLevelRange {
+export function useLevelRange({ enabled }: { enabled: boolean }): UseLevelRange {
   const [range, setRangeState] = useState<LevelRangeKey>('week');
   const [fetched, setFetched] = useState<Partial<Record<LevelRangeKey, MedicationLevelsResponse>>>(
     {},
@@ -31,8 +42,10 @@ export function useLevelRange(): UseLevelRange {
    * double-invokes them — a request fired from inside one goes out twice.
    */
   const held = useRef<Partial<Record<LevelRangeKey, MedicationLevelsResponse>>>({});
-  // The range the in-flight request is for. A slow Month landing after the
-  // user has moved on to 90d must not overwrite what they are looking at.
+  /** In flight right now, so a prefetch and a tap cannot both request one. */
+  const inFlight = useRef(new Set<LevelRangeKey>());
+  // The range the user is actually looking at. A slow Month landing after they
+  // have moved on to 90d must not flip the chart under them.
   const wanted = useRef<LevelRangeKey>('week');
 
   useEffect(() => {
@@ -42,37 +55,64 @@ export function useLevelRange(): UseLevelRange {
     };
   }, []);
 
-  const load = useCallback((next: LevelRangeKey) => {
+  const load = useCallback((next: LevelRangeKey, background: boolean) => {
     if (next === 'week') return; // /home already has it
-    setLoading(true);
-    setFailed(null);
+    if (held.current[next] || inFlight.current.has(next)) return;
+    inFlight.current.add(next);
+    if (!background) {
+      setLoading(true);
+      setFailed(null);
+    }
     api
       .getMedicationLevels(next)
       .then((response) => {
-        if (!alive.current || wanted.current !== next) return;
+        inFlight.current.delete(next);
+        if (!alive.current) return;
+        // Stored whoever asked for it: a prefetch that lands while the user is
+        // elsewhere is exactly the point.
         held.current = { ...held.current, [next]: response };
         setFetched(held.current);
-        setLoading(false);
+        if (wanted.current === next) setLoading(false);
       })
       .catch(() => {
-        if (!alive.current || wanted.current !== next) return;
+        inFlight.current.delete(next);
+        if (!alive.current) return;
+        // A window nobody asked for failing is not news. It will be refetched
+        // if they tap it, and reported then.
+        if (background || wanted.current !== next) return;
         setLoading(false);
         setFailed(next);
       });
   }, []);
+
+  // Warms the other three once there is a curve to window at all. A user with
+  // no doses logged has nothing to prefetch.
+  useEffect(() => {
+    if (!enabled) return;
+    for (const key of PREFETCHED) load(key, true);
+  }, [enabled, load]);
 
   const setRange = useCallback(
     (next: LevelRangeKey) => {
       wanted.current = next;
       setRangeState(next);
       setFailed(null);
-      // Already held: show it immediately and do not re-request.
-      if (!held.current[next]) load(next);
+      if (held.current[next]) {
+        setLoading(false);
+        return; // already warm — this is the whole point of the prefetch
+      }
+      load(next, false);
+      // Already in flight from the prefetch: adopt the wait rather than firing
+      // a second request for the same window.
+      if (inFlight.current.has(next)) setLoading(true);
     },
     [load],
   );
 
-  const retry = useCallback(() => load(wanted.current), [load]);
+  const retry = useCallback(() => {
+    setFailed(null);
+    load(wanted.current, false);
+  }, [load]);
 
   return { range, setRange, fetched, loading, failed, retry };
 }

@@ -96,7 +96,12 @@ export function TrackScreen() {
   );
   const [feedExpanded, setFeedExpanded] = useState(false);
   // ALSO above the early returns, for the same reason as the feed memos.
-  const levelRange = useLevelRange();
+  // Enabled once there is a curve to window — a user with nothing logged has
+  // nothing to prefetch. `home` is read directly here because resolveLevelView
+  // runs below the early returns and this hook cannot.
+  const levelRange = useLevelRange({
+    enabled: (home?.medicationLevels ?? []).some((level) => level.curve.length > 1),
+  });
   // Which shot's report is open, by dose id. Held here rather than in the card
   // so it survives the feed collapsing under it.
   const [openShotId, setOpenShotId] = useState<string | null>(null);

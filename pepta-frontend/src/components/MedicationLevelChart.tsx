@@ -35,6 +35,9 @@ export interface MedicationLevelChartProps {
   unit: string;
   /** Highest level in THIS window — the design's third legend item. */
   peak?: number;
+  /** The low point before the next dose. Window-independent, so it is stated
+   *  as what it is rather than printed beside the window's peak. */
+  troughBeforeNextDose?: number;
   now?: Date;
 }
 
@@ -43,6 +46,7 @@ export function MedicationLevelChart({
   doses = [],
   unit,
   peak,
+  troughBeforeNextDose,
   now = new Date(),
 }: MedicationLevelChartProps) {
   const theme = useTheme();
@@ -80,6 +84,11 @@ export function MedicationLevelChart({
             <AppText variant="caption" color="textTertiary" style={{ marginTop: 4 }}>
               Right now · {formatNow(now)}
             </AppText>
+            {troughBeforeNextDose != null && troughBeforeNextDose > 0 ? (
+              <AppText variant="caption" color="textTertiary" style={{ marginTop: 2 }}>
+                Trough before your next dose · {troughBeforeNextDose.toFixed(decimals)} {unit}
+              </AppText>
+            ) : null}
           </View>
 
           <Svg
