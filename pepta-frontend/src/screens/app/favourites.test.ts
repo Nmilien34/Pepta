@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import type { MealLogResponse } from '@pepta/shared';
 import {
   addFavourite,
+  applyPortionEdit,
   countsByKind,
+  isPortionEditValid,
   favouriteFromOffer,
   favouriteId,
   favouritesOf,
@@ -258,5 +260,59 @@ describe('startingSuggestions', () => {
         else expect(s.protein).toBeGreaterThan(0);
       }
     }
+  });
+});
+
+describe('applyPortionEdit', () => {
+  const chicken = fav('Chicken breast', '6 oz, grilled');
+  const withMacros: Favourite = { ...chicken, protein: 54, calories: 280 };
+
+  it('moves the portion AND the numbers together', () => {
+    const { next } = applyPortionEdit(withMacros, { portion: '8 oz, grilled', protein: 72, calories: 373 }, 'now');
+    expect(next.portion).toBe('8 oz, grilled');
+    expect(next.protein).toBe(72);
+    expect(next.calories).toBe(373);
+  });
+
+  it('re-keys, and says which row to remove — a portion is part of the id', () => {
+    const out = applyPortionEdit(withMacros, { portion: '8 oz, grilled', protein: 72 }, 'now');
+    expect(out.removeId).toBe(withMacros.id);
+    expect(out.next.id).not.toBe(withMacros.id);
+    // Without the removal the user would end up holding both portions.
+    expect(out.next.id).toBe(favouriteId('food', 'Chicken breast', '8 oz, grilled'));
+  });
+
+  it('removes nothing when only the numbers changed', () => {
+    const out = applyPortionEdit(withMacros, { portion: '6 oz, grilled', protein: 56 }, 'now');
+    expect(out.removeId).toBeUndefined();
+    expect(out.next.protein).toBe(56);
+  });
+
+  it('trims, so " 8 oz " and "8 oz" are not two favourites', () => {
+    expect(applyPortionEdit(withMacros, { portion: '  8 oz  ', protein: 72 }, 'now').next.portion).toBe('8 oz');
+  });
+
+  it('drops a figure the edit no longer carries rather than keeping a stale one', () => {
+    const { next } = applyPortionEdit(withMacros, { portion: '6 oz, grilled', calories: 280 }, 'now');
+    expect(next.protein).toBeUndefined();
+  });
+});
+
+describe('isPortionEditValid', () => {
+  const food = { ...fav('Chicken breast', '6 oz'), protein: 54, calories: 280 };
+  const drink = { ...fav('Water bottle', '16 oz', 'drink'), ounces: 16 };
+
+  it('needs portion wording', () => {
+    expect(isPortionEditValid(food, { portion: '  ', protein: 54 })).toBe(false);
+  });
+
+  it('needs a volume on a drink — Log would add nothing without one', () => {
+    expect(isPortionEditValid(drink, { portion: '20 oz' })).toBe(false);
+    expect(isPortionEditValid(drink, { portion: '20 oz', ounces: 20 })).toBe(true);
+  });
+
+  it('needs at least one figure on a food', () => {
+    expect(isPortionEditValid(food, { portion: '8 oz' })).toBe(false);
+    expect(isPortionEditValid(food, { portion: '8 oz', calories: 373 })).toBe(true);
   });
 });

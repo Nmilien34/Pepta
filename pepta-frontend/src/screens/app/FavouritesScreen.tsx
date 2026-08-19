@@ -30,10 +30,12 @@ import { useTheme } from '../../theme';
 import { useFavourites } from './useFavourites';
 import { vesselForOunces, vesselNameForExactOunces } from './hydration';
 import { itemFromFavourite } from './itemDetail';
+import { PortionEditSheet } from '../../components/PortionEditSheet';
 import {
   countsByKind,
   favouriteFromDrinkOffer,
   favouriteFromOffer,
+  applyPortionEdit,
   favouritesOf,
   startingSuggestions,
   worthSaving,
@@ -62,6 +64,7 @@ export function FavouritesScreen() {
   // on Food, the one on Water lands on Drinks.
   const [tab, setTab] = useState<FavouriteKind>(route.params?.kind === 'drink' ? 'drink' : 'food');
   const [editing, setEditing] = useState(false);
+  const [editingPortion, setEditingPortion] = useState<Favourite | null>(null);
 
   const counts = countsByKind(favourites);
   const rows = favouritesOf(favourites, tab);
@@ -224,8 +227,13 @@ export function FavouritesScreen() {
                       Haptics.selectionAsync().catch(() => undefined);
                       navigation.navigate('ItemDetail', { item: itemFromFavourite(fav) });
                     }}
+                    onLongPress={() => {
+                      Haptics.selectionAsync().catch(() => undefined);
+                      setEditingPortion(fav);
+                    }}
                     accessibilityRole="button"
                     accessibilityLabel={`${fav.name} details`}
+                    accessibilityHint="Hold to change the portion"
                     style={({ pressed }) => ({
                       flex: 1,
                       flexDirection: 'row',
@@ -459,10 +467,25 @@ export function FavouritesScreen() {
 
           <AppText variant="caption" color="textTertiary" style={{ fontSize: 10.5, marginTop: 14, lineHeight: 15 }}>
             {tab === 'food'
-              ? 'A favourite logs the portion you saved — not a category. Swipe a row to remove it, or use Edit.'
+              ? 'A favourite logs the portion you saved — not a category. Hold a row to change the portion; swipe to remove.'
               : 'A saved drink also appears in Quick add on the Water screen, so the favourite and the shortcut are the same thing.'}
           </AppText>
         </ScrollView>
+
+        <PortionEditSheet
+          favourite={editingPortion}
+          onCancel={() => setEditingPortion(null)}
+          onSave={(edit) => {
+            const fav = editingPortion;
+            setEditingPortion(null);
+            if (!fav) return;
+            const { removeId, next } = applyPortionEdit(fav, edit, new Date().toISOString());
+            // Order matters: save the new row first, so a failure between the
+            // two leaves the user with a favourite rather than none.
+            save(next);
+            if (removeId) unsave(removeId);
+          }}
+        />
       </SafeAreaView>
     </View>
   );

@@ -55,6 +55,10 @@ vi.mock("react-native-gesture-handler/ReanimatedSwipeable", () => ({
   default: ({ children, renderRightActions }: { children?: React.ReactNode; renderRightActions?: () => React.ReactNode }) =>
     React.createElement("Swipeable", null, renderRightActions?.(), children),
 }));
+vi.mock("../../components/PortionEditSheet", () => ({
+  PortionEditSheet: (props: { favourite: unknown }) =>
+    props.favourite ? React.createElement("PortionEditSheet", props) : null,
+}));
 vi.mock("../../components/Icon", () => ({ Icon: () => null }));
 vi.mock("../../components/VesselIcon", () => ({
   VesselIcon: (props: { vessel: string }) => React.createElement("VesselIcon", props),
@@ -91,8 +95,8 @@ const row = (over: Record<string, unknown>) => ({
   createdAt: "2026-08-17T12:00:00.000Z", updatedAt: "2026-08-17T12:00:00.000Z", ...over,
 });
 
-const chicken = row({ key: "food:chicken-breast:6-oz", name: "Chicken breast", portion: "6 oz, grilled", protein: 54, calories: 280 });
-const bottle = row({ key: "drink:water-bottle:16-oz", kind: "drink", name: "Water bottle", portion: "The one on your desk", ounces: 16 });
+const chicken = row({ key: "food:chicken-breast:6-oz-grilled", name: "Chicken breast", portion: "6 oz, grilled", protein: 54, calories: 280 });
+const bottle = row({ key: "drink:water-bottle:the-one-on-your-desk", kind: "drink", name: "Water bottle", portion: "The one on your desk", ounces: 16 });
 const yogurtRecipe = row({ key: "food:greek-yogurt-berries:1-cup", name: "Greek yogurt + berries", portion: "1 cup, blueberries, honey", protein: 20, calories: 240, source: "recipe" });
 
 async function render(favourites: unknown[], kind?: "food" | "drink") {
@@ -299,9 +303,9 @@ describe("FavouritesScreen · Worth saving", () => {
 });
 
 describe("FavouritesScreen · the right row acts, not the first one", () => {
-  const salmon = row({ key: "food:salmon:6-oz", name: "Salmon", portion: "6 oz fillet", protein: 40, calories: 350 });
+  const salmon = row({ key: "food:salmon:6-oz-fillet", name: "Salmon", portion: "6 oz fillet", protein: 40, calories: 350 });
   const yogurt = row({ key: "food:greek-yogurt:1-cup", name: "Greek yogurt", portion: "1 cup", protein: 20, calories: 140 });
-  const coffee = row({ key: "drink:morning-coffee:12-oz", kind: "drink", name: "Morning coffee", portion: "Black, large mug", ounces: 12 });
+  const coffee = row({ key: "drink:morning-coffee:black-large-mug", kind: "drink", name: "Morning coffee", portion: "Black, large mug", ounces: 12 });
 
   it("logs the third food, with the third food's numbers", async () => {
     const tree = await render([chicken, salmon, yogurt], "food");
@@ -414,7 +418,7 @@ describe("FavouritesScreen · the drinks side", () => {
   });
 
   it("still offers Edit and removes the right drink", async () => {
-    const coffee = row({ key: "drink:morning-coffee:12-oz", kind: "drink", name: "Morning coffee", portion: "Black, large mug", ounces: 12 });
+    const coffee = row({ key: "drink:morning-coffee:black-large-mug", kind: "drink", name: "Morning coffee", portion: "Black, large mug", ounces: 12 });
     const tree = await render([bottle, coffee], "drink");
     press(tree, "Edit");
     await act(async () => {
@@ -425,8 +429,8 @@ describe("FavouritesScreen · the drinks side", () => {
 });
 
 describe("FavouritesScreen · the tabs partition, everywhere", () => {
-  const coffee = row({ key: "drink:morning-coffee:12-oz", kind: "drink", name: "Morning coffee", portion: "Black, large mug", ounces: 12 });
-  const salmon = row({ key: "food:salmon:6-oz", name: "Salmon", portion: "6 oz fillet", protein: 40, calories: 350 });
+  const coffee = row({ key: "drink:morning-coffee:black-large-mug", kind: "drink", name: "Morning coffee", portion: "Black, large mug", ounces: 12 });
+  const salmon = row({ key: "food:salmon:6-oz-fillet", name: "Salmon", portion: "6 oz fillet", protein: 40, calories: 350 });
 
   const mixedTrack = () => {
     const at = (d: number) => new Date(Date.now() - d * 86_400_000).toISOString();
@@ -494,14 +498,14 @@ describe("FavouritesScreen · the tabs partition, everywhere", () => {
 
 describe("FavouritesScreen · swipe to remove", () => {
   it("offers a swipe action on every saved row", async () => {
-    const salmon = row({ key: "food:salmon:6-oz", name: "Salmon", portion: "6 oz fillet", protein: 40, calories: 350 });
+    const salmon = row({ key: "food:salmon:6-oz-fillet", name: "Salmon", portion: "6 oz fillet", protein: 40, calories: 350 });
     const tree = await render([chicken, salmon], "food");
     expect(find(tree, "Remove Chicken breast")).toBeDefined();
     expect(find(tree, "Remove Salmon")).toBeDefined();
   });
 
   it("removes the row that was swiped, not the first", async () => {
-    const salmon = row({ key: "food:salmon:6-oz", name: "Salmon", portion: "6 oz fillet", protein: 40, calories: 350 });
+    const salmon = row({ key: "food:salmon:6-oz-fillet", name: "Salmon", portion: "6 oz fillet", protein: 40, calories: 350 });
     const tree = await render([chicken, salmon], "food");
     await act(async () => {
       find(tree, "Remove Salmon")!.props.onPress();
@@ -525,8 +529,8 @@ describe("FavouritesScreen · swipe to remove", () => {
 });
 
 describe("FavouritesScreen · no two controls answer to one label", () => {
-  const coffee = row({ key: "drink:morning-coffee:12-oz", kind: "drink", name: "Morning coffee", portion: "Black, large mug", ounces: 12 });
-  const salmon = row({ key: "food:salmon:6-oz", name: "Salmon", portion: "6 oz fillet", protein: 40, calories: 350 });
+  const coffee = row({ key: "drink:morning-coffee:black-large-mug", kind: "drink", name: "Morning coffee", portion: "Black, large mug", ounces: 12 });
+  const salmon = row({ key: "food:salmon:6-oz-fillet", name: "Salmon", portion: "6 oz fillet", protein: 40, calories: 350 });
 
   const mixedTrack = () => {
     const at = (d: number) => new Date(Date.now() - d * 86_400_000).toISOString();
@@ -559,5 +563,63 @@ describe("FavouritesScreen · no two controls answer to one label", () => {
     for (const side of ["food", "drink"] as const) {
       expect(duplicateLabels(await render([], side)), side).toEqual([]);
     }
+  });
+});
+
+describe("FavouritesScreen · hold a row to change its portion", () => {
+  const held = (tree: TestRenderer.ReactTestRenderer) =>
+    tree.root.findAll((n) => String(n.type) === "PortionEditSheet")[0];
+
+  it("stays closed until a row is actually held", async () => {
+    expect(held(await render([chicken], "food"))).toBeUndefined();
+  });
+
+  it("opens on the row that was held, not the first", async () => {
+    const salmon = row({ key: "food:salmon:6-oz-fillet", name: "Salmon", portion: "6 oz fillet", protein: 40, calories: 350 });
+    const tree = await render([chicken, salmon], "food");
+    await act(async () => {
+      one(tree, "Salmon details").props.onLongPress();
+    });
+    expect(held(tree)!.props.favourite.name).toBe("Salmon");
+  });
+
+  it("re-keys on save: the new portion is added and the old row removed", async () => {
+    const tree = await render([chicken], "food");
+    await act(async () => {
+      one(tree, "Chicken breast details").props.onLongPress();
+    });
+    await act(async () => {
+      held(tree)!.props.onSave({ portion: "8 oz, grilled", protein: 72, calories: 373 });
+    });
+    expect(mocks.saveFavourite).toHaveBeenCalledWith(
+      expect.objectContaining({ portion: "8 oz, grilled", protein: 72, calories: 373 }),
+    );
+    // The old portion must not linger — a portion is part of the id.
+    expect(mocks.removeFavourite).toHaveBeenCalledWith(chicken.key);
+  });
+
+  it("does not remove anything when only the numbers changed", async () => {
+    const tree = await render([chicken], "food");
+    await act(async () => {
+      one(tree, "Chicken breast details").props.onLongPress();
+    });
+    await act(async () => {
+      held(tree)!.props.onSave({ portion: chicken.portion, protein: 56, calories: 280 });
+    });
+    expect(mocks.saveFavourite).toHaveBeenCalled();
+    expect(mocks.removeFavourite).not.toHaveBeenCalled();
+  });
+
+  it("writes nothing on cancel", async () => {
+    const tree = await render([chicken], "food");
+    await act(async () => {
+      one(tree, "Chicken breast details").props.onLongPress();
+    });
+    await act(async () => {
+      held(tree)!.props.onCancel();
+    });
+    expect(mocks.saveFavourite).not.toHaveBeenCalled();
+    expect(mocks.removeFavourite).not.toHaveBeenCalled();
+    expect(held(tree)).toBeUndefined();
   });
 });

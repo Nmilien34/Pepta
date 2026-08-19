@@ -286,3 +286,56 @@ export function favouriteFromDrinkOffer(
     savedAt,
   };
 }
+
+/**
+ * Editing a saved portion.
+ *
+ * THE PORTION AND THE NUMBERS MOVE TOGETHER, always. Changing "6 oz" to "8 oz"
+ * while the protein stays at 54 g produces a favourite that logs the wrong
+ * figure every time it is tapped — quietly, forever, on the one screen built
+ * for one-tap logging. So an edit takes both, and the caller cannot supply one
+ * without the other.
+ *
+ * The portion is part of the id, so an edit is a NEW favourite: the old row
+ * has to be removed rather than mutated, or the user ends up with both.
+ */
+export interface PortionEdit {
+  portion: string;
+  protein?: number;
+  calories?: number;
+  fiber?: number;
+  ounces?: number;
+}
+
+export interface PortionEditResult {
+  /** The row to remove — absent when the id did not change. */
+  removeId?: string;
+  next: Favourite;
+}
+
+export function applyPortionEdit(
+  fav: Favourite,
+  edit: PortionEdit,
+  savedAt: string,
+): PortionEditResult {
+  const portion = edit.portion.trim();
+  const next: Favourite = {
+    ...fav,
+    id: favouriteId(fav.kind, fav.name, portion),
+    portion,
+    protein: edit.protein,
+    calories: edit.calories,
+    fiber: edit.fiber,
+    ounces: edit.ounces,
+    savedAt,
+  };
+  return next.id === fav.id ? { next } : { removeId: fav.id, next };
+}
+
+/** A portion with no wording, or a drink with no volume, cannot be saved. */
+export function isPortionEditValid(fav: Favourite, edit: PortionEdit): boolean {
+  if (edit.portion.trim().length === 0) return false;
+  if (fav.kind === 'drink') return edit.ounces != null && edit.ounces > 0;
+  // A food with no figures at all would log nothing.
+  return (edit.protein != null && edit.protein > 0) || (edit.calories != null && edit.calories > 0);
+}
