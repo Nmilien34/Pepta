@@ -83,6 +83,7 @@ export function NutrientWaysScreen() {
     navigation.navigate('ItemDetail', {
       item: {
         ...itemFromFood(food, kind),
+        photo: FOOD_PHOTOS[food.key],
         ...(panel
           ? {
               calories: panel.calories,

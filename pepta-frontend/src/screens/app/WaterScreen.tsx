@@ -188,7 +188,11 @@ export function WaterScreen() {
                     Haptics.selectionAsync().catch(() => undefined);
                     const panel = DRINK_PANELS[drink.key];
                     navigation.navigate('ItemDetail', {
-                      item: { ...itemFromDrink(drink), ...(panel ?? {}) },
+                      item: {
+                        ...itemFromDrink(drink),
+                        ...(panel ?? {}),
+                        photo: DRINK_PHOTOS[drink.key],
+                      },
                     });
                   }}
                   accessibilityRole="button"

@@ -4,7 +4,7 @@
 import React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import TestRenderer, { act } from "react-test-renderer";
-import { duplicateLabels, one } from "../../tests/byLabel";
+import { duplicateLabels, maybeOne, one } from "../../tests/byLabel";
 
 const mocks = vi.hoisted(() => ({
   item: null as unknown,
@@ -38,6 +38,7 @@ vi.mock("react-native", () => {
       ScrollView: passthrough("Animated.ScrollView"),
       event: () => () => undefined,
     },
+    Image: passthrough("Image"),
     Pressable: passthrough("Pressable"),
     View: passthrough("View"),
     Text: passthrough("Text"),
@@ -50,8 +51,7 @@ vi.mock("@react-navigation/native", () => ({
   useRoute: () => ({ params: { item: mocks.item } }),
 }));
 vi.mock("react-native-safe-area-context", () => ({
-  SafeAreaView: ({ children }: { children?: React.ReactNode }) => React.createElement("SafeAreaView", null, children),
-  useSafeAreaInsets: () => ({ top: 0, bottom: 34, left: 0, right: 0 }),
+  useSafeAreaInsets: () => ({ top: 44, bottom: 34, left: 0, right: 0 }),
 }));
 vi.mock("../../components", () => {
   const p = (n: string) => ({ children }: { children?: React.ReactNode }) => React.createElement(n, null, children);
@@ -101,13 +101,15 @@ const chicken = {
   calories: 185, protein: 34.7, carbs: 0, fat: 4, satFat: 1.1, fiber: 0, sodium: 83,
   source: "USDA FoodData Central · Chicken breast (171477)",
   note: "Cook a few at once.",
+  photo: 9 as never,
 };
 
 const lmnt = {
   key: "drink:lmnt", kind: "drink" as const, name: "LMNT",
-  servingLabel: "Makes 16 fl oz", servingNoun: "serving",
+  servingLabel: "Makes 16 fl oz", servingNoun: "stick",
   calories: 10, ounces: 16, sodium: 1000, potassium: 200, magnesium: 60,
   source: "LMNT label, one stick",
+  photo: 7 as never,
 };
 
 const home = { profile: { dailyProteinTargetGrams: 120, dailyWaterTargetOz: 100 }, todayProteinGrams: 74, todayFiberGrams: 0, todayWaterOz: 48, todayCalories: 0 };
@@ -172,9 +174,9 @@ describe("ItemDetailScreen · the stepper drives every number", () => {
 
   it("says what a drink adds, in its own unit", async () => {
     const tree = await render(lmnt);
-    expect(button(tree).props.label).toBe("Log 1 serving · 16 oz");
+    expect(button(tree).props.label).toBe("Log 1 stick · 16 oz");
     act(() => one(tree, "One more").props.onPress());
-    expect(button(tree).props.label).toBe("Log 2 servings · 32 oz");
+    expect(button(tree).props.label).toBe("Log 2 sticks · 32 oz");
     expect(texts(tree)).toContain("2000"); // sodium doubled
   });
 });
@@ -253,5 +255,65 @@ describe("ItemDetailScreen · what it says about today, and about itself", () =>
   it("no two controls answer to one label", async () => {
     expect(duplicateLabels(await render(chicken))).toEqual([]);
     expect(duplicateLabels(await render(lmnt))).toEqual([]);
+  });
+});
+
+describe("ItemDetailScreen · the hero, per the frame", () => {
+  it("shows the item's photo, contained rather than cropped", async () => {
+    const tree = await render(chicken);
+    const img = tree.root.findAll((n) => String(n.type) === "Image")[0];
+    expect(img).toBeDefined();
+    // A cropped packshot is a bottle you cannot recognise.
+    expect(img!.props.resizeMode).toBe("contain");
+    expect(img!.props.source).toBe(chicken.photo);
+  });
+
+  it("renders no image element at all when the item has no photo", async () => {
+    const tree = await render({ ...chicken, photo: undefined });
+    expect(tree.root.findAll((n) => String(n.type) === "Image")).toHaveLength(0);
+  });
+
+  it("keeps back and the star reachable over the photo", async () => {
+    const tree = await render(chicken);
+    expect(one(tree, "Back")).toBeDefined();
+    expect(one(tree, "Save Chicken breast to favourites")).toBeDefined();
+  });
+
+  it("flips the star's label once it is saved", async () => {
+    mocks.getFavourites.mockResolvedValue({
+      favourites: [{
+        id: "r", key: "food:chicken-breast:4-oz-cooked", kind: "food",
+        name: "Chicken breast", portion: "4 oz, cooked", source: "item",
+        createdAt: "", updatedAt: "",
+      }],
+      suggestions: [],
+    });
+    const tree = await render(chicken);
+    expect(maybeOne(tree, "Remove Chicken breast from favourites")).toBeDefined();
+  });
+});
+
+describe("ItemDetailScreen · the drink side", () => {
+  it("counts in the drink's own noun, not a generic serving", async () => {
+    const tree = await render(lmnt);
+    expect(button(tree).props.label).toBe("Log 1 stick · 16 oz");
+    act(() => one(tree, "One more").props.onPress());
+    expect(button(tree).props.label).toBe("Log 2 sticks · 32 oz");
+  });
+
+  it("lists electrolytes where a food lists macros", async () => {
+    const out = texts(await render(lmnt));
+    expect(out).toContain("SODIUM");
+    expect(out).toContain("POTASSIUM");
+    expect(out).toContain("MAGNESIUM");
+    expect(out).not.toContain("CARBS");
+  });
+
+  it("moves the water number, never protein", async () => {
+    const out = texts(await render(lmnt));
+    expect(out).toContain("Water");
+    expect(out).toContain("48");
+    expect(out).toContain("64");
+    expect(out).not.toContain("Protein");
   });
 });

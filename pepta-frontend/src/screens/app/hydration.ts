@@ -133,15 +133,20 @@ export interface HydrationExample {
   fact: string;
   /** Ounces logged when tapped. */
   ounces: number;
+  /**
+   * What ONE of them is called. "Log 1 stick · 16 oz" tells you more than
+   * "Log 1 serving", and the frame's button says stick.
+   */
+  servingNoun: string;
 }
 
 export const HYDRATION_EXAMPLES: readonly HydrationExample[] = [
-  { key: 'vita-coco', brand: 'Vita Coco', name: 'Coconut water, original', volume: '16.9 fl oz', fact: 'Potassium 470 mg', ounces: 16.9 },
-  { key: 'lmnt', brand: 'LMNT', name: 'Lemonade + iced tea stick', volume: 'Makes 16 fl oz', fact: 'Sodium 1,000 mg', ounces: 16 },
-  { key: 'liquid-iv', brand: 'Liquid I.V.', name: 'Hydration multiplier stick', volume: 'Makes 16 fl oz', fact: 'Sodium 500 mg', ounces: 16 },
-  { key: 'nuun', brand: 'Nuun Sport', name: 'Lemon lime tablet', volume: 'Makes 16 fl oz', fact: 'Sodium 300 mg', ounces: 16 },
-  { key: 'kirkland-coconut', brand: 'Kirkland', name: 'Organic coconut water', volume: '14 fl oz', fact: 'Potassium 590 mg', ounces: 14 },
-  { key: 'helenvita', brand: 'Helenvita', name: 'Electrolyte tablet', volume: 'Makes 8.5 oz', fact: 'Minerals + vitamins', ounces: 8.5 },
+  { key: 'vita-coco', brand: 'Vita Coco', name: 'Coconut water, original', volume: '16.9 fl oz', fact: 'Potassium 470 mg', ounces: 16.9, servingNoun: 'carton' },
+  { key: 'lmnt', brand: 'LMNT', name: 'Lemonade + iced tea stick', volume: 'Makes 16 fl oz', fact: 'Sodium 1,000 mg', ounces: 16, servingNoun: 'stick' },
+  { key: 'liquid-iv', brand: 'Liquid I.V.', name: 'Hydration multiplier stick', volume: 'Makes 16 fl oz', fact: 'Sodium 500 mg', ounces: 16, servingNoun: 'stick' },
+  { key: 'nuun', brand: 'Nuun Sport', name: 'Lemon lime tablet', volume: 'Makes 16 fl oz', fact: 'Sodium 300 mg', ounces: 16, servingNoun: 'tablet' },
+  { key: 'kirkland-coconut', brand: 'Kirkland', name: 'Organic coconut water', volume: '14 fl oz', fact: 'Potassium 590 mg', ounces: 14, servingNoun: 'bottle' },
+  { key: 'helenvita', brand: 'Helenvita', name: 'Electrolyte tablet', volume: 'Makes 8.5 oz', fact: 'Minerals + vitamins', ounces: 8.5, servingNoun: 'tablet' },
 ];
 
 /** "of your 100 oz goal", or nothing to compare against yet. */

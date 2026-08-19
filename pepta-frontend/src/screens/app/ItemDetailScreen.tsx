@@ -14,9 +14,9 @@
 // underneath; Pep's note is the only judgement on the screen and it says so.
 
 import React, { useMemo, useRef, useState } from 'react';
-import { Animated, Pressable, View } from 'react-native';
+import { Animated, Image, Pressable, View } from 'react-native';
 import { useNavigation, useRoute, type NavigationProp, type RouteProp } from '@react-navigation/native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { AppText, Button, Card } from '../../components';
 import { Icon } from '../../components/Icon';
@@ -37,8 +37,11 @@ import {
 
 export type ItemDetailParams = { item: DetailItem };
 
-/** Where the title hands over from the page to the nav bar. */
-const COLLAPSE_AT = 56;
+/** The photo's height, and where the title hands over to the nav bar. */
+const HERO_HEIGHT = 212;
+/** The sheet rides up over the photo by this much, per the frame. */
+const SHEET_OVERLAP = 26;
+const COLLAPSE_AT = HERO_HEIGHT - 80;
 
 export function ItemDetailScreen() {
   const theme = useTheme();
@@ -143,44 +146,51 @@ export function ItemDetailScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.bg }}>
-      <SafeAreaView edges={['top']} style={{ flex: 1 }}>
-        {/* The nav bar is always here; only its title fades in, so nothing
-            ever slides under the status area. */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 20, paddingTop: 4, paddingBottom: 8 }}>
-          <Pressable
-            onPress={() => navigation.goBack()}
-            hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
-            accessibilityRole="button"
-            accessibilityLabel="Back"
-          >
-            <Icon name="chevron-back" size={25} color={theme.colors.textSecondary} stroke={2.4} />
-          </Pressable>
-          <Animated.View style={{ flex: 1, opacity: navTitleOpacity }}>
-            <AppText variant="cardTitle" style={{ fontSize: 16 }} numberOfLines={1}>
-              {item.name}
-            </AppText>
-          </Animated.View>
-          <Pressable
-            onPress={toggleStar}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-            accessibilityRole="button"
-            accessibilityLabel={starred ? `Remove ${item.name} from favourites` : `Save ${item.name} to favourites`}
-            style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
-          >
-            <Icon name="star" size={21} color={starred ? theme.colors.warning : theme.colors.border} stroke={2.2} />
-          </Pressable>
+      <Animated.ScrollView
+        contentContainerStyle={{ paddingBottom: 24 }}
+        showsVerticalScrollIndicator={false}
+        scrollEventThrottle={16}
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
+          useNativeDriver: true,
+        })}
+      >
+        {/* The hero. CONTAINED, never cropped — these are packshots, and a
+            cropped bottle is a bottle you cannot recognise. */}
+        <View style={{ height: HERO_HEIGHT, backgroundColor: theme.colors.bg }}>
+          {item.photo ? (
+            <Image source={item.photo} resizeMode="contain" style={{ width: '100%', height: '100%' }} />
+          ) : null}
+          {/* Fades the photo into the sheet rather than cutting it off. */}
+          <View
+            pointerEvents="none"
+            style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 70, backgroundColor: theme.colors.bg, opacity: 0.001 }}
+          />
         </View>
 
-        <Animated.ScrollView
-          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 24 }}
-          showsVerticalScrollIndicator={false}
-          scrollEventThrottle={16}
-          onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
-            useNativeDriver: true,
-          })}
+        {/* The sheet rides up over the photo. */}
+        <View
+          style={{
+            backgroundColor: theme.colors.bg,
+            borderTopLeftRadius: 26,
+            borderTopRightRadius: 26,
+            marginTop: -SHEET_OVERLAP,
+            paddingTop: 10,
+            paddingHorizontal: 20,
+            paddingBottom: 8,
+          }}
         >
+          <View
+            style={{
+              alignSelf: 'center',
+              width: 38,
+              height: 4,
+              borderRadius: 2,
+              backgroundColor: theme.colors.border,
+              marginBottom: 10,
+            }}
+          />
           <Animated.View style={{ opacity: heroOpacity }}>
-            <AppText variant="screenTitle" style={{ fontSize: 26 }}>{item.name}</AppText>
+            <AppText variant="screenTitle" style={{ fontSize: 24, lineHeight: 28 }}>{item.name}</AppText>
             {item.subtitle ? (
               <AppText variant="caption" color="textTertiary" style={{ fontSize: 11.5, marginTop: 4, lineHeight: 16 }}>
                 {item.subtitle} · {item.servingLabel} per {item.servingNoun}
@@ -323,7 +333,53 @@ export function ItemDetailScreen() {
               Source: {item.source}
             </AppText>
           ) : null}
-        </Animated.ScrollView>
+        </View>
+      </Animated.ScrollView>
+
+      {/* A nav bar that fades in as the photo scrolls away, so the title never
+          slides under the clock. */}
+      <Animated.View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          paddingTop: insets.top,
+          paddingBottom: 10,
+          backgroundColor: theme.colors.bg,
+          borderBottomWidth: 0.5,
+          borderBottomColor: theme.colors.border,
+          opacity: navTitleOpacity,
+        }}
+      >
+        <AppText variant="cardTitle" style={{ fontSize: 16, textAlign: 'center', paddingHorizontal: 64 }} numberOfLines={1}>
+          {item.name}
+        </AppText>
+      </Animated.View>
+
+      {/* The two circles ride above both, so back and star are reachable at
+          every scroll position. */}
+      <View
+        style={{
+          position: 'absolute',
+          top: insets.top + 12,
+          left: 14,
+          right: 14,
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+        }}
+      >
+        <FloatingButton label="Back" onPress={() => navigation.goBack()}>
+          <Icon name="chevron-back" size={19} color={theme.colors.textPrimary} stroke={2.4} />
+        </FloatingButton>
+        <FloatingButton
+          label={starred ? `Remove ${item.name} from favourites` : `Save ${item.name} to favourites`}
+          onPress={toggleStar}
+        >
+          <Icon name="star" size={18} color={starred ? theme.colors.warning : theme.colors.textTertiary} stroke={2.2} />
+        </FloatingButton>
+      </View>
 
         <View
           style={{
@@ -337,8 +393,42 @@ export function ItemDetailScreen() {
         >
           <Button label={logButtonLabel(item, servings)} onPress={logIt} disabled={logging} />
         </View>
-      </SafeAreaView>
     </View>
+  );
+}
+
+/** A control that sits on the photo: white disc, soft shadow, always reachable. */
+function FloatingButton({
+  label,
+  onPress,
+  children,
+}: {
+  label: string;
+  onPress: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={({ pressed }) => ({
+        width: 34,
+        height: 34,
+        borderRadius: 17,
+        backgroundColor: 'rgba(255,255,255,0.92)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: '#1E1812',
+        shadowOpacity: 0.16,
+        shadowRadius: 3,
+        shadowOffset: { width: 0, height: 1 },
+        opacity: pressed ? 0.7 : 1,
+      })}
+    >
+      {children}
+    </Pressable>
   );
 }
 

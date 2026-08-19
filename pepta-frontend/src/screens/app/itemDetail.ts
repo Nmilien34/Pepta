@@ -11,6 +11,7 @@
 //
 // Pure and RN-free.
 
+import type { ImageSourcePropType } from 'react-native';
 import type { NutrientFood, NutrientKind } from './nutrientWays';
 import type { HydrationExample } from './hydration';
 import type { Favourite } from './favourites';
@@ -46,6 +47,8 @@ export interface DetailItem {
   source?: string;
   /** Pep's opinion. The only one on the screen, and labelled as one. */
   note?: string;
+  /** The hero. Shown contained, not cropped — a packshot must not be cut. */
+  photo?: ImageSourcePropType;
 }
 
 /** Every figure, multiplied by the amount about to be logged. */
@@ -190,10 +193,12 @@ export function itemFromDrink(drink: HydrationExample): DetailItem {
   return {
     key: `drink:${drink.key}`,
     kind: 'drink',
+    // Brand first, matching the row that was tapped — landing on a screen
+    // titled something other than what you pressed is disorienting.
     name: drink.brand,
-    subtitle: drink.name,
+    subtitle: `${drink.name} · ${drink.volume}`,
     servingLabel: drink.volume,
-    servingNoun: 'serving',
+    servingNoun: drink.servingNoun,
     ounces: drink.ounces,
   };
 }
