@@ -6,8 +6,8 @@
 // calories / protein / fiber / water vs. their profile targets, logging streak,
 // setup progress, latest weight, and the first insight.
 
-import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, View } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Switch, View } from 'react-native';
 import { Icon } from "../../components/Icon";
 import * as Haptics from 'expo-haptics';
 import { useNavigation, type NavigationProp } from '@react-navigation/native';
@@ -60,8 +60,29 @@ function formatSyncTime(iso: string): string {
 export function HomeScreen() {
   const theme = useTheme();
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
-  const { home, track, homeLoading, homeError, homeRefreshing, homeRange, refreshHome, refreshTrack, schedules, cycles, refreshScheduling, bumpProtein, bumpWater, bumpFiber, pendingLogs, lastSyncedAt } = usePeptaData();
+  const { home, track, homeLoading, homeError, homeRefreshing, homeRange, refreshHome, refreshTrack, schedules, cycles, refreshScheduling, bumpProtein, bumpWater, bumpFiber, pendingLogs, lastSyncedAt, saveLog, deleteLog } = usePeptaData();
   const { openQuickLog, openMeal } = useLogSheets();
+  /**
+   * Today's resistance log id. A ref because the handler is declared above the
+   * early returns — where hooks must live — and `activity` is built below
+   * them; the ref is read at tap time, by which point it is set.
+   */
+  const resistanceLogRef = useRef<string | null>(null);
+
+  /**
+   * Turning the row on writes an activity log for today; turning it off
+   * removes the one that carried it. Logs are create-and-soft-delete — there
+   * is no edit — so "off" has to mean the record goes, not that a second log
+   * says the opposite.
+   */
+  const setResistanceToday = (next: boolean) => {
+    if (next) {
+      void saveLog('activity', { resistanceTraining: true, datetime: new Date().toISOString() });
+      return;
+    }
+    const id = resistanceLogRef.current;
+    if (id) void deleteLog('activity', id);
+  };
   // When "Log a shot" is on the level card, and whether it beats. Dose LOGS,
   // not medicationLevels — the level list excludes unmodelled and oral
   // compounds, so reading it here would leave those users pulsing forever no
@@ -153,6 +174,7 @@ export function HomeScreen() {
   const selectedRange = home.selectedRange ?? homeRange;
   const rangeAvailability = home.rangeAvailability ?? { today: true, week: false, month: false, year: false };
   const activity = buildActivity(track, home.profile, new Date(), selectedRange, home.rangeTotals);
+  resistanceLogRef.current = activity.resistanceLogId;
   const todaysLog = buildTodaysLog(track, home, new Date(), selectedRange);
   // Three of the four designed tiles have somewhere to go. Recipes does not —
   // its screen is designed but unbuilt — so it is left out rather than shipped
@@ -544,7 +566,11 @@ export function HomeScreen() {
 
           {/* activity */}
           <Reveal delay={280} style={{ marginTop: 12 }}>
-            <ActivityCard activity={activity} onLog={() => openQuickLog('activity')} />
+            <ActivityCard
+              activity={activity}
+              onLog={() => openQuickLog('activity')}
+              onSetResistance={setResistanceToday}
+            />
           </Reveal>
 
           {/* today's log */}
@@ -1204,16 +1230,16 @@ function HomeWeightPulseCard({
             {pulse.detail}
           </AppText>
         </View>
-        {hasWeight ? (
-          <View style={{ alignItems: 'flex-end' }}>
-            <AppText variant="statMedium" style={{ color: theme.colors.weight }}>
-              {pulse.latestLabel}
-            </AppText>
-            <AppText variant="caption" color="textTertiary" style={{ fontSize: 10 }}>
-              latest
-            </AppText>
-          </View>
-        ) : null}
+        <View style={{ alignItems: 'flex-end' }}>
+          {/* A dash, not a blank: the frame shows "— lb" so the card keeps its
+              shape and reads as waiting rather than broken. */}
+          <AppText variant="statMedium" style={{ color: theme.colors.weight }}>
+            {hasWeight ? pulse.latestLabel : '—'}
+          </AppText>
+          <AppText variant="caption" color="textTertiary" style={{ fontSize: 10 }}>
+            {hasWeight ? 'latest' : 'no weigh-in yet'}
+          </AppText>
+        </View>
       </View>
       {goal ? <MilestoneTrackView goal={goal} /> : null}
       <View style={{ marginTop: 14, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -1248,7 +1274,15 @@ function HomeWeightPulseCard({
   );
 }
 
-function ActivityCard({ activity, onLog }: { activity: ActivitySummary; onLog(): void }) {
+function ActivityCard({
+  activity,
+  onLog,
+  onSetResistance,
+}: {
+  activity: ActivitySummary;
+  onLog(): void;
+  onSetResistance(next: boolean): void;
+}) {
   const theme = useTheme();
   const stepsPct = activity.stepTarget > 0 ? Math.min(1, activity.steps / activity.stepTarget) : 0;
   const workoutPct = activity.workoutTarget > 0 ? Math.min(1, activity.workoutMin / activity.workoutTarget) : 0;
@@ -1313,6 +1347,41 @@ function ActivityCard({ activity, onLog }: { activity: ActivitySummary; onLog():
       </View>
       <View style={{ marginTop: 8 }}>
         <ProgressBar pct={workoutPct} color={theme.colors.activity} height={6} />
+      </View>
+      {/* The one row on Home that feeds Muscle protection directly, and says
+          so. Lifting is what protects lean mass on a GLP-1, and it is a
+          yes/no about today rather than a number to enter — so it is a switch
+          and not another field. */}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 10,
+          marginTop: 14,
+          paddingTop: 12,
+          borderTopWidth: 0.5,
+          borderTopColor: theme.colors.border,
+        }}
+      >
+        <View style={{ flexShrink: 1 }}>
+          <AppText variant="caption" style={{ fontWeight: '700' }}>
+            Resistance today
+          </AppText>
+          <AppText variant="caption" color="textTertiary" style={{ fontSize: 10.5, marginTop: 2 }}>
+            Counts toward muscle protection
+          </AppText>
+        </View>
+        <Switch
+          value={activity.resistanceToday}
+          onValueChange={(next) => {
+            Haptics.selectionAsync().catch(() => undefined);
+            onSetResistance(next);
+          }}
+          accessibilityLabel="Resistance training today"
+          trackColor={{ false: theme.colors.surfaceAlt, true: theme.colors.activity }}
+          thumbColor="#FFFFFF"
+        />
       </View>
     </Card>
   );

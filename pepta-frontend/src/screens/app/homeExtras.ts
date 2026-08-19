@@ -36,6 +36,14 @@ export interface ActivitySummary {
   stepTarget: number;
   workoutMin: number;
   workoutTarget: number;
+  /**
+   * Resistance training logged TODAY, whatever the selected range. It is a
+   * yes/no about today — the frame's row reads "Resistance today" — so a
+   * week's worth of them cannot be summed into it.
+   */
+  resistanceToday: boolean;
+  /** The log carrying it, so turning the row off can remove it. */
+  resistanceLogId: string | null;
 }
 
 export function buildActivity(
@@ -65,7 +73,22 @@ export function buildActivity(
       ? serverTotals.workoutMinutes ?? 0
       : items.reduce((s, a) => s + (a.workoutMinutes ?? 0), 0),
     workoutTarget: 30 * days,
+    ...resistanceState(track, now),
   };
+}
+
+/** Today's resistance log, if there is one. Always today, never the range. */
+function resistanceState(
+  track: TrackResponse | null,
+  now: Date,
+): { resistanceToday: boolean; resistanceLogId: string | null } {
+  const today = (track?.activityLogs ?? []).find(
+    (log) =>
+      log.deletedAt == null &&
+      log.resistanceTraining === true &&
+      inLocalRange(log.datetime, now, 'today'),
+  );
+  return { resistanceToday: today != null, resistanceLogId: today?.id ?? null };
 }
 
 export type LogKind = 'shot' | 'meal' | 'water' | 'protein' | 'weight' | 'sideEffect' | 'measurement' | 'activity';

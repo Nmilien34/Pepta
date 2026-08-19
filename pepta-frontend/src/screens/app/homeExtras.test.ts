@@ -107,3 +107,52 @@ describe('buildTodaysLog', () => {
     expect(chips).toEqual([{ kind: 'water', label: '16 oz' }]);
   });
 });
+
+describe('resistance today', () => {
+  const activityLog = (over: Record<string, unknown>) => ({
+    id: 'a1',
+    datetime: new Date().toISOString(),
+    steps: 0,
+    workoutMinutes: 0,
+    resistanceTraining: false,
+    deletedAt: null,
+    ...over,
+  });
+
+  const withLogs = (logs: unknown[]) =>
+    buildActivity({ activityLogs: logs } as never, null, new Date(), 'today');
+
+  it('is on when today carries a resistance log, and names it', () => {
+    const view = withLogs([activityLog({ id: 'r1', resistanceTraining: true })]);
+
+    expect(view.resistanceToday).toBe(true);
+    expect(view.resistanceLogId).toBe('r1');
+  });
+
+  it('is off without one', () => {
+    expect(withLogs([activityLog({ steps: 4000 })]).resistanceToday).toBe(false);
+    expect(withLogs([]).resistanceLogId).toBeNull();
+  });
+
+  it('ignores a deleted one', () => {
+    const view = withLogs([
+      activityLog({ id: 'r1', resistanceTraining: true, deletedAt: new Date().toISOString() }),
+    ]);
+
+    expect(view.resistanceToday).toBe(false);
+  });
+
+  it('stays about TODAY even when the card is showing a wider range', () => {
+    // "Resistance today" is a yes/no about today; a week of them cannot be
+    // summed into it.
+    const yesterday = new Date(Date.now() - 36 * 60 * 60 * 1000).toISOString();
+    const view = buildActivity(
+      { activityLogs: [activityLog({ id: 'old', resistanceTraining: true, datetime: yesterday })] } as never,
+      null,
+      new Date(),
+      'week',
+    );
+
+    expect(view.resistanceToday).toBe(false);
+  });
+});

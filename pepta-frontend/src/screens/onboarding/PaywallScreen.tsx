@@ -374,7 +374,7 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
               Never wonder what’s in your body again
             </AppText>
             <AppText variant="caption" color="textSecondary" align="center">
-              The only tracker your protocol will ever need.
+              Here is what you get today.
             </AppText>
           </Rise>
 

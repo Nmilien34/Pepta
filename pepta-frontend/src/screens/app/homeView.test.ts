@@ -165,13 +165,17 @@ describe('buildHomeView', () => {
     expect(view.protein.pct).toBe(0);
   });
 
-  it('asks for a first scale check when there is no logged weight', () => {
+  it('asks for a baseline when there is no logged weight', () => {
     const view = buildHomeView(buildHome({ latestWeight: null }));
+    // The frame keeps the card's ordinary title and lets the line do the
+    // asking — it says what a baseline buys them rather than instructing
+    // them to produce one.
     expect(view.weightPulse).toMatchObject({
-      title: 'Add your first scale check',
+      title: 'Weight',
       latestLabel: null,
-      actionLabel: 'Add weight',
+      actionLabel: 'Add your first weight',
     });
+    expect(view.weightPulse.detail).toBe('A baseline makes your timeline useful from day one.');
   });
 });
 

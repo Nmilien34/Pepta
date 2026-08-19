@@ -57,6 +57,7 @@ vi.mock("react-native", () => {
     Platform: { OS: "ios" },
     StyleSheet: { create: (s: unknown) => s, absoluteFill: {}, hairlineWidth: 1 },
     Dimensions: { get: () => ({ width: 402, height: 874 }) },
+    Switch: passthrough('Switch'),
     Pressable: passthrough("Pressable"),
     RefreshControl: "RefreshControl",
     ScrollView: passthrough("ScrollView"),

@@ -245,10 +245,13 @@ export function buildHomeView(home: HomeResponse): HomeView {
         actionLabel: 'Log weight',
       }
     : {
-        title: 'Add your first scale check',
-        detail: 'A baseline weight makes your progress timeline useful from day one.',
+        title: 'Weight',
+        // The frame's first-run copy: the card keeps its ordinary title, and
+        // the line says what a baseline BUYS them rather than instructing
+        // them to produce one.
+        detail: 'A baseline makes your timeline useful from day one.',
         latestLabel: null,
-        actionLabel: 'Add weight',
+        actionLabel: 'Add your first weight',
       };
 
   return {
