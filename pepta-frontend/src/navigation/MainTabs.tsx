@@ -27,6 +27,7 @@ import { WaterScreen } from "../screens/app/WaterScreen";
 import { FavouritesScreen } from "../screens/app/FavouritesScreen";
 import { RecipesScreen } from "../screens/app/RecipesScreen";
 import { NewRecipeScreen } from "../screens/app/NewRecipeScreen";
+import { ItemDetailScreen } from "../screens/app/ItemDetailScreen";
 import { LibraryEntryScreen } from "../screens/app/LibraryEntryScreen";
 import { FoodHistoryScreen } from "../screens/app/FoodHistoryScreen";
 import { WeightDetailScreen } from "../screens/app/WeightDetailScreen";
@@ -53,6 +54,7 @@ export function MainTabs() {
         <Stack.Screen name="Favourites" component={FavouritesScreen} />
         <Stack.Screen name="Recipes" component={RecipesScreen} />
         <Stack.Screen name="NewRecipe" component={NewRecipeScreen} />
+        <Stack.Screen name="ItemDetail" component={ItemDetailScreen} />
         <Stack.Screen name="FoodHistory" component={FoodHistoryScreen} />
         <Stack.Screen name="WeightDetail" component={WeightDetailScreen} />
         <Stack.Screen name="WidgetSetup" component={WidgetSetupScreen} />

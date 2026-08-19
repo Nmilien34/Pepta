@@ -109,7 +109,7 @@ vi.mock("../../context/LogSheetsContext", () => ({
 
 import { NutrientWaysScreen } from "./NutrientWaysScreen";
 import { FIBER_FOODS, PROTEIN_FOODS, gramsLabel } from "./nutrientWays";
-import { duplicateLabels, maybeOne } from "../../tests/byLabel";
+import { duplicateLabels, maybeOne, one } from "../../tests/byLabel";
 
 function homeWith(loggedProtein: number, target: number | null = 120, extra: object = {}) {
   return {
@@ -341,64 +341,67 @@ describe("NutrientWaysScreen · tapping a food", () => {
       .findAll((n) => String(n.type) === "Pressable")
       .find((p) => String(p.props.accessibilityLabel).includes(needle));
 
-  it("seeds the meal sheet with the food, not a blank chooser", () => {
+  it("opens the detail screen from the row body", () => {
     const tree = render(fiberHome(12), "fiber");
     act(() => {
-      rowFor(tree, "Edamame")!.props.onPress();
+      rowFor(tree, "Edamame, 1 cup, shelled")!.props.onPress();
     });
-    expect(mocks.openMeal).toHaveBeenCalledWith(
-      expect.objectContaining({ foodName: "Edamame", servingSize: "1 cup, shelled" }),
+    expect(mocks.navigate).toHaveBeenCalledWith(
+      "ItemDetail",
+      expect.objectContaining({ item: expect.objectContaining({ name: "Edamame" }) }),
     );
-    // The fiber seeded is whatever the (looked-up) list states — asserted
-    // against the source rather than a copy of it, so a correction to the
-    // figures does not read as a regression here.
-    const seed = mocks.openMeal.mock.calls[0]![0] as { fiber?: number; calories?: number };
-    const edamame = FIBER_FOODS.find((f) => f.key === "edamame")!;
-    expect(seed.fiber).toBe(edamame.amount);
-    expect(seed.calories).toBe(edamame.calories);
+    // The row is a door now, not a log.
+    expect(mocks.openMeal).not.toHaveBeenCalled();
   });
 
-  it("seeds protein on the protein side", () => {
+  it("opens detail from the strip photo too — the frame says tap the photos", () => {
+    const tree = render(fiberHome(12), "fiber");
+    const avocado = FIBER_FOODS.find((f) => f.key === "avocado")!;
+    act(() => {
+      one(tree, `Avocado, ${gramsLabel(avocado.amount)} of fiber`).props.onPress();
+    });
+    expect(mocks.navigate).toHaveBeenCalledWith(
+      "ItemDetail",
+      expect.objectContaining({ item: expect.objectContaining({ name: "Avocado" }) }),
+    );
+  });
+
+  it("carries the looked-up panel into detail, source and all", () => {
     const tree = render(homeWith(74), "protein");
     act(() => {
-      rowFor(tree, "Chicken breast")!.props.onPress();
+      one(tree, "Log Chicken breast");
     });
-    const chicken = PROTEIN_FOODS.find((f) => f.key === "chicken")!;
-    expect(mocks.openMeal).toHaveBeenCalledWith({
-      foodName: "Chicken breast",
-      servingSize: "4 oz, cooked",
-      calories: chicken.calories,
-      protein: chicken.amount,
+    act(() => {
+      rowFor(tree, "Chicken breast, 4 oz, cooked")!.props.onPress();
     });
+    const item = (mocks.navigate.mock.calls.at(-1)![1] as { item: Record<string, unknown> }).item;
+    expect(item.source).toMatch(/USDA/);
+    expect(item.sodium).toBeGreaterThan(0);
+    expect(item.satFat).toBeGreaterThan(0);
+  });
+
+  it("still logs straight from the plus, seeded with the food", () => {
+    const tree = render(fiberHome(12), "fiber");
+    act(() => {
+      one(tree, "Log Edamame").props.onPress();
+    });
+    const edamame = FIBER_FOODS.find((f) => f.key === "edamame")!;
+    expect(mocks.openMeal).toHaveBeenCalledWith(
+      expect.objectContaining({
+        foodName: "Edamame",
+        servingSize: "1 cup, shelled",
+        fiber: edamame.amount,
+      }),
+    );
+    expect(mocks.navigate).not.toHaveBeenCalled();
   });
 
   it("never invents the macro this screen did not measure", () => {
-    // Edamame HAS protein; this screen does not know how much, and logging 0
-    // would quietly understate the user's protein for the day.
     const tree = render(fiberHome(12), "fiber");
     act(() => {
-      rowFor(tree, "Edamame")!.props.onPress();
+      one(tree, "Log Edamame").props.onPress();
     });
-    const seed = mocks.openMeal.mock.calls[0]![0] as Record<string, unknown>;
-    expect(seed).not.toHaveProperty("protein");
-
-    const tree2 = render(homeWith(74), "protein");
-    act(() => {
-      rowFor(tree2, "Chicken breast")!.props.onPress();
-    });
-    expect(mocks.openMeal.mock.calls[0]![0]).not.toHaveProperty("fiber");
-  });
-
-  it("seeds from the strip photo too — the frame says tap the photos", () => {
-    const tree = render(fiberHome(12), "fiber");
-    const photo = maybeOne(tree, `Avocado, ${gramsLabel(FIBER_FOODS.find((f) => f.key === "avocado")!.amount)} of fiber`);
-    expect(photo).toBeDefined();
-    act(() => {
-      photo!.props.onPress();
-    });
-    expect(mocks.openMeal).toHaveBeenCalledWith(
-      expect.objectContaining({ foodName: "Avocado" }),
-    );
+    expect(mocks.openMeal.mock.calls[0]![0]).not.toHaveProperty("protein");
   });
 });
 

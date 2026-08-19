@@ -25,6 +25,8 @@ import { useFavourites } from './useFavourites';
 import { YoursBlock } from './YoursBlock';
 import { favouriteId, isSaved } from './favourites';
 import { FOOD_PHOTOS } from './nutrientPhotos';
+import { itemFromFood } from './itemDetail';
+import { FOOD_PANELS } from './nutrientWays';
 import {
   foodsFor,
   gramsLabel,
@@ -73,6 +75,29 @@ export function NutrientWaysScreen() {
   const stat = home ? todayStat(home, kind) : null;
   const target = stat?.target ?? null;
   const head = target != null ? waysHeadline(kind, stat?.current ?? 0, target) : null;
+
+  /** The row body opens the detail screen; the plus beside it still logs. */
+  const openDetail = (food: NutrientFood) => {
+    Haptics.selectionAsync().catch(() => undefined);
+    const panel = FOOD_PANELS[food.key];
+    navigation.navigate('ItemDetail', {
+      item: {
+        ...itemFromFood(food, kind),
+        ...(panel
+          ? {
+              calories: panel.calories,
+              protein: panel.protein,
+              carbs: panel.carbs,
+              fat: panel.fat,
+              satFat: panel.satFat,
+              fiber: panel.fiber,
+              sodium: panel.sodium,
+              source: panel.source,
+            }
+          : {}),
+      },
+    });
+  };
 
   const openFood = (food: NutrientFood) => {
     Haptics.selectionAsync().catch(() => undefined);
@@ -172,7 +197,7 @@ export function NutrientWaysScreen() {
             {foodsFor(kind).map((food) => (
               <Pressable
                 key={food.key}
-                onPress={() => openFood(food)}
+                onPress={() => openDetail(food)}
                 accessibilityRole="button"
                 accessibilityLabel={`${food.name}, ${gramsLabel(food.amount)} of ${kind}`}
                 style={({ pressed }) => ({ width: 56, alignItems: 'center', gap: 5, opacity: pressed ? 0.7 : 1 })}
@@ -204,7 +229,7 @@ export function NutrientWaysScreen() {
             {foodsFor(kind).map((food, i, all) => (
               <Pressable
                 key={food.key}
-                onPress={() => openFood(food)}
+                onPress={() => openDetail(food)}
                 accessibilityRole="button"
                 accessibilityLabel={`${food.name}, ${food.serving}, ${gramsLabel(food.amount)} of ${kind}`}
                 style={({ pressed }) => ({
@@ -294,9 +319,16 @@ export function NutrientWaysScreen() {
                     stroke={2.2}
                   />
                 </Pressable>
-                {/* A plus, tinted. The row's action is "add this", and a
-                    chevron would promise a detail screen that does not exist. */}
-                <Icon name="add" size={17} color={tint} stroke={2} />
+                {/* The plus logs straight away; the row body opens detail. */}
+                <Pressable
+                  onPress={() => openFood(food)}
+                  hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Log ${food.name}`}
+                  style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+                >
+                  <Icon name="add" size={17} color={tint} stroke={2} />
+                </Pressable>
               </Pressable>
             ))}
           </Card>

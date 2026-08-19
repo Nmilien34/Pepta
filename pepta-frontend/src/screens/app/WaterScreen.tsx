@@ -28,6 +28,7 @@ import { useTheme } from '../../theme';
 import { todayStat } from './homeView';
 import { useTodayRefresh } from './useTodayRefresh';
 import { useFavourites } from './useFavourites';
+import { itemFromDrink } from './itemDetail';
 import { favouriteId, isSaved } from './favourites';
 import { YoursBlock } from './YoursBlock';
 import { DRINK_PHOTOS } from './nutrientPhotos';
@@ -183,7 +184,10 @@ export function WaterScreen() {
               {HYDRATION_EXAMPLES.map((drink, i, all) => (
                 <Pressable
                   key={drink.key}
-                  onPress={() => add(drink.ounces)}
+                  onPress={() => {
+                    Haptics.selectionAsync().catch(() => undefined);
+                    navigation.navigate('ItemDetail', { item: itemFromDrink(drink) });
+                  }}
                   accessibilityRole="button"
                   accessibilityLabel={`${drink.brand}, ${drink.volume}. ${drink.fact}. Adds ${drink.ounces} ounces`}
                   style={({ pressed }) => ({
@@ -268,7 +272,16 @@ export function WaterScreen() {
                       stroke={2.2}
                     />
                   </Pressable>
-                  <Icon name="add" size={17} color={theme.colors.water} stroke={2.5} />
+                  {/* The plus adds it now; the row body opens detail. */}
+                  <Pressable
+                    onPress={() => add(drink.ounces)}
+                    hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Log ${drink.brand}`}
+                    style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+                  >
+                    <Icon name="add" size={17} color={theme.colors.water} stroke={2.5} />
+                  </Pressable>
                 </Pressable>
               ))}
             </Card>

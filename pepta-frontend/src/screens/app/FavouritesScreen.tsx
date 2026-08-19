@@ -29,6 +29,7 @@ import { useLogSheets } from '../../context/LogSheetsContext';
 import { useTheme } from '../../theme';
 import { useFavourites } from './useFavourites';
 import { vesselForOunces, vesselNameForExactOunces } from './hydration';
+import { itemFromFavourite } from './itemDetail';
 import {
   countsByKind,
   favouriteFromDrinkOffer,
@@ -217,8 +218,26 @@ export function FavouritesScreen() {
                     borderBottomColor: theme.colors.border,
                   }}
                 >
-                  <Leading fav={fav} tint={tint} accent={accent} />
-                  <FavouriteBody fav={fav} accent={accent} />
+                  {/* The row body opens detail; Log below still logs. */}
+                  <Pressable
+                    onPress={() => {
+                      Haptics.selectionAsync().catch(() => undefined);
+                      navigation.navigate('ItemDetail', { item: itemFromFavourite(fav) });
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${fav.name} details`}
+                    style={({ pressed }) => ({
+                      flex: 1,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 11,
+                      minWidth: 0,
+                      opacity: pressed ? 0.68 : 1,
+                    })}
+                  >
+                    <Leading fav={fav} tint={tint} accent={accent} />
+                    <FavouriteBody fav={fav} accent={accent} />
+                  </Pressable>
                   {editing ? (
                     <Pressable
                       onPress={() => {
