@@ -12,6 +12,48 @@
 //
 // Pure data + pure helpers, no RN imports, so the copy logic unit-tests.
 
+/**
+ * The full panel, for the item-detail screen.
+ *
+ * VERIFIED AGAINST USDA FoodData Central, not estimated — the API returns
+ * per-100 g values and a real FDC id, and the figures here are that record
+ * scaled to the serving stated in `serving`. `fdcId` is the record actually
+ * used, so the citation on screen can be checked.
+ *
+ * NOTE ON THE DESIGN'S CITATION: the frame prints "SR Legacy 05062" beside
+ * "Cooked, skinless". 05062 is the RAW record; the roasted one is 05064, whose
+ * modern FDC id is 171477. The frame's NUMBERS are right for 4 oz cooked — it
+ * is only the id that points at the wrong row.
+ */
+export interface FoodPanel {
+  fdcId: number;
+  /** Per the food's own stated serving, not per 100 g. */
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  satFat: number;
+  fiber: number;
+  sodium: number;
+}
+
+/** Keyed by NutrientFood.key. Absent until a food has been looked up. */
+export const FOOD_PANELS: Record<string, FoodPanel> = {
+  // FDC 171477 "Chicken, broilers or fryers, breast, meat only, cooked,
+  // roasted" — per 100 g: 165 kcal, 31 g protein, 3.57 g fat, 1.01 g sat,
+  // 0 carbs, 0 fiber, 74 mg sodium. Scaled to 4 oz (112 g).
+  chicken: {
+    fdcId: 171477,
+    calories: 185,
+    protein: 34.7,
+    carbs: 0,
+    fat: 4,
+    satFat: 1.1,
+    fiber: 0,
+    sodium: 83,
+  },
+};
+
 export interface NutrientFood {
   key: string;
   /** Brand, where the item IS a branded product. Shown above the name. */
