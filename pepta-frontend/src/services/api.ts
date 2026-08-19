@@ -95,6 +95,7 @@ import {
   type UserProfileSettingsPatch,
   favouritePhotoIntentResponseSchema,
   medicationLevelsResponseSchema,
+  uiPreferencesResponseSchema,
   favouriteResponseSchema,
   favouritesResponseSchema,
   type FavouriteInput,
@@ -102,6 +103,8 @@ import {
   type FavouritePhotoIntentResponse,
   type LevelRangeKey,
   type MedicationLevelsResponse,
+  type UiPreferencesInput,
+  type UiPreferencesResponse,
   type FavouriteResponse,
   type FavouritesResponse,
   recipeComposeResponseSchema,
@@ -698,6 +701,18 @@ class PeptaApi {
   public deleteLog(kind: DeletableLogKind, id: string): Promise<unknown> {
     return this.request(`${LOG_PATHS[kind]}/${encodeURIComponent(id)}`, z.unknown(), {
       method: "DELETE",
+    });
+  }
+
+  /** Display preferences. Its own route — the profile schema is strict. */
+  public getUiPreferences(): Promise<UiPreferencesResponse> {
+    return this.request("/me/ui-preferences", uiPreferencesResponseSchema);
+  }
+
+  public putUiPreferences(input: UiPreferencesInput): Promise<UiPreferencesResponse> {
+    return this.request("/me/ui-preferences", uiPreferencesResponseSchema, {
+      method: "PUT",
+      body: JSON.stringify(input),
     });
   }
 

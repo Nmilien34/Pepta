@@ -837,6 +837,33 @@ export const medicationLevelsResponseSchema = z
   })
   .strict();
 
+/**
+ * Display preferences — what the app SHOWS, never what it stores.
+ *
+ * ITS OWN ENDPOINT, NOT A FIELD ON THE PROFILE. userProfileResponseSchema is
+ * .strict(), so a new key there is rejected outright by every shipped build.
+ * A new route is the same escape this codebase already uses for favourite
+ * photo intents and level ranges.
+ *
+ * Keys are open: a client that hides a card the server has never heard of
+ * still round-trips its choice, and a client that has never heard of a stored
+ * key ignores it. Nothing here is health data, so nothing here needs a
+ * migration when a card is added or renamed.
+ */
+export const uiPreferencesSchema = z
+  .object({
+    /** Progress "What to show": section key → visible. */
+    progressSections: z.record(z.string(), z.boolean()).default({}),
+  })
+  .strict();
+
+export const uiPreferencesResponseSchema = z
+  .object({
+    preferences: uiPreferencesSchema,
+    updatedAt: isoDateTimeSchema.nullable(),
+  })
+  .strict();
+
 export const insightSchema = z
   .object({
     id: idSchema,
@@ -1553,6 +1580,9 @@ export const favouritePhotoIntentResponseSchema = z
 
 export type FavouritePhotoIntentInput = z.infer<typeof favouritePhotoIntentInputSchema>;
 export type FavouritePhotoDiscardInput = z.infer<typeof favouritePhotoDiscardInputSchema>;
+export type UiPreferences = z.infer<typeof uiPreferencesSchema>;
+export type UiPreferencesInput = z.input<typeof uiPreferencesSchema>;
+export type UiPreferencesResponse = z.infer<typeof uiPreferencesResponseSchema>;
 export type LevelRangeKey = z.infer<typeof levelRangeKeySchema>;
 export type LevelRangeQuery = z.input<typeof levelRangeQuerySchema>;
 export type MedicationLevelsResponse = z.infer<typeof medicationLevelsResponseSchema>;

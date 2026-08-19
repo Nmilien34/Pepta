@@ -6,6 +6,11 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const store = new Map<string, string>();
+const apiMocks = vi.hoisted(() => ({ getUiPreferences: vi.fn(), putUiPreferences: vi.fn() }));
+
+vi.mock('../../services/api', () => ({
+  api: { getUiPreferences: apiMocks.getUiPreferences, putUiPreferences: apiMocks.putUiPreferences },
+}));
 
 vi.mock('@react-native-async-storage/async-storage', () => ({
   default: {
@@ -34,6 +39,9 @@ async function mount() {
 beforeEach(() => {
   store.clear();
   vi.clearAllMocks();
+  // An account that has never saved preferences.
+  apiMocks.getUiPreferences.mockResolvedValue({ preferences: { progressSections: {} }, updatedAt: null });
+  apiMocks.putUiPreferences.mockResolvedValue({ preferences: { progressSections: {} }, updatedAt: null });
 });
 
 describe('useProgressSections', () => {
@@ -52,6 +60,90 @@ describe('useProgressSections', () => {
 
     expect(handle.sections.eating).toBe(false);
     expect(JSON.parse(store.get(PROGRESS_SECTIONS_KEY)!).eating).toBe(false);
+  });
+
+  it('sends it to the server, so it follows the user to another device', async () => {
+    await mount();
+    await act(async () => {
+      handle.toggle('eating');
+    });
+
+    expect(apiMocks.putUiPreferences).toHaveBeenCalledWith({
+      progressSections: expect.objectContaining({ eating: false, weight: true }),
+    });
+  });
+
+  it('sends every known section, not only the one that changed', async () => {
+    await mount();
+    await act(async () => {
+      handle.toggle('photos');
+    });
+
+    // The server replaces rather than merges, so a partial body would read as
+    // "everything else unset".
+    const sent = apiMocks.putUiPreferences.mock.calls[0]![0].progressSections;
+    expect(Object.keys(sent).sort()).toEqual(
+      ['eating', 'muscle', 'numbers', 'photos', 'timeline', 'weight'],
+    );
+  });
+
+  it('writes once per tap, not twice', async () => {
+    await mount();
+    await act(async () => {
+      handle.toggle('muscle');
+    });
+
+    expect(apiMocks.putUiPreferences).toHaveBeenCalledTimes(1);
+  });
+
+  it('takes the server’s value over a stale cache', async () => {
+    store.set(PROGRESS_SECTIONS_KEY, JSON.stringify({ weight: false }));
+    apiMocks.getUiPreferences.mockResolvedValue({
+      preferences: { progressSections: { weight: true, muscle: false } },
+      updatedAt: '2026-08-13T00:00:00.000Z',
+    });
+
+    await mount();
+
+    expect(handle.sections.weight).toBe(true);
+    expect(handle.sections.muscle).toBe(false);
+    // And caches it, so the next launch paints the right thing immediately.
+    expect(JSON.parse(store.get(PROGRESS_SECTIONS_KEY)!).muscle).toBe(false);
+  });
+
+  it('keeps the cache when the account has never saved anything', async () => {
+    store.set(PROGRESS_SECTIONS_KEY, JSON.stringify({ photos: false }));
+    await mount();
+
+    // An empty object is "nothing chosen", not "all off".
+    expect(handle.sections.photos).toBe(false);
+  });
+
+  it('never lets a late server response undo a tap', async () => {
+    let land!: (value: unknown) => void;
+    apiMocks.getUiPreferences.mockReturnValue(new Promise((resolve) => { land = resolve; }));
+    await mount();
+
+    await act(async () => {
+      handle.toggle('weight');
+    });
+    await act(async () => {
+      land({ preferences: { progressSections: { weight: true } }, updatedAt: null });
+    });
+
+    expect(handle.sections.weight).toBe(false);
+  });
+
+  it('still works offline — the screen changes even when the server refuses', async () => {
+    apiMocks.putUiPreferences.mockRejectedValue(new Error('offline'));
+    await mount();
+
+    await act(async () => {
+      handle.toggle('numbers');
+    });
+
+    expect(handle.sections.numbers).toBe(false);
+    expect(JSON.parse(store.get(PROGRESS_SECTIONS_KEY)!).numbers).toBe(false);
   });
 
   it('reads it back on the next launch', async () => {

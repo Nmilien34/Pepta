@@ -6,6 +6,13 @@ import { applyApiTransforms } from "./model-utils";
 export interface UserProfileDocument
   extends UserProfileInput, Document<Types.ObjectId> {
   userId: Types.ObjectId;
+  /**
+   * Display preferences — which Progress cards to show, and whatever comes
+   * next. Deliberately schemaless: nothing here is health data, so a card
+   * added or renamed needs no migration, and an unknown key costs nothing.
+   */
+  uiPreferences?: Record<string, unknown>;
+  uiPreferencesUpdatedAt?: Date | null;
   ageYears: number;
   dailyCalorieTarget: number;
   dailyProteinTargetGrams: number;
@@ -154,6 +161,14 @@ const userProfileSchema = new Schema<UserProfileDocument>(
       required: true,
       trim: true,
       default: "America/New_York",
+    },
+    uiPreferences: {
+      type: Schema.Types.Mixed,
+      default: undefined,
+    },
+    uiPreferencesUpdatedAt: {
+      type: Date,
+      default: null,
     },
     sideEffectBaseline: {
       type: [String],

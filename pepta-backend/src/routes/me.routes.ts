@@ -6,11 +6,13 @@ import {
   nudgeDismissInputSchema,
   notificationPreferencesPatchSchema,
   pushTokenRegistrationRequestSchema,
+  uiPreferencesSchema,
   userAccountPatchSchema,
   userProfileSettingsPatchSchema,
 } from "@pepta/shared";
 import { Router } from "express";
 import { requireAuth } from "../auth/middleware";
+import { getUiPreferences, putUiPreferences } from "../services/ui-preferences.service";
 import { asyncHandler } from "../lib/async-handler";
 import { sendData, sendNoContent } from "../lib/responses";
 import { validateBody } from "../middleware/validate.middleware";
@@ -92,6 +94,24 @@ router.patch(
   validateBody(notificationPreferencesPatchSchema),
   asyncHandler(async (req, res) => {
     sendData(res, await updateNotificationPreferences(req.user!.id, req.body));
+  }),
+);
+
+// Display preferences — which Progress cards to show. Its own endpoint for the
+// same reason as the one below: no strict client-facing response schema has to
+// learn the field, so shipped builds are untouched.
+router.get(
+  "/ui-preferences",
+  asyncHandler(async (req, res) => {
+    sendData(res, await getUiPreferences(req.user!.id));
+  }),
+);
+
+router.put(
+  "/ui-preferences",
+  validateBody(uiPreferencesSchema),
+  asyncHandler(async (req, res) => {
+    sendData(res, await putUiPreferences(req.user!.id, req.body));
   }),
 );
 
