@@ -148,14 +148,29 @@ describe("ScheduleSheet", () => {
     return { root: renderer.root, onEditCycle };
   }
 
-  it("marks the June grid: logged Fridays green, due Saturday purple, today highlighted", () => {
+  it("marks the June grid: logged Fridays green, due Saturday purple, missed Saturday grey", () => {
     const { root } = render();
 
     expect(dotColorOf(cellByLabel(root, "Fri, Jun 5"))).toBe("#34C759");
     expect(dotColorOf(cellByLabel(root, "Fri, Jun 12"))).toBe("#34C759");
-    // Upcoming Saturday is due; past Saturdays show nothing.
     expect(dotColorOf(cellByLabel(root, "Sat, Jun 27"))).toBe("#7C5CFC");
-    expect(dotColorOf(cellByLabel(root, "Sat, Jun 20"))).toBe("transparent");
+    // Jun 20 was planned, is in the past, and was never logged. It used to
+    // draw as nothing — identical to a rest day — which is the pair somebody
+    // checking their protocol most needs told apart. Grey, not red: this is a
+    // record, not a telling-off.
+    expect(dotColorOf(cellByLabel(root, "Sat, Jun 20"))).toBe("#999");
+  });
+
+  it("says what a missed day was, rather than 'nothing scheduled'", () => {
+    const { root } = render();
+
+    act(() => {
+      cellByLabel(root, "Sat, Jun 20").props.onPress();
+    });
+
+    const copy = textOf(root);
+    expect(copy).toMatch(/nothing logged/i);
+    expect(copy).not.toMatch(/nothing scheduled/i);
   });
 
   it("paints the continuous rest band with rounded window ends (July)", () => {

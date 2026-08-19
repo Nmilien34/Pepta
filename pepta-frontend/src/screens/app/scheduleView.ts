@@ -21,17 +21,28 @@ import {
   type CyclePattern,
 } from '../../utils/cycleWindows';
 
-export type DayMark = 'logged' | 'due' | 'none';
+/**
+ * 'missed' is new with the mark-based strip: a day the schedule planned, now
+ * in the past, with nothing logged against it. It used to collapse into
+ * 'none', which drew it exactly like a rest day — the one distinction someone
+ * checking whether they kept to their protocol actually needs.
+ */
+export type DayMark = 'logged' | 'due' | 'missed' | 'none';
 
 export interface StripDay {
   date: string; // YYYY-MM-DD
-  letter: string; // M T W T F S S
-  dayOfMonth: number;
+  /**
+   * "MON". The tiles name the day rather than numbering it — the mark carries
+   * the state, so a number would be a second thing to read that says less.
+   * (`letter` and `dayOfMonth` lived here for the old number-based strip; the
+   * month sheet builds its own header and cells, and read neither.)
+   */
+  name: string;
   mark: DayMark;
   isToday: boolean;
 }
 
-const DAY_LETTERS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']; // JS getDay() order
+const DAY_NAMES = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
 function addDays(dateOnly: string, days: number): string {
   const [y, m, d] = dateOnly.split('-').map(Number);
@@ -147,12 +158,10 @@ export function markForDay(
   pattern: CyclePattern | null,
 ): DayMark {
   if (logged.has(date)) return 'logged';
-  if (
-    planned.has(date) &&
-    dayDiff(today, date) >= 0 &&
-    !(pattern && isRestDay(pattern, date))
-  ) {
-    return 'due';
+  if (planned.has(date) && !(pattern && isRestDay(pattern, date))) {
+    // Ahead of today it is still coming; behind it, the day passed without a
+    // log. Today itself counts as due until it ends.
+    return dayDiff(today, date) >= 0 ? 'due' : 'missed';
   }
   return 'none';
 }
@@ -175,8 +184,7 @@ export function weekStrip(
     const date = addDays(monday, i);
     return {
       date,
-      letter: DAY_LETTERS[dayOfWeek(date)]!,
-      dayOfMonth: Number(date.slice(8)),
+      name: DAY_NAMES[dayOfWeek(date)]!,
       mark: markForDay(date, todayOnly, logged, planned, pattern),
       isToday: date === todayOnly,
     };

@@ -107,24 +107,62 @@ describe('weekStrip', () => {
 
   it('is the design-lab strip: Mon 22 – Sun 28, today Wed 24, due Sat 27', () => {
     const strip = weekStrip(TODAY, [schedule({ daysOfWeek: [6] })], [], pattern);
-    expect(strip.map((d) => d.dayOfMonth)).toEqual([22, 23, 24, 25, 26, 27, 28]);
-    expect(strip.map((d) => d.letter).join('')).toBe('MTWTFSS');
+    expect(strip.map((d) => d.date.slice(8))).toEqual([
+      '22', '23', '24', '25', '26', '27', '28',
+    ]);
+    expect(strip.map((d) => d.name).join(' ')).toBe('MON TUE WED THU FRI SAT SUN');
     expect(strip[2]).toMatchObject({ isToday: true, date: '2026-06-24' });
     expect(strip.map((d) => d.mark)).toEqual([
       'none', 'none', 'none', 'none', 'none', 'due', 'none',
     ]);
   });
 
-  it('logged beats due; past planned days show nothing', () => {
-    // Wednesday's shot was logged; Monday was planned but missed (past → none).
+  it('logged beats due; a planned day that passed unlogged reads as missed', () => {
+    // Wednesday's shot was logged; Monday was planned and never was.
     const strip = weekStrip(
       TODAY,
       [schedule({ daysOfWeek: [1, 3] })],
       [dose('2026-06-24T12:00:00.000Z')],
       pattern,
     );
-    expect(strip[0]!.mark).toBe('none'); // Mon 22, past
+    // Was 'none' before the mark-based strip, which drew it exactly like a
+    // rest day — the one distinction someone checking their protocol needs.
+    expect(strip[0]!.mark).toBe('missed'); // Mon 22, planned, past, no log
     expect(strip[2]!.mark).toBe('logged'); // Wed 24
+  });
+
+  it('never calls a rest day missed — nothing was planned to miss', () => {
+    // Aug 3 2026 sits inside the Jul 27 - Aug 9 rest window, on a daily
+    // schedule, so every day this week is both "planned" and resting.
+    const strip = weekStrip(
+      new Date('2026-08-05T12:00:00.000Z'),
+      [schedule({ frequency: 'daily' })],
+      [],
+      pattern,
+    );
+    expect(strip.some((d) => d.mark === 'missed')).toBe(false);
+  });
+
+  it('does not call an unplanned past day missed either', () => {
+    // Saturdays only: nothing was expected on Monday, so nothing was missed.
+    const strip = weekStrip(TODAY, [schedule({ daysOfWeek: [6] })], [], pattern);
+
+    expect(strip[0]!.mark).toBe('none');
+    expect(strip[5]!.mark).toBe('due');
+  });
+
+  it('counts today as still due, not already missed', () => {
+    const strip = weekStrip(TODAY, [schedule({ daysOfWeek: [3] })], [], pattern);
+
+    expect(strip[2]!.mark).toBe('due'); // Wed 24 is today
+  });
+
+  it('names each day for the strip tiles, alongside the letter the sheet uses', () => {
+    const strip = weekStrip(TODAY, [schedule({ daysOfWeek: [6] })], [], pattern);
+
+    expect(strip.map((d) => d.name)).toEqual([
+      'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN',
+    ]);
   });
 
   it('rest days suppress due dots', () => {

@@ -22,6 +22,7 @@ import {
   isLastDoseOfCycle,
   loggedDays,
   markForDay,
+  type DayMark,
   patternOf,
   plannedDays,
 } from '../screens/app/scheduleView';
@@ -49,7 +50,7 @@ interface GridCell {
   dayOfMonth: number;
   inMonth: boolean;
   isToday: boolean;
-  mark: 'due' | 'logged' | 'none';
+  mark: DayMark;
   rest: boolean;
   restStart: boolean; // window's first day
   restEnd: boolean; // window's last day
@@ -192,6 +193,12 @@ export function ScheduleSheet({ visible, onClose, onEditCycle, onDismissed }: Sc
           : 'This cycle is complete.',
       };
     }
+    if (cell?.mark === 'missed') {
+      return {
+        title: `Nothing logged — a ${doseWord} was planned.`,
+        line: 'Tap + to add it late, or leave it. Either is fine.',
+      };
+    }
     if (cell?.mark === 'due') {
       const dose = compound?.plannedDose
         ? `${compound.plannedDose} ${compound.doseUnit} ${compound.name}`
@@ -315,7 +322,11 @@ export function ScheduleSheet({ visible, onClose, onEditCycle, onDismissed }: Sc
                       ? theme.colors.primary
                       : cell.mark === 'logged'
                         ? theme.colors.fiber
-                        : 'transparent',
+                        // A planned day that passed unlogged. Grey rather than
+                        // red: this is a record, not a telling-off.
+                        : cell.mark === 'missed'
+                          ? theme.colors.textTertiary
+                          : 'transparent',
                 }}
               />
             </Pressable>
