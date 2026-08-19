@@ -55,6 +55,10 @@ vi.mock("react-native-gesture-handler/ReanimatedSwipeable", () => ({
   default: ({ children, renderRightActions }: { children?: React.ReactNode; renderRightActions?: () => React.ReactNode }) =>
     React.createElement("Swipeable", null, renderRightActions?.(), children),
 }));
+vi.mock("../../components/NewItemSheet", () => ({
+  NewItemSheet: (props: { visible: boolean }) =>
+    props.visible ? React.createElement("NewItemSheet", props) : null,
+}));
 vi.mock("../../components/PortionEditSheet", () => ({
   PortionEditSheet: (props: { favourite: unknown }) =>
     props.favourite ? React.createElement("PortionEditSheet", props) : null,
@@ -277,8 +281,6 @@ describe("FavouritesScreen · before anything is saved", () => {
   it("offers Add your own on the drinks side", async () => {
     const tree = await render([], "drink");
     expect(texts(tree)).toContain("Name it, set the volume");
-    press(tree, "Add your own drink");
-    expect(mocks.openQuickLog).toHaveBeenCalledWith("water");
   });
 });
 
@@ -621,5 +623,67 @@ describe("FavouritesScreen · hold a row to change its portion", () => {
     expect(mocks.saveFavourite).not.toHaveBeenCalled();
     expect(mocks.removeFavourite).not.toHaveBeenCalled();
     expect(held(tree)).toBeUndefined();
+  });
+});
+
+describe("FavouritesScreen · adding an item of your own", () => {
+  const sheet = (tree: TestRenderer.ReactTestRenderer) =>
+    tree.root.findAll((n) => String(n.type) === "NewItemSheet")[0];
+
+  it("is offered on both sides, worded for each", async () => {
+    expect(texts(await render([chicken], "food"))).toContain("Name it, set the portion");
+    expect(texts(await render([bottle], "drink"))).toContain("Name it, set the volume");
+  });
+
+  it("opens pre-set to the side you are on, and can still be changed", async () => {
+    const tree = await render([bottle], "drink");
+    await act(async () => {
+      one(tree, "Add your own drink").props.onPress();
+    });
+    expect(sheet(tree)!.props.initialKind).toBe("drink");
+  });
+
+  it("saves a drink with its volume and nothing a drink cannot log", async () => {
+    const tree = await render([], "drink");
+    await act(async () => one(tree, "Add your own drink").props.onPress());
+    await act(async () => {
+      sheet(tree)!.props.onSave({ kind: "drink", name: "Desk bottle", portion: "21 oz", ounces: 21 });
+    });
+    const saved = mocks.saveFavourite.mock.calls[0]![0] as Record<string, unknown>;
+    expect(saved).toMatchObject({ kind: "drink", name: "Desk bottle", ounces: 21 });
+    expect(saved).not.toHaveProperty("protein");
+  });
+
+  it("saves a food with its figures, keeping the kind the user chose", async () => {
+    const tree = await render([], "food");
+    await act(async () => one(tree, "Add your own food").props.onPress());
+    await act(async () => {
+      sheet(tree)!.props.onSave({
+        kind: "food", name: "Protein shake", portion: "1 scoop, milk", protein: 32, calories: 270,
+      });
+    });
+    const saved = mocks.saveFavourite.mock.calls[0]![0] as Record<string, unknown>;
+    // Named like a drink, saved as a food because that is what was chosen.
+    expect(saved).toMatchObject({ kind: "food", name: "Protein shake", protein: 32 });
+    expect(saved).not.toHaveProperty("ounces");
+  });
+
+  it("switches to the tab the new item landed in", async () => {
+    const tree = await render([], "food");
+    await act(async () => one(tree, "Add your own food").props.onPress());
+    await act(async () => {
+      sheet(tree)!.props.onSave({ kind: "drink", name: "Desk bottle", portion: "21 oz", ounces: 21 });
+    });
+    // Saved as a drink from the food tab — the user must not be left staring
+    // at a list it is not in.
+    expect(maybeOne(tree, "Add your own drink")).toBeDefined();
+  });
+
+  it("writes nothing on cancel", async () => {
+    const tree = await render([], "drink");
+    await act(async () => one(tree, "Add your own drink").props.onPress());
+    await act(async () => sheet(tree)!.props.onCancel());
+    expect(mocks.saveFavourite).not.toHaveBeenCalled();
+    expect(sheet(tree)).toBeUndefined();
   });
 });

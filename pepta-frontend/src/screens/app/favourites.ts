@@ -339,3 +339,69 @@ export function isPortionEditValid(fav: Favourite, edit: PortionEdit): boolean {
   // A food with no figures at all would log nothing.
   return (edit.protein != null && edit.protein > 0) || (edit.calories != null && edit.calories > 0);
 }
+
+/**
+ * Creating a favourite the user typed themselves.
+ *
+ * KIND IS CHOSEN, NEVER GUESSED. A drink and a food are not the same record:
+ * a drink's Log adds ounces to the water total and it draws as a vessel; a
+ * food's Log writes a meal and it draws as a tile. Inferring that from a name
+ * would put "protein shake" in the wrong one, so the caller states it and the
+ * fields required follow from it.
+ *
+ * The id is built the same way as every other favourite, so a hand-typed
+ * "Chicken breast, 6 oz" and one saved from the Protein screen are the SAME
+ * favourite rather than two rows that look identical.
+ */
+export interface NewItemDraft {
+  kind: FavouriteKind;
+  name: string;
+  portion: string;
+  protein?: number;
+  calories?: number;
+  fiber?: number;
+  ounces?: number;
+}
+
+/** What each kind needs before it can be saved AND logged. */
+export function isNewItemValid(draft: NewItemDraft): boolean {
+  if (draft.name.trim().length === 0) return false;
+  if (draft.portion.trim().length === 0) return false;
+  if (draft.kind === 'drink') return draft.ounces != null && draft.ounces > 0;
+  return (
+    (draft.protein != null && draft.protein > 0) ||
+    (draft.calories != null && draft.calories > 0)
+  );
+}
+
+/** Why it cannot be saved yet, in the user's terms. */
+export function newItemProblem(draft: NewItemDraft): string | null {
+  if (draft.name.trim().length === 0) return 'Give it a name.';
+  if (draft.portion.trim().length === 0) return 'Say how much one is.';
+  if (draft.kind === 'drink') {
+    return draft.ounces != null && draft.ounces > 0
+      ? null
+      : 'A drink needs a volume, or logging it would add nothing.';
+  }
+  return (draft.protein != null && draft.protein > 0) || (draft.calories != null && draft.calories > 0)
+    ? null
+    : 'Add protein or calories, or logging it would record nothing.';
+}
+
+export function favouriteFromDraft(draft: NewItemDraft, savedAt: string): Favourite {
+  const name = draft.name.trim();
+  const portion = draft.portion.trim();
+  return {
+    id: favouriteId(draft.kind, name, portion),
+    kind: draft.kind,
+    name,
+    portion,
+    // Only the figures this kind actually uses — a drink carrying a protein
+    // value would show a macro row it never logs.
+    ...(draft.kind === 'drink'
+      ? { ounces: draft.ounces }
+      : { protein: draft.protein, calories: draft.calories, fiber: draft.fiber }),
+    source: 'item',
+    savedAt,
+  };
+}

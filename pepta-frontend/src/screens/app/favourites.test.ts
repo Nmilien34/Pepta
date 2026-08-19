@@ -4,6 +4,9 @@ import {
   addFavourite,
   applyPortionEdit,
   countsByKind,
+  favouriteFromDraft,
+  isNewItemValid,
+  newItemProblem,
   isPortionEditValid,
   favouriteFromOffer,
   favouriteId,
@@ -314,5 +317,70 @@ describe('isPortionEditValid', () => {
   it('needs at least one figure on a food', () => {
     expect(isPortionEditValid(food, { portion: '8 oz' })).toBe(false);
     expect(isPortionEditValid(food, { portion: '8 oz', calories: 373 })).toBe(true);
+  });
+});
+
+describe('adding an item the user typed', () => {
+  const drink = { kind: 'drink' as const, name: 'Desk bottle', portion: '21 oz', ounces: 21 };
+  const food = { kind: 'food' as const, name: 'Protein shake', portion: '1 scoop, milk', protein: 32, calories: 270 };
+
+  it('keeps the kind the user chose — a name never decides it', () => {
+    // "Protein shake" is a food here because the user said so. Guessing from
+    // the word "shake" is how it ends up in the wrong tab.
+    expect(favouriteFromDraft(food, 'now').kind).toBe('food');
+    expect(favouriteFromDraft({ ...food, kind: 'drink', ounces: 12 }, 'now').kind).toBe('drink');
+  });
+
+  it('carries only the figures its kind uses', () => {
+    const asDrink = favouriteFromDraft(drink, 'now');
+    expect(asDrink.ounces).toBe(21);
+    expect(asDrink).not.toHaveProperty('protein');
+
+    const asFood = favouriteFromDraft(food, 'now');
+    expect(asFood.protein).toBe(32);
+    expect(asFood.ounces).toBeUndefined();
+  });
+
+  it('shares an id with the same thing saved from a screen', () => {
+    const typed = favouriteFromDraft(
+      { kind: 'food', name: 'Chicken breast', portion: '6 oz, grilled', protein: 54 },
+      'now',
+    );
+    expect(typed.id).toBe(favouriteId('food', 'Chicken breast', '6 oz, grilled'));
+  });
+
+  it('trims, so trailing spaces do not make a second row', () => {
+    const out = favouriteFromDraft({ ...drink, name: '  Desk bottle  ', portion: ' 21 oz ' }, 'now');
+    expect(out.name).toBe('Desk bottle');
+    expect(out.portion).toBe('21 oz');
+  });
+});
+
+describe('what a new item needs before it can be saved', () => {
+  it('needs a name and a portion whatever the kind', () => {
+    expect(newItemProblem({ kind: 'food', name: '', portion: '1 cup', protein: 20 })).toMatch(/name/i);
+    expect(newItemProblem({ kind: 'food', name: 'X', portion: ' ', protein: 20 })).toMatch(/how much/i);
+  });
+
+  it('needs a volume on a drink — logging it would add nothing otherwise', () => {
+    expect(newItemProblem({ kind: 'drink', name: 'X', portion: '1 can' })).toMatch(/volume/i);
+    expect(newItemProblem({ kind: 'drink', name: 'X', portion: '1 can', ounces: 12 })).toBeNull();
+  });
+
+  it('needs a figure on a food, for the same reason', () => {
+    expect(newItemProblem({ kind: 'food', name: 'X', portion: '1 cup' })).toMatch(/protein or calories/i);
+    expect(newItemProblem({ kind: 'food', name: 'X', portion: '1 cup', calories: 100 })).toBeNull();
+  });
+
+  it('agrees with the boolean check in both directions', () => {
+    const cases = [
+      { kind: 'drink' as const, name: 'X', portion: '1 can' },
+      { kind: 'drink' as const, name: 'X', portion: '1 can', ounces: 12 },
+      { kind: 'food' as const, name: '', portion: '1 cup', protein: 5 },
+      { kind: 'food' as const, name: 'X', portion: '1 cup', protein: 5 },
+    ];
+    for (const c of cases) {
+      expect(isNewItemValid(c)).toBe(newItemProblem(c) === null);
+    }
   });
 });

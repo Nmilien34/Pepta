@@ -31,11 +31,13 @@ import { useFavourites } from './useFavourites';
 import { vesselForOunces, vesselNameForExactOunces } from './hydration';
 import { itemFromFavourite } from './itemDetail';
 import { PortionEditSheet } from '../../components/PortionEditSheet';
+import { NewItemSheet } from '../../components/NewItemSheet';
 import {
   countsByKind,
   favouriteFromDrinkOffer,
   favouriteFromOffer,
   applyPortionEdit,
+  favouriteFromDraft,
   favouritesOf,
   startingSuggestions,
   worthSaving,
@@ -57,7 +59,7 @@ export function FavouritesScreen() {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
   const route = useRoute<RouteProp<Record<string, FavouritesParams>, string>>();
   const { track, bumpWater } = usePeptaData();
-  const { openMeal, openQuickLog } = useLogSheets();
+  const { openMeal } = useLogSheets();
   const { favourites, suggestions: seededSuggestions, save, unsave } = useFavourites();
 
   // Opens on the side you came from: the star row on Protein and Fiber lands
@@ -65,6 +67,7 @@ export function FavouritesScreen() {
   const [tab, setTab] = useState<FavouriteKind>(route.params?.kind === 'drink' ? 'drink' : 'food');
   const [editing, setEditing] = useState(false);
   const [editingPortion, setEditingPortion] = useState<Favourite | null>(null);
+  const [addingItem, setAddingItem] = useState(false);
 
   const counts = countsByKind(favourites);
   const rows = favouritesOf(favourites, tab);
@@ -427,19 +430,20 @@ export function FavouritesScreen() {
             </>
           ) : null}
 
-          {tab === 'drink' ? (
-            <>
-              <AppText variant="cardTitle" style={{ fontSize: 15, marginTop: 16 }}>
-                Add your own
-              </AppText>
+          {/* Both sides. The frame drew this only on drinks, but a food the
+              examples do not cover is the same need. */}
+          <>
+            <AppText variant="cardTitle" style={{ fontSize: 15, marginTop: 16 }}>
+              Add your own
+            </AppText>
               <Card style={{ marginTop: 10, paddingVertical: 0 }}>
                 <Pressable
                   onPress={() => {
                     Haptics.selectionAsync().catch(() => undefined);
-                    openQuickLog('water');
+                    setAddingItem(true);
                   }}
                   accessibilityRole="button"
-                  accessibilityLabel="Add your own drink"
+                  accessibilityLabel={tab === 'drink' ? "Add your own drink" : "Add your own food"}
                   style={({ pressed }) => ({
                     flexDirection: 'row',
                     alignItems: 'center',
@@ -448,12 +452,12 @@ export function FavouritesScreen() {
                     opacity: pressed ? 0.68 : 1,
                   })}
                 >
-                  <View style={{ width: 40, height: 40, borderRadius: 13, backgroundColor: DRINK_TINT, alignItems: 'center', justifyContent: 'center' }}>
-                    <Icon name="add" size={19} color={theme.colors.water} stroke={2.4} />
+                  <View style={{ width: 40, height: 40, borderRadius: 13, backgroundColor: tint, alignItems: 'center', justifyContent: 'center' }}>
+                    <Icon name="add" size={19} color={accent} stroke={2.4} />
                   </View>
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <AppText variant="cardTitle" style={{ fontSize: 14 }}>
-                      Name it, set the volume
+                      {tab === 'drink' ? 'Name it, set the volume' : 'Name it, set the portion'}
                     </AppText>
                     <AppText variant="caption" color="textTertiary" style={{ fontSize: 10.5, marginTop: 2 }}>
                       Anything the examples do not cover
@@ -461,9 +465,8 @@ export function FavouritesScreen() {
                   </View>
                   <Icon name="chevron-forward" size={17} color={theme.colors.textTertiary} stroke={2.2} />
                 </Pressable>
-              </Card>
-            </>
-          ) : null}
+            </Card>
+          </>
 
           <AppText variant="caption" color="textTertiary" style={{ fontSize: 10.5, marginTop: 14, lineHeight: 15 }}>
             {tab === 'food'
@@ -471,6 +474,20 @@ export function FavouritesScreen() {
               : 'A saved drink also appears in Quick add on the Water screen, so the favourite and the shortcut are the same thing.'}
           </AppText>
         </ScrollView>
+
+        <NewItemSheet
+          visible={addingItem}
+          initialKind={tab}
+          onCancel={() => setAddingItem(false)}
+          onSave={(draft) => {
+            setAddingItem(false);
+            const next = favouriteFromDraft(draft, new Date().toISOString());
+            save(next);
+            // Land on the side it actually belongs to, so it is never saved
+            // into a tab the user cannot see it in.
+            setTab(next.kind);
+          }}
+        />
 
         <PortionEditSheet
           favourite={editingPortion}
