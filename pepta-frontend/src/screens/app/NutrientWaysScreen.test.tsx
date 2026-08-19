@@ -108,7 +108,7 @@ vi.mock("../../context/LogSheetsContext", () => ({
 }));
 
 import { NutrientWaysScreen } from "./NutrientWaysScreen";
-import { duplicateLabels } from "../../tests/byLabel";
+import { duplicateLabels, maybeOne } from "../../tests/byLabel";
 
 function homeWith(loggedProtein: number, target: number | null = 120, extra: object = {}) {
   return {
@@ -385,9 +385,7 @@ describe("NutrientWaysScreen · tapping a food", () => {
 
   it("seeds from the strip photo too — the frame says tap the photos", () => {
     const tree = render(fiberHome(12), "fiber");
-    const photo = tree.root
-      .findAll((n) => String(n.type) === "Pressable")
-      .find((p) => p.props.accessibilityLabel === "Avocado, 7 g of fiber");
+    const photo = maybeOne(tree, "Avocado, 7 g of fiber");
     expect(photo).toBeDefined();
     act(() => {
       photo!.props.onPress();
@@ -400,9 +398,7 @@ describe("NutrientWaysScreen · tapping a food", () => {
 
 describe("NutrientWaysScreen · Yours", () => {
   const press = (tree: TestRenderer.ReactTestRenderer, label: string) => {
-    const p = tree.root
-      .findAll((n) => String(n.type) === "Pressable")
-      .find((x) => x.props.accessibilityLabel === label);
+    const p = maybeOne(tree, label, "Pressable");
     expect(p, `no pressable labelled "${label}"`).toBeDefined();
     act(() => {
       p!.props.onPress();

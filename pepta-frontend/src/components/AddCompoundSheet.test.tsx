@@ -1,4 +1,5 @@
 import React from "react";
+import { all } from "../tests/byLabel";
 import TestRenderer, { act } from "react-test-renderer";
 import { describe, expect, it, vi } from "vitest";
 import { AddCompoundSheet } from "./AddCompoundSheet";
@@ -168,11 +169,7 @@ describe("AddCompoundSheet", () => {
       tree = TestRenderer.create(<AddCompoundSheet visible={true} onClose={vi.fn()} />);
     });
     expect(
-      tree!.root.findAll(
-        (node) =>
-          String(node.type) === "Pressable" &&
-          node.props?.accessibilityLabel === "Add your own medication",
-      ),
+      all(tree!, "Add your own medication", "Pressable"),
     ).toHaveLength(1);
   });
 
@@ -182,8 +179,7 @@ describe("AddCompoundSheet", () => {
       tree = TestRenderer.create(<AddCompoundSheet visible={true} onClose={vi.fn()} />);
     });
     await act(async () => {
-      tree!.root
-        .findAll((n) => n.props?.accessibilityLabel === "Add your own medication")
+      all(tree!, "Add your own medication", null)
         .at(-1)!
         .props.onPress();
     });

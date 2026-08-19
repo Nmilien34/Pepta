@@ -1,4 +1,5 @@
 import React from "react";
+import { all } from "../tests/byLabel";
 import TestRenderer, { act, type ReactTestInstance } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ScheduleSheet } from "./ScheduleSheet";
@@ -108,9 +109,7 @@ function seedData() {
 }
 
 function cellByLabel(root: ReactTestInstance, label: string): ReactTestInstance {
-  const matches = root.findAll(
-    (node) => String(node.type) === "Pressable" && node.props.accessibilityLabel === label,
-  );
+  const matches = all({ root: root }, label, "Pressable");
   expect(matches.length).toBe(1);
   return matches[0]!;
 }
@@ -162,9 +161,7 @@ describe("ScheduleSheet", () => {
   it("paints the continuous rest band with rounded window ends (July)", () => {
     const { root } = render();
     // Navigate June → July.
-    const next = root.findAll(
-      (node) => String(node.type) === "Pressable" && node.props.accessibilityLabel === "Next month",
-    )[0]!;
+    const next = all({ root: root }, "Next month", "Pressable")[0]!;
     act(() => next.props.onPress());
 
     const restStart = cellByLabel(root, "Mon, Jul 27");
@@ -188,9 +185,7 @@ describe("ScheduleSheet", () => {
     act(() => cellByLabel(root, "Sat, Jun 27").props.onPress());
     expect(textOf(root)).toContain("Shot day — 5 mg Tirzepatide");
 
-    const next = root.findAll(
-      (node) => String(node.type) === "Pressable" && node.props.accessibilityLabel === "Next month",
-    )[0]!;
+    const next = all({ root: root }, "Next month", "Pressable")[0]!;
     act(() => next.props.onPress());
     act(() => cellByLabel(root, "Tue, Jul 28").props.onPress());
     const text = textOf(root);
@@ -201,9 +196,7 @@ describe("ScheduleSheet", () => {
   it("cycle row shows the pattern and Edit fires onEditCycle", () => {
     const { root, onEditCycle } = render();
     expect(textOf(root)).toContain("Cycle · 8 wk on, 2 off");
-    const edit = root.findAll(
-      (node) => String(node.type) === "Pressable" && node.props.accessibilityLabel === "Edit cycle",
-    )[0]!;
+    const edit = all({ root: root }, "Edit cycle", "Pressable")[0]!;
     act(() => edit.props.onPress());
     expect(onEditCycle).toHaveBeenCalledTimes(1);
   });

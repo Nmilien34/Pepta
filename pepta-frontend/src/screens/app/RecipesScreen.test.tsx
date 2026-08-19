@@ -65,7 +65,7 @@ vi.mock("../../context/LogSheetsContext", () => ({
 }));
 
 import { RecipesScreen } from "./RecipesScreen";
-import { duplicateLabels } from "../../tests/byLabel";
+import { duplicateLabels, maybeOne } from "../../tests/byLabel";
 
 const recipe = (name: string, ingredients: { name: string; amount: string; protein: number; calories: number; fiber?: number }[], id = name) => ({
   id,
@@ -105,7 +105,7 @@ function texts(tree: TestRenderer.ReactTestRenderer): string {
 }
 
 const press = (tree: TestRenderer.ReactTestRenderer, label: string) => {
-  const p = tree.root.findAll((n) => String(n.type) === "Pressable").find((x) => x.props.accessibilityLabel === label);
+  const p = maybeOne(tree, label, "Pressable");
   expect(p, `no pressable labelled "${label}"`).toBeDefined();
   act(() => p!.props.onPress());
 };
@@ -180,7 +180,7 @@ describe("RecipesScreen · the actions", () => {
   it("offers no delete on a starter — it belongs to everybody", async () => {
     const starter = { ...recipe("Tuna salad", [{ name: "Tuna", amount: "5 oz can", protein: 30, calories: 165 }], "s1"), isStarter: true };
     const tree = await render({ recipes: [], starters: [starter] });
-    const del = tree.root.findAll((n) => String(n.type) === "Pressable").find((x) => x.props.accessibilityLabel === "Delete Tuna salad");
+    const del = maybeOne(tree, "Delete Tuna salad", "Pressable");
     expect(del).toBeUndefined();
   });
 

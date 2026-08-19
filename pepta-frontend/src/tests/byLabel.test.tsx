@@ -92,3 +92,42 @@ describe("all", () => {
     expect(all(render(["Row", "Row", "Other"]), "Row")).toHaveLength(2);
   });
 });
+
+describe("one control counted once", () => {
+  // react-test-renderer returns BOTH the composite and the host element it
+  // renders. Without this they look like a duplicate and every unfiltered
+  // lookup reports a phantom collision.
+  function renderComposite(label: string) {
+    const Button = ({ accessibilityLabel }: { accessibilityLabel: string }) =>
+      React.createElement("Pressable", { accessibilityLabel });
+    let tree!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      tree = TestRenderer.create(
+        <View>
+          {React.createElement(Button, { accessibilityLabel: label })}
+        </View>,
+      );
+    });
+    return tree;
+  }
+
+  it("does not report a phantom duplicate with no type filter", () => {
+    const tree = renderComposite("Sign in");
+    expect(all(tree, "Sign in", null)).toHaveLength(1);
+    expect(duplicateLabels(tree, null)).toEqual([]);
+    expect(() => one(tree, "Sign in", null)).not.toThrow();
+  });
+
+  it("still catches a genuine duplicate with no type filter", () => {
+    let tree!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      tree = TestRenderer.create(
+        <View>
+          <Pressable accessibilityLabel="Remove" />
+          <Pressable accessibilityLabel="Remove" />
+        </View>,
+      );
+    });
+    expect(() => one(tree, "Remove", null)).toThrow(/share the label/);
+  });
+});

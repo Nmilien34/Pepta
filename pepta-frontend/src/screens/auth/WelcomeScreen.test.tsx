@@ -9,6 +9,7 @@
 // animation. The turn this replaced hid its footer for 2.14s.
 
 import React from "react";
+import { oneWhere } from "../../tests/byLabel";
 import TestRenderer, { act, type ReactTestInstance } from "react-test-renderer";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { WelcomeScreen } from "./WelcomeScreen";
@@ -90,32 +91,26 @@ function link(
   root: TestRenderer.ReactTestRenderer["root"],
   label: string,
 ): ReactTestInstance {
-  const match = root
-    .findAll(
-      (node) =>
-        node.props.accessibilityRole === "link" &&
-        node.props.accessibilityLabel === label &&
-        typeof node.props.onPress === "function",
-    )
-    .at(0);
-  if (!match) throw new Error(`No legal link named "${label}"`);
-  return match;
+  return oneWhere(
+    { root },
+    label,
+    (node) =>
+      node.props.accessibilityRole === "link" &&
+      typeof node.props.onPress === "function",
+  );
 }
 
 function button(
   root: TestRenderer.ReactTestRenderer["root"],
   label: string,
 ): ReactTestInstance {
-  const match = root
-    .findAll(
-      (node) =>
-        node.props.accessibilityRole === "button" &&
-        node.props.accessibilityLabel === label &&
-        typeof node.props.onPress === "function",
-    )
-    .at(0);
-  if (!match) throw new Error(`No button named "${label}"`);
-  return match;
+  return oneWhere(
+    { root },
+    label,
+    (node) =>
+      node.props.accessibilityRole === "button" &&
+      typeof node.props.onPress === "function",
+  );
 }
 
 function allText(node: ReactTestInstance): string {

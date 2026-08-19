@@ -5,6 +5,7 @@
 //    events; hard has no "Later" and survives an Update tap.
 
 import React from "react";
+import { all } from "../tests/byLabel";
 import TestRenderer, { act, type ReactTestInstance } from "react-test-renderer";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -105,9 +106,7 @@ async function mount(element: React.ReactElement) {
 }
 
 function findByLabel(root: ReactTestInstance, label: string) {
-  return root.findAll(
-    (n) => String(n.type) === "Pressable" && n.props.accessibilityLabel === label,
-  );
+  return all({ root: root }, label, "Pressable");
 }
 
 beforeEach(() => {

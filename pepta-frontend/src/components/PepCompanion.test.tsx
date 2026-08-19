@@ -1,4 +1,5 @@
 import React from "react";
+import { all } from "../tests/byLabel";
 import TestRenderer, { act, type ReactTestInstance } from "react-test-renderer";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PepCompanion } from "./PepCompanion";
@@ -178,12 +179,7 @@ function button(
   root: TestRenderer.ReactTestRenderer["root"],
   label: string,
 ): ReactTestInstance {
-  const match = root
-    .findAll(
-      (node) =>
-        (node.type as unknown) === "Pressable" &&
-        node.props.accessibilityLabel === label,
-    )
+  const match = all({ root: root }, label, "Pressable")
     .at(0);
   if (!match) throw new Error(`No button named "${label}"`);
   return match;

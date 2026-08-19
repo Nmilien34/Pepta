@@ -47,7 +47,7 @@ vi.mock("../../context/LogSheetsContext", () => ({
 }));
 
 import { NewRecipeScreen } from "./NewRecipeScreen";
-import { duplicateLabels } from "../../tests/byLabel";
+import { duplicateLabels, maybeOne } from "../../tests/byLabel";
 
 function render() {
   let tree!: TestRenderer.ReactTestRenderer;
@@ -58,7 +58,7 @@ function render() {
 }
 
 const press = (tree: TestRenderer.ReactTestRenderer, label: string) => {
-  const p = tree.root.findAll((n) => String(n.type) === "Pressable").find((x) => x.props.accessibilityLabel === label);
+  const p = maybeOne(tree, label, "Pressable");
   expect(p, `no pressable labelled "${label}"`).toBeDefined();
   act(() => p!.props.onPress());
 };

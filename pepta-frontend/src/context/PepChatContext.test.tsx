@@ -1,4 +1,5 @@
 import React from "react";
+import { all } from "../tests/byLabel";
 import TestRenderer, { act, type ReactTestInstance } from "react-test-renderer";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PepChatProvider, usePepChat } from "./PepChatContext";
@@ -112,9 +113,7 @@ function render(seed?: string) {
 }
 
 function byLabel(root: ReactTestInstance, label: string): ReactTestInstance {
-  const hit = root.findAll(
-    (n) => String(n.type) === "Pressable" && n.props.accessibilityLabel === label,
-  )[0];
+  const hit = all({ root: root }, label, "Pressable")[0];
   if (!hit) throw new Error(`no pressable "${label}"`);
   return hit;
 }

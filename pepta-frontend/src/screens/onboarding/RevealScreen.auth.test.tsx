@@ -3,6 +3,7 @@
 // the two variants and the resume path for drafts saved at the old step.
 
 import React from "react";
+import { all } from "../../tests/byLabel";
 import TestRenderer, { act, type ReactTestInstance } from "react-test-renderer";
 import { describe, expect, it, vi } from "vitest";
 
@@ -155,9 +156,7 @@ describe("the payoff-first reveal (Start today for everyone, auth in a sheet)", 
     // The payoff lands unconditionally — one Start today button, no identity
     // ask anywhere on the screen itself.
     expect(
-      tree.root.findAll(
-        (n) => String(n.type) === "ConvoButton" && n.props.accessibilityLabel === "Start today",
-      ),
+      all(tree, "Start today", "ConvoButton"),
     ).toHaveLength(1);
     expect(nodeText(tree.root)).not.toContain("Save your plan");
     expect(tree.root.findAll((n) => String(n.type) === "ProviderButton")).toHaveLength(0);
@@ -165,9 +164,7 @@ describe("the payoff-first reveal (Start today for everyone, auth in a sheet)", 
 
   it("signed out: the claim tap logs the funnel event and raises the save sheet", async () => {
     const tree = await mount(false);
-    const cta = tree.root.findAll(
-      (n) => String(n.type) === "ConvoButton" && n.props.accessibilityLabel === "Start today",
-    )[0]!;
+    const cta = all(tree, "Start today", "ConvoButton")[0]!;
     await act(async () => {
       cta.props.onPress();
     });
@@ -176,9 +173,7 @@ describe("the payoff-first reveal (Start today for everyone, auth in a sheet)", 
     expect(text).toContain("Save your plan");
     expect(text).toContain("Your plan is private to you.");
     expect(
-      tree.root.findAll(
-        (n) => String(n.type) === "ProviderButton" && n.props.accessibilityLabel === "Continue with Google",
-      ),
+      all(tree, "Continue with Google", "ProviderButton"),
     ).toHaveLength(1);
     expect(tree.root.findAll((n) => String(n.type) === "AppleAuthenticationButton")).toHaveLength(1);
     expect(text).toContain("Terms");
@@ -187,23 +182,17 @@ describe("the payoff-first reveal (Start today for everyone, auth in a sheet)", 
 
   it("dismissing the sheet returns to the plan with the button still there", async () => {
     const tree = await mount(false);
-    const cta = tree.root.findAll(
-      (n) => String(n.type) === "ConvoButton" && n.props.accessibilityLabel === "Start today",
-    )[0]!;
+    const cta = all(tree, "Start today", "ConvoButton")[0]!;
     await act(async () => {
       cta.props.onPress();
     });
-    const backdrop = tree.root.findAll(
-      (n) => String(n.type) === "Pressable" && n.props.accessibilityLabel === "Close",
-    )[0]!;
+    const backdrop = all(tree, "Close", "Pressable")[0]!;
     await act(async () => {
       backdrop.props.onPress();
     });
     expect(nodeText(tree.root)).not.toContain("Save your plan");
     expect(
-      tree.root.findAll(
-        (n) => String(n.type) === "ConvoButton" && n.props.accessibilityLabel === "Start today",
-      ),
+      all(tree, "Start today", "ConvoButton"),
     ).toHaveLength(1);
   });
 
@@ -224,9 +213,7 @@ describe("the payoff-first reveal (Start today for everyone, auth in a sheet)", 
         />,
       );
     });
-    const cta = tree.root.findAll(
-      (n) => String(n.type) === "ConvoButton" && n.props.accessibilityLabel === "Start today",
-    )[0]!;
+    const cta = all(tree, "Start today", "ConvoButton")[0]!;
     await act(async () => {
       cta.props.onPress();
     });
@@ -238,9 +225,7 @@ describe("the payoff-first reveal (Start today for everyone, auth in a sheet)", 
   it("surfaces the sign-in error inline in the sheet, never as a navigation", async () => {
     mocks.auth.error = "We couldn’t sign you in with Google. Please try again.";
     const tree = await mount(false);
-    const cta = tree.root.findAll(
-      (n) => String(n.type) === "ConvoButton" && n.props.accessibilityLabel === "Start today",
-    )[0]!;
+    const cta = all(tree, "Start today", "ConvoButton")[0]!;
     await act(async () => {
       cta.props.onPress();
     });

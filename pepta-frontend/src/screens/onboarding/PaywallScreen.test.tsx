@@ -1,4 +1,6 @@
 import React from "react";
+import { oneWhere } from "../../tests/byLabel";
+import { all } from "../../tests/byLabel";
 import TestRenderer, { act, type ReactTestInstance } from "react-test-renderer";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PaywallScreen } from "./PaywallScreen";
@@ -270,15 +272,13 @@ function button(
   root: TestRenderer.ReactTestRenderer["root"],
   label: string,
 ): ReactTestInstance {
-  const match = root
-    .findAll(
-      (node) =>
-        (node.type as unknown) === "Pressable" &&
-        node.props.accessibilityRole === "button" &&
-        node.props.accessibilityLabel === label,
-    )
-    .at(0);
-  if (!match) throw new Error(`No button named "${label}"`);
+  const match = oneWhere(
+    { root },
+    label,
+    (node: ReactTestInstance) =>
+      (node.type as unknown) === "Pressable" &&
+      node.props.accessibilityRole === "button",
+  );
   return match;
 }
 
@@ -344,7 +344,7 @@ describe("PaywallScreen legal links", () => {
     });
 
     expect(
-      tree!.root.findAll((node) => node.props.accessibilityLabel === "Close"),
+      all(tree!, "Close", null),
     ).toHaveLength(0);
     expect(button(tree!.root, "Start my year — $40.00")).toBeTruthy();
     expect(allText(tree!.root).toLowerCase()).not.toContain("free trial");

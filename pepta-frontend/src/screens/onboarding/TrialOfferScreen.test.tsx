@@ -4,6 +4,7 @@
 // screens its wall won't honor — and no failure may ever block the funnel.
 
 import React from "react";
+import { all } from "../../tests/byLabel";
 import TestRenderer, { act, type ReactTestInstance } from "react-test-renderer";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -185,9 +186,7 @@ describe("TrialOfferScreen trial gate", () => {
     expect(text).toContain("One last thing");
     // The shared glass pane, same object as Get started and the paywall CTA.
     expect(
-      tree.root.findAll(
-        (n) => String(n.type) === "GlassButton" && n.props.accessibilityLabel === "See my free offer",
-      ),
+      all(tree, "See my free offer", "GlassButton"),
     ).toHaveLength(1);
     // The gift comes from the companion the user named, never "we".
     expect(text).toContain("Ollie would love you");
@@ -209,9 +208,7 @@ describe("TrialOfferScreen trial gate", () => {
     expect(text).toContain("Bartholomew would love you");
     expect(text).toContain("3 days on us");
     expect(
-      tree.root.findAll(
-        (n) => String(n.type) === "GlassButton" && n.props.accessibilityLabel === "See my free offer",
-      ),
+      all(tree, "See my free offer", "GlassButton"),
     ).toHaveLength(1);
   });
 
@@ -304,9 +301,7 @@ describe("TrialCarouselScreen", () => {
     expect(tree.root.findAll((n) => String(n.type) === "Mascot" && n.props.pose === "peek")).toHaveLength(1);
     // The same first-person yes as screen A, persistent under every slide.
     expect(
-      tree.root.findAll(
-        (n) => String(n.type) === "ConvoButton" && n.props.accessibilityLabel === "See my free offer",
-      ),
+      all(tree, "See my free offer", "ConvoButton"),
     ).toHaveLength(1);
   });
 });

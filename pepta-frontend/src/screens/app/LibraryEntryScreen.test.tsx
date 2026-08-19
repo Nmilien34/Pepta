@@ -1,4 +1,5 @@
 import React from "react";
+import { all } from "../../tests/byLabel";
 import TestRenderer, { act, type ReactTestInstance } from "react-test-renderer";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { LibraryEntryScreen } from "./LibraryEntryScreen";
@@ -103,9 +104,7 @@ function textOf(root: ReactTestInstance): string {
 }
 
 function byLabel(root: ReactTestInstance, label: string): ReactTestInstance {
-  const match = root.findAll(
-    (n) => String(n.type) === "Pressable" && n.props.accessibilityLabel === label,
-  )[0];
+  const match = all({ root: root }, label, "Pressable")[0];
   if (!match) throw new Error(`No pressable labelled "${label}"`);
   return match;
 }
@@ -180,9 +179,7 @@ describe("LibraryEntryScreen", () => {
     mocks.entryId = "mk-677";
     const oral = render();
     expect(
-      oral.root.findAll(
-        (n) => n.props.accessibilityLabel === "Open the mix calculator",
-      ),
+      all(oral, "Open the mix calculator", null),
     ).toHaveLength(0);
   });
 

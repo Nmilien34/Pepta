@@ -1,4 +1,5 @@
 import React from "react";
+import { oneWhere } from "../../tests/byLabel";
 import TestRenderer, { act, type ReactTestInstance } from "react-test-renderer";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SignInScreen } from "./SignInScreen";
@@ -192,16 +193,14 @@ function button(
   root: TestRenderer.ReactTestRenderer["root"],
   label: string,
 ): ReactTestInstance {
-  const match = root
-    .findAll(
-      (node) =>
-        (node.type as unknown) === "Pressable" &&
-        node.props.accessibilityRole === "button" &&
-        node.props.accessibilityLabel === label &&
-        typeof node.props.onPress === "function",
-    )
-    .at(0);
-  if (!match) throw new Error(`No button named "${label}"`);
+  const match = oneWhere(
+    { root },
+    label,
+    (node: ReactTestInstance) =>
+      (node.type as unknown) === "Pressable" &&
+      node.props.accessibilityRole === "button" &&
+      typeof node.props.onPress === "function",
+  );
   return match;
 }
 

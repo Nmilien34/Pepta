@@ -157,7 +157,7 @@ vi.mock("../../context/LogSheetsContext", () => ({
 
 import { homeResponseSchema, trackResponseSchema, type HomeResponse } from "@pepta/shared";
 import { HomeScreen } from "./HomeScreen";
-import { duplicateLabels } from "../../tests/byLabel";
+import { duplicateLabels, maybeOne } from "../../tests/byLabel";
 import { recentDayLetters } from "./homeView";
 
 const prod = homeResponseSchema.parse(
@@ -319,9 +319,7 @@ function reopenRow(tree: TestRenderer.ReactTestRenderer) {
 }
 
 function closeRow(tree: TestRenderer.ReactTestRenderer) {
-  return tree.root
-    .findAll((n) => String(n.type) === "Pressable")
-    .find((p) => p.props.accessibilityLabel === "Close");
+  return maybeOne(tree, "Close", "Pressable");
 }
 
 describe("Home · dose day — the Log a shot section", () => {
@@ -373,9 +371,7 @@ describe("Home · dose day — the Log a shot section", () => {
 describe("Home · the doors to the Water screen", () => {
   it("opens it from the water card's glass, not from the stepper", () => {
     const tree = render(doseDay());
-    const card = tree.root
-      .findAll((n) => String(n.type) === "Pressable")
-      .find((p) => p.props.accessibilityLabel === "Water. Open hydration");
+    const card = maybeOne(tree, "Water. Open hydration", "Pressable");
     expect(card).toBeDefined();
     act(() => {
       card!.props.onPress();
@@ -385,9 +381,7 @@ describe("Home · the doors to the Water screen", () => {
 
   it("opens it from the Hydration shortcut tile", () => {
     const tree = render(doseDay());
-    const tile = tree.root
-      .findAll((n) => String(n.type) === "Pressable")
-      .find((p) => p.props.accessibilityLabel === "Hydration");
+    const tile = maybeOne(tree, "Hydration", "Pressable");
     expect(tile).toBeDefined();
     act(() => {
       tile!.props.onPress();
@@ -397,9 +391,7 @@ describe("Home · the doors to the Water screen", () => {
 
   it("keeps the stepper logging rather than navigating", () => {
     const tree = render(doseDay());
-    const card = tree.root
-      .findAll((n) => String(n.type) === "Pressable")
-      .find((p) => p.props.accessibilityLabel === "Water. Open hydration");
+    const card = maybeOne(tree, "Water. Open hydration", "Pressable");
     // The stepper is a sibling of the pressable glass, never inside it, so a
     // thumb aiming at +8 can never navigate away.
     // findAll includes the instance itself, so the glass is the only one.
@@ -410,9 +402,7 @@ describe("Home · the doors to the Water screen", () => {
 
 describe("Home · the doors to the nutrient screens", () => {
   const doorFor = (tree: TestRenderer.ReactTestRenderer, label: string) =>
-    tree.root
-      .findAll((n) => String(n.type) === "Pressable")
-      .find((p) => p.props.accessibilityLabel === label);
+    maybeOne(tree, label, "Pressable");
 
   it("opens Protein from the protein card", () => {
     const tree = render(doseDay());

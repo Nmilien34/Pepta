@@ -45,4 +45,28 @@ export default tseslint.config(
       'react-hooks/exhaustive-deps': 'warn',
     },
   },
+  {
+    // Screen tests must not look a control up by accessibility label and take
+    // the first match. When two controls share a label the lookup silently
+    // answers with the wrong one, and a test written for the other keeps
+    // passing — a false green, which tells you nothing.
+    //
+    // Two controls with one label is also a real accessibility defect: a
+    // screen reader announces the same phrase for two different actions.
+    //
+    // Use src/tests/byLabel.ts — `one` / `maybeOne` throw on ambiguity, and
+    // `duplicateLabels` sweeps a whole screen.
+    files: ['**/*.test.ts', '**/*.test.tsx'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "CallExpression[callee.property.name=/^(find|findAll|filter)$/] BinaryExpression[operator='==='] MemberExpression[property.name='accessibilityLabel']",
+          message:
+            'Do not match on accessibilityLabel directly — two controls can share a label and the lookup will silently pick the wrong one. Use one() / maybeOne() / duplicateLabels() from src/tests/byLabel.',
+        },
+      ],
+    },
+  },
 );

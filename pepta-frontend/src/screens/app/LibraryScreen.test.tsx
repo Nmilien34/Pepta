@@ -1,4 +1,5 @@
 import React from "react";
+import { all } from "../../tests/byLabel";
 import TestRenderer, { act, type ReactTestInstance } from "react-test-renderer";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { LibraryScreen } from "./LibraryScreen";
@@ -86,9 +87,7 @@ function textOf(root: ReactTestInstance): string {
 }
 
 function byLabel(root: ReactTestInstance, label: string): ReactTestInstance {
-  const match = root.findAll(
-    (n) => String(n.type) === "Pressable" && n.props.accessibilityLabel === label,
-  )[0];
+  const match = all({ root: root }, label, "Pressable")[0];
   if (!match) throw new Error(`No pressable labelled "${label}"`);
   return match;
 }

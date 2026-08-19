@@ -1,4 +1,5 @@
 import React from "react";
+import { one } from "../../tests/byLabel";
 import TestRenderer, { act } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SymptomWeekBeatScreen } from "./SymptomWeekBeatScreen";
@@ -191,9 +192,7 @@ describe("SymptomWeekBeatScreen", () => {
 
   it("advances on the CTA", async () => {
     const tree = await renderScreen();
-    const button = tree.root.find(
-      (n) => String(n.type) === "ConvoButton" && n.props.accessibilityLabel === "Show me mine",
-    );
+    const button = one(tree, "Show me mine", "ConvoButton");
     await act(async () => button.props.onPress());
     expect(mocks.onContinue).toHaveBeenCalledTimes(1);
   });

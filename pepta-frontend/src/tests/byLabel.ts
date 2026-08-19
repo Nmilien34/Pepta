@@ -18,8 +18,10 @@ export interface LabelQuery {
   root: ReactTestInstance;
 }
 
-function matches(node: ReactTestInstance, type: string, label: string): boolean {
-  return String(node.type) === type && node.props.accessibilityLabel === label;
+/** `type: null` matches any node type — some screens label a non-Pressable. */
+function matches(node: ReactTestInstance, type: string | null, label: string): boolean {
+  if (type !== null && String(node.type) !== type) return false;
+  return node.props.accessibilityLabel === label;
 }
 
 /**
@@ -29,9 +31,20 @@ function matches(node: ReactTestInstance, type: string, label: string): boolean 
 export function all(
   tree: LabelQuery,
   label: string,
-  type = 'Pressable',
+  type: string | null = 'Pressable',
 ): ReactTestInstance[] {
-  return tree.root.findAll((n) => matches(n, type, label));
+  const found = tree.root.findAll((n) => matches(n, type, label));
+  if (type !== null) return found;
+
+  // ONE CONTROL, COUNTED ONCE. With no type filter, react-test-renderer
+  // returns both the composite (<Pressable/>) and the host element it renders
+  // — same props, same label, one actual control. Counting them as two would
+  // make every unfiltered lookup report a phantom duplicate.
+  //
+  // Host elements have a string type. Prefer those; fall back to the whole set
+  // for a label that only ever sits on a composite.
+  const hosts = found.filter((n) => typeof n.type === 'string');
+  return hosts.length > 0 ? hosts : found;
 }
 
 /**
@@ -43,15 +56,15 @@ export function all(
 export function one(
   tree: LabelQuery,
   label: string,
-  type = 'Pressable',
+  type: string | null = 'Pressable',
 ): ReactTestInstance {
   const found = all(tree, label, type);
   if (found.length === 0) {
-    throw new Error(`No ${type} labelled "${label}"`);
+    throw new Error(`No ${type ?? 'node'} labelled "${label}"`);
   }
   if (found.length > 1) {
     throw new Error(
-      `${found.length} ${type}s share the label "${label}" — a screen reader ` +
+      `${found.length} ${type ?? 'node'}s share the label "${label}" — a screen reader ` +
         `cannot tell them apart, and a test looking one up would silently ` +
         `match whichever comes first. Give them distinct labels.`,
     );
@@ -63,12 +76,12 @@ export function one(
 export function maybeOne(
   tree: LabelQuery,
   label: string,
-  type = 'Pressable',
+  type: string | null = 'Pressable',
 ): ReactTestInstance | undefined {
   const found = all(tree, label, type);
   if (found.length > 1) {
     throw new Error(
-      `${found.length} ${type}s share the label "${label}" — give them distinct labels.`,
+      `${found.length} ${type ?? 'node'}s share the label "${label}" — give them distinct labels.`,
     );
   }
   return found[0];
@@ -79,12 +92,42 @@ export function maybeOne(
  * Run this over a rendered screen to catch the defect wholesale rather than
  * one lookup at a time.
  */
-export function duplicateLabels(tree: LabelQuery, type = 'Pressable'): string[] {
-  const seen = new Map<string, number>();
-  for (const node of tree.root.findAll((n) => String(n.type) === type)) {
+export function duplicateLabels(
+  tree: LabelQuery,
+  type: string | null = 'Pressable',
+): string[] {
+  const labels = new Set<string>();
+  for (const node of tree.root.findAll((n) => type === null || String(n.type) === type)) {
     const label = node.props.accessibilityLabel;
-    if (typeof label !== 'string' || label.length === 0) continue;
-    seen.set(label, (seen.get(label) ?? 0) + 1);
+    if (typeof label === 'string' && label.length > 0) labels.add(label);
   }
-  return [...seen.entries()].filter(([, n]) => n > 1).map(([label]) => label);
+  // Counted through `all`, so the composite/host pair is one control here too
+  // — otherwise this reports a phantom duplicate for every labelled control.
+  return [...labels].filter((label) => all(tree, label, type).length > 1);
+}
+
+/**
+ * The single control with this label that also satisfies `extra` — for screens
+ * whose helpers additionally filter on accessibilityRole or on onPress being
+ * wired.
+ *
+ * Still refuses to guess: two survivors throw, for the same reason as `one`.
+ */
+export function oneWhere(
+  tree: LabelQuery,
+  label: string,
+  extra: (node: ReactTestInstance) => boolean,
+  type: string | null = null,
+): ReactTestInstance {
+  const found = all(tree, label, type).filter(extra);
+  if (found.length === 0) {
+    throw new Error(`No node labelled "${label}" matching the extra filter`);
+  }
+  if (found.length > 1) {
+    throw new Error(
+      `${found.length} nodes share the label "${label}" and pass the same ` +
+        `filter — give them distinct labels.`,
+    );
+  }
+  return found[0]!;
 }
