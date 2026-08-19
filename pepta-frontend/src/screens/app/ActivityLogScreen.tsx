@@ -13,11 +13,11 @@ import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useNavigation, type NavigationProp } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ActivityFeedCard, AppText, LogFilterSheet, Mascot, ShotDetailSheet } from '../../components';
+import { ActivityFeedCard, AppText, BottomSheet, Button, LogFilterSheet, Mascot, ShotDetailSheet } from '../../components';
 import { Icon } from '../../components/Icon';
 import { usePeptaData } from '../../context/PeptaDataContext';
 import { useTheme } from '../../theme';
-import { buildActivityFeed, FULL_FEED_DAYS } from './activityFeed';
+import { buildActivityFeed, removeConfirmLine, FULL_FEED_DAYS, type ActivityEntry } from './activityFeed';
 import {
   NO_FILTER,
   emptyLine,
@@ -33,10 +33,14 @@ import { buildShotWindow } from './shotDetail';
 export function ActivityLogScreen() {
   const theme = useTheme();
   const navigation = useNavigation<NavigationProp<Record<string, undefined>>>();
-  const { home, track, trackRefreshing, refreshTrack, refreshHome } = usePeptaData();
+  const { home, track, trackRefreshing, refreshTrack, refreshHome, deleteLog } = usePeptaData();
   const [openShotId, setOpenShotId] = useState<string | null>(null);
   const [filter, setFilter] = useState<LogFilter>(NO_FILTER);
   const [filterOpen, setFilterOpen] = useState(false);
+  /** The row awaiting confirmation. Removing a record is not undoable here. */
+  const [pendingRemoval, setPendingRemoval] = useState<ActivityEntry | null>(null);
+  const [removing, setRemoving] = useState(false);
+  const [removeError, setRemoveError] = useState('');
 
   const all = useMemo(
     () => buildActivityFeed({ track, home, maxDays: FULL_FEED_DAYS }),
@@ -50,6 +54,24 @@ export function ActivityLogScreen() {
   );
 
   const shown = entryCount(days);
+
+  const confirmRemoval = async () => {
+    const entry = pendingRemoval;
+    if (!entry) return;
+    setRemoving(true);
+    setRemoveError('');
+    // Every source row, because one water row can stand for a dozen pours.
+    const outcomes = await Promise.all(
+      entry.sourceIds.map((id) => deleteLog(entry.kind, id)),
+    );
+    setRemoving(false);
+    if (outcomes.every(Boolean)) {
+      setPendingRemoval(null);
+      return;
+    }
+    // The optimistic marks already rolled back, so the rows are still there.
+    setRemoveError('That did not go through. Nothing was removed.');
+  };
   const filtered = isFiltered(filter);
 
   return (
@@ -192,11 +214,46 @@ export function ActivityLogScreen() {
                 )}
               </View>
             ) : (
-              <ActivityFeedCard bare days={days} onOpenShot={setOpenShotId} />
+              <ActivityFeedCard
+                bare
+                days={days}
+                onOpenShot={setOpenShotId}
+                onRemove={(entry) => {
+                  setRemoveError('');
+                  setPendingRemoval(entry);
+                }}
+              />
             )}
           </View>
         </ScrollView>
       </SafeAreaView>
+
+      <BottomSheet
+        visible={pendingRemoval != null}
+        onClose={() => setPendingRemoval(null)}
+        avoidKeyboard={false}
+      >
+        <AppText variant="cardTitle" style={{ fontSize: 17 }}>
+          {pendingRemoval ? removeConfirmLine(pendingRemoval) : ''}
+        </AppText>
+        <AppText variant="body" color="textSecondary" style={{ marginTop: 8 }}>
+          {removeError ||
+            'It comes out of your totals and your charts. You can log it again, but this particular record is gone.'}
+        </AppText>
+        <View style={{ marginTop: 18 }}>
+          <Button label="Remove" onPress={confirmRemoval} loading={removing} />
+        </View>
+        <Pressable
+          onPress={() => setPendingRemoval(null)}
+          accessibilityRole="button"
+          accessibilityLabel="Keep it"
+          style={({ pressed }) => ({ alignSelf: 'center', paddingVertical: 12, opacity: pressed ? 0.6 : 1 })}
+        >
+          <AppText variant="caption" color="textSecondary" style={{ fontWeight: '700' }}>
+            Keep it
+          </AppText>
+        </Pressable>
+      </BottomSheet>
 
       <LogFilterSheet
         visible={filterOpen}

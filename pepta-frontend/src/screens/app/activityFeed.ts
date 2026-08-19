@@ -45,6 +45,12 @@ export interface ActivityEntry {
    * 10:04.
    */
   timeLabel?: string;
+  /**
+   * The log rows behind this entry. Usually one; a day's water is however
+   * many pours went into it, which is why removing that row has to say so
+   * before it removes a dozen records on one swipe.
+   */
+  sourceIds: string[];
 }
 
 export interface ActivityDay {
@@ -190,6 +196,7 @@ export function buildActivityFeed({
         : '';
     entries.push({
       id: `dose-${dose.id}`,
+      sourceIds: [dose.id],
       kind: 'dose',
       title: `${compound?.name ?? 'Medication'} · ${dose.amount} ${dose.unit}`,
       detail,
@@ -200,6 +207,7 @@ export function buildActivityFeed({
   for (const weight of weightHistory) {
     entries.push({
       id: `weight-${weight.id}`,
+      sourceIds: [weight.id],
       kind: 'weight',
       title: `${weight.value} ${weight.unit}`,
       detail: weightTrend(weight.value, weight.unit, weight.datetime, weightHistory),
@@ -210,6 +218,7 @@ export function buildActivityFeed({
   for (const protein of live(track.proteinLogs)) {
     entries.push({
       id: `protein-${protein.id}`,
+      sourceIds: [protein.id],
       kind: 'protein',
       title: `${protein.grams} g protein`,
       detail: targetFor(home?.profile?.dailyProteinTargetGrams, protein.datetime, 'g'),
@@ -222,22 +231,24 @@ export function buildActivityFeed({
   // and a dozen rows of it would bury the dose this screen is anchored on.
   // Everything else keeps its own timestamp: a meal happened at a time, a
   // glass of water did not.
-  const waterByDay = new Map<string, { total: number; latest: string }>();
+  const waterByDay = new Map<string, { total: number; latest: string; ids: string[] }>();
   for (const water of live(track.waterLogs)) {
     const day = localDay(water.datetime);
     if (!day) continue;
     const running = waterByDay.get(day);
     if (running) {
       running.total += water.amountOz;
+      running.ids.push(water.id);
       if (water.datetime > running.latest) running.latest = water.datetime;
     } else {
-      waterByDay.set(day, { total: water.amountOz, latest: water.datetime });
+      waterByDay.set(day, { total: water.amountOz, latest: water.datetime, ids: [water.id] });
     }
   }
-  for (const [day, { total, latest }] of waterByDay) {
+  for (const [day, { total, latest, ids }] of waterByDay) {
     entries.push({
       id: `water-${day}`,
       kind: 'water',
+      sourceIds: ids,
       // Rounded to a tenth: summing floats gives 63.99999999999999.
       title: `${Math.round(total * 10) / 10} oz water`,
       detail: targetFor(home?.profile?.dailyWaterTargetOz, latest, 'oz'),
@@ -251,6 +262,7 @@ export function buildActivityFeed({
   for (const meal of live(track.mealLogs)) {
     entries.push({
       id: `meal-${meal.id}`,
+      sourceIds: [meal.id],
       kind: 'meal',
       title: meal.foodName,
       detail: `${meal.calories} cal · ${meal.protein} g protein`,
@@ -263,6 +275,7 @@ export function buildActivityFeed({
     const word = severityWord(effect.severity);
     entries.push({
       id: `se-${effect.id}`,
+      sourceIds: [effect.id],
       kind: 'sideEffect',
       // Severity joins the title as a word — "Nausea · mild" — because
       // "Severity 3 of 5" made the reader do the conversion, and the detail
@@ -281,6 +294,7 @@ export function buildActivityFeed({
     if (bits.length === 0) continue;
     entries.push({
       id: `act-${activity.id}`,
+      sourceIds: [activity.id],
       kind: 'activity',
       title: bits[0]!,
       detail: bits[1] ?? '',
@@ -291,6 +305,7 @@ export function buildActivityFeed({
   for (const measurement of live(track.measurements)) {
     entries.push({
       id: `meas-${measurement.id}`,
+      sourceIds: [measurement.id],
       kind: 'measurement',
       title: `${measurementLabel(measurement.type)} ${measurement.value} ${measurement.unit}`,
       detail: '',
@@ -342,4 +357,17 @@ export function entryTime(iso: string): string {
   } catch {
     return at.toISOString().slice(11, 16);
   }
+}
+
+
+/**
+ * What a Remove confirmation says. It names the row and, where one gesture
+ * would take several records, says how many — a day's water is a dozen pours,
+ * and "Remove 64 oz water" would hide that.
+ */
+export function removeConfirmLine(entry: ActivityEntry): string {
+  if (entry.sourceIds.length > 1) {
+    return `${entry.title} is ${entry.sourceIds.length} separate entries. Remove all of them?`;
+  }
+  return `Remove ${entry.title}?`;
 }

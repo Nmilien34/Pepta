@@ -15,7 +15,13 @@ import { AppText } from './AppText';
 import { Card } from './Card';
 import { Icon } from './Icon';
 import { useTheme } from '../theme';
-import { entryTime, type ActivityDay, type ActivityKind } from '../screens/app/activityFeed';
+import ReanimatedSwipeable from 'react-native-gesture-handler/ReanimatedSwipeable';
+import {
+  entryTime,
+  type ActivityDay,
+  type ActivityEntry,
+  type ActivityKind,
+} from '../screens/app/activityFeed';
 
 export const ACTIVITY_ICON: Record<ActivityKind, { name: string; bg: string; fg: string }> = {
   dose: { name: 'needle', bg: '#EFEBFF', fg: '#6751E8' },
@@ -32,6 +38,7 @@ export function ActivityFeedCard({
   days,
   onSeeAll,
   onOpenShot,
+  onRemove,
   /** The screen version drops the card chrome — it IS the screen. */
   bare = false,
 }: {
@@ -39,6 +46,12 @@ export function ActivityFeedCard({
   /** Absent on the full screen: there is nowhere further to go. */
   onSeeAll?: () => void;
   onOpenShot(doseId: string): void;
+  /**
+   * Absent on the Track card. Removing a record is a deliberate act, and the
+   * card is a three-day glance you scroll past — the full screen is where you
+   * go to manage your history.
+   */
+  onRemove?: (entry: ActivityEntry) => void;
   bare?: boolean;
 }) {
   const theme = useTheme();
@@ -101,7 +114,7 @@ export function ActivityFeedCard({
               // detail that does not exist.
               const opens = entry.kind === 'dose';
               const doseId = opens ? entry.id.replace(/^dose-/, '') : null;
-              return (
+              const row = (
                 <Pressable
                   key={entry.id}
                   onPress={() => {
@@ -142,6 +155,40 @@ export function ActivityFeedCard({
                     <Icon name="chevron-forward" size={14} color={theme.colors.textTertiary} />
                   ) : null}
                 </Pressable>
+              );
+
+              // Swipe rather than a visible button: the frame has no delete
+              // affordance, and a row of X's would make a history screen look
+              // like a to-do list. The gesture is the same one Favourites
+              // uses, so it is already learned.
+              if (!onRemove) return row;
+              return (
+                <ReanimatedSwipeable
+                  key={entry.id}
+                  friction={2}
+                  rightThreshold={36}
+                  renderRightActions={() => (
+                    <Pressable
+                      onPress={() => {
+                        Haptics.selectionAsync().catch(() => undefined);
+                        onRemove(entry);
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Remove ${entry.title}`}
+                      style={({ pressed }) => ({
+                        justifyContent: 'center',
+                        paddingHorizontal: 18,
+                        opacity: pressed ? 0.7 : 1,
+                      })}
+                    >
+                      <AppText variant="caption" style={{ fontWeight: '800', color: theme.colors.danger }}>
+                        Remove
+                      </AppText>
+                    </Pressable>
+                  )}
+                >
+                  {row}
+                </ReanimatedSwipeable>
               );
             })}
           </View>

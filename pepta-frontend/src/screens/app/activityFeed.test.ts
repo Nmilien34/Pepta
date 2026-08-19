@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { makeHome } from '../../mocks/home';
-import { buildActivityFeed, entryTime, localDay, severityWord } from './activityFeed';
+import { buildActivityFeed, entryTime, localDay, removeConfirmLine, severityWord } from './activityFeed';
 
 const NOW = new Date(2026, 7, 13, 14, 0, 0); // Thu Aug 13 2026, 2pm local
 const at = (day: number, hour: number) => new Date(2026, 7, day, hour, 0, 0).toISOString();
@@ -434,5 +434,45 @@ describe('water is a day, not a moment', () => {
 
     expect(protein).toHaveLength(2);
     expect(protein.every((entry) => entry.timeLabel == null)).toBe(true);
+  });
+});
+
+describe('what a Remove confirmation says', () => {
+  const one = { sourceIds: ['a'], title: 'Zepbound · 5 mg' } as never;
+  const many = { sourceIds: ['a', 'b', 'c'], title: '64 oz water' } as never;
+
+  it('names the row for a single record', () => {
+    expect(removeConfirmLine(one)).toBe('Remove Zepbound · 5 mg?');
+  });
+
+  it('says how many when one swipe would take several', () => {
+    // A day's water is a dozen pours. "Remove 64 oz water?" would hide that.
+    expect(removeConfirmLine(many)).toBe(
+      '64 oz water is 3 separate entries. Remove all of them?',
+    );
+  });
+
+  it('carries the source ids the delete needs, on every kind', () => {
+    const feed = buildActivityFeed({
+      home: home(),
+      now: NOW,
+      track: track({
+        doseLogs: [{ id: 'd', compoundId: 'c1', amount: 5, unit: 'mg', datetime: at(13, 9), deletedAt: null }],
+        weightLogs: [{ id: 'w', value: 230, unit: 'lb', datetime: at(13, 7), deletedAt: null }],
+        proteinLogs: [{ id: 'p', grams: 42, datetime: at(13, 8), deletedAt: null }],
+        waterLogs: [
+          { id: 'h1', amountOz: 8, datetime: at(13, 10), deletedAt: null },
+          { id: 'h2', amountOz: 8, datetime: at(13, 11), deletedAt: null },
+        ],
+        sideEffectLogs: [{ id: 's', types: ['nausea'], severity: 2, datetime: at(13, 18), deletedAt: null }],
+      }),
+    });
+
+    for (const item of feed.flatMap((day) => day.entries)) {
+      expect(item.sourceIds.length).toBeGreaterThan(0);
+      expect(item.sourceIds.every((id) => typeof id === 'string' && id.length > 0)).toBe(true);
+    }
+    const water = feed[0]!.entries.find((item) => item.kind === 'water')!;
+    expect(water.sourceIds.sort()).toEqual(['h1', 'h2']);
   });
 });

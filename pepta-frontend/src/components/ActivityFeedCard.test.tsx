@@ -26,6 +26,13 @@ vi.mock('react-native', () => {
 
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn(() => Promise.resolve()) }));
 
+vi.mock('react-native-gesture-handler/ReanimatedSwipeable', () => ({
+  // Renders the row AND its right action, so the swipe target is reachable
+  // without simulating a gesture.
+  default: ({ children, renderRightActions }: { children?: React.ReactNode; renderRightActions?: () => React.ReactNode }) =>
+    React.createElement('Swipeable', null, renderRightActions?.(), children),
+}));
+
 vi.mock('./AppText', () => ({
   AppText: ({ children }: { children?: React.ReactNode }) => React.createElement('AppText', null, children),
 }));
@@ -45,16 +52,16 @@ const days: ActivityDay[] = [
     date: '2026-08-13',
     label: 'Today',
     entries: [
-      { id: 'dose-d1', kind: 'dose', title: 'Zepbound · 5 mg', detail: 'Left abdomen', datetime: '2026-08-13T09:04:00.000Z' },
-      { id: 'weight-w1', kind: 'weight', title: '230 lb', detail: 'Down 1.2 lb this week', datetime: '2026-08-13T07:20:00.000Z' },
-      { id: 'protein-p1', kind: 'protein', title: '42 g protein', detail: 'Of 140 g today', datetime: '2026-08-13T08:15:00.000Z' },
+      { id: 'dose-d1', sourceIds: ['d1'], kind: 'dose', title: 'Zepbound · 5 mg', detail: 'Left abdomen', datetime: '2026-08-13T09:04:00.000Z' },
+      { id: 'weight-w1', sourceIds: ['w1'], kind: 'weight', title: '230 lb', detail: 'Down 1.2 lb this week', datetime: '2026-08-13T07:20:00.000Z' },
+      { id: 'protein-p1', sourceIds: ['p1'], kind: 'protein', title: '42 g protein', detail: 'Of 140 g today', datetime: '2026-08-13T08:15:00.000Z' },
     ],
   },
   {
     date: '2026-08-12',
     label: 'Yesterday',
     entries: [
-      { id: 'se-s1', kind: 'sideEffect', title: 'Nausea · mild', detail: '2 days after your dose', datetime: '2026-08-12T18:40:00.000Z' },
+      { id: 'se-s1', sourceIds: ['s1'], kind: 'sideEffect', title: 'Nausea · mild', detail: '2 days after your dose', datetime: '2026-08-12T18:40:00.000Z' },
     ],
   },
 ];
@@ -178,5 +185,49 @@ describe('the screen variant', () => {
       texts(tree).filter((t) => t !== 'Your log' && t !== 'See all');
 
     expect(rowsOf(screen)).toEqual(rowsOf(card));
+  });
+});
+
+describe('removing a row', () => {
+  const onRemove = vi.fn();
+
+  it('is offered on the full screen, where you go to manage history', async () => {
+    const tree = await render({ bare: true, onSeeAll: undefined, onRemove });
+
+    await act(async () => {
+      one(tree, 'Remove Zepbound · 5 mg').props.onPress();
+    });
+
+    expect(onRemove).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'dose-d1', sourceIds: ['d1'] }),
+    );
+  });
+
+  it('is NOT offered on the Track card — that is a glance, not a manager', async () => {
+    const tree = await render();
+
+    expect(maybeOne(tree, 'Remove Zepbound · 5 mg')).toBeUndefined();
+    expect(tree.root.findAll((n) => String(n.type) === 'Swipeable')).toHaveLength(0);
+  });
+
+  it('offers it on every row, not only the ones that open', async () => {
+    const tree = await render({ bare: true, onSeeAll: undefined, onRemove });
+
+    for (const label of ['Remove 230 lb', 'Remove 42 g protein', 'Remove Nausea · mild']) {
+      expect(one(tree, label)).toBeTruthy();
+    }
+  });
+
+  it('keeps the row itself intact behind the swipe action', async () => {
+    const tree = await render({ bare: true, onSeeAll: undefined, onRemove });
+
+    expect(texts(tree)).toContain('Zepbound · 5 mg');
+    expect(one(tree, 'Zepbound · 5 mg — see how this shot went')).toBeTruthy();
+  });
+
+  it('gives no two remove actions the same label', async () => {
+    const tree = await render({ bare: true, onSeeAll: undefined, onRemove });
+
+    expect(duplicateLabels(tree)).toEqual([]);
   });
 });

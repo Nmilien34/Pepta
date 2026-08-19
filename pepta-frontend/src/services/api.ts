@@ -215,6 +215,20 @@ const RETRY_DELAY_MS = 400;
 const delay = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
+/** Every log the activity feed can show, and where its rows live. */
+export const LOG_PATHS = {
+  dose: "/dose-logs",
+  weight: "/weight-logs",
+  meal: "/meal-logs",
+  water: "/water-logs",
+  protein: "/protein-logs",
+  activity: "/activity-logs",
+  sideEffect: "/side-effect-logs",
+  measurement: "/measurements",
+} as const;
+
+export type DeletableLogKind = keyof typeof LOG_PATHS;
+
 class PeptaApi {
   private authToken: string | null = null;
   private onUnauthorized?: () => void;
@@ -675,6 +689,16 @@ class PeptaApi {
       `/medication-levels?range=${encodeURIComponent(range)}`,
       medicationLevelsResponseSchema,
     );
+  }
+
+  /**
+   * Soft-deletes one log. The route exists for every kind the feed shows —
+   * this is what had never been wired to a button.
+   */
+  public deleteLog(kind: DeletableLogKind, id: string): Promise<unknown> {
+    return this.request(`${LOG_PATHS[kind]}/${encodeURIComponent(id)}`, z.unknown(), {
+      method: "DELETE",
+    });
   }
 
   public getRecipes(): Promise<RecipesResponse> {

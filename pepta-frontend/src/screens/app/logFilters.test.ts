@@ -18,6 +18,7 @@ const at = (day: number, hour = 9) => new Date(2026, 7, day, hour, 0, 0).toISOSt
 
 const entry = (id: string, kind: string, day: number, hour = 9) => ({
   id,
+  sourceIds: [id],
   kind: kind as never,
   title: id,
   detail: '',

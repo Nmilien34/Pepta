@@ -36,7 +36,7 @@ import type {
   WeightLogInput,
   WeightLogResponse,
 } from "@pepta/shared";
-import { api } from "../services/api";
+import { api, type DeletableLogKind } from "../services/api";
 import { useAuth } from "./AuthContext";
 import { readSnapshot, writeSnapshot } from "../services/peptaSnapshotStore";
 import {
@@ -124,6 +124,11 @@ interface PeptaDataContextValue {
   addSideEffectLog(input: SideEffectLogInput): void;
   // Optimistically fold a logged meal into today's Home macro totals.
   addMeal(input: MealLogInput): void;
+  /**
+   * Soft-deletes one log and rolls back if the server refuses. Resolves true
+   * when it stuck. The delete routes have always existed; nothing called them.
+   */
+  deleteLog(kind: DeletableLogKind, id: string): Promise<boolean>;
 }
 
 const PeptaDataContext = createContext<PeptaDataContextValue | undefined>(
@@ -222,6 +227,13 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
   const [homeError, setHomeError] = useState<string | null>(null);
   const [homeRange, setHomeRange] = useState<HomeRangeKey>("today");
   const [track, setTrack] = useState<TrackResponse | null>(null);
+  /**
+   * The current track payload, readable synchronously. Rollback has to capture
+   * what was on screen at the moment of the delete; reading state inside a
+   * setState updater captures whatever a concurrent write left behind.
+   */
+  const trackRef = useRef<TrackResponse | null>(null);
+  trackRef.current = track;
   const [trackLoading, setTrackLoading] = useState(false);
   const [trackRefreshing, setTrackRefreshing] = useState(false);
   const [trackError, setTrackError] = useState<string | null>(null);
@@ -536,6 +548,55 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
         : t,
     );
   }, []);
+  /**
+   * Removes one log, optimistically.
+   *
+   * MARKS deletedAt RATHER THAN SPLICING THE ROW OUT. Every consumer already
+   * filters on it — the whole soft-delete guard exists for this moment — and
+   * a marked row rolls back by clearing one field, where a spliced one has to
+   * be put back in the right place in the right array.
+   *
+   * The rollback value is captured from a ref, synchronously. Reading it
+   * inside the setState updater would capture whatever a concurrent write had
+   * already done.
+   */
+  const deleteLog = useCallback(
+    async (kind: DeletableLogKind, id: string): Promise<boolean> => {
+      const before = trackRef.current;
+      const mark = <T extends { id: string; deletedAt?: string | null }>(rows: T[]) =>
+        rows.map((row) => (row.id === id ? { ...row, deletedAt: new Date().toISOString() } : row));
+
+      setTrack((t) =>
+        t
+          ? {
+              ...t,
+              doseLogs: mark(t.doseLogs),
+              mealLogs: mark(t.mealLogs),
+              waterLogs: mark(t.waterLogs),
+              proteinLogs: mark(t.proteinLogs),
+              activityLogs: mark(t.activityLogs),
+              sideEffectLogs: mark(t.sideEffectLogs),
+              weightLogs: mark(t.weightLogs),
+              measurements: mark(t.measurements),
+            }
+          : t,
+      );
+
+      try {
+        await api.deleteLog(kind, id);
+        // Totals, streaks and the level curve are all server-derived, so the
+        // row vanishing locally is only half of it.
+        void refreshHome();
+        void refreshTrack();
+        return true;
+      } catch {
+        setTrack(before);
+        return false;
+      }
+    },
+    [refreshHome, refreshTrack],
+  );
+
   const addSideEffectLog = useCallback((input: SideEffectLogInput) => {
     setTrack((t) => trackWithAddedSideEffect(t, input));
   }, []);
@@ -794,6 +855,7 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
       addMeasurement,
       addSideEffectLog,
       addMeal,
+      deleteLog,
     }),
     [
       saveLog,
@@ -828,6 +890,7 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
       addMeasurement,
       addSideEffectLog,
       addMeal,
+      deleteLog,
     ],
   );
 
