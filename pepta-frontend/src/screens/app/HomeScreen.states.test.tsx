@@ -157,7 +157,7 @@ vi.mock("../../context/LogSheetsContext", () => ({
 
 import { homeResponseSchema, trackResponseSchema, type HomeResponse } from "@pepta/shared";
 import { HomeScreen } from "./HomeScreen";
-import { duplicateLabels, maybeOne } from "../../tests/byLabel";
+import { duplicateLabels, maybeOne, one } from "../../tests/byLabel";
 import { recentDayLetters } from "./homeView";
 
 const prod = homeResponseSchema.parse(
@@ -451,5 +451,25 @@ describe("Home · no two controls answer to one label", () => {
   it("holds on the first run and on a dose day", () => {
     expect(duplicateLabels(render(firstRun()))).toEqual([]);
     expect(duplicateLabels(render(doseDay()))).toEqual([]);
+  });
+});
+
+describe("Home · the two log affordances I added", () => {
+  it("logs a workout from the activity card", async () => {
+    const tree = render(doseDay());
+    act(() => one(tree, "Log a workout").props.onPress());
+    expect(mocks.openQuickLog).toHaveBeenCalledWith("activity");
+  });
+
+  it("logs a meal from the Meals tile in the nutrient grid", async () => {
+    const tree = render(doseDay());
+    act(() => one(tree, "Log a meal").props.onPress());
+    expect(mocks.openMeal).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the two apart — the workout pill never opens the meal sheet", async () => {
+    const tree = render(doseDay());
+    act(() => one(tree, "Log a workout").props.onPress());
+    expect(mocks.openMeal).not.toHaveBeenCalled();
   });
 });
