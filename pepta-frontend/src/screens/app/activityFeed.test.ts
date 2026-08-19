@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { makeHome } from '../../mocks/home';
-import { buildActivityFeed, entryTime, localDay } from './activityFeed';
+import { buildActivityFeed, entryTime, localDay, severityWord } from './activityFeed';
 
 const NOW = new Date(2026, 7, 13, 14, 0, 0); // Thu Aug 13 2026, 2pm local
 const at = (day: number, hour: number) => new Date(2026, 7, day, hour, 0, 0).toISOString();
@@ -192,5 +192,158 @@ describe('entryTime', () => {
   });
   it('returns empty for junk rather than "Invalid Date"', () => {
     expect(entryTime('not-a-date')).toBe('');
+  });
+});
+
+const withTargets = (compounds?: unknown[]) =>
+  makeHome({
+    activeCompounds: (compounds ?? [
+      { id: 'c1', name: 'Zepbound', route: 'injection', doseUnit: 'mg' },
+    ]) as never,
+    profile: { dailyProteinTargetGrams: 140, dailyWaterTargetOz: 100 } as never,
+  });
+
+const find = (feed: ReturnType<typeof buildActivityFeed>, kind: string) =>
+  feed.flatMap((day) => day.entries).find((entry) => entry.kind === kind);
+
+describe('every row says what it means, not just what it was', () => {
+  it('measures a habit log against the target for that day', () => {
+    const feed = buildActivityFeed({
+      home: withTargets(),
+      now: NOW,
+      track: track({
+        proteinLogs: [{ id: 'p', grams: 42, datetime: at(13, 8), deletedAt: null }],
+        waterLogs: [{ id: 'h', amountOz: 64, datetime: at(13, 10), deletedAt: null }],
+      }),
+    });
+
+    expect(find(feed, 'protein')!.detail).toBe('Of 140 g today');
+    expect(find(feed, 'water')!.detail).toBe('Of 100 oz today');
+  });
+
+  it("does not put today's target under an older day — it may never have been theirs", () => {
+    const feed = buildActivityFeed({
+      home: withTargets(),
+      now: NOW,
+      track: track({
+        proteinLogs: [{ id: 'p', grams: 42, datetime: at(11, 8), deletedAt: null }],
+      }),
+    });
+
+    expect(find(feed, 'protein')!.detail).toBe('');
+  });
+
+  it('says nothing about a target the user has not set', () => {
+    const feed = buildActivityFeed({
+      home: home(),
+      now: NOW,
+      track: track({ waterLogs: [{ id: 'h', amountOz: 64, datetime: at(13, 10), deletedAt: null }] }),
+    });
+
+    expect(find(feed, 'water')!.detail).toBe('');
+  });
+
+  it('gives a weigh-in its weekly trend', () => {
+    const feed = buildActivityFeed({
+      home: home(),
+      now: NOW,
+      track: track({
+        weightLogs: [
+          { id: 'w2', value: 230, unit: 'lb', datetime: at(13, 7), deletedAt: null },
+          { id: 'w1', value: 231.2, unit: 'lb', datetime: at(6, 7), deletedAt: null },
+        ],
+      }),
+    });
+
+    expect(find(feed, 'weight')!.detail).toBe('Down 1.2 lb this week');
+  });
+
+  it('says up when it went up, and level when it did not move', () => {
+    const up = buildActivityFeed({
+      home: home(),
+      now: NOW,
+      track: track({
+        weightLogs: [
+          { id: 'w2', value: 232, unit: 'lb', datetime: at(13, 7), deletedAt: null },
+          { id: 'w1', value: 230, unit: 'lb', datetime: at(6, 7), deletedAt: null },
+        ],
+      }),
+    });
+    expect(find(up, 'weight')!.detail).toBe('Up 2 lb this week');
+
+    const level = buildActivityFeed({
+      home: home(),
+      now: NOW,
+      track: track({
+        weightLogs: [
+          { id: 'w2', value: 230, unit: 'lb', datetime: at(13, 7), deletedAt: null },
+          { id: 'w1', value: 230, unit: 'lb', datetime: at(6, 7), deletedAt: null },
+        ],
+      }),
+    });
+    expect(find(level, 'weight')!.detail).toBe('Same as last week');
+  });
+
+  it('claims no weekly trend from two weigh-ins on the same morning', () => {
+    const feed = buildActivityFeed({
+      home: home(),
+      now: NOW,
+      track: track({
+        weightLogs: [
+          { id: 'w2', value: 230, unit: 'lb', datetime: at(13, 9), deletedAt: null },
+          { id: 'w1', value: 231, unit: 'lb', datetime: at(13, 7), deletedAt: null },
+        ],
+      }),
+    });
+
+    expect(find(feed, 'weight')!.detail).toBe('');
+  });
+
+  it('places a side effect against the dose that preceded it', () => {
+    const feed = buildActivityFeed({
+      home: home(),
+      now: NOW,
+      track: track({
+        doseLogs: [{ id: 'd', compoundId: 'c1', amount: 5, unit: 'mg', datetime: at(10, 9), deletedAt: null }],
+        sideEffectLogs: [{ id: 's', types: ['nausea'], severity: 2, datetime: at(12, 18), deletedAt: null }],
+      }),
+    });
+
+    const effect = find(feed, 'sideEffect')!;
+    expect(effect.title).toBe('Nausea · mild');
+    expect(effect.detail).toBe('2 days after your dose');
+  });
+
+  it('never reads a side effect against a dose that came after it', () => {
+    const feed = buildActivityFeed({
+      home: home(),
+      now: NOW,
+      track: track({
+        doseLogs: [{ id: 'd', compoundId: 'c1', amount: 5, unit: 'mg', datetime: at(13, 9), deletedAt: null }],
+        sideEffectLogs: [{ id: 's', types: ['nausea'], severity: 4, datetime: at(11, 18), deletedAt: null }],
+      }),
+    });
+
+    expect(find(feed, 'sideEffect')!.detail).toBe('');
+  });
+
+  it('says severity as a word, so nobody converts 3-of-5 in their head', () => {
+    expect(severityWord(1)).toBe('mild');
+    expect(severityWord(2)).toBe('mild');
+    expect(severityWord(3)).toBe('moderate');
+    expect(severityWord(5)).toBe('severe');
+    expect(severityWord(null)).toBe('');
+  });
+
+  it('leaves a severity-less effect with just its name', () => {
+    const feed = buildActivityFeed({
+      home: home(),
+      now: NOW,
+      track: track({
+        sideEffectLogs: [{ id: 's', types: ['nausea'], severity: null, datetime: at(13, 18), deletedAt: null }],
+      }),
+    });
+
+    expect(find(feed, 'sideEffect')!.title).toBe('Nausea');
   });
 });

@@ -84,12 +84,70 @@ function dayLabel(date: string, now: Date): string {
   }
 }
 
+/**
+ * The full-history window, shared by the See-all screen and by Track's test of
+ * whether See all is worth offering. Two numbers here would mean the card
+ * could hide a link to a screen that had more to show. /track looks back 30
+ * days, so this is a ceiling the payload reaches first, not a cap of its own.
+ */
+export const FULL_FEED_DAYS = 400;
+
 export interface ActivityFeedInput {
   track: TrackResponse | null;
   home: HomeResponse | null;
   now?: Date;
   /** Cap on DAYS shown, not entries — a busy day is never truncated. */
   maxDays?: number;
+}
+
+/** 1-5 as a word, the way the frame writes it: "Nausea · mild". */
+export function severityWord(severity: number | null | undefined): string {
+  if (severity == null) return '';
+  if (severity <= 2) return 'mild';
+  if (severity === 3) return 'moderate';
+  return 'severe';
+}
+
+/**
+ * "2 days after your dose" — the line that makes a side effect mean something.
+ * Counted from the most recent dose AT OR BEFORE it, because a side effect is
+ * read against the shot that preceded it, never the next one.
+ */
+function daysAfterDose(at: string, doseTimes: number[]): string {
+  const when = new Date(at).getTime();
+  if (!Number.isFinite(when)) return '';
+  const previous = doseTimes.filter((time) => time <= when).sort((a, b) => b - a)[0];
+  if (previous == null) return '';
+  const days = Math.floor((when - previous) / 86_400_000);
+  if (days === 0) return 'Same day as your dose';
+  return `${days} day${days === 1 ? '' : 's'} after your dose`;
+}
+
+/**
+ * "Down 1.2 lb this week".
+ *
+ * Only against a log 5-10 days older, so "this week" is a claim the data
+ * actually supports. Someone who weighs in twice in one morning gets no line
+ * rather than a fabricated weekly trend.
+ */
+function weightTrend(
+  value: number,
+  unit: string,
+  at: string,
+  history: { value: number; datetime: string }[],
+): string {
+  const when = new Date(at).getTime();
+  const prior = history
+    .map((row) => ({ value: row.value, time: new Date(row.datetime).getTime() }))
+    .filter((row) => {
+      const days = (when - row.time) / 86_400_000;
+      return days >= 5 && days <= 10;
+    })
+    .sort((a, b) => b.time - a.time)[0];
+  if (!prior) return '';
+  const delta = Math.round((value - prior.value) * 10) / 10;
+  if (delta === 0) return 'Same as last week';
+  return `${delta < 0 ? 'Down' : 'Up'} ${Math.abs(delta)} ${unit} this week`;
 }
 
 export function buildActivityFeed({
@@ -102,6 +160,18 @@ export function buildActivityFeed({
   const compounds = home?.activeCompounds ?? [];
   const compoundOf = (id: string) => compounds.find((compound) => compound.id === id);
   const entries: ActivityEntry[] = [];
+  const today = localDay(now.toISOString());
+  const doseTimes = live(track.doseLogs)
+    .map((dose) => new Date(dose.datetime).getTime())
+    .filter((time) => Number.isFinite(time));
+  const weightHistory = live(track.weightLogs);
+  /**
+   * A target only describes the day it is set for. Printing today's 140 g
+   * under a row from three weeks ago would state a target that may never have
+   * been theirs — so the reference line is offered on today's rows only.
+   */
+  const targetFor = (unitTarget: number | undefined, at: string, suffix: string) =>
+    unitTarget && localDay(at) === today ? `Of ${unitTarget} ${suffix} today` : '';
 
   for (const dose of live(track.doseLogs)) {
     const compound = compoundOf(dose.compoundId);
@@ -121,12 +191,12 @@ export function buildActivityFeed({
     });
   }
 
-  for (const weight of live(track.weightLogs)) {
+  for (const weight of weightHistory) {
     entries.push({
       id: `weight-${weight.id}`,
       kind: 'weight',
       title: `${weight.value} ${weight.unit}`,
-      detail: '',
+      detail: weightTrend(weight.value, weight.unit, weight.datetime, weightHistory),
       datetime: weight.datetime,
     });
   }
@@ -136,7 +206,7 @@ export function buildActivityFeed({
       id: `protein-${protein.id}`,
       kind: 'protein',
       title: `${protein.grams} g protein`,
-      detail: '',
+      detail: targetFor(home?.profile?.dailyProteinTargetGrams, protein.datetime, 'g'),
       datetime: protein.datetime,
     });
   }
@@ -146,7 +216,7 @@ export function buildActivityFeed({
       id: `water-${water.id}`,
       kind: 'water',
       title: `${water.amountOz} oz water`,
-      detail: '',
+      detail: targetFor(home?.profile?.dailyWaterTargetOz, water.datetime, 'oz'),
       datetime: water.datetime,
     });
   }
@@ -163,11 +233,15 @@ export function buildActivityFeed({
 
   for (const effect of live(track.sideEffectLogs)) {
     const names = (effect.types ?? []).map(sideEffectTypeLabel).join(', ');
+    const word = severityWord(effect.severity);
     entries.push({
       id: `se-${effect.id}`,
       kind: 'sideEffect',
-      title: names || 'Side effect',
-      detail: effect.severity ? `Severity ${effect.severity} of 5` : '',
+      // Severity joins the title as a word — "Nausea · mild" — because
+      // "Severity 3 of 5" made the reader do the conversion, and the detail
+      // line is worth more spent on when it happened relative to the dose.
+      title: [names || 'Side effect', word].filter(Boolean).join(' · '),
+      detail: daysAfterDose(effect.datetime, doseTimes),
       datetime: effect.datetime,
     });
   }

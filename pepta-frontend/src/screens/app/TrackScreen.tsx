@@ -9,7 +9,7 @@ import * as Haptics from 'expo-haptics';
 import { useNavigation, type NavigationProp } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../theme';
-import { AddCompoundSheet, AppText, BodyMap, Button, Card, Mascot, ProgressRing, Reveal, MedicationLevelCard, ScreenHeader, SectionErrorBanner, ShotDetailSheet } from '../../components';
+import { ActivityFeedCard, AddCompoundSheet, AppText, BodyMap, Button, Card, Mascot, ProgressRing, Reveal, MedicationLevelCard, ScreenHeader, SectionErrorBanner, ShotDetailSheet } from '../../components';
 import { WeekStrip } from '../../components/WeekStrip';
 import { ScheduleSheet } from '../../components/ScheduleSheet';
 import { usePeptaData } from '../../context/PeptaDataContext';
@@ -27,22 +27,10 @@ import {
   suggestNextSite,
   usedSites,
 } from './trackView';
-import {
-  buildActivityFeed,
-  entryTime,
-  type ActivityDay,
-  type ActivityKind,
-} from './activityFeed';
+import { buildActivityFeed, FULL_FEED_DAYS } from './activityFeed';
 import { buildShotWindow } from './shotDetail';
 import { useLevelRange } from './useLevelRange';
 import { doseNoun, globalDoseNoun, resolveLevelView } from './levelSuppression';
-
-/**
- * Depth of the expanded "Your log". Comfortably past /track's own 30-day
- * lookback, so "See all" really does mean every log in the payload rather than
- * a second, quieter cap the user cannot see.
- */
-const FEED_MAX_DAYS = 60;
 
 export function TrackScreen() {
   const theme = useTheme();
@@ -90,11 +78,10 @@ export function TrackScreen() {
   // appended when three days of habit logs would have pushed it out), and
   // slicing the full list in the card would silently drop it.
   const activityDays = useMemo(() => buildActivityFeed({ track, home }), [track, home]);
-  const allActivityDays = useMemo(
-    () => buildActivityFeed({ track, home, maxDays: FEED_MAX_DAYS }),
-    [track, home],
+  const hasMoreActivity = useMemo(
+    () => buildActivityFeed({ track, home, maxDays: FULL_FEED_DAYS }).length > activityDays.length,
+    [track, home, activityDays.length],
   );
-  const [feedExpanded, setFeedExpanded] = useState(false);
   // ALSO above the early returns, for the same reason as the feed memos.
   // Enabled once there is a curve to window — a user with nothing logged has
   // nothing to prefetch. `home` is read directly here because resolveLevelView
@@ -240,13 +227,12 @@ export function TrackScreen() {
           <View onLayout={(e) => { doseHistoryY.current = e.nativeEvent.layout.y; }}>
             <Reveal delay={100} style={{ marginTop: 12 }}>
               <ActivityFeedCard
-                days={feedExpanded ? allActivityDays : activityDays}
-                canExpand={allActivityDays.length > activityDays.length}
-                expanded={feedExpanded}
-                onToggle={() => {
-                  Haptics.selectionAsync().catch(() => undefined);
-                  setFeedExpanded((open) => !open);
-                }}
+                days={activityDays}
+                // Offered only when there is more than the card is showing, so
+                // it never promises a longer history than the user has.
+                onSeeAll={
+                  hasMoreActivity ? () => navigation.navigate('ActivityLog') : undefined
+                }
                 onOpenShot={setOpenShotId}
               />
             </Reveal>
@@ -501,128 +487,6 @@ export function TrackScreen() {
 // "Current". MedicationLevelChart draws the same data with its time intact.
 // "Your log" — every kind of log the user recorded, grouped by day. Replaces
 // the doses-only "Dose history" that sat five cards down; see activityFeed.ts.
-const ACTIVITY_ICON: Record<ActivityKind, { name: string; bg: string; fg: string }> = {
-  dose: { name: 'needle', bg: '#EFEBFF', fg: '#6751E8' },
-  weight: { name: 'scale', bg: '#F2F3F5', fg: '#52525B' },
-  protein: { name: 'food-drumstick', bg: '#FFEDE0', fg: '#D2691E' },
-  water: { name: 'water', bg: '#E3F2FF', fg: '#2A8FD8' },
-  meal: { name: 'nutrition', bg: '#E8F8EE', fg: '#1E8E40' },
-  sideEffect: { name: 'alert-circle-outline', bg: '#FFF4E5', fg: '#B87514' },
-  activity: { name: 'pulse', bg: '#FFE9EC', fg: '#C2415A' },
-  measurement: { name: 'chart-line', bg: '#F2F3F5', fg: '#52525B' },
-};
-
-function ActivityFeedCard({
-  days,
-  canExpand,
-  expanded,
-  onToggle,
-  onOpenShot,
-}: {
-  days: ActivityDay[];
-  canExpand: boolean;
-  expanded: boolean;
-  onToggle(): void;
-  onOpenShot(doseId: string): void;
-}) {
-  const theme = useTheme();
-  return (
-    <Card>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 }}>
-          <Icon name="history" size={18} color={theme.colors.textSecondary} />
-          <AppText variant="cardTitle" style={{ fontSize: 15 }} numberOfLines={1}>
-            Your log
-          </AppText>
-        </View>
-        {/* Expands in place rather than pushing to a screen: everything it
-            would show is already in this payload, and the card is two taps
-            from the top of Track. Hidden when there is nothing more to see, so
-            it never promises a longer history than the user has. */}
-        {canExpand ? (
-          <Pressable
-            onPress={onToggle}
-            accessibilityRole="button"
-            hitSlop={10}
-            style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, flexShrink: 0 })}
-          >
-            <AppText variant="caption" color="primary" style={{ fontWeight: '700' }}>
-              {expanded ? 'Show less' : 'See all'}
-            </AppText>
-          </Pressable>
-        ) : null}
-      </View>
-      {days.length === 0 ? (
-        <AppText variant="body" color="textSecondary" style={{ marginTop: theme.spacing.md }}>
-          Nothing logged yet.
-        </AppText>
-      ) : (
-        days.map((day) => (
-          <View key={day.date}>
-            <AppText
-              variant="sectionHeader"
-              color="textTertiary"
-              style={{ textTransform: 'uppercase', marginTop: theme.spacing.md }}
-            >
-              {day.label}
-            </AppText>
-            {day.entries.map((entry, index) => {
-              const icon = ACTIVITY_ICON[entry.kind];
-              // ONLY DOSES OPEN. Every other row is a single number with
-              // nothing behind it; a chevron on all of them would promise
-              // detail that does not exist.
-              const opens = entry.kind === 'dose';
-              const doseId = opens ? entry.id.replace(/^dose-/, '') : null;
-              return (
-                <Pressable
-                  key={entry.id}
-                  onPress={() => {
-                    if (!doseId) return;
-                    Haptics.selectionAsync().catch(() => undefined);
-                    onOpenShot(doseId);
-                  }}
-                  disabled={!opens}
-                  accessibilityRole={opens ? 'button' : undefined}
-                  accessibilityLabel={opens ? `${entry.title} — see how this shot went` : undefined}
-                  style={({ pressed }) => ({
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 11,
-                    paddingVertical: 11,
-                    borderBottomWidth: index < day.entries.length - 1 ? 0.5 : 0,
-                    borderBottomColor: theme.colors.border,
-                    opacity: pressed && opens ? 0.6 : 1,
-                  })}
-                >
-                  <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: icon.bg, alignItems: 'center', justifyContent: 'center' }}>
-                    <Icon name={icon.name} size={16} color={icon.fg} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <AppText variant="bodyStrong" style={{ fontWeight: '700' }}>
-                      {entry.title}
-                    </AppText>
-                    {entry.detail ? (
-                      <AppText variant="caption" color="textSecondary" style={{ marginTop: 2 }}>
-                        {entry.detail}
-                      </AppText>
-                    ) : null}
-                  </View>
-                  <AppText variant="caption" color="textTertiary" style={{ fontWeight: '600' }}>
-                    {entryTime(entry.datetime)}
-                  </AppText>
-                  {opens ? (
-                    <Icon name="chevron-forward" size={14} color={theme.colors.textTertiary} />
-                  ) : null}
-                </Pressable>
-              );
-            })}
-          </View>
-        ))
-      )}
-    </Card>
-  );
-}
-
 function SeverityDots({ level }: { level: number }) {
   const theme = useTheme();
   // 1-2 mild (success), 3 moderate (warning), 4-5 strong (danger).

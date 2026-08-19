@@ -18,6 +18,7 @@ import { AccountScreen } from "../screens/app/AccountScreen";
 import { AccountDetailsScreen } from "../screens/app/AccountDetailsScreen";
 import { AccountFAQScreen } from "../screens/app/AccountFAQScreen";
 import { SourcesScreen } from "../screens/app/SourcesScreen";
+import { ActivityLogScreen } from "../screens/app/ActivityLogScreen";
 import { DoseSettingsScreen } from "../screens/app/DoseSettingsScreen";
 import { CycleSetupScreen } from "../screens/app/CycleSetupScreen";
 import { MixCalculatorScreen } from "../screens/app/MixCalculatorScreen";
@@ -44,6 +45,7 @@ export function MainTabs() {
       <PepChatProvider>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Tabs" component={Tabs} />
+        <Stack.Screen name="ActivityLog" component={ActivityLogScreen} />
         <Stack.Screen name="DoseSettings" component={DoseSettingsScreen} />
         <Stack.Screen name="CycleSetup" component={CycleSetupScreen} />
         <Stack.Screen name="MixCalculator" component={MixCalculatorScreen} />
