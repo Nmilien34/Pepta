@@ -14,6 +14,8 @@ import {
   sortSideEffects,
   suggestNextSite,
   usedSites,
+  compoundLine,
+  cadenceLabel,
 } from './trackView';
 import type { SideEffectLogResponse } from '@pepta/shared';
 
@@ -148,5 +150,57 @@ describe('rotationReason', () => {
 
   it('does not say "your last 1"', () => {
     expect(rotationReason(new Set(['abdomen_left'] as const))).not.toContain('last 1');
+  });
+});
+
+describe('the line under a compound name', () => {
+  it('is the frame\'s three facts, in its order', () => {
+    expect(
+      compoundLine(
+        { plannedDose: 5, doseUnit: 'mg', halfLifeDays: 5 },
+        { frequency: 'weekly' },
+      ),
+    ).toBe('5 mg · weekly · half-life 5d');
+  });
+
+  it('omits a half-life the compound does not have', () => {
+    // The frame's own second compound. This used to render the literal
+    // "half-life d" — halfLifeDays is nullish, and nothing checked.
+    expect(
+      compoundLine({ plannedDose: 250, doseUnit: 'mcg', halfLifeDays: null }, { frequency: 'daily' }),
+    ).toBe('250 mcg · daily');
+  });
+
+  it('omits the cadence when nothing is scheduled', () => {
+    expect(compoundLine({ plannedDose: 5, doseUnit: 'mg', halfLifeDays: 5 }, null)).toBe(
+      '5 mg · half-life 5d',
+    );
+  });
+
+  it('falls back to the unit when no dose is planned', () => {
+    expect(compoundLine({ doseUnit: 'mg', halfLifeDays: 7 }, { frequency: 'weekly' })).toBe(
+      'mg · weekly · half-life 7d',
+    );
+  });
+
+  it('says a custom cadence as its interval, never the word "custom"', () => {
+    expect(cadenceLabel({ frequency: 'custom', intervalDays: 10 })).toBe('every 10 days');
+    expect(cadenceLabel({ frequency: 'custom' })).toBe('');
+  });
+
+  it('spells biweekly out — "every 2 weeks" is not misread as twice a week', () => {
+    expect(cadenceLabel({ frequency: 'biweekly' })).toBe('every 2 weeks');
+  });
+
+  it('never leaves a dangling separator, whatever is missing', () => {
+    const cases = [
+      compoundLine({ doseUnit: 'mg' }, null),
+      compoundLine({ doseUnit: 'mg', halfLifeDays: 5 }, null),
+      compoundLine({ plannedDose: 1, doseUnit: 'mg' }, { frequency: 'custom' }),
+    ];
+    for (const line of cases) {
+      expect(line).not.toMatch(/·\s*$/);
+      expect(line).not.toMatch(/·\s*·/);
+    }
   });
 });

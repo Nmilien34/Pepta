@@ -146,3 +146,51 @@ export function sideEffectSummary(log: Pick<SideEffectLogResponse, 'types' | 'cu
   if (log.customType) labels.push(log.customType);
   return labels.join(' · ');
 }
+
+
+/**
+ * The line under a compound's name: "5 mg · weekly · half-life 5d".
+ *
+ * THREE FACTS, EACH OMITTED WHEN UNKNOWN. It used to be built inline as
+ * `${dose} · half-life ${halfLifeDays}d`, which had two problems the frame
+ * shows up: halfLifeDays is nullish — an unmodelled compound rendered the
+ * literal "half-life d" — and the cadence, the thing people actually check,
+ * was not there at all. The frame's own second compound is the case:
+ * "250 mcg · daily", no half-life, because it does not have one.
+ */
+export function compoundLine(
+  compound: {
+    plannedDose?: number | null;
+    doseUnit: string;
+    halfLifeDays?: number | null;
+  },
+  schedule?: { frequency?: string | null; intervalDays?: number | null } | null,
+): string {
+  const parts: string[] = [];
+  parts.push(compound.plannedDose ? `${compound.plannedDose} ${compound.doseUnit}` : compound.doseUnit);
+  const cadence = cadenceLabel(schedule);
+  if (cadence) parts.push(cadence);
+  if (compound.halfLifeDays != null) parts.push(`half-life ${compound.halfLifeDays}d`);
+  return parts.join(' · ');
+}
+
+/** "weekly" · "every 10 days". Empty when nothing is scheduled to say. */
+export function cadenceLabel(
+  schedule?: { frequency?: string | null; intervalDays?: number | null } | null,
+): string {
+  if (!schedule) return '';
+  switch (schedule.frequency) {
+    case 'daily':
+      return 'daily';
+    case 'weekly':
+      return 'weekly';
+    case 'biweekly':
+      return 'every 2 weeks';
+    case 'custom':
+      // A custom schedule says nothing useful without its interval, so it says
+      // nothing at all rather than the word "custom".
+      return schedule.intervalDays ? `every ${schedule.intervalDays} days` : '';
+    default:
+      return '';
+  }
+}

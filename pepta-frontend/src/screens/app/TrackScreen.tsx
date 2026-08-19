@@ -18,6 +18,7 @@ import { formatCountdown } from './homeView';
 import { activeCycleOf, cyclePillFor, isLastDoseOfCycle, patternOf, shortDateOnly, todayCycleStatus, weekStrip } from './scheduleView';
 import {
   compoundIconName,
+  compoundLine,
   compoundStatusLabel,
   formatDoseRelative,
   formatNextDoseAt,
@@ -271,7 +272,7 @@ export function TrackScreen() {
                           {c.name}
                         </AppText>
                         <AppText variant="caption" color="textSecondary">
-                          {c.plannedDose ? `${c.plannedDose} ${c.doseUnit}` : c.doseUnit} · half-life {c.halfLifeDays}d
+                          {compoundLine(c, schedules?.find((s) => s.compoundId === c.id && s.active))}
                         </AppText>
                       </View>
                       {active ? (
