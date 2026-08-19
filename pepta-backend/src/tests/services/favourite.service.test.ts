@@ -3,7 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   find: vi.fn(),
   findOneAndUpdate: vi.fn(),
-  deleteOne: vi.fn(),
+  findOneAndDelete: vi.fn(),
+  deleteS3Object: vi.fn(),
   createPresignedGetUrl: vi.fn(),
   createPresignedPutUrl: vi.fn(),
 }));
@@ -11,6 +12,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("../../services/s3.service", () => ({
   createPresignedGetUrl: mocks.createPresignedGetUrl,
   createPresignedPutUrl: mocks.createPresignedPutUrl,
+  deleteS3Object: mocks.deleteS3Object,
   signedUrlExpiresAt: () => "2026-08-19T12:15:00.000Z",
 }));
 
@@ -18,7 +20,7 @@ vi.mock("../../models/favourite.model", () => ({
   FavouriteModel: {
     find: mocks.find,
     findOneAndUpdate: mocks.findOneAndUpdate,
-    deleteOne: mocks.deleteOne,
+    findOneAndDelete: mocks.findOneAndDelete,
   },
 }));
 
@@ -35,7 +37,8 @@ const USER = "507f1f77bcf86cd799439011";
 beforeEach(() => {
   mocks.find.mockReset();
   mocks.findOneAndUpdate.mockReset();
-  mocks.deleteOne.mockReset();
+  mocks.findOneAndDelete.mockReset().mockReturnValue({ exec: vi.fn().mockResolvedValue(null) });
+  mocks.deleteS3Object.mockReset().mockResolvedValue(undefined);
   mocks.createPresignedGetUrl.mockReset().mockResolvedValue("https://s3/signed-get");
   mocks.createPresignedPutUrl.mockReset().mockResolvedValue("https://s3/signed-put");
 });
@@ -154,19 +157,44 @@ describe("saveFavourite", () => {
 
 describe("removeFavourite", () => {
   it("deletes by key for that user only", async () => {
-    const exec = vi.fn().mockResolvedValue({ deletedCount: 1 });
-    mocks.deleteOne.mockReturnValue({ exec });
+    mocks.findOneAndDelete.mockReturnValue({ exec: vi.fn().mockResolvedValue(doc()) });
 
     await removeFavourite(USER, "food:chicken-breast:6-oz");
 
-    const filter = mocks.deleteOne.mock.calls[0]![0];
+    const filter = mocks.findOneAndDelete.mock.calls[0]![0];
     expect(filter.key).toBe("food:chicken-breast:6-oz");
     expect(String(filter.userId)).toBe(USER);
   });
 
   it("is idempotent — removing something already gone is not an error", async () => {
-    mocks.deleteOne.mockReturnValue({ exec: vi.fn().mockResolvedValue({ deletedCount: 0 }) });
+    mocks.findOneAndDelete.mockReturnValue({ exec: vi.fn().mockResolvedValue(null) });
     await expect(removeFavourite(USER, "nope")).resolves.toBeUndefined();
+    expect(mocks.deleteS3Object).not.toHaveBeenCalled();
+  });
+
+  it("takes the photo with it, rather than leaking the file into the bucket", async () => {
+    mocks.findOneAndDelete.mockReturnValue({
+      exec: vi.fn().mockResolvedValue(doc({ photoS3Key: "favourites/u1/a.jpg" })),
+    });
+
+    await removeFavourite(USER, "food:chicken-breast:6-oz");
+
+    expect(mocks.deleteS3Object).toHaveBeenCalledWith("favourites/u1/a.jpg");
+  });
+
+  it("deletes nothing in S3 for an item that never had a photo", async () => {
+    mocks.findOneAndDelete.mockReturnValue({ exec: vi.fn().mockResolvedValue(doc()) });
+    await removeFavourite(USER, "food:chicken-breast:6-oz");
+    expect(mocks.deleteS3Object).not.toHaveBeenCalled();
+  });
+
+  it("still reports the removal when the bucket cleanup fails — the row is gone", async () => {
+    mocks.findOneAndDelete.mockReturnValue({
+      exec: vi.fn().mockResolvedValue(doc({ photoS3Key: "favourites/u1/a.jpg" })),
+    });
+    mocks.deleteS3Object.mockRejectedValue(new Error("s3 down"));
+
+    await expect(removeFavourite(USER, "food:chicken-breast:6-oz")).resolves.toBeUndefined();
   });
 });
 

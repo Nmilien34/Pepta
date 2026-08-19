@@ -11,7 +11,12 @@
 // would make the list's own count wrong for no benefit.
 
 import type { FavouriteInput, FavouriteResponse } from "@pepta/shared";
-import { createPresignedGetUrl, createPresignedPutUrl, signedUrlExpiresAt } from "./s3.service";
+import {
+  createPresignedGetUrl,
+  createPresignedPutUrl,
+  deleteS3Object,
+  signedUrlExpiresAt,
+} from "./s3.service";
 import { randomUUID } from "node:crypto";
 import { Types } from "mongoose";
 import { FavouriteModel, type FavouriteDocument } from "../models/favourite.model";
@@ -101,10 +106,18 @@ export async function saveFavourite(
 
 /** Idempotent: removing something already gone is not an error. */
 export async function removeFavourite(userId: string, key: string): Promise<void> {
-  await FavouriteModel.deleteOne({
+  const removed = await FavouriteModel.findOneAndDelete({
     userId: new Types.ObjectId(userId),
     key,
   }).exec();
+
+  // The row is what the user asked to be rid of, so its photo goes with it —
+  // otherwise unstarring leaks a file into the bucket that nothing will ever
+  // reference again. Best-effort: the favourite is already gone, and failing
+  // the request over the cleanup would tell the user a removal did not happen
+  // when it did.
+  const photoS3Key = (removed as FavouriteDocument | null)?.photoS3Key;
+  if (photoS3Key) await deleteS3Object(photoS3Key).catch(() => undefined);
 }
 
 /**
