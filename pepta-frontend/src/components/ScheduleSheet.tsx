@@ -165,8 +165,11 @@ export function ScheduleSheet({ visible, onClose, onEditCycle, onDismissed }: Sc
   // ---- selected-day detail ----------------------------------------------
   const doseWord = globalDoseNoun(home?.activeCompounds);
   const detail = useMemo(() => {
+    // deletedAt too, not just the date: the day detail reads "Logged — 5 mg
+    // Zepbound, 12:00 PM" straight off this list, and a removed dose saying
+    // so is the same resurrection loggedDays used to perform one line above.
     const logsForDay = (track?.doseLogs ?? []).filter(
-      (log) => localDateOnly(new Date(log.datetime)) === selected,
+      (log) => log.deletedAt == null && localDateOnly(new Date(log.datetime)) === selected,
     );
     const compound = home?.activeCompounds[0] ?? null;
     const status = pattern ? cycleDayStatus(pattern, selected) : null;

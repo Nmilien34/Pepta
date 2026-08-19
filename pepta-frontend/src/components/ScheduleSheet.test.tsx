@@ -222,3 +222,51 @@ describe("ScheduleSheet", () => {
     expect(textOf(root)).toContain("Set up an on/off cycle");
   });
 });
+
+describe("a dose the user deleted", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(TODAY);
+    seedData();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  // Nothing in the app deletes a log yet — the backend route exists, the
+  // client has no button for it. These pin the guard so the day the delete
+  // UI lands, the calendar does not start resurrecting removed shots.
+  function renderWithDeleted() {
+    mocks.data.track = {
+      doseLogs: [
+        { id: "d1", compoundId: "c1", amount: 5, unit: "mg", datetime: "2026-06-05T12:00:00.000Z", deletedAt: "2026-06-06T09:00:00.000Z" },
+        { id: "d2", compoundId: "c1", amount: 5, unit: "mg", datetime: "2026-06-12T12:00:00.000Z", deletedAt: null },
+      ],
+    } as never;
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      renderer = TestRenderer.create(
+        <ScheduleSheet visible onClose={vi.fn()} onEditCycle={vi.fn()} />,
+      );
+    });
+    return renderer.root;
+  }
+
+  it("loses its green dot on the grid", () => {
+    const root = renderWithDeleted();
+
+    expect(dotColorOf(cellByLabel(root, "Fri, Jun 5"))).not.toBe("#34C759");
+    // The one that is still there keeps its dot.
+    expect(dotColorOf(cellByLabel(root, "Fri, Jun 12"))).toBe("#34C759");
+  });
+
+  it("stops the day detail claiming it was logged", () => {
+    const root = renderWithDeleted();
+
+    act(() => {
+      cellByLabel(root, "Fri, Jun 5").props.onPress();
+    });
+
+    expect(textOf(root)).not.toMatch(/logged —/i);
+  });
+});
