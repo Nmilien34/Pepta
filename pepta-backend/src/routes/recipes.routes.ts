@@ -7,6 +7,7 @@ import { validateBody } from '../middleware/validate.middleware';
 import {
   createRecipe,
   deleteRecipe,
+  getRecipe,
   listRecipes,
 } from '../services/recipe.service';
 import { composeRecipe } from '../services/recipe-compose.service';
@@ -39,6 +40,13 @@ router.post(
   validateBody(recipeComposeInputSchema),
   asyncHandler(async (req, res) => {
     sendData(res, await composeRecipe(req.body.text, req.body.name));
+  }),
+);
+
+router.get(
+  '/:id',
+  asyncHandler(async (req, res) => {
+    sendData(res, await getRecipe(req.user!.id, req.params.id as string));
   }),
 );
 
