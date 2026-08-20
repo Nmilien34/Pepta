@@ -5,6 +5,7 @@ import {
   queueExpiredMedia,
   runDueMediaCleanup,
 } from "./media-cleanup.service";
+import { expirePendingProgressPhotos } from "./progress-photo.service";
 
 export class MediaCleanupScheduler {
   private static instance: MediaCleanupScheduler | null = null;
@@ -23,12 +24,13 @@ export class MediaCleanupScheduler {
       () => {
         if (this.running) return;
         this.running = true;
-        void queueExpiredMedia()
-          .then(async (expired) => {
+        void expirePendingProgressPhotos()
+          .then(async (progressExpired) => {
+            const expired = await queueExpiredMedia();
             const cleanup = await runDueMediaCleanup();
-            if (expired > 0 || cleanup.attempted > 0) {
+            if (progressExpired > 0 || expired > 0 || cleanup.attempted > 0) {
               logger.info(
-                { expired, ...cleanup },
+                { progressExpired, expired, ...cleanup },
                 "[media-cleanup] processed expired and due media",
               );
             }

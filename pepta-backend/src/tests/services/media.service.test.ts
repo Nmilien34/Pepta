@@ -47,6 +47,7 @@ import {
   createMediaUploadIntent,
   detachMedia,
   discardMedia,
+  getMediaReadDetails,
   getMediaViewUrl,
   persistImportedAvatarMedia,
   persistMealScanMedia,
@@ -534,6 +535,23 @@ describe("media ownership and links", () => {
     await expect(getMediaViewUrl(USER, MEDIA)).resolves.toBe("https://s3.example/view");
     expect(mocks.createPresignedGetUrl).toHaveBeenCalledWith({
       key: `pepta/media/${USER}/${MEDIA}.jpg`,
+    });
+  });
+
+  it("returns only signed and server-measured read details", async () => {
+    mocks.findOne.mockResolvedValue(
+      asset({
+        status: "ready",
+        storageKey: `pepta/media/${USER}/${MEDIA}.jpg`,
+        contentType: "image/jpeg",
+        byteSize: 777,
+      }),
+    );
+
+    await expect(getMediaReadDetails(USER, MEDIA)).resolves.toEqual({
+      viewUrl: "https://s3.example/view",
+      contentType: "image/jpeg",
+      sizeBytes: 777,
     });
   });
 

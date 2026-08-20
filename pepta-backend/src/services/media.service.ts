@@ -562,6 +562,32 @@ export async function getMediaViewUrl(
   return createPresignedGetUrl({ key: asset.storageKey });
 }
 
+export async function getMediaReadDetails(
+  userId: string,
+  mediaId: string,
+): Promise<{
+  viewUrl: string;
+  contentType: "image/jpeg";
+  sizeBytes: number;
+}> {
+  const asset = await MediaAssetModel.findOne({
+    _id: asObjectId(mediaId),
+    userId: asObjectId(userId),
+    status: "ready",
+    storageKey: { $exists: true },
+    contentType: "image/jpeg",
+    byteSize: { $gt: 0 },
+  });
+  if (!asset?.storageKey || !asset.contentType || !asset.byteSize) {
+    throw new NotFoundError("Media not found");
+  }
+  return {
+    viewUrl: await createPresignedGetUrl({ key: asset.storageKey }),
+    contentType: asset.contentType,
+    sizeBytes: asset.byteSize,
+  };
+}
+
 export async function queueAllUserMediaForDeletion(
   userId: string,
 ): Promise<void> {

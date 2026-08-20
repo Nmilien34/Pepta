@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   cronSchedule: vi.fn(),
+  expirePendingProgressPhotos: vi.fn(),
   stop: vi.fn(),
   queueExpiredMedia: vi.fn(),
   runDueMediaCleanup: vi.fn(),
@@ -31,12 +32,17 @@ vi.mock("../../services/media-cleanup.service", () => ({
   runDueMediaCleanup: mocks.runDueMediaCleanup,
 }));
 
+vi.mock("../../services/progress-photo.service", () => ({
+  expirePendingProgressPhotos: mocks.expirePendingProgressPhotos,
+}));
+
 import { MediaCleanupScheduler } from "../../services/media-cleanup.scheduler";
 
 describe("MediaCleanupScheduler", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.cronSchedule.mockReturnValue({ stop: mocks.stop });
+    mocks.expirePendingProgressPhotos.mockResolvedValue(3);
     mocks.queueExpiredMedia.mockResolvedValue(2);
     mocks.runDueMediaCleanup.mockResolvedValue({ attempted: 2, succeeded: 2, failed: 0 });
   });
@@ -59,6 +65,7 @@ describe("MediaCleanupScheduler", () => {
     callback();
     callback();
     await vi.waitFor(() => expect(mocks.runDueMediaCleanup).toHaveBeenCalledOnce());
+    expect(mocks.expirePendingProgressPhotos).toHaveBeenCalledOnce();
     expect(mocks.queueExpiredMedia).toHaveBeenCalledOnce();
 
     scheduler.stop();

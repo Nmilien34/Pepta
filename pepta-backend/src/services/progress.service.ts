@@ -1,12 +1,11 @@
 import {
-  progressPhotoSchema,
   progressResponseSchema,
   weeklyRetentionResponseSchema,
   type LogListQuery,
 } from '@pepta/shared';
-import { ProgressPhotoModel, WeeklyRetentionModel } from '../models';
+import { WeeklyRetentionModel } from '../models';
 import { measurementService, weightLogService } from './logs.service';
-import { serializeWithSchema } from './serializers';
+import { listProgressPhotos } from './progress-photo.service';
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Section failed';
@@ -45,7 +44,7 @@ export async function getProgress(userId: string, query?: LogListQuery) {
   const entries = await Promise.allSettled([
     weightLogService.list(userId, query),
     measurementService.list(userId, query),
-    ProgressPhotoModel.find({ userId, status: { $ne: 'deleted' } }).sort({ captureDate: -1 }),
+    listProgressPhotos(userId),
     WeeklyRetentionModel.find({ userId }).sort({ weekOf: -1 }).limit(12),
   ]);
   const sectionErrors: Record<string, string> = {};
@@ -62,7 +61,7 @@ export async function getProgress(userId: string, query?: LogListQuery) {
     measurements: entries[1]!.status === 'fulfilled' ? entries[1]!.value : [],
     progressPhotos:
       entries[2]!.status === 'fulfilled'
-        ? entries[2]!.value.map((photo) => serializeWithSchema(progressPhotoSchema, photo))
+        ? entries[2]!.value
         : [],
     weeklyRetention:
       entries[3]!.status === 'fulfilled'
