@@ -5,6 +5,7 @@ import {
   type MediaIntent,
   type MediaUploadIntentInput,
 } from "@pepta/shared";
+import { createHash } from "node:crypto";
 import { Types } from "mongoose";
 import { InternalError, NotFoundError, ValidationError } from "../lib/errors";
 import {
@@ -320,6 +321,109 @@ export async function persistMealScanMedia(
     );
     if (!ready) {
       throw new InternalError("Meal photo could not be persisted");
+    }
+    return readyResponse(ready);
+  } catch (error) {
+    await MediaAssetModel.findOneAndUpdate(
+      { _id: mediaId, userId: ownerId, status: "processing" },
+      {
+        $set: { status: "deletion_pending", nextDeleteAttemptAt: now },
+        $unset: { expiresAt: 1, deleteLeaseUntil: 1 },
+      },
+      { new: true },
+    ).catch(() => undefined);
+    throw error;
+  }
+}
+
+export async function persistImportedAvatarMedia(
+  userId: string,
+  input: {
+    bytes: Uint8Array;
+    contentType: "image/jpeg" | "image/png" | "image/heic" | "image/webp";
+  },
+) {
+  const now = new Date();
+  const ownerId = asObjectId(userId);
+  const limits = INTENT_LIMITS.avatar;
+  if (input.bytes.byteLength === 0) {
+    throw new ValidationError("Invalid image");
+  }
+  if (input.bytes.byteLength > limits.maxBytes) {
+    throw new ValidationError("Image is too large");
+  }
+
+  await assertPendingQuota(ownerId, input.bytes.byteLength, now);
+
+  const mediaId = new Types.ObjectId();
+  const storageKey = `pepta/media/${ownerId.toString()}/${mediaId.toString()}.jpg`;
+  await MediaAssetModel.create({
+    _id: mediaId,
+    userId: ownerId,
+    source: "provider_import",
+    intent: "avatar",
+    status: "processing",
+    declaredContentType: input.contentType,
+    declaredSizeBytes: input.bytes.byteLength,
+    links: [],
+    expiresAt: new Date(now.getTime() + PENDING_TTL_MS),
+  });
+
+  try {
+    const normalized = await normalizeImage(input.bytes, {
+      maxBytes: limits.maxBytes,
+      maxEdge: limits.maxEdge,
+      maxPixels: MAX_PIXELS,
+    });
+    const contentHash = createHash("sha256").update(normalized.bytes).digest("hex");
+    const duplicate = await MediaAssetModel.findOne({
+      userId: ownerId,
+      source: "provider_import",
+      intent: "avatar",
+      status: "ready",
+      contentHash,
+      storageKey: { $exists: true },
+    });
+    if (duplicate) {
+      await MediaAssetModel.findOneAndUpdate(
+        { _id: mediaId, userId: ownerId, status: "processing" },
+        {
+          $set: { status: "deletion_pending", nextDeleteAttemptAt: now },
+          $unset: { expiresAt: 1, deleteLeaseUntil: 1 },
+        },
+        { new: true },
+      );
+      return readyResponse(duplicate);
+    }
+
+    await putS3Object({
+      key: storageKey,
+      body: normalized.bytes,
+      contentType: normalized.contentType,
+    });
+    const ready = await MediaAssetModel.findOneAndUpdate(
+      { _id: mediaId, userId: ownerId, status: "processing" },
+      {
+        $set: {
+          status: "ready",
+          storageKey,
+          contentHash,
+          contentType: normalized.contentType,
+          byteSize: normalized.bytes.byteLength,
+          width: normalized.width,
+          height: normalized.height,
+          expiresAt: new Date(now.getTime() + UNATTACHED_TTL_MS),
+        },
+        $unset: {
+          deleteLeaseUntil: 1,
+          lastDeleteErrorCode: 1,
+          nextDeleteAttemptAt: 1,
+        },
+      },
+      { new: true, runValidators: true },
+    );
+    if (!ready) {
+      throw new InternalError("Provider avatar could not be persisted");
     }
     return readyResponse(ready);
   } catch (error) {

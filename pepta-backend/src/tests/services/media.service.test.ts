@@ -48,6 +48,7 @@ import {
   detachMedia,
   discardMedia,
   getMediaViewUrl,
+  persistImportedAvatarMedia,
   persistMealScanMedia,
   queueAllUserMediaForDeletion,
   validateAttachableMedia,
@@ -331,6 +332,120 @@ describe("server-ingested meal media", () => {
     ).rejects.toBe(storageError);
 
     expect(mocks.findOneAndUpdate).toHaveBeenLastCalledWith(
+      expect.objectContaining({ status: "processing" }),
+      expect.objectContaining({
+        $set: { status: "deletion_pending", nextDeleteAttemptAt: NOW },
+      }),
+      { new: true },
+    );
+  });
+});
+
+describe("trusted provider avatar media", () => {
+  it("creates cleanup authority before writing a normalized provider avatar", async () => {
+    mocks.findOneAndUpdate.mockImplementationOnce(
+      async (
+        filter: { _id: { toString(): string } },
+        update: { $set?: Record<string, unknown> },
+      ) =>
+        asset({
+          _id: { toString: () => filter._id.toString() },
+          source: "provider_import",
+          intent: "avatar",
+          status: "ready",
+          stagingKey: undefined,
+          ...update.$set,
+        }),
+    );
+
+    const result = await persistImportedAvatarMedia(USER, {
+      bytes: UPLOAD_BYTES,
+      contentType: "image/png",
+    });
+
+    const created = mocks.create.mock.calls[0]![0] as Record<string, unknown>;
+    const mediaId = String(created._id);
+    expect(result).toEqual({ mediaId, status: "ready" });
+    expect(created).toMatchObject({
+      source: "provider_import",
+      intent: "avatar",
+      status: "processing",
+      declaredContentType: "image/png",
+      declaredSizeBytes: 2048,
+      links: [],
+    });
+    expect(mocks.create.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.putS3Object.mock.invocationCallOrder[0]!,
+    );
+    expect(mocks.putS3Object).toHaveBeenCalledWith({
+      key: `pepta/media/${USER}/${mediaId}.jpg`,
+      body: Uint8Array.of(4, 5, 6),
+      contentType: "image/jpeg",
+    });
+    expect(mocks.createPresignedPostUpload).not.toHaveBeenCalled();
+    expect(mocks.findOneAndUpdate.mock.calls[0]![1]).toMatchObject({
+      $set: expect.objectContaining({
+        status: "ready",
+        contentHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+      }),
+    });
+  });
+
+  it("reuses identical canonical provider content for the same owner", async () => {
+    mocks.findOne.mockResolvedValueOnce(
+      asset({
+        source: "provider_import",
+        intent: "avatar",
+        status: "ready",
+        storageKey: `pepta/media/${USER}/${MEDIA}.jpg`,
+      }),
+    );
+    mocks.findOneAndUpdate.mockResolvedValueOnce(
+      asset({ source: "provider_import", intent: "avatar", status: "deletion_pending" }),
+    );
+
+    await expect(
+      persistImportedAvatarMedia(USER, {
+        bytes: UPLOAD_BYTES,
+        contentType: "image/png",
+      }),
+    ).resolves.toEqual({ mediaId: MEDIA, status: "ready" });
+
+    expect(mocks.putS3Object).not.toHaveBeenCalled();
+    expect(mocks.findOne).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: expect.anything(),
+        source: "provider_import",
+        intent: "avatar",
+        status: "ready",
+        contentHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+      }),
+    );
+    expect(mocks.findOneAndUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "processing" }),
+      expect.objectContaining({
+        $set: expect.objectContaining({ status: "deletion_pending" }),
+      }),
+      { new: true },
+    );
+  });
+
+  it("queues the provider row when image normalization fails", async () => {
+    const invalid = new Error("invalid image");
+    mocks.normalizeImage.mockRejectedValueOnce(invalid);
+    mocks.findOneAndUpdate.mockResolvedValueOnce(
+      asset({ source: "provider_import", intent: "avatar", status: "deletion_pending" }),
+    );
+
+    await expect(
+      persistImportedAvatarMedia(USER, {
+        bytes: UPLOAD_BYTES,
+        contentType: "image/png",
+      }),
+    ).rejects.toBe(invalid);
+
+    expect(mocks.putS3Object).not.toHaveBeenCalled();
+    expect(mocks.findOneAndUpdate).toHaveBeenCalledWith(
       expect.objectContaining({ status: "processing" }),
       expect.objectContaining({
         $set: { status: "deletion_pending", nextDeleteAttemptAt: NOW },

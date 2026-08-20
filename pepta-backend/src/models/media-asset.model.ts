@@ -42,6 +42,7 @@ export interface MediaAssetDocument extends Document<Types.ObjectId> {
   byteSize?: number;
   width?: number;
   height?: number;
+  contentHash?: string;
   links: MediaLink[];
   expiresAt?: Date;
   deleteAttemptCount: number;
@@ -109,6 +110,7 @@ const mediaAssetSchema = new Schema<MediaAssetDocument>(
     byteSize: { type: Number, min: 1 },
     width: { type: Number, min: 1 },
     height: { type: Number, min: 1 },
+    contentHash: { type: String, minlength: 64, maxlength: 64 },
     links: {
       type: [mediaLinkSchema],
       default: [],
@@ -129,6 +131,7 @@ const mediaAssetSchema = new Schema<MediaAssetDocument>(
 
 mediaAssetSchema.index({ userId: 1, status: 1 });
 mediaAssetSchema.index({ userId: 1, intent: 1 });
+mediaAssetSchema.index({ userId: 1, source: 1, intent: 1, contentHash: 1, status: 1 });
 mediaAssetSchema.index({ expiresAt: 1, status: 1 });
 mediaAssetSchema.index({
   status: 1,
