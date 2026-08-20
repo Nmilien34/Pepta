@@ -22,21 +22,32 @@ export function UserAvatar({ size = 44 }: UserAvatarProps) {
     }
 
     let cancelled = false;
-    api
-      .getAvatarViewUrl()
-      .then((result) => {
-        if (!cancelled) setUploadedUrl(result.viewUrl);
-      })
-      .catch(() => {
+    let refreshTimer: ReturnType<typeof setTimeout> | undefined;
+    const refresh = async () => {
+      try {
+        const result = await api.getAvatarViewUrl();
+        if (cancelled) return;
+        setUploadedUrl(result.viewUrl);
+        if (result.viewUrl && result.expiresAt) {
+          const refreshInMs = Math.max(
+            1_000,
+            Date.parse(result.expiresAt) - Date.now() - 30_000,
+          );
+          refreshTimer = setTimeout(() => void refresh(), refreshInMs);
+        }
+      } catch {
         if (!cancelled) setUploadedUrl(null);
-      });
+      }
+    };
+    void refresh();
 
     return () => {
       cancelled = true;
+      if (refreshTimer) clearTimeout(refreshTimer);
     };
   }, [isAuthenticated, user?.hasAvatar, user?.id, user?.updatedAt]);
 
-  const imageUri = uploadedUrl ?? user?.avatarUrl ?? null;
+  const imageUri = uploadedUrl;
   const dimensions = {
     width: size,
     height: size,
@@ -48,6 +59,7 @@ export function UserAvatar({ size = 44 }: UserAvatarProps) {
       <Image
         source={{ uri: imageUri }}
         resizeMode="cover"
+        onError={() => setUploadedUrl(null)}
         style={[styles.avatar, dimensions]}
       />
     );

@@ -2,8 +2,6 @@ import {
   apiErrorResponseSchema,
   appleAuthSchema,
   avatarConfirmRequestSchema,
-  avatarUploadIntentRequestSchema,
-  avatarUploadIntentResponseSchema,
   avatarViewUrlResponseSchema,
   authResponseSchema,
   googleAuthSchema,
@@ -78,8 +76,6 @@ import {
   type ActivityLogResponse,
   type AppleAuth,
   type AvatarConfirmRequest,
-  type AvatarUploadIntentRequest,
-  type AvatarUploadIntentResponse,
   type AvatarViewUrlResponse,
   type AuthResponse,
   type CompoundInput,
@@ -530,19 +526,6 @@ class PeptaApi {
     return this.fetchNoContent("/me/account", { method: "DELETE" });
   }
 
-  public createAvatarUploadIntent(
-    body: AvatarUploadIntentRequest,
-  ): Promise<AvatarUploadIntentResponse> {
-    return this.request(
-      "/me/avatar/upload-intent",
-      avatarUploadIntentResponseSchema,
-      {
-        method: "POST",
-        body: JSON.stringify(avatarUploadIntentRequestSchema.parse(body)),
-      },
-    );
-  }
-
   public confirmAvatarUpload(body: AvatarConfirmRequest): Promise<User> {
     return this.request("/me/avatar", userResponseSchema, {
       method: "POST",
@@ -708,19 +691,24 @@ class PeptaApi {
       contentType: input.contentType,
       sizeBytes: blob.size,
     });
+    await this.uploadBlobToPostPolicy(intent.uploadUrl, intent.fields, blob);
+    return this.confirmMedia({ mediaId: intent.mediaId });
+  }
+
+  private async uploadBlobToPostPolicy(
+    uploadUrl: string,
+    fields: Record<string, string>,
+    blob: Blob,
+  ): Promise<void> {
     const form = new FormData();
-    for (const [key, value] of Object.entries(intent.fields)) {
+    for (const [key, value] of Object.entries(fields)) {
       form.append(key, value);
     }
     form.append("file", blob, "upload");
-    const uploaded = await fetch(intent.uploadUrl, {
-      method: "POST",
-      body: form,
-    });
+    const uploaded = await fetch(uploadUrl, { method: "POST", body: form });
     if (!uploaded.ok) {
       throw new Error(`Photo upload failed: ${uploaded.status}`);
     }
-    return this.confirmMedia({ mediaId: intent.mediaId });
   }
 
   /**
@@ -992,8 +980,8 @@ class PeptaApi {
     });
   }
 
-  // Progress-photo upload is a 3-step presigned-S3 flow:
-  // 1) intent → presigned uploadUrl, 2) PUT bytes to S3, 3) confirm.
+  // Progress-photo upload is a 3-step verified flow:
+  // 1) intent with measured bytes, 2) policy-bound POST, 3) opaque confirmation.
   public createPhotoUploadIntent(
     body: ProgressPhotoInput,
   ): Promise<ProgressPhotoUploadIntentResponse> {
@@ -1007,29 +995,29 @@ class PeptaApi {
     );
   }
 
-  // Raw binary PUT straight to the presigned S3 URL (no auth header / no JSON envelope).
-  public async uploadToPresignedUrl(
-    uploadUrl: string,
-    uri: string,
-    contentType: string,
-  ): Promise<void> {
-    const file = await fetch(uri);
-    const blob = await file.blob();
-    const res = await fetch(uploadUrl, {
-      method: "PUT",
-      headers: { "Content-Type": contentType },
-      body: blob,
-    });
-    if (!res.ok) {
-      throw new Error(`Photo upload failed: ${res.status}`);
-    }
-  }
-
   public confirmPhoto(body: ProgressPhotoConfirmInput): Promise<ProgressPhoto> {
     return this.request("/progress-photos/confirm", progressPhotoSchema, {
       method: "POST",
       body: JSON.stringify(progressPhotoConfirmInputSchema.parse(body)),
     });
+  }
+
+  public async uploadProgressPhoto(
+    input: Omit<ProgressPhotoInput, "sizeBytes"> & { uri: string },
+  ): Promise<ProgressPhoto> {
+    const local = await fetch(input.uri);
+    const blob = await local.blob();
+    const intent = await this.createPhotoUploadIntent({
+      captureDate: input.captureDate,
+      contentType: input.contentType,
+      sizeBytes: blob.size,
+      kind: input.kind,
+      ...(input.faceFullness === undefined
+        ? {}
+        : { faceFullness: input.faceFullness }),
+    });
+    await this.uploadBlobToPostPolicy(intent.uploadUrl, intent.fields, blob);
+    return this.confirmPhoto({ photoId: intent.photo.id });
   }
 }
 

@@ -588,4 +588,91 @@ describe("PeptaApi opaque media uploads", () => {
       }),
     );
   });
+
+  it("measures and POSTs a progress photo before confirming only its photo id", async () => {
+    const mediaId = "507f1f77bcf86cd799439011";
+    const photoId = "507f1f77bcf86cd799439012";
+    const userId = "507f1f77bcf86cd799439013";
+    const fileBytes = new Blob(["progress-photo"], { type: "image/jpeg" });
+    const photo = {
+      id: photoId,
+      userId,
+      mediaId,
+      captureDate: "2026-08-19",
+      contentType: "image/jpeg",
+      sizeBytes: fileBytes.size,
+      kind: "body",
+      status: "pending_upload",
+      createdAt: "2026-08-19T12:00:00.000Z",
+      updatedAt: "2026-08-19T12:00:00.000Z",
+    };
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url === "file:///progress.jpg") {
+        return new Response(fileBytes, { status: 200 });
+      }
+      if (url.endsWith("/progress-photos/upload-intent")) {
+        return new Response(
+          JSON.stringify({
+            data: {
+              photo,
+              uploadUrl: "https://bucket.example/progress",
+              fields: { key: "private-progress-staging", policy: "signed-policy" },
+              expiresAt: "2026-08-19T12:10:00.000Z",
+            },
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      }
+      if (url === "https://bucket.example/progress") {
+        return new Response(null, { status: 204 });
+      }
+      if (url.endsWith("/progress-photos/confirm")) {
+        return new Response(
+          JSON.stringify({
+            data: {
+              ...photo,
+              status: "uploaded",
+              viewUrl: "https://signed.example/progress",
+            },
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      }
+      throw new Error(`Unexpected URL: ${url}; ${String(init?.method)}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      api.uploadProgressPhoto({
+        uri: "file:///progress.jpg",
+        captureDate: "2026-08-19",
+        contentType: "image/jpeg",
+        kind: "body",
+      }),
+    ).resolves.toMatchObject({ id: photoId, status: "uploaded" });
+
+    expect(fetchMock.mock.calls[1]![1]).toEqual(
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          captureDate: "2026-08-19",
+          contentType: "image/jpeg",
+          sizeBytes: fileBytes.size,
+          kind: "body",
+        }),
+      }),
+    );
+    const upload = fetchMock.mock.calls[2]![1]!;
+    expect(upload.method).toBe("POST");
+    const form = upload.body as FormData;
+    expect(form.get("key")).toBe("private-progress-staging");
+    expect(form.get("policy")).toBe("signed-policy");
+    expect(form.get("file")).toBeInstanceOf(Blob);
+    expect(fetchMock.mock.calls[3]![1]).toEqual(
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ photoId }),
+      }),
+    );
+  });
 });
