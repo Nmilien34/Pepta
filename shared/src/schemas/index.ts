@@ -547,7 +547,7 @@ export const mealLogInputSchema = z
     fiber: z.number().nonnegative().optional(),
     source: mealLogSourceSchema,
     datetime: isoDateTimeSchema,
-    photoS3Key: z.string().trim().min(1).optional(),
+    photoMediaId: idSchema.optional(),
     idempotencyKey: z.string().trim().min(1).optional(),
     notes: z.string().trim().max(500).optional(),
   })
@@ -1058,7 +1058,7 @@ export const mealProductScanMetadataSchema = z
 export const mealScanResponseSchema = z
   .object({
     scanId: idSchema,
-    photoS3Key: z.string().min(1).optional(),
+    photoMediaId: idSchema.optional(),
     analysis: mealScanAnalysisSchema,
     coachContent: mealScanCoachContentSchema.nullable(),
     note: z.string().trim().min(1).optional(),
@@ -1545,6 +1545,7 @@ export const recipeInputSchema = z
   .object({
     name: z.string().trim().min(1).max(120),
     ingredients: z.array(recipeIngredientSchema).min(1).max(40),
+    photoMediaId: idSchema.optional(),
   })
   .strict();
 
@@ -1552,6 +1553,7 @@ export const recipeResponseSchema = recipeInputSchema.extend({
   id: idSchema,
   /** True for the seeded ones, which belong to nobody and cannot be edited. */
   isStarter: z.boolean(),
+  photoUrl: z.string().url().nullable().default(null),
   createdAt: isoDateTimeSchema,
   updatedAt: isoDateTimeSchema,
 });

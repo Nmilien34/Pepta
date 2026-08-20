@@ -12,6 +12,7 @@ import {
   favouriteResponseSchema,
   insightSchema,
   mealBarcodeInputSchema,
+  mealLogInputSchema,
   mealLogScanDetailResponseSchema,
   mealLogSourceSchema,
   mealProductScanInputSchema,
@@ -25,6 +26,8 @@ import {
   onboardingResultResponseSchema,
   pushTokenRegistrationRequestSchema,
   pushTokenRegistrationResponseSchema,
+  recipeInputSchema,
+  recipeResponseSchema,
   revenueCatWebhookSchema,
   sideEffectLogInputSchema,
   userAccountPatchSchema,
@@ -80,6 +83,91 @@ describe("opaque media contracts", () => {
 
     expect(parsed.photoMediaId).toBe("507f1f77bcf86cd799439011");
     expect(parsed).not.toHaveProperty("photoS3Key");
+  });
+
+  it("accepts opaque meal media ids and rejects caller-supplied storage keys", () => {
+    const meal = {
+      foodName: "Chicken rice bowl",
+      protein: 42,
+      calories: 640,
+      source: "scan" as const,
+      datetime: "2026-08-19T12:00:00.000Z",
+      photoMediaId: "507f1f77bcf86cd799439011",
+    };
+
+    expect(mealLogInputSchema.parse(meal).photoMediaId).toBe(
+      "507f1f77bcf86cd799439011",
+    );
+    expect(
+      mealScanResponseSchema.parse({
+        scanId: "507f1f77bcf86cd799439012",
+        photoMediaId: "507f1f77bcf86cd799439011",
+        analysis: {
+          foodName: "Chicken rice bowl",
+          servingSize: "1 bowl",
+          protein: 42,
+          calories: 640,
+          carbs: 72,
+          fat: 18,
+          fiber: 7,
+          confidence: 0.82,
+        },
+        coachContent: null,
+        visionEngineVersion: "meal-scan-vision-v1",
+      }).photoMediaId,
+    ).toBe("507f1f77bcf86cd799439011");
+    expect(() =>
+      mealLogInputSchema.parse({
+        ...meal,
+        photoS3Key: "pepta/meal-scans/someone-else/private.jpg",
+      }),
+    ).toThrow();
+    expect(() =>
+      mealScanResponseSchema.parse({
+        scanId: "507f1f77bcf86cd799439012",
+        photoS3Key: "pepta/meal-scans/someone-else/private.jpg",
+        analysis: {
+          foodName: "Chicken rice bowl",
+          servingSize: "1 bowl",
+          protein: 42,
+          calories: 640,
+          carbs: 72,
+          fat: 18,
+          fiber: 7,
+          confidence: 0.82,
+        },
+        coachContent: null,
+        visionEngineVersion: "meal-scan-vision-v1",
+      }),
+    ).toThrow();
+  });
+
+  it("carries recipe media ids and signed URLs without exposing storage keys", () => {
+    const input = recipeInputSchema.parse({
+      name: "Morning shake",
+      ingredients: [
+        { name: "Whey", amount: "1 scoop", protein: 24, calories: 120 },
+      ],
+      photoMediaId: "507f1f77bcf86cd799439011",
+    });
+    const response = recipeResponseSchema.parse({
+      ...input,
+      id: "507f1f77bcf86cd799439012",
+      isStarter: false,
+      photoUrl: "https://signed.example/recipe",
+      createdAt: "2026-08-19T12:00:00.000Z",
+      updatedAt: "2026-08-19T12:00:00.000Z",
+    });
+
+    expect(response.photoMediaId).toBe("507f1f77bcf86cd799439011");
+    expect(response.photoUrl).toBe("https://signed.example/recipe");
+    expect(response).not.toHaveProperty("photoS3Key");
+    expect(() =>
+      recipeInputSchema.parse({
+        ...input,
+        photoS3Key: "pepta/recipes/private.jpg",
+      }),
+    ).toThrow();
   });
 });
 
@@ -256,7 +344,7 @@ describe("shared profile schemas", () => {
 
     const response = mealScanResponseSchema.safeParse({
       scanId: "scan-1",
-      photoS3Key: "pepta/meal-scans/user-1/product.png",
+      photoMediaId: "507f1f77bcf86cd799439011",
       analysis: {
         foodName: "Acme Protein Yogurt",
         servingSize: "1 cup",
@@ -460,7 +548,7 @@ describe("shared profile schemas", () => {
   it("allows meal scan tracker notes without replacing structured coach content", () => {
     const result = mealScanResponseSchema.safeParse({
       scanId: "scan-1",
-      photoS3Key: "pepta/meal-scans/user-1/photo.png",
+      photoMediaId: "507f1f77bcf86cd799439011",
       analysis: {
         foodName: "Chicken rice bowl",
         servingSize: "1 bowl",
