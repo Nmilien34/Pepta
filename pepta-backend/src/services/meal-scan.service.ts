@@ -9,7 +9,6 @@ import {
   type MealScanInput,
   type MealVoiceInput,
 } from "@pepta/shared";
-import { randomUUID } from "node:crypto";
 import { isValidObjectId } from "mongoose";
 import { addUtcDays, startOfUtcDay, startOfUtcWeek } from "../lib/dates";
 import { AppError, NotFoundError } from "../lib/errors";
@@ -21,6 +20,11 @@ import {
   UserProfileModel,
   type MealScanDocument,
 } from "../models";
+import {
+  discardMedia,
+  getMediaViewUrl,
+  persistMealScanMedia,
+} from "./media.service";
 import {
   generateMealScanNote,
   type MealScanProteinSnapshot,
@@ -41,7 +45,6 @@ import {
   generateProductCluesFromImage,
   PRODUCT_SCAN_VISION_ENGINE_VERSION,
 } from "./product-scan-vision.service";
-import { createPresignedGetUrl, putS3Object } from "./s3.service";
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const MEAL_SCAN_COACH_COPY_VERSION = "meal-scan-coach-v1";
@@ -77,28 +80,6 @@ function clamp(value: number, min: number, max: number): number {
 
 function roundOne(value: number): number {
   return Math.round(value * 10) / 10;
-}
-
-function imageExtension(
-  mimeType: MealScanInput["imageMimeType"],
-): "jpg" | "png" | "webp" {
-  if (mimeType === "image/png") {
-    return "png";
-  }
-
-  if (mimeType === "image/webp") {
-    return "webp";
-  }
-
-  return "jpg";
-}
-
-export function buildMealScanObjectKey(
-  userId: string,
-  imageMimeType: MealScanInput["imageMimeType"],
-  uploadId = randomUUID(),
-): string {
-  return `pepta/meal-scans/${userId}/${uploadId}.${imageExtension(imageMimeType)}`;
 }
 
 function isDuplicateIdempotencyError(
@@ -344,7 +325,9 @@ function serializeScan(scan: MealScanDocument | Record<string, unknown>) {
 
   return mealScanResponseSchema.parse({
     scanId: String(value.id ?? value._id),
-    photoS3Key: value.photoS3Key,
+    ...(value.photoMediaId
+      ? { photoMediaId: String(value.photoMediaId) }
+      : {}),
     analysis,
     coachContent:
       (value.coachContent as MealScanCoachContent | null | undefined) ?? null,
@@ -382,18 +365,7 @@ export async function analyzeMealScan(userId: string, input: MealScanInput) {
     input.imageMimeType,
   );
   const normalizedImage = input.imageData.trim();
-  const photoS3Key = buildMealScanObjectKey(userId, input.imageMimeType);
   const capturedAt = input.capturedAt ? new Date(input.capturedAt) : new Date();
-
-  try {
-    await putS3Object({
-      key: photoS3Key,
-      body: imageBytes,
-      contentType: input.imageMimeType,
-    });
-  } catch {
-    throw storageFailed();
-  }
 
   const analysis = await generateMealScanVision(
     normalizedImage,
@@ -406,11 +378,21 @@ export async function analyzeMealScan(userId: string, input: MealScanInput) {
   });
   const coachContent = buildCoachContent(analysis);
   const note = await resolveTrackerNote({ analysis, snapshot, biggestWorry });
+  let media: Awaited<ReturnType<typeof persistMealScanMedia>>;
+  try {
+    media = await persistMealScanMedia(userId, {
+      bytes: imageBytes,
+      contentType: input.imageMimeType,
+    });
+  } catch (error) {
+    if (error instanceof AppError) throw error;
+    throw storageFailed();
+  }
 
   try {
     const scan = await MealScanModel.create({
       userId,
-      photoS3Key,
+      photoMediaId: media.mediaId,
       imageMimeType: input.imageMimeType,
       analysis,
       coachContent,
@@ -422,6 +404,12 @@ export async function analyzeMealScan(userId: string, input: MealScanInput) {
 
     return serializeScan(scan);
   } catch (error) {
+    await discardMedia(userId, media.mediaId).catch((discardError) => {
+      logger.warn(
+        { error: discardError, mediaId: media.mediaId },
+        "[meal-scan] failed to queue uncommitted media",
+      );
+    });
     if (input.idempotencyKey && isDuplicateIdempotencyError(error)) {
       const idempotentScan = await findSuccessfulIdempotentScan(
         userId,
@@ -510,18 +498,7 @@ export async function analyzeProductScan(
     input.imageMimeType,
   );
   const normalizedImage = input.imageData.trim();
-  const photoS3Key = buildMealScanObjectKey(userId, input.imageMimeType);
   const capturedAt = input.capturedAt ? new Date(input.capturedAt) : new Date();
-
-  try {
-    await putS3Object({
-      key: photoS3Key,
-      body: imageBytes,
-      contentType: input.imageMimeType,
-    });
-  } catch {
-    throw storageFailed();
-  }
 
   const clues = await generateProductCluesFromImage(
     normalizedImage,
@@ -537,11 +514,21 @@ export async function analyzeProductScan(
   const coachContent = buildCoachContent(analysis);
   const note = await resolveTrackerNote({ analysis, snapshot, biggestWorry });
   const product = productMetadata("product_scan", nutrition);
+  let media: Awaited<ReturnType<typeof persistMealScanMedia>>;
+  try {
+    media = await persistMealScanMedia(userId, {
+      bytes: imageBytes,
+      contentType: input.imageMimeType,
+    });
+  } catch (error) {
+    if (error instanceof AppError) throw error;
+    throw storageFailed();
+  }
 
   try {
     const scan = await MealScanModel.create({
       userId,
-      photoS3Key,
+      photoMediaId: media.mediaId,
       imageMimeType: input.imageMimeType,
       analysis,
       coachContent,
@@ -554,6 +541,12 @@ export async function analyzeProductScan(
 
     return serializeScan(scan);
   } catch (error) {
+    await discardMedia(userId, media.mediaId).catch((discardError) => {
+      logger.warn(
+        { error: discardError, mediaId: media.mediaId },
+        "[meal-scan] failed to queue uncommitted media",
+      );
+    });
     if (input.idempotencyKey && isDuplicateIdempotencyError(error)) {
       const idempotentScan = await findSuccessfulIdempotentScan(
         userId,
@@ -608,7 +601,7 @@ export async function getMealLogScanDetail(userId: string, mealLogId: string) {
     throw new NotFoundError("Meal log not found");
   }
 
-  if (!log.photoS3Key) {
+  if (!log.photoMediaId) {
     return mealLogScanDetailResponseSchema.parse({
       photoViewUrl: null,
       analysis: null,
@@ -617,9 +610,10 @@ export async function getMealLogScanDetail(userId: string, mealLogId: string) {
     });
   }
 
+  const photoMediaId = log.photoMediaId.toString();
   const [photoViewUrl, scan] = await Promise.all([
-    createPresignedGetUrl({ key: log.photoS3Key }),
-    MealScanModel.findOne({ userId, photoS3Key: log.photoS3Key }),
+    getMediaViewUrl(userId, photoMediaId),
+    MealScanModel.findOne({ userId, photoMediaId }),
   ]);
   const scanValue = scan ? toPlainRecord(scan) : null;
 
