@@ -8,6 +8,8 @@ import {
   avatarViewUrlResponseSchema,
   authResponseSchema,
   compoundResponseSchema,
+  favouriteInputSchema,
+  favouriteResponseSchema,
   insightSchema,
   mealBarcodeInputSchema,
   mealLogScanDetailResponseSchema,
@@ -15,6 +17,8 @@ import {
   mealProductScanInputSchema,
   mealScanResponseSchema,
   medicationCatalogItemSchema,
+  mediaConfirmInputSchema,
+  mediaUploadIntentInputSchema,
   notificationPreferencesPatchSchema,
   notificationPreferencesResponseSchema,
   onboardingCompleteInputSchema,
@@ -28,6 +32,56 @@ import {
   userProfileInputSchema,
   userProfileResponseSchema,
 } from "./index";
+
+describe("opaque media contracts", () => {
+  it("accepts a media upload intent and confirmation", () => {
+    expect(
+      mediaUploadIntentInputSchema.parse({
+        intent: "favourite_photo",
+        contentType: "image/jpeg",
+        sizeBytes: 2048,
+      }),
+    ).toEqual({
+      intent: "favourite_photo",
+      contentType: "image/jpeg",
+      sizeBytes: 2048,
+    });
+    expect(
+      mediaConfirmInputSchema.parse({
+        mediaId: "507f1f77bcf86cd799439011",
+      }),
+    ).toEqual({ mediaId: "507f1f77bcf86cd799439011" });
+  });
+
+  it("never accepts a favourite S3 key from the caller", () => {
+    expect(() =>
+      favouriteInputSchema.parse({
+        key: "food:desk-lunch:1-box",
+        kind: "food",
+        name: "Desk lunch",
+        portion: "1 box",
+        photoS3Key: "favourites/someone-else/private.jpg",
+      }),
+    ).toThrow();
+  });
+
+  it("carries a favourite media id and signed URL without a storage key", () => {
+    const parsed = favouriteResponseSchema.parse({
+      id: "507f1f77bcf86cd799439012",
+      key: "food:desk-lunch:1-box",
+      kind: "food",
+      name: "Desk lunch",
+      portion: "1 box",
+      photoMediaId: "507f1f77bcf86cd799439011",
+      photoUrl: "https://signed.example/photo",
+      createdAt: "2026-08-19T12:00:00.000Z",
+      updatedAt: "2026-08-19T12:00:00.000Z",
+    });
+
+    expect(parsed.photoMediaId).toBe("507f1f77bcf86cd799439011");
+    expect(parsed).not.toHaveProperty("photoS3Key");
+  });
+});
 
 describe("shared profile schemas", () => {
   const baseProfile = {

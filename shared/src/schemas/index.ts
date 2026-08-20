@@ -1394,6 +1394,57 @@ export const accessDecisionSchema = z
   });
 
 // ---------------------------------------------------------------------------
+// User media — opaque ownership records, never caller-selected S3 keys.
+//
+// The app uploads through a short-lived policy, then confirms only the media
+// id. Product inputs can carry that id, but storage keys stay backend-only.
+// ---------------------------------------------------------------------------
+
+export const mediaIntentSchema = z.enum([
+  "avatar",
+  "progress_photo",
+  "favourite_photo",
+  "meal_photo",
+]);
+
+export const mediaContentTypeSchema = z.enum([
+  "image/jpeg",
+  "image/png",
+  "image/heic",
+  "image/webp",
+]);
+
+export const mediaUploadIntentInputSchema = z
+  .object({
+    intent: mediaIntentSchema,
+    contentType: mediaContentTypeSchema,
+    sizeBytes: z.number().int().positive(),
+  })
+  .strict();
+
+export const mediaUploadIntentResponseSchema = z
+  .object({
+    mediaId: idSchema,
+    uploadUrl: z.string().url(),
+    fields: z.record(z.string()),
+    expiresAt: isoDateTimeSchema,
+  })
+  .strict();
+
+export const mediaConfirmInputSchema = z
+  .object({ mediaId: idSchema })
+  .strict();
+
+export const mediaReadyResponseSchema = z
+  .object({
+    mediaId: idSchema,
+    status: z.literal("ready"),
+  })
+  .strict();
+
+export const mediaDiscardInputSchema = mediaConfirmInputSchema;
+
+// ---------------------------------------------------------------------------
 // Favourites — the foods and drinks the user saved, with the portion.
 //
 // SERVER-BACKED so they follow the account rather than the handset: a
@@ -1428,12 +1479,8 @@ export const favouriteInputSchema = z
      * before you tap Log.
      */
     source: z.enum(["item", "recipe"]).default("item"),
-    /**
-     * A photo the user took of their own item. Stored as an S3 key; the list
-     * response carries a short-lived view URL rather than the key, so the
-     * client never has to sign anything.
-     */
-    photoS3Key: z.string().trim().min(1).max(300).optional(),
+    /** An owned, verified media record. Raw storage keys never cross here. */
+    photoMediaId: idSchema.optional(),
   })
   .strict();
 
@@ -1554,36 +1601,9 @@ export const recipeComposeResponseSchema = z
 export type RecipeComposeInput = z.infer<typeof recipeComposeInputSchema>;
 export type RecipeComposeResponse = z.infer<typeof recipeComposeResponseSchema>;
 
-/** Asking for somewhere to put a favourite's photo. */
-export const favouritePhotoIntentInputSchema = z
-  .object({
-    contentType: z.enum(["image/jpeg", "image/png", "image/webp"]),
-  })
-  .strict();
-
-/**
- * Throwing away a photo that was uploaded but never attached to anything —
- * the user picked a second one, or closed the sheet without saving. Without
- * it those bytes sit in the bucket forever with nothing referencing them.
- */
-export const favouritePhotoDiscardInputSchema = z
-  .object({ photoS3Key: z.string().trim().min(1).max(300) })
-  .strict();
-
-export const favouritePhotoIntentResponseSchema = z
-  .object({
-    uploadUrl: z.string().min(1),
-    photoS3Key: z.string().min(1),
-    expiresAt: isoDateTimeSchema,
-  })
-  .strict();
-
-export type FavouritePhotoIntentInput = z.infer<typeof favouritePhotoIntentInputSchema>;
-export type FavouritePhotoDiscardInput = z.infer<typeof favouritePhotoDiscardInputSchema>;
 export type UiPreferences = z.infer<typeof uiPreferencesSchema>;
 export type UiPreferencesInput = z.input<typeof uiPreferencesSchema>;
 export type UiPreferencesResponse = z.infer<typeof uiPreferencesResponseSchema>;
 export type LevelRangeKey = z.infer<typeof levelRangeKeySchema>;
 export type LevelRangeQuery = z.input<typeof levelRangeQuerySchema>;
 export type MedicationLevelsResponse = z.infer<typeof medicationLevelsResponseSchema>;
-export type FavouritePhotoIntentResponse = z.infer<typeof favouritePhotoIntentResponseSchema>;

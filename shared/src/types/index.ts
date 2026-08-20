@@ -56,6 +56,13 @@ import type {
   mealTranscriptResponseSchema,
   mealTranscriptionInputSchema,
   mealVoiceInputSchema,
+  mediaConfirmInputSchema,
+  mediaContentTypeSchema,
+  mediaDiscardInputSchema,
+  mediaIntentSchema,
+  mediaReadyResponseSchema,
+  mediaUploadIntentInputSchema,
+  mediaUploadIntentResponseSchema,
   medicationCatalogItemSchema,
   medicationFrequencySchema,
   medicationLevelResponseSchema,
@@ -177,6 +184,17 @@ export type MealTranscriptionInput = z.infer<
   typeof mealTranscriptionInputSchema
 >;
 export type MealVoiceInput = z.infer<typeof mealVoiceInputSchema>;
+export type MediaConfirmInput = z.infer<typeof mediaConfirmInputSchema>;
+export type MediaContentType = z.infer<typeof mediaContentTypeSchema>;
+export type MediaDiscardInput = z.infer<typeof mediaDiscardInputSchema>;
+export type MediaIntent = z.infer<typeof mediaIntentSchema>;
+export type MediaReadyResponse = z.infer<typeof mediaReadyResponseSchema>;
+export type MediaUploadIntentInput = z.infer<
+  typeof mediaUploadIntentInputSchema
+>;
+export type MediaUploadIntentResponse = z.infer<
+  typeof mediaUploadIntentResponseSchema
+>;
 export type MedicationCatalogItem = z.infer<typeof medicationCatalogItemSchema>;
 export type MedicationFrequency = z.infer<typeof medicationFrequencySchema>;
 export type MedicationLevelResponse = z.infer<
