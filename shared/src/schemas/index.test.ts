@@ -26,6 +26,9 @@ import {
   onboardingResultResponseSchema,
   pushTokenRegistrationRequestSchema,
   pushTokenRegistrationResponseSchema,
+  progressPhotoInputSchema,
+  progressPhotoSchema,
+  progressPhotoUploadIntentResponseSchema,
   recipeInputSchema,
   recipeResponseSchema,
   revenueCatWebhookSchema,
@@ -66,6 +69,42 @@ describe("opaque media contracts", () => {
         photoS3Key: "favourites/someone-else/private.jpg",
       }),
     ).toThrow();
+  });
+
+  it("uses opaque ids for avatars and progress photos", () => {
+    const mediaId = "507f1f77bcf86cd799439011";
+    expect(avatarConfirmRequestSchema.parse({ mediaId })).toEqual({ mediaId });
+    expect(() =>
+      avatarConfirmRequestSchema.parse({ key: "pepta/avatars/user-1/a.jpg" }),
+    ).toThrow();
+    expect(
+      userAccountPatchSchema.safeParse({
+        avatarUrl: "https://tracker.example/avatar.jpg",
+      }).success,
+    ).toBe(false);
+
+    expect(
+      progressPhotoInputSchema.safeParse({
+        captureDate: "2026-08-19",
+        contentType: "image/jpeg",
+        kind: "body",
+      }).success,
+    ).toBe(false);
+    const progress = progressPhotoSchema.parse({
+      id: "507f1f77bcf86cd799439012",
+      userId: "507f1f77bcf86cd799439013",
+      mediaId,
+      captureDate: "2026-08-19",
+      contentType: "image/jpeg",
+      sizeBytes: 2048,
+      kind: "body",
+      status: "uploaded",
+      createdAt: "2026-08-19T12:00:00.000Z",
+      updatedAt: "2026-08-19T12:00:00.000Z",
+    });
+    expect(progress.mediaId).toBe(mediaId);
+    expect(progress).not.toHaveProperty("s3Key");
+    expect(() => progressPhotoSchema.parse({ ...progress, s3Key: "raw/key" })).toThrow();
   });
 
   it("carries a favourite media id and signed URL without a storage key", () => {
@@ -247,14 +286,35 @@ describe("shared profile schemas", () => {
     ).toBe(true);
     expect(
       avatarUploadIntentResponseSchema.safeParse({
-        key: "pepta/avatars/user-1/upload.jpg",
+        mediaId: "507f1f77bcf86cd799439011",
         uploadUrl: "https://signed.example/upload",
+        fields: { key: "server-owned" },
         expiresAt: "2026-06-21T00:10:00.000Z",
       }).success,
     ).toBe(true);
     expect(
       avatarConfirmRequestSchema.safeParse({
-        key: "pepta/avatars/user-1/upload.jpg",
+        mediaId: "507f1f77bcf86cd799439011",
+      }).success,
+    ).toBe(true);
+
+    expect(
+      progressPhotoUploadIntentResponseSchema.safeParse({
+        photo: {
+          id: "507f1f77bcf86cd799439012",
+          userId: "507f1f77bcf86cd799439013",
+          mediaId: "507f1f77bcf86cd799439011",
+          captureDate: "2026-08-19",
+          contentType: "image/jpeg",
+          sizeBytes: 2048,
+          kind: "body",
+          status: "pending_upload",
+          createdAt: "2026-08-19T12:00:00.000Z",
+          updatedAt: "2026-08-19T12:00:00.000Z",
+        },
+        uploadUrl: "https://signed.example/upload",
+        fields: { key: "server-owned" },
+        expiresAt: "2026-06-21T00:10:00.000Z",
       }).success,
     ).toBe(true);
     expect(

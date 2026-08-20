@@ -9,13 +9,14 @@ import { applyApiTransforms } from "./model-utils";
 
 export interface ProgressPhotoDocument extends Document<Types.ObjectId> {
   userId: Types.ObjectId;
+  mediaId: Types.ObjectId;
   captureDate: string;
   contentType: "image/jpeg" | "image/png" | "image/heic" | "image/webp";
   sizeBytes?: number;
   kind: "body" | "face";
   faceFullness?: number;
-  s3Key: string;
   status: "pending_upload" | "uploaded" | "deleted";
+  expiresAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -111,6 +112,12 @@ const progressPhotoSchema = new Schema<ProgressPhotoDocument>(
       required: true,
       index: true,
     },
+    mediaId: {
+      type: Schema.Types.ObjectId,
+      ref: "MediaAsset",
+      required: true,
+      unique: true,
+    },
     captureDate: {
       type: String,
       required: true,
@@ -137,12 +144,6 @@ const progressPhotoSchema = new Schema<ProgressPhotoDocument>(
       min: 1,
       max: 5,
     },
-    s3Key: {
-      type: String,
-      required: true,
-      trim: true,
-      unique: true,
-    },
     status: {
       type: String,
       enum: ["pending_upload", "uploaded", "deleted"],
@@ -150,6 +151,7 @@ const progressPhotoSchema = new Schema<ProgressPhotoDocument>(
       default: "pending_upload",
       index: true,
     },
+    expiresAt: { type: Date },
   },
   {
     timestamps: true,
@@ -158,6 +160,7 @@ const progressPhotoSchema = new Schema<ProgressPhotoDocument>(
 );
 
 progressPhotoSchema.index({ userId: 1, captureDate: -1, status: 1 });
+progressPhotoSchema.index({ status: 1, expiresAt: 1 });
 
 const mealScanAnalysisSchema = new Schema<MealScanAnalysis>(
   {

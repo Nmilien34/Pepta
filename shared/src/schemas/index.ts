@@ -275,21 +275,22 @@ const avatarContentTypeSchema = z.enum([
 export const avatarUploadIntentRequestSchema = z
   .object({
     contentType: avatarContentTypeSchema,
-    sizeBytes: z.number().int().positive().optional(),
+    sizeBytes: z.number().int().positive(),
   })
   .strict();
 
 export const avatarUploadIntentResponseSchema = z
   .object({
-    key: z.string().min(1),
+    mediaId: idSchema,
     uploadUrl: z.string().url(),
+    fields: z.record(z.string()),
     expiresAt: isoDateTimeSchema,
   })
   .strict();
 
 export const avatarConfirmRequestSchema = z
   .object({
-    key: z.string().min(1),
+    mediaId: idSchema,
   })
   .strict();
 
@@ -303,7 +304,6 @@ export const avatarViewUrlResponseSchema = z
 export const userAccountPatchSchema = z
   .object({
     displayName: z.string().trim().min(1).max(120).optional(),
-    avatarUrl: z.string().url().optional(),
   })
   .strict()
   .refine((patch) => Object.keys(patch).length > 0, {
@@ -1085,7 +1085,7 @@ export const progressPhotoInputSchema = z
       "image/heic",
       "image/webp",
     ]),
-    sizeBytes: z.number().int().positive().optional(),
+    sizeBytes: z.number().int().positive(),
     kind: progressPhotoKindSchema.default("body"),
     faceFullness: z.number().int().min(1).max(5).optional(),
   })
@@ -1094,7 +1094,7 @@ export const progressPhotoInputSchema = z
 export const progressPhotoSchema = progressPhotoInputSchema.extend({
   id: idSchema,
   userId: idSchema,
-  s3Key: z.string().min(1),
+  mediaId: idSchema,
   status: progressPhotoStatusSchema,
   viewUrl: z.string().url().optional(),
   createdAt: isoDateTimeSchema,
@@ -1105,6 +1105,7 @@ export const progressPhotoUploadIntentResponseSchema = z
   .object({
     photo: progressPhotoSchema,
     uploadUrl: z.string().url(),
+    fields: z.record(z.string()),
     expiresAt: isoDateTimeSchema,
   })
   .strict();
@@ -1112,7 +1113,6 @@ export const progressPhotoUploadIntentResponseSchema = z
 export const progressPhotoConfirmInputSchema = z
   .object({
     photoId: idSchema,
-    sizeBytes: z.number().int().positive().optional(),
   })
   .strict();
 

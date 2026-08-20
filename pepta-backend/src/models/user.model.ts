@@ -56,8 +56,8 @@ export interface UserDocument extends Document<Types.ObjectId> {
   email?: string;
   emailVerified: boolean;
   displayName?: string;
-  avatarUrl?: string;
-  avatarKey?: string;
+  avatarMediaId?: Types.ObjectId;
+  providerAvatarFingerprint?: string;
   authProviders: LinkedAuthProviderDocument[];
   entitlement: UserEntitlementDocument;
   onboardingComplete?: boolean;
@@ -250,13 +250,14 @@ const userSchema = new Schema<UserDocument>(
       type: String,
       trim: true,
     },
-    avatarUrl: {
-      type: String,
-      trim: true,
+    avatarMediaId: {
+      type: Schema.Types.ObjectId,
+      ref: "MediaAsset",
     },
-    avatarKey: {
+    providerAvatarFingerprint: {
       type: String,
       trim: true,
+      maxlength: 128,
     },
     authProviders: {
       type: [linkedAuthProviderSchema],
