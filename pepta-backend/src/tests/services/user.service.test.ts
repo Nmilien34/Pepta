@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   deleteS3Object: vi.fn(),
   prepareComplimentaryCleanupForDeletion: vi.fn(),
   queueAllUserMediaForDeletion: vi.fn(),
+  sweepLegacyMediaForDeletion: vi.fn(),
   getMediaViewUrl: vi.fn(),
   modelDeleteMany: {
     ActivityLogModel: vi.fn(),
@@ -120,6 +121,10 @@ vi.mock("../../services/complimentary-access-cleanup.service", () => ({
 vi.mock("../../services/media.service", () => ({
   getMediaViewUrl: mocks.getMediaViewUrl,
   queueAllUserMediaForDeletion: mocks.queueAllUserMediaForDeletion,
+}));
+
+vi.mock("../../services/media-legacy.service", () => ({
+  sweepLegacyMediaForDeletion: mocks.sweepLegacyMediaForDeletion,
 }));
 
 vi.mock("../../services/provider-avatar.service", () => ({
@@ -239,6 +244,11 @@ describe("user service account settings", () => {
     mocks.deleteS3Object.mockResolvedValue(undefined);
     mocks.prepareComplimentaryCleanupForDeletion.mockResolvedValue(undefined);
     mocks.queueAllUserMediaForDeletion.mockResolvedValue(undefined);
+    mocks.sweepLegacyMediaForDeletion.mockResolvedValue({
+      registered: 0,
+      alreadyTracked: 0,
+      nonConforming: 0,
+    });
     mocks.getMediaViewUrl.mockResolvedValue("https://signed.example/avatar");
     mocks.mealLogFind.mockResolvedValue([]);
     mocks.mealScanFind.mockResolvedValue([]);
@@ -425,6 +435,19 @@ describe("user service account settings", () => {
       mocks.queueAllUserMediaForDeletion.mock.invocationCallOrder[0],
     ).toBeLessThan(
       mocks.modelDeleteMany.FavouriteModel.mock.invocationCallOrder[0]!,
+    );
+    // The legacy raw-key sweep must read the product rows before ANY of the
+    // deleteMany calls destroy them — once a row is gone, so is the only
+    // record of its S3 key.
+    expect(mocks.sweepLegacyMediaForDeletion).toHaveBeenCalledWith(userId);
+    expect(
+      mocks.sweepLegacyMediaForDeletion.mock.invocationCallOrder[0],
+    ).toBeLessThan(
+      Math.min(
+        ...Object.values(mocks.modelDeleteMany).map(
+          (mock) => mock.mock.invocationCallOrder[0]!,
+        ),
+      ),
     );
     const cleanupOrder =
       mocks.prepareComplimentaryCleanupForDeletion.mock.invocationCallOrder[0]!;

@@ -48,6 +48,7 @@ import {
   getMediaViewUrl,
   queueAllUserMediaForDeletion,
 } from "./media.service";
+import { sweepLegacyMediaForDeletion } from "./media-legacy.service";
 import { serializeWithSchema } from "./serializers";
 import { refreshGoogleAvatar } from "./provider-avatar.service";
 
@@ -423,6 +424,10 @@ export async function deleteCurrentUser(userId: string): Promise<void> {
     throw new NotFoundError("User not found");
   }
 
+  // Legacy raw-key sweep MUST run before the deleteMany fan-out below: the
+  // raw keys live on the product rows, and once those are gone nothing can
+  // ever rediscover the S3 objects they pointed at. No S3 calls in here.
+  await sweepLegacyMediaForDeletion(userId);
   await queueAllUserMediaForDeletion(userId);
 
   await Promise.all([

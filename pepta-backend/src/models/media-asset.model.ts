@@ -4,7 +4,10 @@ import type { Document, Types } from "mongoose";
 export type MediaSource =
   | "direct_upload"
   | "meal_scan"
-  | "provider_import";
+  | "provider_import"
+  // Registered by the legacy sweep/reconcile, not uploaded through an intent:
+  // a raw S3 key that predates the media pipeline. Never has a stagingKey.
+  | "legacy_backfill";
 export type MediaIntent =
   | "avatar"
   | "progress_photo"
@@ -78,7 +81,7 @@ const mediaAssetSchema = new Schema<MediaAssetDocument>(
     source: {
       type: String,
       required: true,
-      enum: ["direct_upload", "meal_scan", "provider_import"],
+      enum: ["direct_upload", "meal_scan", "provider_import", "legacy_backfill"],
     },
     intent: {
       type: String,
