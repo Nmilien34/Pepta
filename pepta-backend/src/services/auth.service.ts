@@ -41,7 +41,7 @@ export async function signInWithReviewAccount(
 
   return {
     token: issueSessionJwt(user._id.toString()),
-    user: serializeUser(user),
+    user: await serializeUser(user),
     isNewUser: false,
   };
 }
@@ -97,7 +97,7 @@ export async function signInWithGoogle(idToken: string): Promise<AuthResponse> {
 
   return {
     token: issueSessionJwt(userId),
-    user: serializeUser(user),
+    user: await serializeUser(user),
     isNewUser,
   };
 }
@@ -116,7 +116,7 @@ export async function signInWithApple(input: AppleAuth): Promise<AuthResponse> {
 
   return {
     token: issueSessionJwt(userId),
-    user: serializeUser(user),
+    user: await serializeUser(user),
     isNewUser,
   };
 }

@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   deleteS3Object: vi.fn(),
   prepareComplimentaryCleanupForDeletion: vi.fn(),
   queueAllUserMediaForDeletion: vi.fn(),
+  getMediaViewUrl: vi.fn(),
   modelDeleteMany: {
     ActivityLogModel: vi.fn(),
     CompoundModel: vi.fn(),
@@ -112,11 +113,13 @@ vi.mock("../../services/complimentary-access-cleanup.service", () => ({
 }));
 
 vi.mock("../../services/media.service", () => ({
+  getMediaViewUrl: mocks.getMediaViewUrl,
   queueAllUserMediaForDeletion: mocks.queueAllUserMediaForDeletion,
 }));
 
 import {
   deleteCurrentUser,
+  serializeUser,
   updateCurrentUser,
   updateProfileSettings,
 } from "../../services/user.service";
@@ -226,6 +229,7 @@ describe("user service account settings", () => {
     mocks.deleteS3Object.mockResolvedValue(undefined);
     mocks.prepareComplimentaryCleanupForDeletion.mockResolvedValue(undefined);
     mocks.queueAllUserMediaForDeletion.mockResolvedValue(undefined);
+    mocks.getMediaViewUrl.mockResolvedValue("https://signed.example/avatar");
     mocks.mealLogFind.mockResolvedValue([]);
     mocks.mealScanFind.mockResolvedValue([]);
     mocks.progressPhotoFind.mockResolvedValue([]);
@@ -271,6 +275,50 @@ describe("user service account settings", () => {
       { new: true, runValidators: true },
     );
     expect(result.displayName).toBe("Nico Pepta");
+  });
+
+  it("serializes only the active Pepta avatar as a signed URL", async () => {
+    const mediaId = "507f1f77bcf86cd799439012";
+    const result = await serializeUser(
+      document({
+        id: userId,
+        email: "nick@pepta.app",
+        emailVerified: true,
+        avatarMediaId: mediaId,
+        authProviders: [],
+        entitlement: { status: "free", expiresAt: null, willRenew: false },
+        onboardingComplete: true,
+        createdAt: "2026-06-21T00:00:00.000Z",
+        updatedAt: "2026-06-21T00:00:00.000Z",
+      }) as never,
+    );
+
+    expect(mocks.getMediaViewUrl).toHaveBeenCalledWith(userId, mediaId);
+    expect(result).toMatchObject({
+      avatarUrl: "https://signed.example/avatar",
+      hasAvatar: true,
+    });
+  });
+
+  it("keeps the user readable when avatar signing fails", async () => {
+    mocks.getMediaViewUrl.mockRejectedValueOnce(new Error("S3 unavailable"));
+    const result = await serializeUser(
+      document({
+        id: userId,
+        email: "nick@pepta.app",
+        emailVerified: true,
+        avatarMediaId: "507f1f77bcf86cd799439012",
+        avatarUrl: "https://provider.example/should-not-leak",
+        authProviders: [],
+        entitlement: { status: "free", expiresAt: null, willRenew: false },
+        onboardingComplete: true,
+        createdAt: "2026-06-21T00:00:00.000Z",
+        updatedAt: "2026-06-21T00:00:00.000Z",
+      }) as never,
+    );
+
+    expect(result.hasAvatar).toBe(true);
+    expect(result.avatarUrl).toBeUndefined();
   });
 
   it("deletes the user, user-owned data, and known S3 images", async () => {

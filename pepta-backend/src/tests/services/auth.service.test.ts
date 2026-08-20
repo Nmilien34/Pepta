@@ -101,7 +101,6 @@ describe("auth service", () => {
         email: "user@example.com",
         emailVerified: true,
         displayName: "Pepta User",
-        avatarUrl: "https://example.com/avatar.png",
         authProviders: [
           {
             provider: "google",
@@ -119,7 +118,6 @@ describe("auth service", () => {
         email: "user@example.com",
         emailVerified: true,
         displayName: "Pepta User",
-        avatarUrl: "https://example.com/avatar.png",
         onboardingComplete: false,
         entitlement: {
           status: "free",

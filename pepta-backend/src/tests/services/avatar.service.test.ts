@@ -1,130 +1,118 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  createPresignedGetUrl: vi.fn(),
-  createPresignedPutUrl: vi.fn(),
-  deleteS3Object: vi.fn(),
+  attachMedia: vi.fn(),
+  detachMedia: vi.fn(),
+  getMediaViewUrl: vi.fn(),
   signedUrlExpiresAt: vi.fn(),
   userFindById: vi.fn(),
+  userFindOneAndUpdate: vi.fn(),
+  validateAttachableMedia: vi.fn(),
 }));
 
 vi.mock("../../models", () => ({
   UserModel: {
     findById: mocks.userFindById,
+    findOneAndUpdate: mocks.userFindOneAndUpdate,
   },
 }));
 
+vi.mock("../../services/media.service", () => ({
+  attachMedia: mocks.attachMedia,
+  detachMedia: mocks.detachMedia,
+  getMediaViewUrl: mocks.getMediaViewUrl,
+  validateAttachableMedia: mocks.validateAttachableMedia,
+}));
+
 vi.mock("../../services/s3.service", () => ({
-  createPresignedGetUrl: mocks.createPresignedGetUrl,
-  createPresignedPutUrl: mocks.createPresignedPutUrl,
-  deleteS3Object: mocks.deleteS3Object,
   signedUrlExpiresAt: mocks.signedUrlExpiresAt,
 }));
 
-import { ValidationError } from "../../lib/errors";
 import {
-  confirmAvatarUpload,
-  createAvatarUploadIntent,
   getAvatarViewUrl,
+  setAvatarMedia,
 } from "../../services/avatar.service";
 
-function userDocument(value: Record<string, unknown>) {
-  const user = {
-    _id: value.id,
-    id: value.id,
-    email: "nick@pepta.app",
-    emailVerified: true,
-    avatarKey: value.avatarKey,
-    authProviders: [],
-    entitlement: { status: "free", expiresAt: null, willRenew: false },
-    onboardingComplete: true,
-    createdAt: new Date("2026-06-21T00:00:00.000Z"),
-    updatedAt: new Date("2026-06-21T00:00:00.000Z"),
-    save: vi.fn(async () => user),
-    toObject: () => ({
-      id: value.id,
-      email: "nick@pepta.app",
-      emailVerified: true,
-      avatarKey: user.avatarKey,
-      authProviders: [],
-      entitlement: { status: "free", expiresAt: null, willRenew: false },
-      onboardingComplete: true,
-      createdAt: "2026-06-21T00:00:00.000Z",
-      updatedAt: "2026-06-21T00:00:00.000Z",
-    }),
+const USER = "507f1f77bcf86cd799439011";
+const MEDIA = "507f1f77bcf86cd799439012";
+const OLD_MEDIA = "507f1f77bcf86cd799439013";
+
+function userDocument(value: Record<string, unknown> = {}) {
+  return {
+    _id: { toString: () => USER },
+    avatarMediaId: undefined,
+    ...value,
   };
-  return user;
 }
 
 describe("avatar service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.createPresignedGetUrl.mockResolvedValue(
-      "https://signed.example/view",
-    );
-    mocks.createPresignedPutUrl.mockResolvedValue("https://signed.example/put");
-    mocks.deleteS3Object.mockResolvedValue(undefined);
+    mocks.attachMedia.mockResolvedValue(undefined);
+    mocks.detachMedia.mockResolvedValue(undefined);
+    mocks.getMediaViewUrl.mockResolvedValue("https://signed.example/view");
     mocks.signedUrlExpiresAt.mockReturnValue("2026-06-21T00:10:00.000Z");
+    mocks.validateAttachableMedia.mockResolvedValue({ _id: MEDIA });
   });
 
-  it("creates a user-owned avatar upload intent", async () => {
-    const result = await createAvatarUploadIntent("user-1", {
-      contentType: "image/png",
-      sizeBytes: 12345,
-    });
-
-    expect(mocks.createPresignedPutUrl).toHaveBeenCalledWith({
-      key: expect.stringMatching(/^pepta\/avatars\/user-1\/.+\.png$/),
-      contentType: "image/png",
-    });
-    expect(result).toEqual({
-      key: expect.stringMatching(/^pepta\/avatars\/user-1\/.+\.png$/),
-      uploadUrl: "https://signed.example/put",
-      expiresAt: "2026-06-21T00:10:00.000Z",
-    });
-  });
-
-  it("persists a confirmed avatar and removes the previous uploaded avatar", async () => {
-    const user = userDocument({
-      id: "user-1",
-      avatarKey: "pepta/avatars/user-1/old.jpg",
-    });
-    mocks.userFindById.mockResolvedValue(user);
-
-    const result = await confirmAvatarUpload("user-1", {
-      key: "pepta/avatars/user-1/new.png",
-    });
-
-    expect(user.avatarKey).toBe("pepta/avatars/user-1/new.png");
-    expect(user.save).toHaveBeenCalledTimes(1);
-    expect(mocks.deleteS3Object).toHaveBeenCalledWith(
-      "pepta/avatars/user-1/old.jpg",
+  it("activates an owned ready avatar before detaching the previous media", async () => {
+    mocks.userFindById.mockResolvedValue(
+      userDocument({ avatarMediaId: { toString: () => OLD_MEDIA } }),
     );
-    expect(result.hasAvatar).toBe(true);
+    mocks.userFindOneAndUpdate.mockResolvedValue(
+      userDocument({ avatarMediaId: { toString: () => MEDIA } }),
+    );
+
+    const result = await setAvatarMedia(USER, MEDIA);
+
+    expect(mocks.validateAttachableMedia).toHaveBeenCalledWith(USER, MEDIA, "avatar");
+    expect(mocks.attachMedia).toHaveBeenCalledWith(USER, MEDIA, {
+      kind: "avatar",
+      resourceId: USER,
+    });
+    expect(mocks.userFindOneAndUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ _id: expect.anything(), avatarMediaId: expect.anything() }),
+      {
+        $set: { avatarMediaId: expect.anything() },
+        $unset: { providerAvatarFingerprint: 1 },
+      },
+      { new: true, runValidators: true },
+    );
+    expect(mocks.detachMedia).toHaveBeenCalledWith(USER, OLD_MEDIA, {
+      kind: "avatar",
+      resourceId: USER,
+    });
+    expect(mocks.attachMedia.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.detachMedia.mock.invocationCallOrder[0]!,
+    );
+    expect(result.avatarMediaId.toString()).toBe(MEDIA);
   });
 
-  it("rejects confirmed avatar keys outside the current user's prefix", async () => {
-    await expect(
-      confirmAvatarUpload("user-1", {
-        key: "pepta/avatars/user-2/avatar.png",
-      }),
-    ).rejects.toBeInstanceOf(ValidationError);
+  it("detaches the new media when the conditional user update loses a race", async () => {
+    mocks.userFindById.mockResolvedValue(userDocument());
+    mocks.userFindOneAndUpdate.mockResolvedValue(null);
 
-    expect(mocks.userFindById).not.toHaveBeenCalled();
+    await expect(setAvatarMedia(USER, MEDIA)).rejects.toThrow(/could not be updated/i);
+
+    expect(mocks.detachMedia).toHaveBeenCalledWith(USER, MEDIA, {
+      kind: "avatar",
+      resourceId: USER,
+    });
   });
 
-  it("returns a fresh view URL only when the user has an uploaded avatar", async () => {
+  it("returns a fresh signed view URL only for the active media id", async () => {
     mocks.userFindById
       .mockResolvedValueOnce(
-        userDocument({ id: "user-1", avatarKey: "pepta/avatars/user-1/a.jpg" }),
+        userDocument({ avatarMediaId: { toString: () => MEDIA } }),
       )
-      .mockResolvedValueOnce(userDocument({ id: "user-1" }));
+      .mockResolvedValueOnce(userDocument());
 
-    await expect(getAvatarViewUrl("user-1")).resolves.toEqual({
+    await expect(getAvatarViewUrl(USER)).resolves.toEqual({
       viewUrl: "https://signed.example/view",
       expiresAt: "2026-06-21T00:10:00.000Z",
     });
-    await expect(getAvatarViewUrl("user-1")).resolves.toEqual({
+    expect(mocks.getMediaViewUrl).toHaveBeenCalledWith(USER, MEDIA);
+    await expect(getAvatarViewUrl(USER)).resolves.toEqual({
       viewUrl: null,
       expiresAt: null,
     });

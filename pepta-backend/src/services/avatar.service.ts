@@ -1,94 +1,64 @@
+import { avatarViewUrlResponseSchema } from "@pepta/shared";
+import { Types } from "mongoose";
+import { InternalError, NotFoundError } from "../lib/errors";
+import { UserModel, type UserDocument } from "../models";
 import {
-  avatarUploadIntentResponseSchema,
-  avatarViewUrlResponseSchema,
-  type AvatarConfirmRequest,
-  type AvatarUploadIntentRequest,
-} from "@pepta/shared";
-import { randomUUID } from "node:crypto";
-import { NotFoundError, ValidationError } from "../lib/errors";
-import { UserModel } from "../models";
-import {
-  createPresignedGetUrl,
-  createPresignedPutUrl,
-  deleteS3Object,
-  signedUrlExpiresAt,
-} from "./s3.service";
-import { serializeUser } from "./user.service";
+  attachMedia,
+  detachMedia,
+  getMediaViewUrl,
+  validateAttachableMedia,
+} from "./media.service";
+import { signedUrlExpiresAt } from "./s3.service";
 
-type AvatarContentType = AvatarUploadIntentRequest["contentType"];
+const avatarLink = (userId: string) => ({
+  kind: "avatar" as const,
+  resourceId: userId,
+});
 
-function extensionForContentType(contentType: AvatarContentType): string {
-  if (contentType === "image/png") {
-    return "png";
-  }
-
-  if (contentType === "image/heic") {
-    return "heic";
-  }
-
-  if (contentType === "image/webp") {
-    return "webp";
-  }
-
-  return "jpg";
-}
-
-function avatarKeyPrefix(userId: string): string {
-  return `pepta/avatars/${userId}/`;
-}
-
-export function buildAvatarObjectKey(input: {
-  userId: string;
-  contentType: AvatarContentType;
-  uploadId?: string;
-}): string {
-  return `${avatarKeyPrefix(input.userId)}${
-    input.uploadId ?? randomUUID()
-  }.${extensionForContentType(input.contentType)}`;
-}
-
-export async function createAvatarUploadIntent(
+export async function setAvatarMedia(
   userId: string,
-  input: AvatarUploadIntentRequest,
-) {
-  const key = buildAvatarObjectKey({
-    userId,
-    contentType: input.contentType,
-  });
-  const uploadUrl = await createPresignedPutUrl({
-    key,
-    contentType: input.contentType,
-  });
-
-  return avatarUploadIntentResponseSchema.parse({
-    key,
-    uploadUrl,
-    expiresAt: signedUrlExpiresAt(),
-  });
-}
-
-export async function confirmAvatarUpload(
-  userId: string,
-  input: AvatarConfirmRequest,
-) {
-  if (!input.key.startsWith(avatarKeyPrefix(userId))) {
-    throw new ValidationError("Avatar upload key does not belong to this user");
-  }
+  mediaId: string,
+): Promise<UserDocument> {
+  await validateAttachableMedia(userId, mediaId, "avatar");
 
   const user = await UserModel.findById(userId);
   if (!user) {
     throw new NotFoundError("User not found");
   }
 
-  const previousKey = user.avatarKey;
-  user.avatarKey = input.key;
-  await user.save();
+  const previousMediaId = user.avatarMediaId?.toString();
+  const link = avatarLink(userId);
+  await attachMedia(userId, mediaId, link);
 
-  if (previousKey && previousKey !== input.key) {
-    deleteS3Object(previousKey).catch(() => undefined);
+  if (previousMediaId === mediaId) {
+    return user;
   }
 
-  return serializeUser(user);
+  const currentMediaMatch = previousMediaId
+    ? new Types.ObjectId(previousMediaId)
+    : { $exists: false };
+  const updatedUser = await UserModel.findOneAndUpdate(
+    {
+      _id: new Types.ObjectId(userId),
+      avatarMediaId: currentMediaMatch,
+    },
+    {
+      $set: { avatarMediaId: new Types.ObjectId(mediaId) },
+      $unset: { providerAvatarFingerprint: 1 },
+    },
+    { new: true, runValidators: true },
+  );
+
+  if (!updatedUser) {
+    await detachMedia(userId, mediaId, link);
+    throw new InternalError("Avatar could not be updated");
+  }
+
+  if (previousMediaId) {
+    await detachMedia(userId, previousMediaId, link);
+  }
+
+  return updatedUser;
 }
 
 export async function getAvatarViewUrl(userId: string) {
@@ -97,7 +67,8 @@ export async function getAvatarViewUrl(userId: string) {
     throw new NotFoundError("User not found");
   }
 
-  if (!user.avatarKey) {
+  const mediaId = user.avatarMediaId?.toString();
+  if (!mediaId) {
     return avatarViewUrlResponseSchema.parse({
       viewUrl: null,
       expiresAt: null,
@@ -105,7 +76,7 @@ export async function getAvatarViewUrl(userId: string) {
   }
 
   return avatarViewUrlResponseSchema.parse({
-    viewUrl: await createPresignedGetUrl({ key: user.avatarKey }),
+    viewUrl: await getMediaViewUrl(userId, mediaId),
     expiresAt: signedUrlExpiresAt(),
   });
 }

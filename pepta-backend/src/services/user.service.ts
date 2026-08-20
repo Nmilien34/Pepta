@@ -44,7 +44,10 @@ import {
   type UserDocument,
 } from "../models";
 import { deleteS3Object } from "./s3.service";
-import { queueAllUserMediaForDeletion } from "./media.service";
+import {
+  getMediaViewUrl,
+  queueAllUserMediaForDeletion,
+} from "./media.service";
 import { serializeWithSchema } from "./serializers";
 
 function documentObject(document: unknown): Record<string, unknown> {
@@ -160,10 +163,6 @@ function applyIdentityToUser(
     user.displayName = identity.name;
   }
 
-  if (identity.picture && user.avatarUrl !== identity.picture) {
-    user.avatarUrl = identity.picture;
-  }
-
   if (provider) {
     provider.linkedAt = new Date();
     return;
@@ -184,8 +183,16 @@ function providerConflict(message: string): AppError {
   });
 }
 
-export function serializeUser(user: UserDocument): User {
+export async function serializeUser(user: UserDocument): Promise<User> {
   const value = documentObject(user);
+  const userId = idToString(value.id ?? value._id);
+  const avatarMediaId = idToString(value.avatarMediaId);
+  let avatarUrl: string | undefined;
+  if (avatarMediaId) {
+    avatarUrl = await getMediaViewUrl(userId, avatarMediaId).catch(
+      () => undefined,
+    );
+  }
   const entitlement = isRecord(value.entitlement) ? value.entitlement : {};
   const authProviders = Array.isArray(value.authProviders)
     ? value.authProviders
@@ -200,12 +207,12 @@ export function serializeUser(user: UserDocument): User {
     notificationPreferences.aiPushCopyConsent === true;
 
   return userResponseSchema.parse({
-    id: idToString(value.id ?? value._id),
+    id: userId,
     email: optionalString(value.email),
     emailVerified: value.emailVerified === true,
     displayName: optionalString(value.displayName),
-    avatarUrl: optionalString(value.avatarUrl),
-    hasAvatar: optionalString(value.avatarKey) !== undefined,
+    avatarUrl,
+    hasAvatar: Boolean(avatarMediaId),
     authProviders: authProviders.map((provider) => {
       const providerRecord = isRecord(provider) ? provider : {};
 
@@ -283,7 +290,6 @@ export async function upsertUserFromIdentityWithResult(
     email,
     emailVerified: emailIsVerified,
     displayName: identity.name,
-    avatarUrl: identity.picture,
     authProviders: [
       {
         provider: identity.provider,
@@ -373,10 +379,6 @@ export async function updateCurrentUser(
   if ("displayName" in patch) {
     update.displayName = patch.displayName;
   }
-  if ("avatarUrl" in patch) {
-    update.avatarUrl = patch.avatarUrl;
-  }
-
   const user = await UserModel.findByIdAndUpdate(
     userId,
     { $set: update },
