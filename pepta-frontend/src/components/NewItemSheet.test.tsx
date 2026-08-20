@@ -36,6 +36,9 @@ vi.mock("../services/api", () => ({
   },
 }));
 
+const captureMock = vi.hoisted(() => ({ discardLocalCapture: vi.fn() }));
+vi.mock("../services/localCaptures", () => captureMock);
+
 vi.mock("./index", () => ({
   AppText: ({ children }: { children?: React.ReactNode }) =>
     React.createElement("AppText", null, children),
@@ -385,5 +388,77 @@ describe("photos that end up attached to nothing", () => {
       one(tree, "Add a photo").props.onPress();
     });
     await expect(hide(tree)).resolves.toBeUndefined();
+  });
+});
+
+// The device-side mirror of the media-id lifecycle above: the picker's cache
+// copy must go when nothing displays it any more — and ONLY then.
+describe("the capture file behind the preview", () => {
+  it("is deleted when a second photo replaces it", async () => {
+    const tree = await render();
+    await act(async () => {
+      one(tree, "Add a photo").props.onPress();
+    });
+    pickReturns("file:///tmp/b.jpg", MEDIA_B);
+    await act(async () => {
+      one(tree, "Change the photo").props.onPress();
+    });
+
+    expect(captureMock.discardLocalCapture).toHaveBeenCalledWith("file:///tmp/a.jpg");
+    expect(captureMock.discardLocalCapture).not.toHaveBeenCalledWith("file:///tmp/b.jpg");
+  });
+
+  it("is the FAILED pick that gets deleted when a replacement upload dies — the kept photo's file survives", async () => {
+    const tree = await render();
+    await act(async () => {
+      one(tree, "Add a photo").props.onPress();
+    });
+    picker.launchImageLibraryAsync.mockResolvedValue({
+      canceled: false,
+      assets: [{ uri: "file:///tmp/b.jpg", mimeType: "image/jpeg" }],
+    } as never);
+    apiMock.uploadMediaPhoto.mockRejectedValueOnce(new Error("network"));
+    await act(async () => {
+      one(tree, "Change the photo").props.onPress();
+    });
+
+    expect(captureMock.discardLocalCapture).toHaveBeenCalledWith("file:///tmp/b.jpg");
+    expect(captureMock.discardLocalCapture).not.toHaveBeenCalledWith("file:///tmp/a.jpg");
+  });
+
+  it("is deleted when the sheet closes unsaved", async () => {
+    const tree = await render();
+    await act(async () => {
+      one(tree, "Add a photo").props.onPress();
+    });
+    await hide(tree);
+
+    expect(captureMock.discardLocalCapture).toHaveBeenCalledWith("file:///tmp/a.jpg");
+  });
+
+  it("is deleted when the screen unmounts under the sheet", async () => {
+    const tree = await render();
+    await act(async () => {
+      one(tree, "Add a photo").props.onPress();
+    });
+    await act(async () => {
+      tree.unmount();
+    });
+
+    expect(captureMock.discardLocalCapture).toHaveBeenCalledWith("file:///tmp/a.jpg");
+  });
+
+  it("SURVIVES a save — the optimistic row in the list is still rendering it", async () => {
+    const tree = await render();
+    await fillFood(tree);
+    await act(async () => {
+      one(tree, "Add a photo").props.onPress();
+    });
+    await act(async () => {
+      saveButton(tree).props.onPress();
+    });
+    await hide(tree);
+
+    expect(captureMock.discardLocalCapture).not.toHaveBeenCalledWith("file:///tmp/a.jpg");
   });
 });

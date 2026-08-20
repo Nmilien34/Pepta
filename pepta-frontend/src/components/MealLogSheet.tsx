@@ -26,6 +26,7 @@ import {
   useAudioRecorderState,
 } from "expo-audio";
 import { File } from "expo-file-system";
+import { discardLocalCapture } from "../services/localCaptures";
 import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "../theme";
 import { AppText } from "./AppText";
@@ -152,6 +153,27 @@ export function MealLogSheet({
   const [pendingAiAction, setPendingAiAction] = useState<AiMealAction | null>(
     null,
   );
+
+  // The capture file behind `preview` (camera shot or picker cache copy).
+  // Nothing outside this sheet ever renders it — the saved log shows the
+  // server's copy — so the file's life is exactly the preview's: when the
+  // preview moves on to another URI, and when the sheet closes or unmounts,
+  // the spent file is deleted instead of sitting in the cache forever.
+  const previewFileRef = useRef<string | null>(null);
+  useEffect(() => {
+    const previous = previewFileRef.current;
+    if (previous && previous !== preview) discardLocalCapture(previous);
+    previewFileRef.current = preview;
+  }, [preview]);
+  // Deleting on `visible` flipping false would be too early: BottomSheet keeps
+  // rendering its children through a ~200ms slide-out, so the photo would be
+  // pulled out from under a frame the user is still watching. The sweep is
+  // wired to the sheet's onDismissed instead — see the BottomSheet below.
+  const discardPreviewFile = () => {
+    discardLocalCapture(previewFileRef.current);
+    previewFileRef.current = null;
+  };
+  useEffect(() => () => discardLocalCapture(previewFileRef.current), []);
 
   // Debounced food search (only while the search view is open).
   useEffect(() => {
@@ -589,6 +611,10 @@ export function MealLogSheet({
           } else if (barcodeRequested) {
             setBarcodeOpen(true);
           } else {
+            // Fully off-screen now, so the spent capture can go. Only this
+            // branch is a real dismissal — the two above are the sheet
+            // stepping aside for the camera and coming back.
+            discardPreviewFile();
             onDismissed?.();
           }
         }}
