@@ -31,9 +31,8 @@ vi.mock("expo-haptics", () => ({ selectionAsync: vi.fn(() => Promise.resolve()) 
 
 vi.mock("../services/api", () => ({
   api: {
-    createFavouritePhotoIntent: vi.fn(),
-    uploadToPresignedUrl: vi.fn(),
-    discardFavouritePhoto: vi.fn(),
+    uploadMediaPhoto: vi.fn(),
+    discardMedia: vi.fn(),
   },
 }));
 
@@ -60,6 +59,8 @@ const picker = vi.mocked(ImagePicker);
 const apiMock = vi.mocked(api);
 
 const onSave = vi.fn();
+const MEDIA_A = "507f1f77bcf86cd799439011";
+const MEDIA_B = "507f1f77bcf86cd799439012";
 
 async function render(initialKind: "food" | "drink" = "food") {
   let tree!: TestRenderer.ReactTestRenderer;
@@ -105,25 +106,22 @@ beforeEach(() => {
     canceled: false,
     assets: [{ uri: "file:///tmp/a.jpg", mimeType: "image/jpeg" }],
   } as never);
-  apiMock.createFavouritePhotoIntent.mockResolvedValue({
-    uploadUrl: "https://s3/put",
-    photoS3Key: "favourites/u1/a.jpg",
-    expiresAt: "2026-08-19T12:00:00.000Z",
+  apiMock.uploadMediaPhoto.mockResolvedValue({
+    mediaId: MEDIA_A,
+    status: "ready",
   } as never);
-  apiMock.uploadToPresignedUrl.mockResolvedValue(undefined as never);
-  apiMock.discardFavouritePhoto.mockResolvedValue(undefined as never);
+  apiMock.discardMedia.mockResolvedValue(undefined as never);
 });
 
-/** Second and later picks land on distinct keys, as the server's would. */
-function pickReturns(uri: string, key: string) {
+/** Second and later picks land on distinct media ids, as the server's would. */
+function pickReturns(uri: string, mediaId: string) {
   picker.launchImageLibraryAsync.mockResolvedValue({
     canceled: false,
     assets: [{ uri, mimeType: "image/jpeg" }],
   } as never);
-  apiMock.createFavouritePhotoIntent.mockResolvedValue({
-    uploadUrl: "https://s3/put",
-    photoS3Key: key,
-    expiresAt: "2026-08-19T12:00:00.000Z",
+  apiMock.uploadMediaPhoto.mockResolvedValue({
+    mediaId,
+    status: "ready",
   } as never);
 }
 
@@ -136,25 +134,26 @@ const hide = async (tree: TestRenderer.ReactTestRenderer) => {
 };
 
 describe("attaching a photo to an item the user typed", () => {
-  it("uploads what was picked and saves the key it came back with", async () => {
+  it("uploads what was picked and saves only the opaque media id", async () => {
     const tree = await render();
     await fillFood(tree);
     await act(async () => {
       one(tree, "Add a photo").props.onPress();
     });
 
-    expect(apiMock.uploadToPresignedUrl).toHaveBeenCalledWith(
-      "https://s3/put",
-      "file:///tmp/a.jpg",
-      "image/jpeg",
-    );
+    expect(apiMock.uploadMediaPhoto).toHaveBeenCalledWith({
+      intent: "favourite_photo",
+      uri: "file:///tmp/a.jpg",
+      contentType: "image/jpeg",
+    });
 
     await act(async () => {
       saveButton(tree).props.onPress();
     });
     expect(onSave).toHaveBeenCalledWith(
-      expect.objectContaining({ photoS3Key: "favourites/u1/a.jpg", photoUri: "file:///tmp/a.jpg" }),
+      expect.objectContaining({ photoMediaId: MEDIA_A, photoUri: "file:///tmp/a.jpg" }),
     );
+    expect(onSave.mock.calls[0]![0]).not.toHaveProperty("photoS3Key");
   });
 
   it("shows the local file immediately, without waiting on the round trip", async () => {
@@ -177,10 +176,14 @@ describe("attaching a photo to an item the user typed", () => {
     await act(async () => {
       one(tree, "Add a photo").props.onPress();
     });
-    expect(apiMock.createFavouritePhotoIntent).toHaveBeenCalledWith({ contentType: "image/png" });
+    expect(apiMock.uploadMediaPhoto).toHaveBeenCalledWith({
+      intent: "favourite_photo",
+      uri: "file:///tmp/a.png",
+      contentType: "image/png",
+    });
   });
 
-  it("falls back to JPEG for a type the bucket does not accept", async () => {
+  it("passes HEIC through for server-side normalization", async () => {
     picker.launchImageLibraryAsync.mockResolvedValue({
       canceled: false,
       assets: [{ uri: "file:///tmp/a.heic", mimeType: "image/heic" }],
@@ -189,11 +192,15 @@ describe("attaching a photo to an item the user typed", () => {
     await act(async () => {
       one(tree, "Add a photo").props.onPress();
     });
-    expect(apiMock.createFavouritePhotoIntent).toHaveBeenCalledWith({ contentType: "image/jpeg" });
+    expect(apiMock.uploadMediaPhoto).toHaveBeenCalledWith({
+      intent: "favourite_photo",
+      uri: "file:///tmp/a.heic",
+      contentType: "image/heic",
+    });
   });
 
   it("still saves the item when the upload fails, minus the photo", async () => {
-    apiMock.uploadToPresignedUrl.mockRejectedValue(new Error("network"));
+    apiMock.uploadMediaPhoto.mockRejectedValue(new Error("network"));
     const tree = await render();
     await fillFood(tree);
     await act(async () => {
@@ -205,7 +212,9 @@ describe("attaching a photo to an item the user typed", () => {
     await act(async () => {
       saveButton(tree).props.onPress();
     });
-    expect(onSave).toHaveBeenCalledWith(expect.not.objectContaining({ photoS3Key: expect.anything() }));
+    expect(onSave).toHaveBeenCalledWith(
+      expect.not.objectContaining({ photoMediaId: expect.anything() }),
+    );
   });
 
   it("says so and uploads nothing when photo access is refused", async () => {
@@ -227,7 +236,7 @@ describe("attaching a photo to an item the user typed", () => {
     await act(async () => {
       one(tree, "Add a photo").props.onPress();
     });
-    expect(apiMock.createFavouritePhotoIntent).not.toHaveBeenCalled();
+    expect(apiMock.uploadMediaPhoto).not.toHaveBeenCalled();
     expect(tree.root.findAll((n) => String(n.type) === "Image")).toHaveLength(0);
   });
 
@@ -261,13 +270,41 @@ describe("photos that end up attached to nothing", () => {
       one(tree, "Add a photo").props.onPress();
     });
 
-    pickReturns("file:///tmp/b.jpg", "favourites/u1/b.jpg");
+    pickReturns("file:///tmp/b.jpg", MEDIA_B);
     await act(async () => {
       one(tree, "Change the photo").props.onPress();
     });
 
-    expect(apiMock.discardFavouritePhoto).toHaveBeenCalledWith("favourites/u1/a.jpg");
-    expect(apiMock.discardFavouritePhoto).not.toHaveBeenCalledWith("favourites/u1/b.jpg");
+    expect(apiMock.discardMedia).toHaveBeenCalledWith(MEDIA_A);
+    expect(apiMock.discardMedia).not.toHaveBeenCalledWith(MEDIA_B);
+  });
+
+  it("keeps the previous confirmed photo when its replacement upload fails", async () => {
+    const tree = await render();
+    await fillFood(tree);
+    await act(async () => {
+      one(tree, "Add a photo").props.onPress();
+    });
+
+    picker.launchImageLibraryAsync.mockResolvedValue({
+      canceled: false,
+      assets: [{ uri: "file:///tmp/b.jpg", mimeType: "image/jpeg" }],
+    } as never);
+    apiMock.uploadMediaPhoto.mockRejectedValueOnce(new Error("network"));
+    await act(async () => {
+      one(tree, "Change the photo").props.onPress();
+    });
+
+    expect(apiMock.discardMedia).not.toHaveBeenCalledWith(MEDIA_A);
+    await act(async () => {
+      saveButton(tree).props.onPress();
+    });
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        photoMediaId: MEDIA_A,
+        photoUri: "file:///tmp/a.jpg",
+      }),
+    );
   });
 
   it("throws away the pending one when the sheet closes unsaved", async () => {
@@ -277,7 +314,7 @@ describe("photos that end up attached to nothing", () => {
     });
     await hide(tree);
 
-    expect(apiMock.discardFavouritePhoto).toHaveBeenCalledWith("favourites/u1/a.jpg");
+    expect(apiMock.discardMedia).toHaveBeenCalledWith(MEDIA_A);
   });
 
   it("keeps the photo of an item that was actually saved", async () => {
@@ -292,7 +329,7 @@ describe("photos that end up attached to nothing", () => {
     await hide(tree);
 
     expect(onSave).toHaveBeenCalled();
-    expect(apiMock.discardFavouritePhoto).not.toHaveBeenCalled();
+    expect(apiMock.discardMedia).not.toHaveBeenCalled();
   });
 
   it("throws away only the last one when several were picked and none saved", async () => {
@@ -300,15 +337,15 @@ describe("photos that end up attached to nothing", () => {
     await act(async () => {
       one(tree, "Add a photo").props.onPress();
     });
-    pickReturns("file:///tmp/b.jpg", "favourites/u1/b.jpg");
+    pickReturns("file:///tmp/b.jpg", MEDIA_B);
     await act(async () => {
       one(tree, "Change the photo").props.onPress();
     });
     await hide(tree);
 
-    expect(apiMock.discardFavouritePhoto.mock.calls.map((c) => c[0])).toEqual([
-      "favourites/u1/a.jpg",
-      "favourites/u1/b.jpg",
+    expect(apiMock.discardMedia.mock.calls.map((c) => c[0])).toEqual([
+      MEDIA_A,
+      MEDIA_B,
     ]);
   });
 
@@ -321,28 +358,28 @@ describe("photos that end up attached to nothing", () => {
       tree.unmount();
     });
 
-    expect(apiMock.discardFavouritePhoto).toHaveBeenCalledWith("favourites/u1/a.jpg");
+    expect(apiMock.discardMedia).toHaveBeenCalledWith(MEDIA_A);
   });
 
   it("discards nothing when no photo was ever picked", async () => {
     const tree = await render();
     await fillFood(tree);
     await hide(tree);
-    expect(apiMock.discardFavouritePhoto).not.toHaveBeenCalled();
+    expect(apiMock.discardMedia).not.toHaveBeenCalled();
   });
 
   it("discards nothing when the upload never landed a key", async () => {
-    apiMock.uploadToPresignedUrl.mockRejectedValue(new Error("network"));
+    apiMock.uploadMediaPhoto.mockRejectedValue(new Error("network"));
     const tree = await render();
     await act(async () => {
       one(tree, "Add a photo").props.onPress();
     });
     await hide(tree);
-    expect(apiMock.discardFavouritePhoto).not.toHaveBeenCalled();
+    expect(apiMock.discardMedia).not.toHaveBeenCalled();
   });
 
   it("survives a cleanup that fails — it is housekeeping, not the user's problem", async () => {
-    apiMock.discardFavouritePhoto.mockRejectedValue(new Error("s3 down"));
+    apiMock.discardMedia.mockRejectedValue(new Error("s3 down"));
     const tree = await render();
     await act(async () => {
       one(tree, "Add a photo").props.onPress();

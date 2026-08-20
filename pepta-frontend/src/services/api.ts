@@ -40,6 +40,11 @@ import {
   mealTranscriptResponseSchema,
   mealTranscriptionInputSchema,
   mealVoiceInputSchema,
+  mediaConfirmInputSchema,
+  mediaDiscardInputSchema,
+  mediaReadyResponseSchema,
+  mediaUploadIntentInputSchema,
+  mediaUploadIntentResponseSchema,
   measurementInputSchema,
   measurementResponseSchema,
   notificationPreferencesPatchSchema,
@@ -93,14 +98,11 @@ import {
   type HomeResponse,
   type DiscoverySource,
   type UserProfileSettingsPatch,
-  favouritePhotoIntentResponseSchema,
   medicationLevelsResponseSchema,
   uiPreferencesResponseSchema,
   favouriteResponseSchema,
   favouritesResponseSchema,
   type FavouriteInput,
-  type FavouritePhotoIntentInput,
-  type FavouritePhotoIntentResponse,
   type LevelRangeKey,
   type MedicationLevelsResponse,
   type UiPreferencesInput,
@@ -127,6 +129,12 @@ import {
   type MealTranscriptResponse,
   type MealTranscriptionInput,
   type MealVoiceInput,
+  type MediaConfirmInput,
+  type MediaContentType,
+  type MediaIntent,
+  type MediaReadyResponse,
+  type MediaUploadIntentInput,
+  type MediaUploadIntentResponse,
   type MeasurementInput,
   type MeasurementResponse,
   type NotificationPreferencesPatch,
@@ -665,22 +673,54 @@ class PeptaApi {
     });
   }
 
-  /** Step 1 of the favourite-photo upload: somewhere to PUT the bytes. */
-  public createFavouritePhotoIntent(
-    input: FavouritePhotoIntentInput,
-  ): Promise<FavouritePhotoIntentResponse> {
-    return this.request("/favourites/photo-intent", favouritePhotoIntentResponseSchema, {
+  public createMediaUploadIntent(
+    input: MediaUploadIntentInput,
+  ): Promise<MediaUploadIntentResponse> {
+    return this.request("/media/upload-intent", mediaUploadIntentResponseSchema, {
       method: "POST",
-      body: JSON.stringify(input),
+      body: JSON.stringify(mediaUploadIntentInputSchema.parse(input)),
     });
   }
 
-  /** Throws away a photo that was uploaded and then never attached. */
-  public discardFavouritePhoto(photoS3Key: string): Promise<unknown> {
-    return this.request("/favourites/photo-discard", z.unknown(), {
+  public confirmMedia(input: MediaConfirmInput): Promise<MediaReadyResponse> {
+    return this.request("/media/confirm", mediaReadyResponseSchema, {
       method: "POST",
-      body: JSON.stringify({ photoS3Key }),
+      body: JSON.stringify(mediaConfirmInputSchema.parse(input)),
     });
+  }
+
+  public discardMedia(mediaId: string): Promise<unknown> {
+    return this.request("/media/discard", z.unknown(), {
+      method: "POST",
+      body: JSON.stringify(mediaDiscardInputSchema.parse({ mediaId })),
+    });
+  }
+
+  public async uploadMediaPhoto(input: {
+    intent: MediaIntent;
+    uri: string;
+    contentType: MediaContentType;
+  }): Promise<MediaReadyResponse> {
+    const local = await fetch(input.uri);
+    const blob = await local.blob();
+    const intent = await this.createMediaUploadIntent({
+      intent: input.intent,
+      contentType: input.contentType,
+      sizeBytes: blob.size,
+    });
+    const form = new FormData();
+    for (const [key, value] of Object.entries(intent.fields)) {
+      form.append(key, value);
+    }
+    form.append("file", blob, "upload");
+    const uploaded = await fetch(intent.uploadUrl, {
+      method: "POST",
+      body: form,
+    });
+    if (!uploaded.ok) {
+      throw new Error(`Photo upload failed: ${uploaded.status}`);
+    }
+    return this.confirmMedia({ mediaId: intent.mediaId });
   }
 
   /**

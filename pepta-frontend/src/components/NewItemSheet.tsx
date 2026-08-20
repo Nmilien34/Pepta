@@ -46,11 +46,11 @@ export function NewItemSheet({ visible, initialKind, onCancel, onSave }: NewItem
   const [calories, setCalories] = useState('');
   const [ounces, setOunces] = useState('');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
-  const [photoS3Key, setPhotoS3Key] = useState<string | null>(null);
+  const [photoMediaId, setPhotoMediaId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [photoError, setPhotoError] = useState('');
   /**
-   * The uploaded key nothing points at yet. A ref, not state, because the
+   * The uploaded media id nothing points at yet. A ref, not state, because the
    * cleanup below has to read it at the moment the sheet closes — a stale
    * closure would strand exactly the photo it is there to collect.
    */
@@ -61,8 +61,8 @@ export function NewItemSheet({ visible, initialKind, onCancel, onSave }: NewItem
    * leaves one stray file, and there is nothing useful to tell the user about
    * a photo they had already walked away from.
    */
-  const discard = (key: string | null) => {
-    if (key) void api.discardFavouritePhoto(key).catch(() => undefined);
+  const discard = (mediaId: string | null) => {
+    if (mediaId) void api.discardMedia(mediaId).catch(() => undefined);
   };
 
   // Cleared on every open, or the next item starts as a copy of the last.
@@ -85,7 +85,7 @@ export function NewItemSheet({ visible, initialKind, onCancel, onSave }: NewItem
     setCalories('');
     setOunces('');
     setPhotoUri(null);
-    setPhotoS3Key(null);
+    setPhotoMediaId(null);
     setUploading(false);
     setPhotoError('');
   }, [visible, initialKind]);
@@ -96,13 +96,16 @@ export function NewItemSheet({ visible, initialKind, onCancel, onSave }: NewItem
   useEffect(() => () => discard(pending.current), []);
 
   /**
-   * Picks, then uploads to a presigned URL. The local URI is shown the moment
+   * Picks, then uploads through the opaque media API. The local URI is shown the moment
    * it is chosen — waiting on a round trip to show a photo the user is already
-   * looking at feels broken — and the key it resolves to is what gets saved.
+   * looking at feels broken — and the media id it resolves to is what gets saved.
    */
   const pickPhoto = async () => {
+    if (uploading) return;
     Haptics.selectionAsync().catch(() => undefined);
     setPhotoError('');
+    const previousUri = photoUri;
+    const previousMediaId = pending.current;
     try {
       const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!perm.granted) {
@@ -115,19 +118,27 @@ export function NewItemSheet({ visible, initialKind, onCancel, onSave }: NewItem
       setPhotoUri(asset.uri);
       setUploading(true);
       const contentType =
-        asset.mimeType === 'image/png' || asset.mimeType === 'image/webp' ? asset.mimeType : 'image/jpeg';
-      const intent = await api.createFavouritePhotoIntent({ contentType });
-      await api.uploadToPresignedUrl(intent.uploadUrl, asset.uri, contentType);
+        asset.mimeType === 'image/png' ||
+        asset.mimeType === 'image/webp' ||
+        asset.mimeType === 'image/heic'
+          ? asset.mimeType
+          : 'image/jpeg';
+      const ready = await api.uploadMediaPhoto({
+        intent: 'favourite_photo',
+        uri: asset.uri,
+        contentType,
+      });
       // The one this replaces is now referenced by nothing. Fire and forget:
       // it is housekeeping, and the photo they just picked is what matters.
-      discard(pending.current);
-      pending.current = intent.photoS3Key;
-      setPhotoS3Key(intent.photoS3Key);
+      discard(previousMediaId);
+      pending.current = ready.mediaId;
+      setPhotoMediaId(ready.mediaId);
     } catch {
       // The item is still saveable — the photo is the optional part, and
       // losing what they typed because an upload failed would be the worse
       // outcome.
-      setPhotoS3Key(null);
+      setPhotoUri(previousMediaId ? previousUri : null);
+      setPhotoMediaId(previousMediaId);
       setPhotoError('That photo did not upload. You can save without it, or try another.');
     } finally {
       setUploading(false);
@@ -140,7 +151,7 @@ export function NewItemSheet({ visible, initialKind, onCancel, onSave }: NewItem
     kind,
     name,
     portion,
-    ...(photoS3Key ? { photoS3Key, photoUri: photoUri ?? undefined } : {}),
+    ...(photoMediaId ? { photoMediaId, photoUri: photoUri ?? undefined } : {}),
     ...(kind === 'drink'
       ? { ounces: num(ounces) }
       : { protein: num(protein), calories: num(calories) }),

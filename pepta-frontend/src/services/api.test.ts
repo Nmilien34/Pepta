@@ -507,3 +507,85 @@ describe("PeptaApi notification preferences", () => {
     );
   });
 });
+
+describe("PeptaApi opaque media uploads", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    api.setAuthToken(null);
+  });
+
+  it("posts the measured file through the supplied policy and confirms its media id", async () => {
+    const mediaId = "507f1f77bcf86cd799439011";
+    const fileBytes = new Blob(["photo"], { type: "image/jpeg" });
+    const fetchMock = vi.fn(async (url: string, _init?: RequestInit) => {
+      if (url === "file:///photo.jpg") {
+        return new Response(fileBytes, { status: 200 });
+      }
+      if (url.endsWith("/media/upload-intent")) {
+        return new Response(
+          JSON.stringify({
+            data: {
+              mediaId,
+              uploadUrl: "https://bucket.example",
+              fields: {
+                key: "generated-staging-key",
+                "x-amz-server-side-encryption": "AES256",
+              },
+              expiresAt: "2026-08-19T12:10:00.000Z",
+            },
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      }
+      if (url === "https://bucket.example") {
+        return new Response(null, { status: 204 });
+      }
+      if (url.endsWith("/media/confirm")) {
+        return new Response(
+          JSON.stringify({ data: { mediaId, status: "ready" } }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      api.uploadMediaPhoto({
+        intent: "favourite_photo",
+        uri: "file:///photo.jpg",
+        contentType: "image/jpeg",
+      }),
+    ).resolves.toEqual({ mediaId, status: "ready" });
+
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      "file:///photo.jpg",
+      "http://localhost:8080/media/upload-intent",
+      "https://bucket.example",
+      "http://localhost:8080/media/confirm",
+    ]);
+    expect(fetchMock.mock.calls[1]![1]).toEqual(
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          intent: "favourite_photo",
+          contentType: "image/jpeg",
+          sizeBytes: fileBytes.size,
+        }),
+      }),
+    );
+    const upload = fetchMock.mock.calls[2]![1]!;
+    expect(upload.method).toBe("POST");
+    expect(upload.body).toBeInstanceOf(FormData);
+    const form = upload.body as FormData;
+    expect(form.get("key")).toBe("generated-staging-key");
+    expect(form.get("x-amz-server-side-encryption")).toBe("AES256");
+    expect(form.get("file")).toBeInstanceOf(Blob);
+    expect(fetchMock.mock.calls[3]![1]).toEqual(
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ mediaId }),
+      }),
+    );
+  });
+});
