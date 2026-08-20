@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   find: vi.fn(),
   findOne: vi.fn(),
   findOneAndDelete: vi.fn(),
+  deleteOne: vi.fn(),
   create: vi.fn(),
   getMediaViewUrl: vi.fn(),
   validateAttachableMedia: vi.fn(),
@@ -16,6 +17,7 @@ vi.mock("../../models/recipe.model", () => ({
     find: mocks.find,
     findOne: mocks.findOne,
     findOneAndDelete: mocks.findOneAndDelete,
+    deleteOne: mocks.deleteOne,
     create: mocks.create,
   },
 }));
@@ -57,6 +59,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.findOne.mockReturnValue({ exec: vi.fn().mockResolvedValue(null) });
   mocks.findOneAndDelete.mockReturnValue({ exec: vi.fn().mockResolvedValue(null) });
+  mocks.deleteOne.mockReturnValue({ exec: vi.fn().mockResolvedValue({ deletedCount: 1 }) });
   mocks.validateAttachableMedia.mockResolvedValue({});
   mocks.attachMedia.mockResolvedValue(undefined);
   mocks.detachMedia.mockResolvedValue(undefined);
@@ -206,29 +209,55 @@ describe("getRecipe", () => {
 });
 
 describe("deleteRecipe", () => {
-  it("only deletes a recipe this user owns", async () => {
-    mocks.findOneAndDelete.mockReturnValue({
+  it("only deletes a recipe this user owns, detaching the media FIRST", async () => {
+    const order: string[] = [];
+    mocks.findOne.mockReturnValue({
       exec: vi
         .fn()
         .mockResolvedValue(doc({ photoMediaId: { toString: () => MEDIA } })),
     });
+    mocks.detachMedia.mockImplementation(async () => void order.push("detach"));
+    mocks.deleteOne.mockImplementation(() => {
+      order.push("delete");
+      return { exec: vi.fn().mockResolvedValue({ deletedCount: 1 }) };
+    });
+
     await deleteRecipe(USER, "507f1f77bcf86cd799439012");
-    const filter = mocks.findOneAndDelete.mock.calls[0]![0];
+
+    const filter = mocks.findOne.mock.calls[0]![0];
     expect(String(filter.userId)).toBe(USER);
     expect(mocks.detachMedia).toHaveBeenCalledWith(USER, MEDIA, {
       kind: "recipe",
       resourceId: "r1",
     });
+    // Detach-before-delete: a crash between the two must leave a retryable
+    // recipe, never a stranded S3 object.
+    expect(order).toEqual(["detach", "delete"]);
+  });
+
+  it("keeps the recipe when the detach fails", async () => {
+    mocks.findOne.mockReturnValue({
+      exec: vi
+        .fn()
+        .mockResolvedValue(doc({ photoMediaId: { toString: () => MEDIA } })),
+    });
+    mocks.detachMedia.mockRejectedValue(new Error("mongo down"));
+
+    await expect(deleteRecipe(USER, "507f1f77bcf86cd799439012")).rejects.toThrow(
+      "mongo down",
+    );
+    expect(mocks.deleteOne).not.toHaveBeenCalled();
   });
 
   it("refuses a starter rather than removing a row everybody reads", async () => {
-    // A starter has no userId, so the scoped delete matches nothing.
+    // A starter has no userId, so the scoped lookup matches nothing.
     await expect(deleteRecipe(USER, "507f1f77bcf86cd799439012")).rejects.toThrow(/not found/i);
+    expect(mocks.deleteOne).not.toHaveBeenCalled();
   });
 
   it("rejects a malformed id instead of throwing a cast error", async () => {
     await expect(deleteRecipe(USER, "nope")).rejects.toThrow(/not found/i);
-    expect(mocks.findOneAndDelete).not.toHaveBeenCalled();
+    expect(mocks.findOne).not.toHaveBeenCalled();
   });
 });
 

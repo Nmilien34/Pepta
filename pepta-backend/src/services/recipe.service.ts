@@ -126,17 +126,36 @@ export async function createRecipe(
   return signedResponse(userId, doc);
 }
 
-/** Deletes only a recipe this user owns — starters belong to everybody. */
+/**
+ * Deletes only a recipe this user owns — starters belong to everybody.
+ *
+ * Detach BEFORE delete, same reasoning as removeFavourite: the reverse order
+ * can strand the photo's asset (row gone, link left) if the process dies in
+ * between. Detach-first is retryable because detachMedia is idempotent.
+ */
 export async function deleteRecipe(userId: string, id: string): Promise<void> {
   if (!Types.ObjectId.isValid(id)) throw new NotFoundError("Recipe not found");
-  const removed = await RecipeModel.findOneAndDelete({
+  const owner = new Types.ObjectId(userId);
+  const doc = await RecipeModel.findOne({
     _id: new Types.ObjectId(id),
-    userId: new Types.ObjectId(userId),
+    userId: owner,
   }).exec();
-  if (!removed) throw new NotFoundError("Recipe not found");
-  if (!removed.photoMediaId) return;
-  await detachMedia(userId, removed.photoMediaId.toString(), {
-    kind: "recipe",
-    resourceId: removed._id.toString(),
-  });
+  if (!doc) throw new NotFoundError("Recipe not found");
+
+  if (doc.photoMediaId) {
+    await detachMedia(userId, doc.photoMediaId.toString(), {
+      kind: "recipe",
+      resourceId: doc._id.toString(),
+    });
+  }
+
+  // Guarded on the detached photo so a concurrent photo swap can't have its
+  // fresh link stranded by this delete; the no-op miss is the safe side.
+  await RecipeModel.deleteOne({
+    _id: doc._id,
+    userId: owner,
+    ...(doc.photoMediaId
+      ? { photoMediaId: doc.photoMediaId }
+      : { photoMediaId: { $exists: false } }),
+  }).exec();
 }

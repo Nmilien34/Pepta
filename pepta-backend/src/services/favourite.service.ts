@@ -153,16 +153,38 @@ export async function saveFavourite(
   return toResponse(saved, await photoUrlFor(userId, saved));
 }
 
-/** Idempotent: removing something already gone is not an error. */
+/**
+ * Idempotent: removing something already gone is not an error.
+ *
+ * Detach BEFORE delete. The other order has a stranding window: row deleted,
+ * then a crash before detach leaves the asset linked to a resource that no
+ * longer exists — never unattached, never reaped, object orphaned in S3.
+ * This order fails safe: a crash after detach leaves the favourite visible
+ * (retryable, and detachMedia is idempotent under that retry).
+ */
 export async function removeFavourite(userId: string, key: string): Promise<void> {
-  const removed = (await FavouriteModel.findOneAndDelete({
-    userId: new Types.ObjectId(userId),
+  const owner = new Types.ObjectId(userId);
+  const doc = (await FavouriteModel.findOne({
+    userId: owner,
     key,
   }).exec()) as FavouriteDocument | null;
-  if (!removed?.photoMediaId) return;
+  if (!doc) return;
 
-  await detachMedia(userId, removed.photoMediaId.toString(), {
-    kind: "favourite",
-    resourceId: removed._id.toString(),
-  });
+  if (doc.photoMediaId) {
+    await detachMedia(userId, doc.photoMediaId.toString(), {
+      kind: "favourite",
+      resourceId: doc._id.toString(),
+    });
+  }
+
+  // Guard on the photo we just detached: if a concurrent save swapped in a
+  // new photo between the read and here, deleting the row would strand the
+  // NEW photo's link. Missing the delete (a no-op) is the safe side.
+  await FavouriteModel.deleteOne({
+    _id: doc._id,
+    userId: owner,
+    ...(doc.photoMediaId
+      ? { photoMediaId: doc.photoMediaId }
+      : { photoMediaId: { $exists: false } }),
+  }).exec();
 }

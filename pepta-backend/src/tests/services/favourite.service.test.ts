@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   findOne: vi.fn(),
   findOneAndUpdate: vi.fn(),
   findOneAndDelete: vi.fn(),
+  deleteOne: vi.fn(),
   validateAttachableMedia: vi.fn(),
   attachMedia: vi.fn(),
   detachMedia: vi.fn(),
@@ -24,6 +25,7 @@ vi.mock("../../models/favourite.model", () => ({
     findOne: mocks.findOne,
     findOneAndUpdate: mocks.findOneAndUpdate,
     findOneAndDelete: mocks.findOneAndDelete,
+    deleteOne: mocks.deleteOne,
   },
 }));
 
@@ -45,6 +47,7 @@ beforeEach(() => {
   mocks.findOne.mockReset().mockReturnValue({ exec: vi.fn().mockResolvedValue(null) });
   mocks.findOneAndUpdate.mockReset();
   mocks.findOneAndDelete.mockReset().mockReturnValue({ exec: vi.fn().mockResolvedValue(null) });
+  mocks.deleteOne.mockReset().mockReturnValue({ exec: vi.fn().mockResolvedValue({ deletedCount: 1 }) });
   mocks.validateAttachableMedia.mockReset().mockResolvedValue({ _id: MEDIA });
   mocks.attachMedia.mockReset().mockResolvedValue(undefined);
   mocks.detachMedia.mockReset().mockResolvedValue(undefined);
@@ -164,25 +167,33 @@ describe("saveFavourite", () => {
 });
 
 describe("removeFavourite", () => {
-  it("deletes by key for that user only", async () => {
-    mocks.findOneAndDelete.mockReturnValue({ exec: vi.fn().mockResolvedValue(doc()) });
+  it("looks up by key for that user only, then deletes that row", async () => {
+    mocks.findOne.mockReturnValue({ exec: vi.fn().mockResolvedValue(doc()) });
 
     await removeFavourite(USER, "food:chicken-breast:6-oz");
 
-    const filter = mocks.findOneAndDelete.mock.calls[0]![0];
+    const filter = mocks.findOne.mock.calls[0]![0];
     expect(filter.key).toBe("food:chicken-breast:6-oz");
     expect(String(filter.userId)).toBe(USER);
+    expect(mocks.deleteOne).toHaveBeenCalledTimes(1);
   });
 
   it("is idempotent — removing something already gone is not an error", async () => {
-    mocks.findOneAndDelete.mockReturnValue({ exec: vi.fn().mockResolvedValue(null) });
+    mocks.findOne.mockReturnValue({ exec: vi.fn().mockResolvedValue(null) });
     await expect(removeFavourite(USER, "nope")).resolves.toBeUndefined();
     expect(mocks.detachMedia).not.toHaveBeenCalled();
+    expect(mocks.deleteOne).not.toHaveBeenCalled();
   });
 
-  it("detaches the removed favourite from its owned media", async () => {
-    mocks.findOneAndDelete.mockReturnValue({
+  it("detaches the media BEFORE deleting the row, so a crash between the two leaves a retryable favourite instead of a stranded S3 object", async () => {
+    const order: string[] = [];
+    mocks.findOne.mockReturnValue({
       exec: vi.fn().mockResolvedValue(doc({ photoMediaId: MEDIA })),
+    });
+    mocks.detachMedia.mockImplementation(async () => void order.push("detach"));
+    mocks.deleteOne.mockImplementation(() => {
+      order.push("delete");
+      return { exec: vi.fn().mockResolvedValue({ deletedCount: 1 }) };
     });
 
     await removeFavourite(USER, "food:chicken-breast:6-oz");
@@ -191,12 +202,39 @@ describe("removeFavourite", () => {
       kind: "favourite",
       resourceId: "row1",
     });
+    expect(order).toEqual(["detach", "delete"]);
+  });
+
+  it("keeps the row when the detach fails — nothing is deleted ahead of its cleanup authority", async () => {
+    mocks.findOne.mockReturnValue({
+      exec: vi.fn().mockResolvedValue(doc({ photoMediaId: MEDIA })),
+    });
+    mocks.detachMedia.mockRejectedValue(new Error("mongo down"));
+
+    await expect(removeFavourite(USER, "food:chicken-breast:6-oz")).rejects.toThrow(
+      "mongo down",
+    );
+    expect(mocks.deleteOne).not.toHaveBeenCalled();
+  });
+
+  it("guards the delete on the photo it detached, so a concurrent photo swap is not stranded", async () => {
+    mocks.findOne.mockReturnValue({
+      exec: vi.fn().mockResolvedValue(doc({ photoMediaId: MEDIA })),
+    });
+
+    await removeFavourite(USER, "food:chicken-breast:6-oz");
+
+    expect(mocks.deleteOne.mock.calls[0]![0]).toMatchObject({ photoMediaId: MEDIA });
   });
 
   it("detaches nothing for an item that never had a photo", async () => {
-    mocks.findOneAndDelete.mockReturnValue({ exec: vi.fn().mockResolvedValue(doc()) });
+    mocks.findOne.mockReturnValue({ exec: vi.fn().mockResolvedValue(doc()) });
     await removeFavourite(USER, "food:chicken-breast:6-oz");
     expect(mocks.detachMedia).not.toHaveBeenCalled();
+    // …and the delete then only matches a row that still has no photo.
+    expect(mocks.deleteOne.mock.calls[0]![0]).toMatchObject({
+      photoMediaId: { $exists: false },
+    });
   });
 });
 
