@@ -28,6 +28,7 @@ const PENDING_UPLOAD_LIMIT = 20;
 const PENDING_BYTES_LIMIT = 100 * MIB;
 const PENDING_TTL_MS = 60 * 60 * 1000;
 const UNATTACHED_TTL_MS = 24 * 60 * 60 * 1000;
+const UNATTACHED_MEAL_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_PIXELS = 24_000_000;
 
 const INTENT_LIMITS: Record<
@@ -167,7 +168,12 @@ export async function confirmMediaUpload(
 
   const processing = await MediaAssetModel.findOneAndUpdate(
     { _id: mediaId, userId: ownerId, status: "pending_upload" },
-    { $set: { status: "processing" }, $unset: { expiresAt: 1 } },
+    {
+      $set: {
+        status: "processing",
+        expiresAt: new Date(now.getTime() + PENDING_TTL_MS),
+      },
+    },
     { new: true, runValidators: true },
   );
   if (!processing?.stagingKey) {
@@ -244,6 +250,87 @@ export async function confirmMediaUpload(
       },
       { new: true },
     );
+    throw error;
+  }
+}
+
+export async function persistMealScanMedia(
+  userId: string,
+  input: {
+    bytes: Uint8Array;
+    contentType: "image/jpeg" | "image/png" | "image/webp";
+  },
+) {
+  const now = new Date();
+  const ownerId = asObjectId(userId);
+  const limits = INTENT_LIMITS.meal_photo;
+  if (input.bytes.byteLength === 0) {
+    throw new ValidationError("Invalid image");
+  }
+  if (input.bytes.byteLength > limits.maxBytes) {
+    throw new ValidationError("Image is too large");
+  }
+
+  await assertPendingQuota(ownerId, input.bytes.byteLength, now);
+
+  const mediaId = new Types.ObjectId();
+  const storageKey = `pepta/media/${ownerId.toString()}/${mediaId.toString()}.jpg`;
+  await MediaAssetModel.create({
+    _id: mediaId,
+    userId: ownerId,
+    source: "meal_scan",
+    intent: "meal_photo",
+    status: "processing",
+    declaredContentType: input.contentType,
+    declaredSizeBytes: input.bytes.byteLength,
+    links: [],
+    expiresAt: new Date(now.getTime() + PENDING_TTL_MS),
+  });
+
+  try {
+    const normalized = await normalizeImage(input.bytes, {
+      maxBytes: limits.maxBytes,
+      maxEdge: limits.maxEdge,
+      maxPixels: MAX_PIXELS,
+    });
+    await putS3Object({
+      key: storageKey,
+      body: normalized.bytes,
+      contentType: normalized.contentType,
+    });
+    const ready = await MediaAssetModel.findOneAndUpdate(
+      { _id: mediaId, userId: ownerId, status: "processing" },
+      {
+        $set: {
+          status: "ready",
+          storageKey,
+          contentType: normalized.contentType,
+          byteSize: normalized.bytes.byteLength,
+          width: normalized.width,
+          height: normalized.height,
+          expiresAt: new Date(now.getTime() + UNATTACHED_MEAL_TTL_MS),
+        },
+        $unset: {
+          deleteLeaseUntil: 1,
+          lastDeleteErrorCode: 1,
+          nextDeleteAttemptAt: 1,
+        },
+      },
+      { new: true, runValidators: true },
+    );
+    if (!ready) {
+      throw new InternalError("Meal photo could not be persisted");
+    }
+    return readyResponse(ready);
+  } catch (error) {
+    await MediaAssetModel.findOneAndUpdate(
+      { _id: mediaId, userId: ownerId, status: "processing" },
+      {
+        $set: { status: "deletion_pending", nextDeleteAttemptAt: now },
+        $unset: { expiresAt: 1, deleteLeaseUntil: 1 },
+      },
+      { new: true },
+    ).catch(() => undefined);
     throw error;
   }
 }

@@ -55,14 +55,14 @@ beforeEach(() => {
 });
 
 describe("media expiry", () => {
-  it("moves abandoned pending and ready assets into the durable deletion queue", async () => {
+  it("moves abandoned pending, processing, and ready assets into the durable deletion queue", async () => {
     mocks.updateMany.mockResolvedValue({ modifiedCount: 3 });
 
     await expect(queueExpiredMedia(NOW)).resolves.toBe(3);
 
     expect(mocks.updateMany).toHaveBeenCalledWith(
       {
-        status: { $in: ["pending_upload", "ready"] },
+        status: { $in: ["pending_upload", "processing", "ready"] },
         expiresAt: { $lte: NOW },
         links: { $size: 0 },
       },

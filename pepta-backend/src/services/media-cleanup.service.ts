@@ -123,7 +123,7 @@ async function deletePendingAsset(
 export async function queueExpiredMedia(now = new Date()): Promise<number> {
   const result = await MediaAssetModel.updateMany(
     {
-      status: { $in: ["pending_upload", "ready"] },
+      status: { $in: ["pending_upload", "processing", "ready"] },
       expiresAt: { $lte: now },
       links: { $size: 0 },
     },

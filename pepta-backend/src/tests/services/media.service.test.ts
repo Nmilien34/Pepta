@@ -48,6 +48,7 @@ import {
   detachMedia,
   discardMedia,
   getMediaViewUrl,
+  persistMealScanMedia,
   queueAllUserMediaForDeletion,
   validateAttachableMedia,
 } from "../../services/media.service";
@@ -252,6 +253,90 @@ describe("media confirmation", () => {
     expect(mocks.findOneAndUpdate.mock.calls.at(-1)?.[1]).toMatchObject({
       $set: expect.objectContaining({ status: "deletion_pending" }),
     });
+  });
+});
+
+describe("server-ingested meal media", () => {
+  it("creates a recoverable processing row before writing a canonical photo and retains it for seven days", async () => {
+    mocks.findOneAndUpdate.mockImplementationOnce(
+      async (
+        filter: { _id: { toString(): string } },
+        update: { $set?: Record<string, unknown> },
+      ) =>
+        asset({
+          _id: { toString: () => filter._id.toString() },
+          source: "meal_scan",
+          intent: "meal_photo",
+          status: "ready",
+          stagingKey: undefined,
+          ...update.$set,
+        }),
+    );
+
+    const result = await persistMealScanMedia(USER, {
+      bytes: UPLOAD_BYTES,
+      contentType: "image/png",
+    });
+
+    const created = mocks.create.mock.calls[0]![0] as Record<string, unknown>;
+    const mediaId = String(created._id);
+    expect(result).toEqual({ mediaId, status: "ready" });
+    expect(created).toMatchObject({
+      userId: expect.anything(),
+      source: "meal_scan",
+      intent: "meal_photo",
+      status: "processing",
+      declaredContentType: "image/png",
+      declaredSizeBytes: 2048,
+      links: [],
+      expiresAt: new Date("2026-08-19T13:00:00.000Z"),
+    });
+    expect(mocks.create.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.putS3Object.mock.invocationCallOrder[0]!,
+    );
+    expect(mocks.normalizeImage).toHaveBeenCalledWith(UPLOAD_BYTES, {
+      maxBytes: 10 * 1024 * 1024,
+      maxEdge: 2048,
+      maxPixels: 24_000_000,
+    });
+    expect(mocks.putS3Object).toHaveBeenCalledWith({
+      key: `pepta/media/${USER}/${mediaId}.jpg`,
+      body: Uint8Array.of(4, 5, 6),
+      contentType: "image/jpeg",
+    });
+    expect(mocks.findOneAndUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "processing" }),
+      expect.objectContaining({
+        $set: expect.objectContaining({
+          status: "ready",
+          expiresAt: new Date("2026-08-26T12:00:00.000Z"),
+        }),
+      }),
+      { new: true, runValidators: true },
+    );
+  });
+
+  it("queues canonical cleanup when an ingest write fails", async () => {
+    const storageError = new Error("S3 unavailable");
+    mocks.putS3Object.mockRejectedValueOnce(storageError);
+    mocks.findOneAndUpdate.mockResolvedValueOnce(
+      asset({ source: "meal_scan", status: "deletion_pending" }),
+    );
+
+    await expect(
+      persistMealScanMedia(USER, {
+        bytes: UPLOAD_BYTES,
+        contentType: "image/png",
+      }),
+    ).rejects.toBe(storageError);
+
+    expect(mocks.findOneAndUpdate).toHaveBeenLastCalledWith(
+      expect.objectContaining({ status: "processing" }),
+      expect.objectContaining({
+        $set: { status: "deletion_pending", nextDeleteAttemptAt: NOW },
+      }),
+      { new: true },
+    );
   });
 });
 
