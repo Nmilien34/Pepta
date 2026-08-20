@@ -11,6 +11,7 @@ import {
 import type { DiscoverySource } from "@pepta/shared";
 import type { ProviderIdentity } from "../auth/google";
 import { AppError, NotFoundError } from "../lib/errors";
+import { logger } from "../lib/logger";
 import { prepareComplimentaryCleanupForDeletion } from "./complimentary-access-cleanup.service";
 import { computeProfileTargets } from "../lib/profile-targets";
 import {
@@ -49,6 +50,7 @@ import {
   queueAllUserMediaForDeletion,
 } from "./media.service";
 import { serializeWithSchema } from "./serializers";
+import { refreshGoogleAvatar } from "./provider-avatar.service";
 
 function documentObject(document: unknown): Record<string, unknown> {
   if (document && typeof document === "object") {
@@ -255,6 +257,25 @@ interface UpsertUserFromIdentityResult {
   isNewUser: boolean;
 }
 
+async function refreshTrustedProviderAvatar(
+  user: UserDocument,
+  identity: ProviderIdentity,
+): Promise<void> {
+  if (identity.provider !== "google" || !identity.picture) return;
+  try {
+    await refreshGoogleAvatar(user, identity.picture);
+  } catch (error) {
+    logger.warn(
+      {
+        userId: user._id.toString(),
+        provider: identity.provider,
+        errorName: error instanceof Error ? error.name : "UnknownError",
+      },
+      "[auth] provider avatar refresh failed",
+    );
+  }
+}
+
 export async function upsertUserFromIdentityWithResult(
   identity: ProviderIdentity,
 ): Promise<UpsertUserFromIdentityResult> {
@@ -270,6 +291,7 @@ export async function upsertUserFromIdentityWithResult(
   if (existingByProvider) {
     applyIdentityToUser(existingByProvider, identity);
     await existingByProvider.save();
+    await refreshTrustedProviderAvatar(existingByProvider, identity);
     return { user: existingByProvider, isNewUser: false };
   }
 
@@ -283,6 +305,7 @@ export async function upsertUserFromIdentityWithResult(
   if (existingByEmail) {
     applyIdentityToUser(existingByEmail, identity);
     await existingByEmail.save();
+    await refreshTrustedProviderAvatar(existingByEmail, identity);
     return { user: existingByEmail, isNewUser: false };
   }
 
@@ -304,6 +327,8 @@ export async function upsertUserFromIdentityWithResult(
     },
     onboardingComplete: false,
   });
+
+  await refreshTrustedProviderAvatar(user, identity);
 
   return { user, isNewUser: true };
 }
@@ -353,6 +378,7 @@ export async function linkProviderIdentityToUser(
 
   applyIdentityToUser(user, identity);
   await user.save();
+  await refreshTrustedProviderAvatar(user, identity);
   return user;
 }
 

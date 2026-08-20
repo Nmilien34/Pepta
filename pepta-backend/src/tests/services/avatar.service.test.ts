@@ -85,7 +85,7 @@ describe("avatar service", () => {
     expect(mocks.attachMedia.mock.invocationCallOrder[0]).toBeLessThan(
       mocks.detachMedia.mock.invocationCallOrder[0]!,
     );
-    expect(result.avatarMediaId.toString()).toBe(MEDIA);
+    expect(result.avatarMediaId?.toString()).toBe(MEDIA);
   });
 
   it("detaches the new media when the conditional user update loses a race", async () => {

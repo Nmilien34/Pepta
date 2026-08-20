@@ -37,9 +37,12 @@ const mocks = vi.hoisted(() => ({
   profileFindOne: vi.fn(),
   profileFindOneAndUpdate: vi.fn(),
   progressPhotoFind: vi.fn(),
+  refreshGoogleAvatar: vi.fn(),
+  userCreate: vi.fn(),
   userDeleteOne: vi.fn(),
   userFindById: vi.fn(),
   userFindByIdAndUpdate: vi.fn(),
+  userFindOne: vi.fn(),
 }));
 
 vi.mock("../../models", () => ({
@@ -86,9 +89,11 @@ vi.mock("../../models", () => ({
     deleteMany: mocks.modelDeleteMany.SideEffectLogModel,
   },
   UserModel: {
+    create: mocks.userCreate,
     deleteOne: mocks.userDeleteOne,
     findById: mocks.userFindById,
     findByIdAndUpdate: mocks.userFindByIdAndUpdate,
+    findOne: mocks.userFindOne,
   },
   UserProfileModel: {
     deleteMany: mocks.modelDeleteMany.UserProfileModel,
@@ -117,9 +122,14 @@ vi.mock("../../services/media.service", () => ({
   queueAllUserMediaForDeletion: mocks.queueAllUserMediaForDeletion,
 }));
 
+vi.mock("../../services/provider-avatar.service", () => ({
+  refreshGoogleAvatar: mocks.refreshGoogleAvatar,
+}));
+
 import {
   deleteCurrentUser,
   serializeUser,
+  upsertUserFromIdentityWithResult,
   updateCurrentUser,
   updateProfileSettings,
 } from "../../services/user.service";
@@ -233,6 +243,7 @@ describe("user service account settings", () => {
     mocks.mealLogFind.mockResolvedValue([]);
     mocks.mealScanFind.mockResolvedValue([]);
     mocks.progressPhotoFind.mockResolvedValue([]);
+    mocks.refreshGoogleAvatar.mockResolvedValue(undefined);
     mocks.userDeleteOne.mockResolvedValue({ deletedCount: 1 });
     mocks.userFindById.mockResolvedValue(
       document({
@@ -319,6 +330,43 @@ describe("user service account settings", () => {
 
     expect(result.hasAvatar).toBe(true);
     expect(result.avatarUrl).toBeUndefined();
+  });
+
+  it("refreshes only the freshly verified Google picture and never fails identity persistence", async () => {
+    const save = vi.fn().mockResolvedValue(undefined);
+    const user = {
+      ...document({
+        id: "507f1f77bcf86cd799439011",
+        email: "nick@pepta.app",
+        emailVerified: true,
+        authProviders: [
+          {
+            provider: "google",
+            providerUserId: "google-user",
+            linkedAt: new Date(),
+          },
+        ],
+      }),
+      save,
+    };
+    mocks.userFindOne.mockResolvedValueOnce(user);
+    mocks.refreshGoogleAvatar.mockRejectedValueOnce(new Error("provider down"));
+
+    await expect(
+      upsertUserFromIdentityWithResult({
+        provider: "google",
+        providerUserId: "google-user",
+        email: "nick@pepta.app",
+        emailVerified: true,
+        picture: "https://lh3.googleusercontent.com/a/photo",
+      }),
+    ).resolves.toMatchObject({ user, isNewUser: false });
+
+    expect(save).toHaveBeenCalled();
+    expect(mocks.refreshGoogleAvatar).toHaveBeenCalledWith(
+      user,
+      "https://lh3.googleusercontent.com/a/photo",
+    );
   });
 
   it("deletes the user, user-owned data, and known S3 images", async () => {
