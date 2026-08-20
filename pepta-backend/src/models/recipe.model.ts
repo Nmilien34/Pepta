@@ -23,6 +23,7 @@ export interface RecipeDocument extends Document<Types.ObjectId> {
   userId: Types.ObjectId | null;
   name: string;
   ingredients: RecipeIngredientSub[];
+  photoMediaId?: Types.ObjectId;
   /** Stable id for a seeded recipe, so re-seeding updates rather than duplicates. */
   starterKey?: string;
   createdAt: Date;
@@ -45,6 +46,7 @@ const recipeSchema = new Schema<RecipeDocument>(
     userId: { type: Schema.Types.ObjectId, ref: "User", default: null, index: true },
     name: { type: String, required: true },
     ingredients: { type: [ingredientSchema], required: true },
+    photoMediaId: { type: Schema.Types.ObjectId, ref: "MediaAsset" },
     starterKey: { type: String },
   },
   { timestamps: true },

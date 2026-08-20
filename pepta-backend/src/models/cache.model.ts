@@ -22,7 +22,7 @@ export interface ProgressPhotoDocument extends Document<Types.ObjectId> {
 
 export interface MealScanDocument extends Document<Types.ObjectId> {
   userId: Types.ObjectId;
-  photoS3Key: string;
+  photoMediaId: Types.ObjectId;
   imageMimeType: "image/jpeg" | "image/png" | "image/webp";
   analysis: MealScanAnalysis | null;
   coachContent: MealScanCoachContent | null;
@@ -242,10 +242,10 @@ const mealScanSchema = new Schema<MealScanDocument>(
       required: true,
       index: true,
     },
-    photoS3Key: {
-      type: String,
+    photoMediaId: {
+      type: Schema.Types.ObjectId,
+      ref: "MediaAsset",
       required: true,
-      trim: true,
       unique: true,
     },
     imageMimeType: {

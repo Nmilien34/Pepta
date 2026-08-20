@@ -39,7 +39,9 @@ export interface DoseLogDocument
 }
 
 export interface MealLogDocument
-  extends Omit<MealLogInput, "datetime">, LogDocumentBase {}
+  extends Omit<MealLogInput, "datetime" | "photoMediaId">, LogDocumentBase {
+  photoMediaId?: Types.ObjectId;
+}
 
 export interface WaterLogDocument
   extends Omit<WaterLogInput, "datetime">, LogDocumentBase {}
@@ -198,9 +200,9 @@ const mealLogSchema = new Schema<MealLogDocument>(
       enum: ["scan", "voice", "search", "manual"],
       required: true,
     },
-    photoS3Key: {
-      type: String,
-      trim: true,
+    photoMediaId: {
+      type: Schema.Types.ObjectId,
+      ref: "MediaAsset",
     },
   },
   {
