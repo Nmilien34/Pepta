@@ -398,11 +398,7 @@ async function collectAccountS3Keys(
   userId: string,
   user: UserDocument,
 ): Promise<string[]> {
-  const [progressPhotos, mealScans, mealLogs] = await Promise.all([
-    ProgressPhotoModel.find({ userId }),
-    MealScanModel.find({ userId }),
-    MealLogModel.find({ userId }),
-  ]);
+  const progressPhotos = await ProgressPhotoModel.find({ userId });
   const keys = new Set<string>();
   const avatarKey = optionalS3Key(documentObject(user).avatarKey);
   if (avatarKey) keys.add(avatarKey);
@@ -411,15 +407,6 @@ async function collectAccountS3Keys(
     const key = optionalS3Key(documentObject(photo).s3Key);
     if (key) keys.add(key);
   }
-  for (const scan of mealScans) {
-    const key = optionalS3Key(documentObject(scan).photoS3Key);
-    if (key) keys.add(key);
-  }
-  for (const meal of mealLogs) {
-    const key = optionalS3Key(documentObject(meal).photoS3Key);
-    if (key) keys.add(key);
-  }
-
   return [...keys];
 }
 

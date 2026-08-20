@@ -277,14 +277,6 @@ describe("user service account settings", () => {
     mocks.progressPhotoFind.mockResolvedValue([
       { s3Key: "pepta/progress/user-1/front.jpg" },
     ]);
-    mocks.mealScanFind.mockResolvedValue([
-      { photoS3Key: "pepta/meal-scans/user-1/scan.jpg" },
-    ]);
-    mocks.mealLogFind.mockResolvedValue([
-      { photoS3Key: "pepta/meal-logs/user-1/manual.jpg" },
-      { photoS3Key: "pepta/meal-scans/user-1/scan.jpg" },
-      { photoS3Key: "" },
-    ]);
     mocks.userFindById.mockResolvedValue(
       document({
         id: userId,
@@ -303,8 +295,6 @@ describe("user service account settings", () => {
 
     expect(mocks.deleteS3Object.mock.calls.map(([key]) => key).sort()).toEqual([
       "pepta/avatars/user-1/avatar.jpg",
-      "pepta/meal-logs/user-1/manual.jpg",
-      "pepta/meal-scans/user-1/scan.jpg",
       "pepta/progress/user-1/front.jpg",
     ]);
     expect(mocks.modelDeleteMany.UserProfileModel).toHaveBeenCalledWith({
@@ -325,7 +315,7 @@ describe("user service account settings", () => {
     expect(mocks.modelDeleteMany.RecipeModel).toHaveBeenCalledWith({
       userId,
     });
-    expect(mocks.mealLogFind).toHaveBeenCalledWith({ userId });
+    expect(mocks.queueAllUserMediaForDeletion).toHaveBeenCalledWith(userId);
     expect(
       mocks.modelDeleteMany.ProcessedWebhookEventModel,
     ).toHaveBeenCalledWith({
