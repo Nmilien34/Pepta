@@ -25,7 +25,7 @@ export interface FavouriteDocument extends Document<Types.ObjectId> {
   fiber?: number;
   ounces?: number;
   source: "item" | "recipe";
-  photoS3Key?: string;
+  photoMediaId?: Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -49,7 +49,7 @@ const favouriteSchema = new Schema<FavouriteDocument>(
     fiber: { type: Number },
     ounces: { type: Number },
     source: { type: String, required: true, enum: ["item", "recipe"], default: "item" },
-    photoS3Key: { type: String },
+    photoMediaId: { type: Schema.Types.ObjectId, ref: "MediaAsset" },
   },
   { timestamps: true },
 );

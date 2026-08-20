@@ -14,4 +14,5 @@ export * from './user.model';
 export * from './discovery-source.model';
 export * from './dismissed-nudge.model';
 export * from './favourite.model';
+export * from './media-asset.model';
 export * from './recipe.model';
