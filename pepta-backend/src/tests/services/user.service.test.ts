@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   deleteS3Object: vi.fn(),
   prepareComplimentaryCleanupForDeletion: vi.fn(),
+  queueAllUserMediaForDeletion: vi.fn(),
   modelDeleteMany: {
     ActivityLogModel: vi.fn(),
     CompoundModel: vi.fn(),
@@ -10,6 +11,7 @@ const mocks = vi.hoisted(() => ({
     DismissedNudgeModel: vi.fn(),
     DoseLogModel: vi.fn(),
     FiberLogModel: vi.fn(),
+    FavouriteModel: vi.fn(),
     InsightModel: vi.fn(),
     MealLogModel: vi.fn(),
     MealScanModel: vi.fn(),
@@ -21,6 +23,7 @@ const mocks = vi.hoisted(() => ({
     ProteinLogModel: vi.fn(),
     PushTokenModel: vi.fn(),
     ReferralClaimModel: vi.fn(),
+    RecipeModel: vi.fn(),
     ScheduleModel: vi.fn(),
     SideEffectLogModel: vi.fn(),
     UserProfileModel: vi.fn(),
@@ -44,6 +47,7 @@ vi.mock("../../models", () => ({
   CycleModel: { deleteMany: mocks.modelDeleteMany.CycleModel },
   DoseLogModel: { deleteMany: mocks.modelDeleteMany.DoseLogModel },
   FiberLogModel: { deleteMany: mocks.modelDeleteMany.FiberLogModel },
+  FavouriteModel: { deleteMany: mocks.modelDeleteMany.FavouriteModel },
   InsightModel: { deleteMany: mocks.modelDeleteMany.InsightModel },
   MealLogModel: {
     deleteMany: mocks.modelDeleteMany.MealLogModel,
@@ -75,6 +79,7 @@ vi.mock("../../models", () => ({
   ReferralClaimModel: {
     deleteMany: mocks.modelDeleteMany.ReferralClaimModel,
   },
+  RecipeModel: { deleteMany: mocks.modelDeleteMany.RecipeModel },
   ScheduleModel: { deleteMany: mocks.modelDeleteMany.ScheduleModel },
   SideEffectLogModel: {
     deleteMany: mocks.modelDeleteMany.SideEffectLogModel,
@@ -104,6 +109,10 @@ vi.mock("../../services/s3.service", () => ({
 vi.mock("../../services/complimentary-access-cleanup.service", () => ({
   prepareComplimentaryCleanupForDeletion:
     mocks.prepareComplimentaryCleanupForDeletion,
+}));
+
+vi.mock("../../services/media.service", () => ({
+  queueAllUserMediaForDeletion: mocks.queueAllUserMediaForDeletion,
 }));
 
 import {
@@ -216,6 +225,7 @@ describe("user service account settings", () => {
     });
     mocks.deleteS3Object.mockResolvedValue(undefined);
     mocks.prepareComplimentaryCleanupForDeletion.mockResolvedValue(undefined);
+    mocks.queueAllUserMediaForDeletion.mockResolvedValue(undefined);
     mocks.mealLogFind.mockResolvedValue([]);
     mocks.mealScanFind.mockResolvedValue([]);
     mocks.progressPhotoFind.mockResolvedValue([]);
@@ -309,6 +319,13 @@ describe("user service account settings", () => {
     expect(mocks.modelDeleteMany.ProgressPhotoModel).toHaveBeenCalledWith({
       userId,
     });
+    expect(mocks.modelDeleteMany.FavouriteModel).toHaveBeenCalledWith({
+      userId,
+    });
+    expect(mocks.modelDeleteMany.RecipeModel).toHaveBeenCalledWith({
+      userId,
+    });
+    expect(mocks.mealLogFind).toHaveBeenCalledWith({ userId });
     expect(
       mocks.modelDeleteMany.ProcessedWebhookEventModel,
     ).toHaveBeenCalledWith({
@@ -323,6 +340,12 @@ describe("user service account settings", () => {
     expect(
       mocks.prepareComplimentaryCleanupForDeletion,
     ).toHaveBeenCalledWith(expect.objectContaining({ _id: userId }));
+    expect(mocks.queueAllUserMediaForDeletion).toHaveBeenCalledWith(userId);
+    expect(
+      mocks.queueAllUserMediaForDeletion.mock.invocationCallOrder[0],
+    ).toBeLessThan(
+      mocks.modelDeleteMany.FavouriteModel.mock.invocationCallOrder[0]!,
+    );
     const cleanupOrder =
       mocks.prepareComplimentaryCleanupForDeletion.mock.invocationCallOrder[0]!;
     expect(
@@ -335,6 +358,9 @@ describe("user service account settings", () => {
     expect(cleanupOrder).toBeLessThan(
       mocks.userDeleteOne.mock.invocationCallOrder[0]!,
     );
+    expect(
+      mocks.queueAllUserMediaForDeletion.mock.invocationCallOrder[0],
+    ).toBeLessThan(mocks.userDeleteOne.mock.invocationCallOrder[0]!);
     expect(mocks.userDeleteOne).toHaveBeenCalledWith({ _id: userId });
   });
 });

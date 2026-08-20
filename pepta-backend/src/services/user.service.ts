@@ -19,6 +19,7 @@ import {
   DiscoverySourceModel,
   CycleModel,
   DoseLogModel,
+  FavouriteModel,
   FiberLogModel,
   InsightModel,
   MealLogModel,
@@ -32,6 +33,7 @@ import {
   ProteinLogModel,
   PushTokenModel,
   ReferralClaimModel,
+  RecipeModel,
   ScheduleModel,
   SideEffectLogModel,
   UserModel,
@@ -42,6 +44,7 @@ import {
   type UserDocument,
 } from "../models";
 import { deleteS3Object } from "./s3.service";
+import { queueAllUserMediaForDeletion } from "./media.service";
 import { serializeWithSchema } from "./serializers";
 
 function documentObject(document: unknown): Record<string, unknown> {
@@ -398,7 +401,7 @@ async function collectAccountS3Keys(
   const [progressPhotos, mealScans, mealLogs] = await Promise.all([
     ProgressPhotoModel.find({ userId }),
     MealScanModel.find({ userId }),
-    MealLogModel.find({ userId, deletedAt: { $exists: true } }),
+    MealLogModel.find({ userId }),
   ]);
   const keys = new Set<string>();
   const avatarKey = optionalS3Key(documentObject(user).avatarKey);
@@ -428,6 +431,7 @@ export async function deleteCurrentUser(userId: string): Promise<void> {
 
   const s3Keys = await collectAccountS3Keys(userId, user);
   await Promise.all(s3Keys.map((key) => deleteS3Object(key)));
+  await queueAllUserMediaForDeletion(userId);
 
   await Promise.all([
     UserProfileModel.deleteMany({ userId }),
@@ -440,6 +444,7 @@ export async function deleteCurrentUser(userId: string): Promise<void> {
     WaterLogModel.deleteMany({ userId }),
     ProteinLogModel.deleteMany({ userId }),
     FiberLogModel.deleteMany({ userId }),
+    FavouriteModel.deleteMany({ userId }),
     ActivityLogModel.deleteMany({ userId }),
     SideEffectLogModel.deleteMany({ userId }),
     MeasurementModel.deleteMany({ userId }),
@@ -449,6 +454,7 @@ export async function deleteCurrentUser(userId: string): Promise<void> {
     WeeklyRetentionModel.deleteMany({ userId }),
     PushTokenModel.deleteMany({ userId }),
     ReferralClaimModel.deleteMany({ userId }),
+    RecipeModel.deleteMany({ userId }),
     PepMemoryModel.deleteMany({ userId }),
     PepPushDeliveryModel.deleteMany({ userId }),
     DismissedNudgeModel.deleteMany({ userId }),
