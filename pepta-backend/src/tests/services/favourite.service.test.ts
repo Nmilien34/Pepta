@@ -2,49 +2,53 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   find: vi.fn(),
+  findOne: vi.fn(),
   findOneAndUpdate: vi.fn(),
   findOneAndDelete: vi.fn(),
-  exists: vi.fn(),
-  deleteS3Object: vi.fn(),
-  createPresignedGetUrl: vi.fn(),
-  createPresignedPutUrl: vi.fn(),
+  validateAttachableMedia: vi.fn(),
+  attachMedia: vi.fn(),
+  detachMedia: vi.fn(),
+  getMediaViewUrl: vi.fn(),
 }));
 
-vi.mock("../../services/s3.service", () => ({
-  createPresignedGetUrl: mocks.createPresignedGetUrl,
-  createPresignedPutUrl: mocks.createPresignedPutUrl,
-  deleteS3Object: mocks.deleteS3Object,
-  signedUrlExpiresAt: () => "2026-08-19T12:15:00.000Z",
+vi.mock("../../services/media.service", () => ({
+  validateAttachableMedia: mocks.validateAttachableMedia,
+  attachMedia: mocks.attachMedia,
+  detachMedia: mocks.detachMedia,
+  getMediaViewUrl: mocks.getMediaViewUrl,
 }));
 
 vi.mock("../../models/favourite.model", () => ({
   FavouriteModel: {
     find: mocks.find,
+    findOne: mocks.findOne,
     findOneAndUpdate: mocks.findOneAndUpdate,
     findOneAndDelete: mocks.findOneAndDelete,
-    exists: mocks.exists,
   },
 }));
 
 import {
-  createFavouritePhotoIntent,
-  discardFavouritePhoto,
   listFavourites,
   removeFavourite,
   saveFavourite,
 } from "../../services/favourite.service";
+import { NotFoundError } from "../../lib/errors";
 import { STARTER_FAVOURITES } from "../../seeds/starter-favourites.seed";
 
 const USER = "507f1f77bcf86cd799439011";
+const MEDIA = "507f1f77bcf86cd799439012";
+const OLD_MEDIA = "507f1f77bcf86cd799439013";
+const OTHER_MEDIA = "507f1f77bcf86cd799439014";
 
 beforeEach(() => {
   mocks.find.mockReset();
+  mocks.findOne.mockReset().mockReturnValue({ exec: vi.fn().mockResolvedValue(null) });
   mocks.findOneAndUpdate.mockReset();
   mocks.findOneAndDelete.mockReset().mockReturnValue({ exec: vi.fn().mockResolvedValue(null) });
-  mocks.deleteS3Object.mockReset().mockResolvedValue(undefined);
-  mocks.exists.mockReset().mockReturnValue({ exec: vi.fn().mockResolvedValue(null) });
-  mocks.createPresignedGetUrl.mockReset().mockResolvedValue("https://s3/signed-get");
-  mocks.createPresignedPutUrl.mockReset().mockResolvedValue("https://s3/signed-put");
+  mocks.validateAttachableMedia.mockReset().mockResolvedValue({ _id: MEDIA });
+  mocks.attachMedia.mockReset().mockResolvedValue(undefined);
+  mocks.detachMedia.mockReset().mockResolvedValue(undefined);
+  mocks.getMediaViewUrl.mockReset().mockResolvedValue("https://s3/signed-get");
 });
 
 function doc(over: Record<string, unknown> = {}) {
@@ -173,32 +177,26 @@ describe("removeFavourite", () => {
   it("is idempotent — removing something already gone is not an error", async () => {
     mocks.findOneAndDelete.mockReturnValue({ exec: vi.fn().mockResolvedValue(null) });
     await expect(removeFavourite(USER, "nope")).resolves.toBeUndefined();
-    expect(mocks.deleteS3Object).not.toHaveBeenCalled();
+    expect(mocks.detachMedia).not.toHaveBeenCalled();
   });
 
-  it("takes the photo with it, rather than leaking the file into the bucket", async () => {
+  it("detaches the removed favourite from its owned media", async () => {
     mocks.findOneAndDelete.mockReturnValue({
-      exec: vi.fn().mockResolvedValue(doc({ photoS3Key: "favourites/u1/a.jpg" })),
+      exec: vi.fn().mockResolvedValue(doc({ photoMediaId: MEDIA })),
     });
 
     await removeFavourite(USER, "food:chicken-breast:6-oz");
 
-    expect(mocks.deleteS3Object).toHaveBeenCalledWith("favourites/u1/a.jpg");
+    expect(mocks.detachMedia).toHaveBeenCalledWith(USER, MEDIA, {
+      kind: "favourite",
+      resourceId: "row1",
+    });
   });
 
-  it("deletes nothing in S3 for an item that never had a photo", async () => {
+  it("detaches nothing for an item that never had a photo", async () => {
     mocks.findOneAndDelete.mockReturnValue({ exec: vi.fn().mockResolvedValue(doc()) });
     await removeFavourite(USER, "food:chicken-breast:6-oz");
-    expect(mocks.deleteS3Object).not.toHaveBeenCalled();
-  });
-
-  it("still reports the removal when the bucket cleanup fails — the row is gone", async () => {
-    mocks.findOneAndDelete.mockReturnValue({
-      exec: vi.fn().mockResolvedValue(doc({ photoS3Key: "favourites/u1/a.jpg" })),
-    });
-    mocks.deleteS3Object.mockRejectedValue(new Error("s3 down"));
-
-    await expect(removeFavourite(USER, "food:chicken-breast:6-oz")).resolves.toBeUndefined();
+    expect(mocks.detachMedia).not.toHaveBeenCalled();
   });
 });
 
@@ -236,18 +234,19 @@ describe("the seeded first-run offers", () => {
 
 describe("photos on an item the user made themselves", () => {
   it("signs a fresh URL on every read — a stored one would expire in the database", async () => {
-    const exec = vi.fn().mockResolvedValue([doc({ photoS3Key: "favourites/u1/a.jpg" })]);
+    const exec = vi.fn().mockResolvedValue([doc({ photoMediaId: MEDIA })]);
     mocks.find.mockReturnValue({ sort: vi.fn(() => ({ exec })) });
 
     const out = await listFavourites(USER);
 
-    expect(mocks.createPresignedGetUrl).toHaveBeenCalledWith({ key: "favourites/u1/a.jpg" });
+    expect(mocks.getMediaViewUrl).toHaveBeenCalledWith(USER, MEDIA);
+    expect(out.favourites[0]!.photoMediaId).toBe(MEDIA);
     expect(out.favourites[0]!.photoUrl).toBe("https://s3/signed-get");
   });
 
   it("sends null rather than failing the whole list when signing fails", async () => {
-    mocks.createPresignedGetUrl.mockRejectedValue(new Error("s3 down"));
-    const exec = vi.fn().mockResolvedValue([doc({ photoS3Key: "favourites/u1/a.jpg" })]);
+    mocks.getMediaViewUrl.mockRejectedValue(new Error("s3 down"));
+    const exec = vi.fn().mockResolvedValue([doc({ photoMediaId: MEDIA })]);
     mocks.find.mockReturnValue({ sort: vi.fn(() => ({ exec })) });
 
     const out = await listFavourites(USER);
@@ -262,13 +261,13 @@ describe("photos on an item the user made themselves", () => {
 
     const out = await listFavourites(USER);
 
-    expect(mocks.createPresignedGetUrl).not.toHaveBeenCalled();
+    expect(mocks.getMediaViewUrl).not.toHaveBeenCalled();
     expect(out.favourites[0]!.photoUrl).toBeNull();
   });
 
-  it("stores the key the client uploaded to", async () => {
+  it("attaches only the caller's ready favourite media", async () => {
     mocks.findOneAndUpdate.mockReturnValue({
-      exec: vi.fn().mockResolvedValue(doc({ photoS3Key: "favourites/u1/a.jpg" })),
+      exec: vi.fn().mockResolvedValue(doc({ photoMediaId: MEDIA })),
     });
 
     await saveFavourite(USER, {
@@ -277,18 +276,50 @@ describe("photos on an item the user made themselves", () => {
       name: "Desk lunch",
       portion: "1 box",
       source: "item",
-      photoS3Key: "favourites/u1/a.jpg",
+      photoMediaId: MEDIA,
     });
 
     const update = mocks.findOneAndUpdate.mock.calls[0]![1] as {
       $set: Record<string, unknown>;
       $unset: Record<string, unknown>;
     };
-    expect(update.$set).toMatchObject({ photoS3Key: "favourites/u1/a.jpg" });
+    expect(String(update.$set.photoMediaId)).toBe(MEDIA);
+    expect(mocks.validateAttachableMedia).toHaveBeenCalledWith(
+      USER,
+      MEDIA,
+      "favourite",
+    );
+    expect(mocks.attachMedia).toHaveBeenCalledWith(USER, MEDIA, {
+      kind: "favourite",
+      resourceId: "row1",
+    });
+  });
+
+  it("does not write the favourite when media ownership validation fails", async () => {
+    mocks.validateAttachableMedia.mockRejectedValue(
+      new NotFoundError("Media not found"),
+    );
+
+    await expect(
+      saveFavourite(USER, {
+        key: "food:desk-lunch:1-box",
+        kind: "food",
+        name: "Desk lunch",
+        portion: "1 box",
+        photoMediaId: OTHER_MEDIA,
+      }),
+    ).rejects.toThrow(/not found/i);
+
+    expect(mocks.findOneAndUpdate).not.toHaveBeenCalled();
   });
 
   it("leaves an existing photo alone when a save does not carry one", async () => {
-    mocks.findOneAndUpdate.mockReturnValue({ exec: vi.fn().mockResolvedValue(doc()) });
+    mocks.findOne.mockReturnValue({
+      exec: vi.fn().mockResolvedValue(doc({ photoMediaId: OLD_MEDIA })),
+    });
+    mocks.findOneAndUpdate.mockReturnValue({
+      exec: vi.fn().mockResolvedValue(doc({ photoMediaId: OLD_MEDIA })),
+    });
 
     await saveFavourite(USER, {
       key: "food:desk-lunch:1-box",
@@ -302,13 +333,15 @@ describe("photos on an item the user made themselves", () => {
       $set: Record<string, unknown>;
       $unset: Record<string, unknown>;
     };
-    expect(update.$set).not.toHaveProperty("photoS3Key");
-    expect(update.$unset).not.toHaveProperty("photoS3Key");
+    expect(update.$set).not.toHaveProperty("photoMediaId");
+    expect(update.$unset).not.toHaveProperty("photoMediaId");
+    expect(mocks.attachMedia).not.toHaveBeenCalled();
+    expect(mocks.detachMedia).not.toHaveBeenCalled();
   });
 
   it("hands back a usable URL on save, not just on the next read", async () => {
     mocks.findOneAndUpdate.mockReturnValue({
-      exec: vi.fn().mockResolvedValue(doc({ photoS3Key: "favourites/u1/a.jpg" })),
+      exec: vi.fn().mockResolvedValue(doc({ photoMediaId: MEDIA })),
     });
 
     const out = await saveFavourite(USER, {
@@ -317,77 +350,84 @@ describe("photos on an item the user made themselves", () => {
       name: "Desk lunch",
       portion: "1 box",
       source: "item",
-      photoS3Key: "favourites/u1/a.jpg",
+      photoMediaId: MEDIA,
     });
 
     expect(out.photoUrl).toBe("https://s3/signed-get");
   });
 
-  it("keys an upload under the owner, so one user cannot write over another", async () => {
-    const a = await createFavouritePhotoIntent(USER, "image/jpeg");
-    const b = await createFavouritePhotoIntent("507f1f77bcf86cd799439012", "image/jpeg");
-
-    expect(a.photoS3Key.startsWith(`favourites/${USER}/`)).toBe(true);
-    expect(b.photoS3Key.startsWith("favourites/507f1f77bcf86cd799439012/")).toBe(true);
-  });
-
-  it("never reuses a key, so a second photo cannot overwrite the first", async () => {
-    const a = await createFavouritePhotoIntent(USER, "image/jpeg");
-    const b = await createFavouritePhotoIntent(USER, "image/jpeg");
-    expect(a.photoS3Key).not.toBe(b.photoS3Key);
-  });
-
-  it("gives the file the extension its type says it has", async () => {
-    expect((await createFavouritePhotoIntent(USER, "image/png")).photoS3Key.endsWith(".png")).toBe(true);
-    expect((await createFavouritePhotoIntent(USER, "image/webp")).photoS3Key.endsWith(".webp")).toBe(true);
-    expect((await createFavouritePhotoIntent(USER, "image/jpeg")).photoS3Key.endsWith(".jpg")).toBe(true);
-  });
-
-  it("signs the PUT for that exact key and type", async () => {
-    const out = await createFavouritePhotoIntent(USER, "image/webp");
-    expect(mocks.createPresignedPutUrl).toHaveBeenCalledWith({
-      key: out.photoS3Key,
-      contentType: "image/webp",
+  it("links the replacement before detaching the previous media", async () => {
+    mocks.findOne.mockReturnValue({
+      exec: vi.fn().mockResolvedValue(doc({ photoMediaId: OLD_MEDIA })),
     });
-    expect(out.uploadUrl).toBe("https://s3/signed-put");
-    expect(out.expiresAt).toBe("2026-08-19T12:15:00.000Z");
-  });
-});
+    mocks.findOneAndUpdate.mockReturnValue({
+      exec: vi.fn().mockResolvedValue(doc({ photoMediaId: MEDIA })),
+    });
 
-describe("throwing away a photo nothing ended up using", () => {
-  const KEY = `favourites/${USER}/a.jpg`;
+    await saveFavourite(USER, {
+      key: "food:desk-lunch:1-box",
+      kind: "food",
+      name: "Desk lunch",
+      portion: "1 box",
+      photoMediaId: MEDIA,
+    });
 
-  it("deletes the file when nothing references it", async () => {
-    await discardFavouritePhoto(USER, KEY);
-    expect(mocks.deleteS3Object).toHaveBeenCalledWith(KEY);
-  });
-
-  it("refuses a key under another user, however it was obtained", async () => {
-    await expect(
-      discardFavouritePhoto(USER, "favourites/507f1f77bcf86cd799439012/a.jpg"),
-    ).rejects.toThrow(/not found/i);
-    expect(mocks.deleteS3Object).not.toHaveBeenCalled();
-  });
-
-  it("refuses a key outside the favourites prefix", async () => {
-    await expect(discardFavouritePhoto(USER, "progress/other/a.jpg")).rejects.toThrow(/not found/i);
-    await expect(discardFavouritePhoto(USER, `../favourites/${USER}/a.jpg`)).rejects.toThrow(
-      /not found/i,
+    expect(mocks.detachMedia).toHaveBeenCalledWith(USER, OLD_MEDIA, {
+      kind: "favourite",
+      resourceId: "row1",
+    });
+    expect(mocks.attachMedia.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.detachMedia.mock.invocationCallOrder[0]!,
     );
-    expect(mocks.deleteS3Object).not.toHaveBeenCalled();
   });
 
-  it("refuses a photo a saved item is still showing", async () => {
-    mocks.exists.mockReturnValue({ exec: vi.fn().mockResolvedValue({ _id: "row1" }) });
+  it("restores the old media reference when linking the replacement fails", async () => {
+    mocks.findOne.mockReturnValue({
+      exec: vi.fn().mockResolvedValue(doc({ photoMediaId: OLD_MEDIA })),
+    });
+    mocks.findOneAndUpdate
+      .mockReturnValueOnce({
+        exec: vi.fn().mockResolvedValue(doc({ photoMediaId: MEDIA })),
+      })
+      .mockReturnValueOnce({ exec: vi.fn().mockResolvedValue(doc()) });
+    mocks.attachMedia.mockRejectedValue(new Error("link failed"));
 
-    await expect(discardFavouritePhoto(USER, KEY)).rejects.toThrow(/saved item/i);
-    expect(mocks.deleteS3Object).not.toHaveBeenCalled();
+    await expect(
+      saveFavourite(USER, {
+        key: "food:desk-lunch:1-box",
+        kind: "food",
+        name: "Desk lunch",
+        portion: "1 box",
+        photoMediaId: MEDIA,
+      }),
+    ).rejects.toThrow("link failed");
+
+    const rollback = mocks.findOneAndUpdate.mock.calls[1]![1] as {
+      $set: { photoMediaId: unknown };
+    };
+    expect(String(rollback.$set.photoMediaId)).toBe(OLD_MEDIA);
+    expect(mocks.detachMedia).not.toHaveBeenCalled();
   });
 
-  it("checks that reference against the caller's own rows", async () => {
-    await discardFavouritePhoto(USER, KEY);
-    const filter = mocks.exists.mock.calls[0]![0] as { userId: unknown; photoS3Key: string };
-    expect(String(filter.userId)).toBe(USER);
-    expect(filter.photoS3Key).toBe(KEY);
+  it("removes a newly inserted favourite when its media cannot be linked", async () => {
+    mocks.findOneAndUpdate.mockReturnValue({
+      exec: vi.fn().mockResolvedValue(doc({ photoMediaId: MEDIA })),
+    });
+    mocks.attachMedia.mockRejectedValue(new Error("link failed"));
+
+    await expect(
+      saveFavourite(USER, {
+        key: "food:desk-lunch:1-box",
+        kind: "food",
+        name: "Desk lunch",
+        portion: "1 box",
+        photoMediaId: MEDIA,
+      }),
+    ).rejects.toThrow("link failed");
+
+    const rollbackFilter = mocks.findOneAndDelete.mock.calls[0]![0];
+    expect(String(rollbackFilter.userId)).toBe(USER);
+    expect(String(rollbackFilter.photoMediaId)).toBe(MEDIA);
+    expect(rollbackFilter._id.toString()).toBe("row1");
   });
 });
