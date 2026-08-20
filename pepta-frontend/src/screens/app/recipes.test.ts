@@ -98,6 +98,21 @@ describe('recipeAsMealSeed', () => {
     } as unknown as RecipeResponse;
     expect(recipeAsMealSeed(recipe)).not.toHaveProperty('fiber');
   });
+
+  it('carries a saved recipe photo into the meal log seed', () => {
+    const recipe = {
+      id: 'r3',
+      name: 'Photo bowl',
+      isStarter: false,
+      ingredients: oats,
+      photoMediaId: 'media-1',
+      photoUrl: 'https://signed.example/recipe.jpg',
+      createdAt: '',
+      updatedAt: '',
+    } as RecipeResponse;
+
+    expect(recipeAsMealSeed(recipe).photoMediaId).toBe('media-1');
+  });
 });
 
 describe('confidenceNote', () => {

@@ -706,6 +706,28 @@ describe("MealLogSheet · keeping the result as a recipe", () => {
     });
   });
 
+  it("reuses the identified meal media when saving it as a recipe", async () => {
+    const tree = await commit({
+      keepAsRecipe: true,
+      seed: {
+        foodName: "Overnight oats",
+        servingSize: "1 bowl",
+        protein: 40,
+        calories: 440,
+        photoMediaId: "media-1",
+      },
+    });
+    await act(async () => {
+      tree.root.findByProps({ label: "Save recipe" }).props.onPress();
+    });
+
+    expect(apiMock.createRecipe).toHaveBeenCalledWith({
+      name: composed.name,
+      ingredients: composed.ingredients,
+      photoMediaId: "media-1",
+    });
+  });
+
   it("drops a row the model invented, and the total follows", async () => {
     const tree = await commit({ keepAsRecipe: true });
     expect(texts(tree)).toContain("29 g protein"); // 5 + 24

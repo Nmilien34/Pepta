@@ -19,7 +19,7 @@ const mealWithPhoto = {
   calories: 180,
   source: "scan",
   datetime: "2026-06-24T12:00:00.000Z",
-  photoS3Key: "pepta/meal-scans/user_1/photo.jpg",
+  photoMediaId: "media-1",
   deletedAt: null,
   createdAt: "2026-06-24T12:00:00.000Z",
   updatedAt: "2026-06-24T12:00:00.000Z",
@@ -87,7 +87,7 @@ describe("reportExport", () => {
       calories: 520,
       waterOz: 48,
     });
-    expect(payload.logs.mealLogs[0]).not.toHaveProperty("photoS3Key");
+    expect(payload.logs.mealLogs[0]).not.toHaveProperty("photoMediaId");
     expect(payload.progress.photos).toEqual([
       {
         id: "photo_1",

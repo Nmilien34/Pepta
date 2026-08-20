@@ -82,6 +82,7 @@ export interface MealSeed {
   protein?: number;
   calories?: number;
   fiber?: number;
+  photoMediaId?: string;
 }
 
 export interface MealLogSheetProps {
@@ -140,6 +141,7 @@ export function MealLogSheet({
     name: string;
     ingredients: RecipeIngredient[];
     confidence: number;
+    photoMediaId?: string;
   } | null>(null);
   const [savingRecipe, setSavingRecipe] = useState(false);
   const saidRef = useRef<string>("");
@@ -272,12 +274,22 @@ export function MealLogSheet({
             name: composed.name,
             ingredients: [...composed.ingredients],
             confidence: composed.confidence,
+            ...(input.photoMediaId
+              ? { photoMediaId: input.photoMediaId }
+              : {}),
           });
         })
         // Composing failed: fall back to the one line we already have rather
         // than losing what the user just described. They still review it.
         .catch(() => {
-          setProposal({ ...asOneLine, ingredients: [...asOneLine.ingredients], confidence: 0.4 });
+          setProposal({
+            ...asOneLine,
+            ingredients: [...asOneLine.ingredients],
+            confidence: 0.4,
+            ...(input.photoMediaId
+              ? { photoMediaId: input.photoMediaId }
+              : {}),
+          });
         })
         .finally(() => setView("recipeReview"));
       return;
@@ -424,7 +436,7 @@ export function MealLogSheet({
   const logResult = () => {
     const a = scaledAnalysis();
     if (!a || !result) return;
-    commit(analysisToMealLog(a, source, now(), result.photoS3Key));
+    commit(analysisToMealLog(a, source, now(), result.photoMediaId));
   };
 
   // "Edit details" — drop the (portion-scaled) estimate into the manual form.
@@ -455,6 +467,11 @@ export function MealLogSheet({
       ...(manual.carbs ? { carbs: Number(manual.carbs) } : {}),
       ...(manual.fat ? { fat: Number(manual.fat) } : {}),
       ...(manual.fiber ? { fiber: Number(manual.fiber) } : {}),
+      ...(result?.photoMediaId
+        ? { photoMediaId: result.photoMediaId }
+        : seed?.photoMediaId
+          ? { photoMediaId: seed.photoMediaId }
+          : {}),
     };
     if (!isManualMealValid(meal)) return;
     commit(toManualMealLog(meal, now()));
@@ -467,7 +484,13 @@ export function MealLogSheet({
     );
     setSavingRecipe(true);
     api
-      .createRecipe({ name: proposal.name.trim(), ingredients: proposal.ingredients })
+      .createRecipe({
+        name: proposal.name.trim(),
+        ingredients: proposal.ingredients,
+        ...(proposal.photoMediaId
+          ? { photoMediaId: proposal.photoMediaId }
+          : {}),
+      })
       .catch(() => undefined)
       .finally(() => {
         setSavingRecipe(false);

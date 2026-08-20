@@ -760,6 +760,13 @@ class PeptaApi {
     return this.request("/recipes", recipesResponseSchema);
   }
 
+  public getRecipe(id: string): Promise<RecipeResponse> {
+    return this.request(
+      `/recipes/${encodeURIComponent(id)}`,
+      recipeResponseSchema,
+    );
+  }
+
   /** Saving a starter as yours comes through here too — it is a copy. */
   public createRecipe(input: RecipeInput): Promise<RecipeResponse> {
     return this.request("/recipes", recipeResponseSchema, {
