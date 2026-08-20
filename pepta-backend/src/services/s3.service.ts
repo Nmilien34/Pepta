@@ -44,23 +44,6 @@ export function signedUrlExpiresAt(): string {
   return new Date(Date.now() + SIGNED_URL_TTL_SECONDS * 1000).toISOString();
 }
 
-export async function createPresignedPutUrl(input: {
-  key: string;
-  contentType: string;
-  expiresInSeconds?: number;
-}): Promise<string> {
-  const config = s3Config();
-  const command = new PutObjectCommand({
-    Bucket: config.bucketName,
-    Key: input.key,
-    ContentType: input.contentType,
-  });
-
-  return getSignedUrl(getS3Client(), command, {
-    expiresIn: input.expiresInSeconds ?? SIGNED_URL_TTL_SECONDS,
-  });
-}
-
 export async function createPresignedPostUpload(input: {
   key: string;
   contentType: string;

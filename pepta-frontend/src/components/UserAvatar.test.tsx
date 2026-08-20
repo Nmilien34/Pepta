@@ -60,7 +60,7 @@ describe("UserAvatar signed URL lifecycle", () => {
     await act(async () => {
       tree = TestRenderer.create(<UserAvatar />);
     });
-    expect(tree.root.find((node) => node.type === "Image").props.source.uri).toBe(
+    expect(tree.root.find((node) => (node.type as unknown) === "Image").props.source.uri).toBe(
       "https://signed.example/first",
     );
 
@@ -68,7 +68,7 @@ describe("UserAvatar signed URL lifecycle", () => {
       await vi.advanceTimersByTimeAsync(30_000);
     });
     expect(mocks.getAvatarViewUrl).toHaveBeenCalledTimes(2);
-    expect(tree.root.find((node) => node.type === "Image").props.source.uri).toBe(
+    expect(tree.root.find((node) => (node.type as unknown) === "Image").props.source.uri).toBe(
       "https://signed.example/refreshed",
     );
     expect(JSON.stringify(tree.toJSON())).not.toContain("provider.example");
@@ -85,7 +85,9 @@ describe("UserAvatar signed URL lifecycle", () => {
       tree = TestRenderer.create(<UserAvatar />);
     });
 
-    expect(tree.root.findAll((node) => node.type === "Image")).toHaveLength(0);
+    expect(
+      tree.root.findAll((node) => (node.type as unknown) === "Image"),
+    ).toHaveLength(0);
     expect(JSON.stringify(tree.toJSON())).not.toContain("provider.example");
   });
 });

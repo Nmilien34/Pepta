@@ -369,16 +369,12 @@ describe("user service account settings", () => {
     );
   });
 
-  it("deletes the user, user-owned data, and known S3 images", async () => {
-    mocks.progressPhotoFind.mockResolvedValue([
-      { s3Key: "pepta/progress/user-1/front.jpg" },
-    ]);
+  it("queues all media before account deletion without calling S3 synchronously", async () => {
     mocks.userFindById.mockResolvedValue(
       document({
         id: userId,
         email: "nick@pepta.app",
         emailVerified: true,
-        avatarKey: "pepta/avatars/user-1/avatar.jpg",
         authProviders: [],
         entitlement: { status: "free", expiresAt: null, willRenew: false },
         onboardingComplete: true,
@@ -389,10 +385,8 @@ describe("user service account settings", () => {
 
     await deleteCurrentUser(userId);
 
-    expect(mocks.deleteS3Object.mock.calls.map(([key]) => key).sort()).toEqual([
-      "pepta/avatars/user-1/avatar.jpg",
-      "pepta/progress/user-1/front.jpg",
-    ]);
+    expect(mocks.deleteS3Object).not.toHaveBeenCalled();
+    expect(mocks.progressPhotoFind).not.toHaveBeenCalled();
     expect(mocks.modelDeleteMany.UserProfileModel).toHaveBeenCalledWith({
       userId,
     });

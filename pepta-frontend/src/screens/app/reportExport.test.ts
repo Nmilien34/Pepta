@@ -28,9 +28,11 @@ const mealWithPhoto = {
 const progressPhoto = {
   id: "photo_1",
   userId: "user_1",
+  mediaId: "media_2",
   captureDate: "2026-06-24",
-  s3Key: "pepta/progress-photos/user_1/photo.jpg",
   contentType: "image/jpeg",
+  sizeBytes: 8421,
+  kind: "body",
   status: "uploaded",
   viewUrl: "https://signed.example.com/photo.jpg",
   createdAt: "2026-06-24T12:00:00.000Z",
@@ -93,7 +95,7 @@ describe("reportExport", () => {
         id: "photo_1",
         captureDate: "2026-06-24",
         contentType: "image/jpeg",
-        sizeBytes: undefined,
+        sizeBytes: 8421,
         kind: "body",
         faceFullness: undefined,
         status: "uploaded",
@@ -101,6 +103,11 @@ describe("reportExport", () => {
         updatedAt: "2026-06-24T12:00:00.000Z",
       },
     ]);
+    const serialized = JSON.stringify(payload);
+    expect(serialized).not.toContain("media_1");
+    expect(serialized).not.toContain("media_2");
+    expect(serialized).not.toContain("signed.example.com");
+    expect(serialized).not.toContain("s3Key");
   });
 
   it("turns the report payload into shareable JSON", () => {

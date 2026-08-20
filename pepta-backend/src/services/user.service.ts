@@ -44,7 +44,6 @@ import {
   WeightLogModel,
   type UserDocument,
 } from "../models";
-import { deleteS3Object } from "./s3.service";
 import {
   getMediaViewUrl,
   queueAllUserMediaForDeletion,
@@ -418,34 +417,12 @@ export async function updateCurrentUser(
   return serializeUser(user);
 }
 
-function optionalS3Key(value: unknown): string | null {
-  return typeof value === "string" && value.trim().length > 0 ? value : null;
-}
-
-async function collectAccountS3Keys(
-  userId: string,
-  user: UserDocument,
-): Promise<string[]> {
-  const progressPhotos = await ProgressPhotoModel.find({ userId });
-  const keys = new Set<string>();
-  const avatarKey = optionalS3Key(documentObject(user).avatarKey);
-  if (avatarKey) keys.add(avatarKey);
-
-  for (const photo of progressPhotos) {
-    const key = optionalS3Key(documentObject(photo).s3Key);
-    if (key) keys.add(key);
-  }
-  return [...keys];
-}
-
 export async function deleteCurrentUser(userId: string): Promise<void> {
   const user = await UserModel.findById(userId);
   if (!user) {
     throw new NotFoundError("User not found");
   }
 
-  const s3Keys = await collectAccountS3Keys(userId, user);
-  await Promise.all(s3Keys.map((key) => deleteS3Object(key)));
   await queueAllUserMediaForDeletion(userId);
 
   await Promise.all([
