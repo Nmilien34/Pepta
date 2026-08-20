@@ -48,6 +48,7 @@ import { createLegalRouter } from "./routes/legal.routes";
 import { createMealLogsRouter } from "./routes/meal-logs.routes";
 import mealScansRoutes from "./routes/meal-scans.routes";
 import medicationLevelRoutes from "./routes/medication-level.routes";
+import mediaRoutes from "./routes/media.routes";
 import meRoutes from "./routes/me.routes";
 import onboardingRoutes from "./routes/onboarding.routes";
 import referralRoutes from "./routes/referral.routes";
@@ -158,6 +159,7 @@ export function createApp(options: CreateAppOptions = {}): Express {
   app.use("/referrals", referralRoutes);
   app.use("/home", ...premium, homeRoutes);
   app.use("/track", ...premium, trackRoutes);
+  app.use("/media", ...premium, mediaRoutes);
   app.use("/favourites", ...premium, favouritesRoutes);
   app.use("/recipes", ...premium, recipesRoutes);
   app.use("/progress", ...premium, progressRoutes);
