@@ -22,7 +22,12 @@
     "access:revoke": "tsx src/scripts/access-admin.ts revoke",
     "access:link-apple": "tsx src/scripts/access-admin.ts link-apple",
     "access:cleanup-list": "tsx src/scripts/access-admin.ts cleanup-list",
-    "access:cleanup-retry": "tsx src/scripts/access-admin.ts cleanup-retry"
+    "access:cleanup-retry": "tsx src/scripts/access-admin.ts cleanup-retry",
+    "media:reconcile": "tsx src/scripts/media-admin.ts reconcile",
+    "media:orphans": "tsx src/scripts/media-admin.ts orphans",
+    "media:failed": "tsx src/scripts/media-admin.ts failed",
+    "media:retry": "tsx src/scripts/media-admin.ts retry",
+    "media:check": "tsx src/scripts/media-admin.ts check"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.758.0",

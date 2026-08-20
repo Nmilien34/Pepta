@@ -135,6 +135,70 @@ export async function queueExpiredMedia(now = new Date()): Promise<number> {
   return result.modifiedCount;
 }
 
+export interface ExhaustedMediaRow {
+  id: string;
+  userId: string;
+  status: MediaStatus;
+  intent: string;
+  source: string;
+  storageKey: string | null;
+  stagingKey: string | null;
+  deleteAttemptCount: number;
+  lastUpdatedAt: Date | null;
+}
+
+const EXHAUSTED_FILTER: FilterQuery<MediaAssetDocument> = {
+  lastDeleteErrorCode: "RETRYABLE_EXHAUSTED",
+};
+
+/**
+ * Rows the reaper has given up on: MAX_DELETE_ATTEMPTS failures parked them
+ * with nextDeleteAttemptAt unset, so nothing retries them without an
+ * operator. This is the list that must be worked down to zero.
+ */
+export async function listExhaustedMedia(limit = 100): Promise<ExhaustedMediaRow[]> {
+  const rows = await MediaAssetModel.find(EXHAUSTED_FILTER)
+    .sort({ updatedAt: 1 })
+    .limit(Math.max(1, Math.min(limit, 500)));
+
+  return rows.map((row) => ({
+    id: row._id.toString(),
+    userId: row.userId.toString(),
+    status: row.status,
+    intent: row.intent,
+    source: row.source,
+    storageKey: row.storageKey ?? null,
+    stagingKey: row.stagingKey ?? null,
+    deleteAttemptCount: row.deleteAttemptCount,
+    lastUpdatedAt: (row as { updatedAt?: Date }).updatedAt ?? null,
+  }));
+}
+
+/**
+ * Puts parked rows back in front of the reaper: attempts reset to zero, due
+ * immediately, error and lease cleared. Scoped to specific ids or the whole
+ * parked set. Rows that are not parked are left alone — this cannot be used
+ * to hurry a row that is merely between backoffs.
+ */
+export async function retryExhaustedMedia(
+  ids?: string[],
+  now = new Date(),
+): Promise<number> {
+  // An EMPTY array means "these zero rows", not "all rows". Collapsing the
+  // two would turn a caller's narrowed-to-nothing selection into a
+  // collection-wide requeue.
+  if (ids && ids.length === 0) return 0;
+  const filter: FilterQuery<MediaAssetDocument> = ids
+    ? { ...EXHAUSTED_FILTER, _id: { $in: ids } }
+    : EXHAUSTED_FILTER;
+
+  const result = await MediaAssetModel.updateMany(filter, {
+    $set: { nextDeleteAttemptAt: now, deleteAttemptCount: 0 },
+    $unset: { deleteLeaseUntil: 1, lastDeleteErrorCode: 1 },
+  });
+  return result.modifiedCount;
+}
+
 export async function runDueMediaCleanup(options: {
   now?: Date;
   limit?: number;

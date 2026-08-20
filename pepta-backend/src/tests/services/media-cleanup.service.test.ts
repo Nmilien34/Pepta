@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  find: vi.fn(),
   findOneAndUpdate: vi.fn(),
   updateMany: vi.fn(),
   updateOne: vi.fn(),
@@ -9,6 +10,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("../../models/media-asset.model", () => ({
   MediaAssetModel: {
+    find: mocks.find,
     findOneAndUpdate: mocks.findOneAndUpdate,
     updateMany: mocks.updateMany,
     updateOne: mocks.updateOne,
@@ -20,7 +22,9 @@ vi.mock("../../services/s3.service", () => ({
 }));
 
 import {
+  listExhaustedMedia,
   queueExpiredMedia,
+  retryExhaustedMedia,
   runDueMediaCleanup,
 } from "../../services/media-cleanup.service";
 
@@ -188,5 +192,57 @@ describe("media cleanup leasing", () => {
       failed: 0,
     });
     expect(mocks.deleteS3Object).not.toHaveBeenCalled();
+  });
+});
+
+describe("the operator's parked-row tooling", () => {
+  it("lists only rows the reaper has given up on", async () => {
+    const rows = [
+      asset({
+        _id: { toString: () => MEDIA },
+        userId: { toString: () => "507f1f77bcf86cd799439011" },
+        lastDeleteErrorCode: "RETRYABLE_EXHAUSTED",
+        deleteAttemptCount: 12,
+      }),
+    ];
+    mocks.find.mockReturnValue({
+      sort: vi.fn(() => ({ limit: vi.fn().mockResolvedValue(rows) })),
+    });
+
+    const out = await listExhaustedMedia();
+
+    expect(mocks.find).toHaveBeenCalledWith({
+      lastDeleteErrorCode: "RETRYABLE_EXHAUSTED",
+    });
+    expect(out[0]).toMatchObject({ id: MEDIA, deleteAttemptCount: 12 });
+  });
+
+  it("requeues parked rows: due now, attempts zeroed, error and lease cleared", async () => {
+    mocks.updateMany.mockResolvedValue({ modifiedCount: 3 });
+
+    const modified = await retryExhaustedMedia(undefined, NOW);
+
+    expect(modified).toBe(3);
+    expect(mocks.updateMany).toHaveBeenCalledWith(
+      { lastDeleteErrorCode: "RETRYABLE_EXHAUSTED" },
+      {
+        $set: { nextDeleteAttemptAt: NOW, deleteAttemptCount: 0 },
+        $unset: { deleteLeaseUntil: 1, lastDeleteErrorCode: 1 },
+      },
+    );
+  });
+
+  it("scopes a retry to the ids the operator named — and ONLY parked ones", async () => {
+    mocks.updateMany.mockResolvedValue({ modifiedCount: 1 });
+
+    await retryExhaustedMedia([MEDIA], NOW);
+
+    const [filter] = mocks.updateMany.mock.calls[0]!;
+    // A row merely between backoffs must not match: the parked-error filter
+    // stays on even when ids are given.
+    expect(filter).toEqual({
+      lastDeleteErrorCode: "RETRYABLE_EXHAUSTED",
+      _id: { $in: [MEDIA] },
+    });
   });
 });
