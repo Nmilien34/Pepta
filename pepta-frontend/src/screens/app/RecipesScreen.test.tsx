@@ -155,6 +155,18 @@ describe("RecipesScreen · nothing is static", () => {
 });
 
 describe("RecipesScreen · the actions", () => {
+  it("opens a recipe detail without triggering its row actions", async () => {
+    const tree = await render({ recipes: [shake], starters: [] });
+
+    press(tree, "Open Morning shake");
+
+    expect(mocks.navigate).toHaveBeenCalledWith("RecipeDetail", {
+      recipeId: "Morning shake",
+    });
+    expect(mocks.openMeal).not.toHaveBeenCalled();
+    expect(mocks.deleteRecipe).not.toHaveBeenCalled();
+  });
+
   it("logs a recipe as the meal it is, with summed macros", async () => {
     const tree = await render({ recipes: [shake], starters: [] });
     press(tree, "Log Morning shake");
