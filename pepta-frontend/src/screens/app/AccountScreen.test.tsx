@@ -560,6 +560,30 @@ describe("AccountScreen settings", () => {
     expect(mocks.navigate).toHaveBeenCalledWith("AccountFAQ");
   });
 
+  it("puts WhatsApp at the top of one Community & support section", async () => {
+    // Community and Support were two cards, the first holding a single row —
+    // which read as a stray link rather than a place to go. They are the same
+    // errand, and the group is the channel we want people using, so it leads.
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+
+    await act(async () => {
+      tree = TestRenderer.create(<AccountScreen />);
+    });
+
+    const screen = nodeText(tree!.root);
+
+    expect(screen).toContain("Community & support");
+    // The two old headings are gone, not merely reordered.
+    expect(screen).not.toMatch(/\bCommunity\b(?!\s*&)/);
+    expect(screen).not.toMatch(/(?<!& )\bSupport\b/);
+
+    // WhatsApp comes before every mail route, so the person with a question
+    // meets the group first and the inbox second.
+    for (const later of ["FAQ", "Feature requests", "Report a problem", "Help"]) {
+      expect(screen.indexOf("WhatsApp")).toBeLessThan(screen.indexOf(later));
+    }
+  });
+
   it("opens the Pepta WhatsApp community channel from settings", async () => {
     let tree: TestRenderer.ReactTestRenderer | undefined;
 

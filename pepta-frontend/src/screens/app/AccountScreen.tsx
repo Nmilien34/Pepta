@@ -371,7 +371,14 @@ export function AccountScreen() {
       chevron: true,
     },
   ];
-  const community: Row[] = [
+  // ONE SECTION, AND WHATSAPP LEADS IT.
+  //
+  // Community and Support were two cards with one row in the first, which read
+  // as a stray link rather than a place to go. They are the same errand: a
+  // person who scrolls here has a question. The group is where we want that
+  // question answered, so it is the first thing offered — the mail rows below
+  // it are the fallback, not the front door.
+  const communitySupport: Row[] = [
     {
       icon: "community",
       label: "WhatsApp",
@@ -379,8 +386,6 @@ export function AccountScreen() {
       onPress: openUrl(WHATSAPP_COMMUNITY_URL),
       chevron: true,
     },
-  ];
-  const support: Row[] = [
     {
       icon: "help-circle",
       label: "FAQ",
@@ -554,8 +559,7 @@ export function AccountScreen() {
           >
             <Section title="Data & reports" delay={330} rows={dataReports} />
           </View>
-          <Section title="Community" delay={360} rows={community} />
-          <Section title="Support" delay={390} rows={support} />
+          <Section title="Community & support" delay={360} rows={communitySupport} />
           <Section title="About" delay={450} rows={about} />
 
           {/* sign out */}
