@@ -296,10 +296,18 @@ export async function getHome(
         : {}),
     },
     rangeAvailability: results.rangeAvailability,
-    todayProteinGrams: results.totals.protein,
-    todayFiberGrams: results.totals.fiber,
-    todayCalories: results.totals.calories,
-    todayWaterOz: results.totals.waterOz,
+    // TODAY's totals, from the 'today' window computed above — NOT
+    // results.totals, which is the SELECTED range. These four feed
+    // todayStat() on the client, whose whole job is "today's number against
+    // today's target, whatever range Home is showing", plus the widget
+    // preview and the report export. Wired to the range totals, switching
+    // Home to Monthly made the Protein screen read a month of grams against
+    // a daily target — the exact claim todayStat's comment says is
+    // impossible. rangeTotals below is where the range's numbers belong.
+    todayProteinGrams: results.todayTotals.protein,
+    todayFiberGrams: results.todayTotals.fiber,
+    todayCalories: results.todayTotals.calories,
+    todayWaterOz: results.todayTotals.waterOz,
     streakDays: results.streakDays,
     setupProgress: {
       loggedItems,

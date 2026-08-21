@@ -74,10 +74,6 @@ function storageFailed(): AppError {
   });
 }
 
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
-
 function roundOne(value: number): number {
   return Math.round(value * 10) / 10;
 }
@@ -425,27 +421,21 @@ export async function analyzeMealScan(userId: string, input: MealScanInput) {
 }
 
 export async function parseVoiceMeal(userId: string, input: MealVoiceInput) {
-  let analysis: MealScanAnalysis;
-  let visionEngineVersion = MEAL_SCAN_TEXT_ENGINE_VERSION;
+  const visionEngineVersion = MEAL_SCAN_TEXT_ENGINE_VERSION;
 
-  try {
-    analysis = await generateMealTextAnalysis(input.transcript);
-  } catch (error) {
-    logger.warn({ error }, "[meal-scan] voice parse failed");
-    const words = input.transcript.trim().split(/\s+/).length;
-    const estimatedCalories = clamp(words * 12, 0, 1200);
-    analysis = {
-      foodName: input.transcript.slice(0, 80),
-      servingSize: "voice estimate",
-      protein: 0,
-      calories: estimatedCalories,
-      carbs: 0,
-      fat: 0,
-      fiber: 0,
-      confidence: 0.25,
-    };
-    visionEngineVersion = "voice-log-fallback-v1";
-  }
+  // NO FABRICATED FALLBACK. This used to catch any model failure and invent
+  // an analysis: protein/carbs/fat/fiber all zero, calories derived from the
+  // TRANSCRIPT'S WORD COUNT (words * 12). The user saw an ordinary review
+  // card — "grilled chicken breast with rice and broccoli, 0 g protein,
+  // 84 cal" with a confidence badge — and logging it wrote those numbers
+  // into their day as a real meal. In a protein-tracking app for GLP-1
+  // users, silently recording 0 g of protein for a chicken dinner is worse
+  // than any error message.
+  //
+  // The failure now propagates. generateMealTextAnalysis raises an
+  // actionable 503, and the app already handles it: "Couldn't read that
+  // description. Try again, or log it manually."
+  const analysis = await generateMealTextAnalysis(input.transcript);
 
   const capturedAt = input.recordedAt ? new Date(input.recordedAt) : new Date();
   const { snapshot, biggestWorry } = await computeProteinSnapshot({

@@ -365,19 +365,30 @@ describe("meal scan service", () => {
     );
   });
 
-  it("falls back safely when voice meal parsing is unavailable", async () => {
+  it("surfaces the failure instead of inventing nutrition when voice parsing is unavailable", async () => {
+    // This used to return a fabricated analysis: protein/carbs/fat/fiber all
+    // zero and calories derived from the transcript's WORD COUNT, shown to
+    // the user as an ordinary review card with a confidence badge. Logging
+    // it wrote 0 g of protein for a real meal into their day. In a
+    // protein-tracking app that is worse than any error message.
     mocks.generateMealTextAnalysis.mockRejectedValueOnce(
       new Error("OpenAI unavailable"),
     );
 
-    const result = await parseVoiceMeal("user-1", {
-      transcript: "small yogurt",
-    });
+    await expect(
+      parseVoiceMeal("user-1", { transcript: "grilled chicken breast with rice" }),
+    ).rejects.toThrow("OpenAI unavailable");
+  });
 
-    expect(result.analysis.foodName).toBe("small yogurt");
-    expect(result.analysis.confidence).toBeLessThan(0.3);
-    expect(result.note).toContain("Review this estimate");
-    expect(result.visionEngineVersion).toBe("voice-log-fallback-v1");
+  it("writes nothing to the user's log when voice parsing fails", async () => {
+    mocks.generateMealTextAnalysis.mockRejectedValueOnce(
+      new Error("OpenAI unavailable"),
+    );
+
+    await expect(
+      parseVoiceMeal("user-1", { transcript: "grilled chicken breast with rice" }),
+    ).rejects.toThrow();
+    expect(mocks.mealScanCreate).not.toHaveBeenCalled();
   });
 
   it("rejects image bytes that do not match the declared mime type", async () => {
