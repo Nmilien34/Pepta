@@ -2,7 +2,7 @@
 // bare workflow forbids runtime-version policies, so it must be a literal).
 // Info.plist and pbxproj still hardcode their own copies — bump ALL of them
 // together; preflight-release.sh step 7 fails the archive on drift.
-const marketingVersion = "1.0.7";
+const marketingVersion = "1.0.8";
 
 const appsFlyerDevKey = process.env.EXPO_PUBLIC_APPSFLYER_DEV_KEY ?? "";
 const appsFlyerAppId = process.env.EXPO_PUBLIC_APPSFLYER_APP_ID ?? "";
@@ -21,7 +21,7 @@ module.exports = {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "ai.boltzman.peptaapp",
-      buildNumber: "34",
+      buildNumber: "35",
       usesAppleSignIn: true,
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
