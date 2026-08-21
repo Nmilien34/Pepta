@@ -418,6 +418,26 @@ export async function updateCurrentUser(
   return serializeUser(user);
 }
 
+/**
+ * Strips a deleted account's payment receipts to a financial-records core.
+ *
+ * The receipts are KEPT — Apple disputes and chargebacks arrive after someone
+ * deletes their account, and defending one needs the transaction, not the
+ * person. What goes is everything that ties a receipt to this human: the
+ * Pepta user reference. What stays is the money: transaction id, product,
+ * price and currency, event type, store, environment, timestamps, and the
+ * RevenueCat customer id the charge was actually made against.
+ *
+ * `detached` makes "this belonged to an account that no longer exists" a fact
+ * on the row rather than something inferred from a null.
+ */
+async function stripPaymentReceiptsForDeletedUser(userId: string): Promise<void> {
+  await ProcessedWebhookEventModel.updateMany(
+    { $or: [{ userId }, { appUserId: userId }] },
+    { $set: { userId: null, detached: true } },
+  );
+}
+
 export async function deleteCurrentUser(userId: string): Promise<void> {
   const user = await UserModel.findById(userId);
   if (!user) {
@@ -455,8 +475,14 @@ export async function deleteCurrentUser(userId: string): Promise<void> {
     PepMemoryModel.deleteMany({ userId }),
     PepPushDeliveryModel.deleteMany({ userId }),
     DismissedNudgeModel.deleteMany({ userId }),
-    ProcessedWebhookEventModel.deleteMany({ appUserId: userId }),
+    // NOT deleted — see stripPaymentReceiptsForDeletedUser below.
   ]);
+
+  // Payment receipts are RETAINED, stripped to a financial-records core.
+  // Apple disputes and chargebacks arrive after a user deletes their account,
+  // and defending one needs the transaction, not the person. Everything that
+  // ties a receipt to this human goes; the money facts stay.
+  await stripPaymentReceiptsForDeletedUser(userId);
 
   // Audit H1: after user-owned data is removed, record durable promotional
   // cleanup immediately before the user document disappears. RevenueCat

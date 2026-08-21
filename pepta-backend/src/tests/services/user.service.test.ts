@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  processedUpdateMany: vi.fn(async () => ({ modifiedCount: 0 })),
   deleteS3Object: vi.fn(),
   prepareComplimentaryCleanupForDeletion: vi.fn(),
   queueAllUserMediaForDeletion: vi.fn(),
@@ -74,6 +75,7 @@ vi.mock("../../models", () => ({
   },
   ProcessedWebhookEventModel: {
     deleteMany: mocks.modelDeleteMany.ProcessedWebhookEventModel,
+    updateMany: mocks.processedUpdateMany,
   },
   ProgressPhotoModel: {
     deleteMany: mocks.modelDeleteMany.ProgressPhotoModel,
@@ -416,11 +418,14 @@ describe("user service account settings", () => {
       userId,
     });
     expect(mocks.queueAllUserMediaForDeletion).toHaveBeenCalledWith(userId);
-    expect(
-      mocks.modelDeleteMany.ProcessedWebhookEventModel,
-    ).toHaveBeenCalledWith({
-      appUserId: userId,
-    });
+    // Payment receipts are RETAINED and stripped, not deleted: a chargeback
+    // can arrive after the account is gone, and defending it needs the
+    // transaction rather than the person.
+    expect(mocks.modelDeleteMany.ProcessedWebhookEventModel).not.toHaveBeenCalled();
+    expect(mocks.processedUpdateMany).toHaveBeenCalledWith(
+      { $or: [{ userId }, { appUserId: userId }] },
+      { $set: { userId: null, detached: true } },
+    );
     expect(mocks.modelDeleteMany.ReferralClaimModel).toHaveBeenCalledWith({
       userId,
     });
@@ -444,18 +449,20 @@ describe("user service account settings", () => {
       mocks.sweepLegacyMediaForDeletion.mock.invocationCallOrder[0],
     ).toBeLessThan(
       Math.min(
-        ...Object.values(mocks.modelDeleteMany).map(
-          (mock) => mock.mock.invocationCallOrder[0]!,
-        ),
+        ...Object.values(mocks.modelDeleteMany)
+          // ProcessedWebhookEventModel is no longer deleted, so it has no
+          // invocation order to compare against.
+          .map((mock) => mock.mock.invocationCallOrder[0])
+          .filter((order): order is number => typeof order === "number"),
       ),
     );
     const cleanupOrder =
       mocks.prepareComplimentaryCleanupForDeletion.mock.invocationCallOrder[0]!;
     expect(
       Math.max(
-        ...Object.values(mocks.modelDeleteMany).map(
-          (mock) => mock.mock.invocationCallOrder[0]!,
-        ),
+        ...Object.values(mocks.modelDeleteMany)
+          .map((mock) => mock.mock.invocationCallOrder[0])
+          .filter((order): order is number => typeof order === "number"),
       ),
     ).toBeLessThan(cleanupOrder);
     expect(cleanupOrder).toBeLessThan(

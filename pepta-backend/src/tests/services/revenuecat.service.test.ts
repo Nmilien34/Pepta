@@ -432,3 +432,80 @@ describe('a purchase survives a failure mid-handler', () => {
     );
   });
 });
+
+// Trials were invisible: period_type was parsed by the schema and read by
+// nothing, so a trial purchase was stored as 'active' and 'trialing' — defined
+// in both the Mongo enum and the shared enum — could never be written.
+describe('trials are distinguishable from payments', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.processedFindOne.mockResolvedValue(null);
+    mocks.processedCreate.mockResolvedValue(undefined);
+  });
+
+  function trialEvent(type: string, periodType: string, id: string, appUserId: string) {
+    return {
+      event: {
+        id,
+        type,
+        app_user_id: appUserId,
+        entitlement_id: 'pepta_plus',
+        period_type: periodType,
+        expiration_at_ms: Date.parse('2026-09-01T00:00:00.000Z'),
+      },
+    } as never;
+  }
+
+  it('stores a trial purchase as trialing, not active', async () => {
+    const userId = new Types.ObjectId().toString();
+    const user = userDocument({ id: userId, status: 'free' });
+    mocks.userFindById.mockResolvedValue(user);
+
+    await applyRevenueCatWebhook(trialEvent('INITIAL_PURCHASE', 'TRIAL', 'evt_t1', userId));
+
+    expect(user.entitlement.status).toBe('trialing');
+  });
+
+  it('flips to active on the first paying renewal', async () => {
+    const userId = new Types.ObjectId().toString();
+    const user = userDocument({ id: userId, status: 'trialing' });
+    mocks.userFindById.mockResolvedValue(user);
+
+    await applyRevenueCatWebhook(trialEvent('RENEWAL', 'NORMAL', 'evt_t2', userId));
+
+    expect(user.entitlement.status).toBe('active');
+  });
+
+  it('treats a paid purchase with no trial period as active', async () => {
+    const userId = new Types.ObjectId().toString();
+    const user = userDocument({ id: userId, status: 'free' });
+    mocks.userFindById.mockResolvedValue(user);
+
+    await applyRevenueCatWebhook(trialEvent('INITIAL_PURCHASE', 'NORMAL', 'evt_t3', userId));
+
+    expect(user.entitlement.status).toBe('active');
+  });
+
+  it('cancelling a trial leaves access until it expires, as Apple does', async () => {
+    const userId = new Types.ObjectId().toString();
+    const user = userDocument({ id: userId, status: 'trialing' });
+    mocks.userFindById.mockResolvedValue(user);
+
+    await applyRevenueCatWebhook(trialEvent('CANCELLATION', 'TRIAL', 'evt_t4', userId));
+
+    // active_canceled still reads as access until expiresAt passes.
+    expect(user.entitlement.status).toBe('active_canceled');
+    expect(user.entitlement.expiresAt).toEqual(new Date('2026-09-01T00:00:00.000Z'));
+  });
+
+  it('records the period on the receipt so the cohort is queryable', async () => {
+    const userId = new Types.ObjectId().toString();
+    mocks.userFindById.mockResolvedValue(userDocument({ id: userId }));
+
+    await applyRevenueCatWebhook(trialEvent('INITIAL_PURCHASE', 'TRIAL', 'evt_t5', userId));
+
+    expect(mocks.processedCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ periodType: 'TRIAL' }),
+    );
+  });
+});

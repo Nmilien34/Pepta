@@ -601,6 +601,8 @@ const processedWebhookEventSchema = new Schema<ProcessedWebhookEventDocument>(
 // Apple dispute or a "I paid and have no access" support request still
 // arrives — and it is the only local record of the charge.
 
+processedWebhookEventSchema.index({ userId: 1, processedAt: -1 });
+
 applyApiTransforms(progressPhotoSchema);
 applyApiTransforms(mealScanSchema);
 applyApiTransforms(insightSchema);

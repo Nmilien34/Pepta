@@ -49,8 +49,30 @@ const ENTITLEMENT_EVENT_STATUS: Record<string, SubscriptionStatus> = {
   REFUND: 'refunded',
 };
 
-function statusForEvent(type: string): SubscriptionStatus | null {
-  return ENTITLEMENT_EVENT_STATUS[type] ?? null;
+/**
+ * RevenueCat reports which phase of the subscription an event belongs to.
+ * TRIAL and INTRO are the free/discounted opening period; NORMAL is a paying
+ * one. period_type was parsed by the schema and read by nothing, so a trial
+ * purchase was stored as 'active' and 'trialing' — a status both the Mongo
+ * enum and the shared enum define — was unreachable. The backend could not
+ * tell a trialist from a payer, so nothing server-side could act on the
+ * trial-to-paid boundary or count how many trials are running.
+ */
+function isTrialPeriod(periodType: string | null | undefined): boolean {
+  return typeof periodType === 'string' && periodType.toUpperCase() === 'TRIAL';
+}
+
+function statusForEvent(
+  type: string,
+  periodType?: string | null,
+): SubscriptionStatus | null {
+  const mapped = ENTITLEMENT_EVENT_STATUS[type];
+  if (mapped === undefined) return null;
+  // A purchase or renewal inside the trial period is access, but it is not a
+  // payment yet. Conversion — the first NORMAL-period renewal — flips it to
+  // 'active' through this same path.
+  if (mapped === 'active' && isTrialPeriod(periodType)) return 'trialing';
+  return mapped;
 }
 
 function isDuplicateKey(error: unknown): error is DuplicateKeyError {
@@ -297,7 +319,7 @@ export async function applyRevenueCatWebhook(input: RevenueCatWebhook): Promise<
     typeof event.expiration_at_ms === 'number'
       ? new Date(event.expiration_at_ms)
       : null;
-  const nextStatus = statusForEvent(event.type);
+  const nextStatus = statusForEvent(event.type, event.period_type);
 
   if (event.type !== 'TRANSFER' && nextStatus === null) {
     // Acknowledged, recorded, and NOT acted on. RevenueCat keeps inventing
