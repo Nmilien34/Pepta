@@ -651,7 +651,12 @@ export async function searchFoods(query: string): Promise<FoodSearchResponse> {
     }
 
     const aiResults = parseFoodSearchJson(content).results;
-    cacheAiFoodSearchResults(normalizedSearchQuery, aiResults);
+    // Never cache "nothing". One bad reply used to make a real food
+    // unsearchable for 24 hours — for every user on the instance — with no
+    // error and no retry, long after the model was healthy again.
+    if (aiResults.length > 0) {
+      cacheAiFoodSearchResults(normalizedSearchQuery, aiResults);
+    }
     return { results: mergeSearchResults(localResults, aiResults) };
   } catch (error) {
     if (error instanceof AppError) {

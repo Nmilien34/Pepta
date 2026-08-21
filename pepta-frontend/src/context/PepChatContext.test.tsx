@@ -212,3 +212,62 @@ describe("PepChatProvider", () => {
     expect(input(tree.root).props.value).toBe("");
   });
 });
+
+// The user's question is added to the transcript BEFORE the request goes out,
+// and a failure leaves it there. Retry must resend that transcript, not
+// re-append the question to it.
+describe("retrying a failed answer", () => {
+  beforeEach(() => {
+    mocks.coachChat.mockReset();
+    mocks.hasAIDataSharingConsent.mockReset();
+    mocks.hasAIDataSharingConsent.mockResolvedValue(true);
+    mocks.saveAIDataSharingConsent.mockReset();
+    mocks.saveAIDataSharingConsent.mockResolvedValue(undefined);
+  });
+
+  async function askAndFail(seed: string) {
+    mocks.coachChat.mockRejectedValueOnce(new Error("429"));
+    const tree = render(seed);
+    await act(async () => {
+      byLabel(tree.root, "open-chat").props.onPress();
+    });
+    await act(async () => {
+      await byLabel(tree.root, "Send Pep message").props.onPress();
+    });
+    return tree;
+  }
+
+  it("does not send the question twice", async () => {
+    const seed = "How much protein have I had today?";
+    const tree = await askAndFail(seed);
+    mocks.coachChat.mockResolvedValue({ reply: "About 90g.", refused: false });
+
+    await act(async () => {
+      await byLabel(tree.root, "Retry").props.onPress();
+    });
+
+    expect(mocks.coachChat).toHaveBeenCalledTimes(2);
+    // The retry carries the SAME one-message transcript, not the question
+    // repeated back to back.
+    expect(mocks.coachChat.mock.calls[1]?.[0]).toEqual([
+      { role: "user", text: seed },
+    ]);
+  });
+
+  it("does not duplicate the question in the transcript", async () => {
+    const seed = "How much protein have I had today?";
+    const tree = await askAndFail(seed);
+    mocks.coachChat.mockResolvedValue({ reply: "About 90g.", refused: false });
+
+    await act(async () => {
+      await byLabel(tree.root, "Retry").props.onPress();
+    });
+
+    // Count rendered Text nodes only — AppText maps to "Text" in this
+    // harness, so a nested walk would count the same bubble twice.
+    const shown = tree.root
+      .findAll((node) => String(node.type) === "Text")
+      .filter((node) => node.props.children === seed);
+    expect(shown).toHaveLength(1);
+  });
+});

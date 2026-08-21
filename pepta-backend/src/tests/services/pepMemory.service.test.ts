@@ -219,7 +219,9 @@ describe("Pep memory service", () => {
             copyVersion: "pep-memory-summary-v1",
           },
         }),
-        $setOnInsert: { userId },
+        // lastNotification is carried like aiSummary — it is written only by
+        // the push path, so a refresh from a log write must not null it.
+        $setOnInsert: { userId, lastNotification: null },
       },
       { new: true, upsert: true, runValidators: true },
     );
@@ -242,7 +244,12 @@ describe("Pep memory service", () => {
     const [, update] = mocks.pepMemoryFindOneAndUpdate.mock.calls[0]!;
     expect(update.$set).not.toHaveProperty("aiSummary");
     // A brand-new row still starts explicitly empty rather than undefined.
-    expect(update.$setOnInsert).toEqual({ userId, aiSummary: null });
+    // A brand-new row starts explicitly empty for both carried fields.
+    expect(update.$setOnInsert).toEqual({
+      userId,
+      aiSummary: null,
+      lastNotification: null,
+    });
   });
 
   it("writes the summary through when one was actually generated", async () => {
@@ -256,7 +263,7 @@ describe("Pep memory service", () => {
     expect(update.$set.aiSummary).toMatchObject({
       text: "Two doses logged, protein on track.",
     });
-    expect(update.$setOnInsert).toEqual({ userId });
+    expect(update.$setOnInsert).toEqual({ userId, lastNotification: null });
   });
 
   it("refreshes memory after log creation without changing the log response", async () => {
@@ -359,5 +366,44 @@ describe("the AI summary is not rewritten on every sweep", () => {
     });
 
     expect(generateSummary).toHaveBeenCalledTimes(1);
+  });
+});
+
+// lastNotification is written only by the push path. A refresh from a log
+// write arrives with none, and nulling it there erased Pep's record of what
+// it had just nudged about — so Pep could repeat or contradict a notification
+// it sent minutes earlier with no idea it had sent one.
+describe("what a refresh is allowed to forget", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.pepMemoryFindOne.mockReturnValue({
+      select: () => ({ lean: () => Promise.resolve(null) }),
+    });
+  });
+
+  it("does not write lastNotification when the refresh has none", async () => {
+    await refreshPepMemory(userId, now, {
+      loadContext: async () => context(),
+    });
+
+    const [, update] = mocks.pepMemoryFindOneAndUpdate.mock.calls[0]!;
+    expect(update.$set).not.toHaveProperty("lastNotification");
+  });
+
+  it("writes it through when the push path supplies one", async () => {
+    const lastNotification = {
+      priorityId: "dose_due",
+      windowKey: "dose_due:2026-06-21",
+      sentAt: now,
+      source: "ai" as const,
+    };
+
+    await refreshPepMemory(userId, now, {
+      loadContext: async () => context(),
+      lastNotification,
+    });
+
+    const [, update] = mocks.pepMemoryFindOneAndUpdate.mock.calls[0]!;
+    expect(update.$set.lastNotification).toEqual(lastNotification);
   });
 });

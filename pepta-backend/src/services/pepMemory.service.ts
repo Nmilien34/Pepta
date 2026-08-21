@@ -319,13 +319,23 @@ async function upsertPepMemory(
   //
   // Absence of a summary is "nothing new to say", not "forget what you knew".
   // Clearing it is a separate, explicit act — see clearPepMemoryAiSummary.
-  const { aiSummary, ...rest } = snapshot;
+  //
+  // lastNotification is carried by the same rule, for the same reason: it is
+  // written by the push path and only ever passed in by it, so a refresh from
+  // a log write arrived with null and erased the record of what Pep had just
+  // nudged about. Pep could then repeat or contradict a notification it had
+  // sent minutes earlier, with no idea it had sent one.
+  const { aiSummary, lastNotification, ...rest } = snapshot;
+  const carried: Record<string, unknown> = { ...rest };
+  const onInsert: Record<string, unknown> = { userId };
+  if (aiSummary) carried.aiSummary = aiSummary;
+  else onInsert.aiSummary = null;
+  if (lastNotification) carried.lastNotification = lastNotification;
+  else onInsert.lastNotification = null;
+
   await PepMemoryModel.findOneAndUpdate(
     { userId },
-    {
-      $set: aiSummary ? { ...rest, aiSummary } : rest,
-      $setOnInsert: { userId, ...(aiSummary ? {} : { aiSummary: null }) },
-    },
+    { $set: carried, $setOnInsert: onInsert },
     { new: true, upsert: true, runValidators: true },
   );
 }
