@@ -6,7 +6,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
   const storage = new Map<string, string>();
-  return { storage, createProteinLog: vi.fn(), createDoseLog: vi.fn() };
+  return {
+    storage,
+    createProteinLog: vi.fn(),
+    createDoseLog: vi.fn(),
+    createWaterLog: vi.fn(),
+  };
 });
 
 vi.mock("@react-native-async-storage/async-storage", () => ({
@@ -25,7 +30,7 @@ vi.mock("./api", () => ({
     createMeasurement: vi.fn(),
     createActivityLog: vi.fn(),
     createMealLog: vi.fn(),
-    createWaterLog: vi.fn(),
+    createWaterLog: mocks.createWaterLog,
     createFiberLog: vi.fn(),
   },
 }));
@@ -298,5 +303,52 @@ describe("no single entry can hold the queue forever", () => {
     // Not dropped — SENT. The user's weigh-in is recovered, not discarded.
     expect(result.sent).toBe(1);
     expect(result.dropped).toBe(0);
+  });
+});
+
+// replayOutbox used to read the queue ONCE and then write back slices of that
+// stale in-memory copy. A log enqueued while a replay was in flight — the app
+// is online again, the user keeps logging — was erased by the next write-back.
+describe("a log enqueued mid-replay is not erased", () => {
+  it("survives a replay that started before it was queued", async () => {
+    const queued = {
+      key: "already-queued",
+      kind: "protein" as const,
+      payload: { grams: 30, datetime: NOW, idempotencyKey: "already-queued" },
+      enqueuedAt: NOW,
+      attempts: 0,
+    };
+    mocks.storage.set(outboxKey("user-1"), JSON.stringify([queued]));
+
+    // Hold the in-flight send open so we can enqueue underneath it, and wait
+    // until the replay has actually reached that send before doing so.
+    let releaseSend: () => void = () => undefined;
+    let sendStarted: () => void = () => undefined;
+    const started = new Promise<void>((resolve) => { sendStarted = () => resolve(); });
+    mocks.createProteinLog.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          releaseSend = () => resolve();
+          sendStarted();
+        }),
+    );
+
+    const replay = replayOutbox("user-1");
+    await started;
+
+    // The user logs water while the replay is mid-flight. It fails offline, so
+    // it lands in the queue — and stays offline, so the replay cannot simply
+    // send it and make the erasure invisible.
+    mocks.createWaterLog.mockRejectedValue(offline());
+    await saveLogDurably("user-1", "water", { amountOz: 8, datetime: NOW });
+
+    releaseSend();
+    await replay;
+
+    // The water log must still be queued. The old code wrote back a slice of
+    // the copy it read BEFORE the water log existed, erasing it — never sent,
+    // never stored, silently gone.
+    const remaining = parseOutbox(mocks.storage.get(outboxKey("user-1")) ?? null);
+    expect(remaining.map((e) => e.kind)).toEqual(["water"]);
   });
 });

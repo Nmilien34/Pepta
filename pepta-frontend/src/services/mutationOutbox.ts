@@ -188,6 +188,31 @@ const CALLS: Record<OutboxKind, (payload: Record<string, unknown>) => Promise<un
     (payload: Record<string, unknown>) => Promise<unknown>
   >;
 
+/**
+ * Every read-modify-write of a user's queue runs through here, one at a time.
+ *
+ * Without it, replayOutbox read the queue ONCE and then wrote back slices of
+ * that stale copy — so a log enqueued while a replay was in flight (the app
+ * came back online and the user kept logging) was silently erased by the next
+ * write-back. Both saveLogDurably and replayOutbox mutate the same key, and
+ * every await between a read and its write is an interleave point.
+ */
+const queueLocks = new Map<string, Promise<unknown>>();
+
+function withQueueLock<T>(userId: string, work: () => Promise<T>): Promise<T> {
+  const previous = queueLocks.get(userId) ?? Promise.resolve();
+  const next = previous.then(work, work);
+  // Keep the chain alive but never let a rejection poison the next waiter.
+  queueLocks.set(
+    userId,
+    next.then(
+      () => undefined,
+      () => undefined,
+    ),
+  );
+  return next;
+}
+
 async function readEntries(userId: string): Promise<OutboxEntry[]> {
   try {
     return parseOutbox(await AsyncStorage.getItem(outboxKey(userId)));
@@ -203,6 +228,32 @@ async function writeEntries(userId: string, entries: OutboxEntry[]): Promise<voi
   } catch {
     // Storage failure degrades to the old behavior (lost on quit) — never throws.
   }
+}
+
+/**
+ * Removes one entry BY KEY against a fresh read of the queue, returning what
+ * is left. Never writes back a slice of a copy read earlier — that is what
+ * erased concurrently-enqueued logs.
+ */
+async function dropEntry(userId: string, key: string): Promise<OutboxEntry[]> {
+  return withQueueLock(userId, async () => {
+    const current = await readEntries(userId);
+    const next = current.filter((entry) => entry.key !== key);
+    await writeEntries(userId, next);
+    return next;
+  });
+}
+
+/** Records another failed attempt on one entry, leaving the rest untouched. */
+async function bumpAttempts(userId: string, key: string): Promise<OutboxEntry[]> {
+  return withQueueLock(userId, async () => {
+    const current = await readEntries(userId);
+    const next = current.map((entry) =>
+      entry.key === key ? { ...entry, attempts: entry.attempts + 1 } : entry,
+    );
+    await writeEntries(userId, next);
+    return next;
+  });
 }
 
 export async function outboxCount(userId: string): Promise<number> {
@@ -231,15 +282,17 @@ export async function saveLogDurably(
     // confusion. Report it as what it is.
     if (error instanceof ResponseParseError) return "saved";
     if (!isRetryable(error)) throw error;
-    const entries = await readEntries(userId);
-    entries.push({
-      key,
-      kind,
-      payload: body,
-      enqueuedAt: new Date().toISOString(),
-      attempts: 1,
+    await withQueueLock(userId, async () => {
+      const entries = await readEntries(userId);
+      entries.push({
+        key,
+        kind,
+        payload: body,
+        enqueuedAt: new Date().toISOString(),
+        attempts: 1,
+      });
+      await writeEntries(userId, entries);
     });
-    await writeEntries(userId, entries);
     return "queued";
   }
 }
@@ -278,21 +331,18 @@ export async function replayOutbox(userId: string): Promise<ReplayResult> {
           `enqueuedAt=${entry.enqueuedAt}`,
         );
         dropped += 1;
-        entries = entries.slice(1);
-        await writeEntries(userId, entries);
+        entries = await dropEntry(userId, entry.key);
         continue;
       }
 
       try {
         await CALLS[entry.kind](entry.payload);
         sent += 1;
-        entries = entries.slice(1);
-        await writeEntries(userId, entries);
+        entries = await dropEntry(userId, entry.key);
       } catch (error) {
         if (isRetryable(error)) {
           // Still unhealthy — keep everything, in order, for next time.
-          entries = [{ ...entry, attempts: entry.attempts + 1 }, ...entries.slice(1)];
-          await writeEntries(userId, entries);
+          entries = await bumpAttempts(userId, entry.key);
           break;
         }
         // Final rejection: this entry can never succeed. Dropping it is the
@@ -306,8 +356,7 @@ export async function replayOutbox(userId: string): Promise<ReplayResult> {
             : "(server refused it)",
         );
         dropped += 1;
-        entries = entries.slice(1);
-        await writeEntries(userId, entries);
+        entries = await dropEntry(userId, entry.key);
       }
     }
     return { sent, dropped, remaining: entries.length };

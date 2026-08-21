@@ -158,8 +158,11 @@ async function getLatestWeight(userId: string) {
   return latestWeight ? serializeWithSchema(weightLogResponseSchema, latestWeight) : null;
 }
 
-async function getStreak(userId: string, now: Date) {
-  const since = addUtcDays(startOfUtcDay(now), -90);
+async function getStreak(userId: string, now: Date, tz: string | null) {
+  // One extra day of slack: the user's local day can start before the UTC one,
+  // so a log that belongs to their earliest counted day may sit just outside a
+  // UTC-cut window.
+  const since = addUtcDays(startOfUtcDay(now), -91);
   const [doses, meals, proteins, waterLogs, activities, weights] = await Promise.all([
     DoseLogModel.find({ userId, datetime: { $gte: since } }).select('datetime'),
     MealLogModel.find({ userId, datetime: { $gte: since } }).select('datetime'),
@@ -172,7 +175,7 @@ async function getStreak(userId: string, now: Date) {
     (log) => ({ datetime: log.datetime }),
   );
 
-  return consecutiveActivityStreak(logs, now);
+  return consecutiveActivityStreak(logs, now, tz);
 }
 
 /**
@@ -241,7 +244,7 @@ export async function getHome(
       () => logger.warn({ userId }, '[home] insights exceeded their deadline; serving without them'),
     ),
     getWeeklyRetention(userId, now),
-    getStreak(userId, now),
+    getStreak(userId, now, tz),
     getNextDoseCandidates(userId, now),
   ]);
   const sectionErrors: Record<string, string> = {};

@@ -562,6 +562,12 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
    */
   const deleteLog = useCallback(
     async (kind: DeletableLogKind, id: string): Promise<boolean> => {
+      // Session epoch, like every other async writer in this file. Without it
+      // this rollback was the one path that could restore a PREVIOUS account's
+      // feed into the current session — and the snapshot write-through then
+      // persisted it to the new account's on-device cache. A delete that fails
+      // after the user has signed out has nothing left to roll back to.
+      const epoch = sessionEpoch.current;
       const before = trackRef.current;
       const mark = <T extends { id: string; deletedAt?: string | null }>(rows: T[]) =>
         rows.map((row) => (row.id === id ? { ...row, deletedAt: new Date().toISOString() } : row));
@@ -584,12 +590,14 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
 
       try {
         await api.deleteLog(kind, id);
+        if (epoch !== sessionEpoch.current) return false;
         // Totals, streaks and the level curve are all server-derived, so the
         // row vanishing locally is only half of it.
         void refreshHome();
         void refreshTrack();
         return true;
       } catch {
+        if (epoch !== sessionEpoch.current) return false;
         setTrack(before);
         return false;
       }
