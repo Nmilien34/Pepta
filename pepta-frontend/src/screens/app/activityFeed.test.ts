@@ -112,6 +112,47 @@ describe('grouping and order', () => {
     expect(feed[0]!.entries).toHaveLength(9);
   });
 
+  it('shows TWO days by default — today and the last day with anything on it', () => {
+    // The card is a glance, not an archive: "See all" is right there for the
+    // rest. Three days pushed the cards below it off the screen on Track, and
+    // the third day is never the one you opened the app to check.
+    //
+    // Note "the last day with anything on it", not literally yesterday: the
+    // feed groups the days that HAVE entries, so someone who logged today and
+    // last Thursday sees those two rather than an empty Yesterday heading.
+    const waterLogs = [
+      { id: 'a', amountOz: 8, datetime: at(13, 9), deletedAt: null },
+      { id: 'b', amountOz: 8, datetime: at(11, 9), deletedAt: null },
+      { id: 'c', amountOz: 8, datetime: at(9, 9), deletedAt: null },
+      { id: 'd', amountOz: 8, datetime: at(7, 9), deletedAt: null },
+    ];
+    const feed = buildActivityFeed({ home: home(), now: NOW, track: track({ waterLogs }) });
+
+    expect(feed).toHaveLength(2);
+    expect(feed[0]!.label).toBe('Today');
+  });
+
+  it('still rescues the last dose when neither day holds one', () => {
+    // The anchor rule matters MORE at two days than at three: a weekly
+    // injector logging water daily would otherwise never see a shot on Track.
+    const waterLogs = [
+      { id: 'a', amountOz: 8, datetime: at(13, 9), deletedAt: null },
+      { id: 'b', amountOz: 8, datetime: at(12, 9), deletedAt: null },
+    ];
+    const doseLogs = [
+      { id: 'd1', datetime: at(8, 9), compound: 'semaglutide', doseMg: 1, deletedAt: null },
+    ];
+    const feed = buildActivityFeed({
+      home: home(),
+      now: NOW,
+      track: track({ waterLogs, doseLogs } as never),
+    });
+
+    // Two days plus the rescued dose day, which stays last because it is older.
+    expect(feed).toHaveLength(3);
+    expect(feed[2]!.entries.some((entry) => entry.kind === 'dose')).toBe(true);
+  });
+
   it('groups on the LOCAL day — a late-evening log is not filed under tomorrow', () => {
     // UTC slicing would push a 9pm log in a western zone into the next day.
     const evening = new Date(2026, 7, 13, 21, 30, 0).toISOString();

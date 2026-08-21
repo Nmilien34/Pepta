@@ -105,6 +105,19 @@ function dayLabel(date: string, now: Date): string {
  */
 export const FULL_FEED_DAYS = 400;
 
+/**
+ * Today and the last day that has anything on it — no more.
+ *
+ * The card is a glance; "See all" is right there for the archive. At three
+ * days a busy user pushed every card below "Your log" off the Track screen,
+ * and the third day is never the one they opened the app to check.
+ *
+ * Note it counts DAYS THAT HAVE ENTRIES, not calendar days: someone who
+ * logged today and last Thursday sees those two, rather than a heading for an
+ * empty yesterday. The dose-anchor rule below can still add a third group.
+ */
+const DEFAULT_FEED_DAYS = 2;
+
 export interface ActivityFeedInput {
   track: TrackResponse | null;
   home: HomeResponse | null;
@@ -167,7 +180,7 @@ export function buildActivityFeed({
   track,
   home,
   now = new Date(),
-  maxDays = 3,
+  maxDays = DEFAULT_FEED_DAYS,
 }: ActivityFeedInput): ActivityDay[] {
   if (!track) return [];
   const compounds = home?.activeCompounds ?? [];
@@ -356,9 +369,9 @@ export function buildActivityFeed({
   const selected = ordered.slice(0, maxDays);
 
   // THE DOSE IS THIS APP'S ANCHOR, so it is never allowed to fall off the end.
-  // A weekly injector who logs water daily fills the three most recent days
-  // with habit logs and pushes their last shot out of the window entirely —
-  // three rows of water and no dose, where the doses-only card this replaced
+  // A weekly injector who logs water daily fills the window with habit logs
+  // and pushes their last shot out of it entirely — rows of water and no
+  // dose, where the doses-only card this replaced
   // would have shown their last eight. When the window contains no dose, the
   // most recent dose day is appended (it is older, so it stays last).
   const hasDose = (day: [string, ActivityEntry[]]) =>
