@@ -98,6 +98,7 @@ vi.mock("../../components", () => {
     AppText: passthrough("AppText"),
     Button: passthrough("Button"),
     Card: passthrough("Card"),
+    CardIcon: () => null,
     CountUp: passthrough("CountUp"),
     GlassEdge: passthrough("GlassEdge"),
     DataHealthCardView: passthrough("DataHealthCardView"),

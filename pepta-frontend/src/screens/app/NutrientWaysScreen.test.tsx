@@ -58,6 +58,7 @@ vi.mock("../../components", () => {
   return {
     AppText: passthrough("AppText"),
     Card: passthrough("Card"),
+    CardIcon: () => null,
     // Keeps its props so the bar's fill can be asserted.
     ProgressBar: (props: { pct: number }) => React.createElement("ProgressBar", props),
   };

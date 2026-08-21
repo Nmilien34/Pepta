@@ -90,3 +90,4 @@ export {
   type AddCompoundSheetProps,
 } from "./AddCompoundSheet";
 export { DataHealthCardView } from "./DataHealthCard";
+export * from './CardIcon';

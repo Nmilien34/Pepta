@@ -57,9 +57,10 @@ describe('the weight card matches the frame', () => {
     // .ch svg.ic { padding:8.5px; border-radius:11px;
     //              background: color-mix(in srgb, currentColor 13%, transparent) }
     // A bare glyph left this title row visibly lighter than every other card.
-    expect(card).toContain('padding: 8.5');
-    expect(card).toContain('borderRadius: 11');
-    expect(card).toContain('WEIGHT_CHIP');
+    // The chip now lives in the shared CardIcon — every card header wears one,
+    // and it was dropped from all of them the same way. Assert the card USES it
+    // rather than re-implementing the padding inline.
+    expect(card).toContain('<CardIcon name="scale"');
   });
 
   it('sizes the unit below the reading, not equal to it', () => {

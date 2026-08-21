@@ -109,6 +109,7 @@ vi.mock("../../components", () => {
     AppText: passthrough("AppText"),
     Button: passthrough("Button"),
     Card: passthrough("Card"),
+    CardIcon: () => null,
     CountUp: passthrough("CountUp"),
     GlassEdge: passthrough("GlassEdge"),
     // Renders null for users whose data is healthy, which is this fixture —

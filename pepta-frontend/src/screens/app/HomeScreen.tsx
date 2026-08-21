@@ -14,7 +14,7 @@ import { useNavigation, type NavigationProp } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { HomeRangeKey } from '@pepta/shared';
 import { useTheme } from '../../theme';
-import { AppText, Button, Card, CountUp, GlassEdge, DataHealthCardView, LogDoseCta, Mascot, ProgressBar, ProgressRing, Reveal, SectionErrorBanner, WaterCup } from '../../components';
+import { AppText, Button, Card, CountUp, GlassEdge, CardIcon, DataHealthCardView, LogDoseCta, Mascot, ProgressBar, ProgressRing, Reveal, SectionErrorBanner, WaterCup } from '../../components';
 import { useCompanionName } from '../../components/useCompanionName';
 import { LivingMascot } from '../../components/LivingMascot';
 import { useSeenTeachCards } from './useSeenTeachCards';
@@ -548,7 +548,7 @@ export function HomeScreen() {
               <FiberCard stat={view.fiber} onMinus={() => bumpFiber(-1)} onPlus={() => bumpFiber(1)} onOpen={() => navigation.navigate('NutrientWays', { kind: 'fiber' })} />
               <MacroRingCard
                 title="Protein"
-                icon={<Icon name="food-drumstick" size={18} color={theme.colors.protein} stroke={2.3} />}
+                icon={<CardIcon name="food-drumstick" color={theme.colors.protein} />}
                 stat={view.protein}
                 unit="g"
                 color={theme.colors.protein}
@@ -998,7 +998,7 @@ function FiberCard({
         style={({ pressed }) => ({ opacity: pressed ? 0.72 : 1 })}
       >
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
-          <Icon name="leaf" size={18} color={theme.colors.fiber} stroke={2.3} />
+          <CardIcon name="leaf" color={theme.colors.fiber} />
           <AppText variant="cardTitle" style={{ fontSize: 15 }}>
             Fiber
           </AppText>
@@ -1049,7 +1049,7 @@ function WaterCard({
         style={({ pressed }) => ({ opacity: pressed ? 0.72 : 1 })}
       >
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
-          <Icon name="water" size={18} color={theme.colors.water} stroke={2.3} />
+          <CardIcon name="water" color={theme.colors.water} />
           <AppText variant="cardTitle" style={{ fontSize: 15 }}>
             Water
           </AppText>
@@ -1069,8 +1069,9 @@ function WaterCard({
 // The halo behind the "now" dot and the card's corner glow. Derived from the
 // one accent so they cannot drift apart.
 const WEIGHT_GLOW = 'rgba(124,92,252,0.08)';
-// The `.ic` chip: the icon's own colour at 13%, per the frame.
-const WEIGHT_CHIP = 'rgba(124,92,252,0.13)';
+// The frame's Log-a-meal tint (#FFF1E6). Its own value, not protein@13%: the
+// frame picked a warmer peach than the chip formula gives.
+const MEAL_CTA_BG = '#FFF1E6';
 // The frame's Log-weight label. Its own grey, not a theme token: the button
 // sits on --alt and the text is deliberately quieter than textSecondary.
 const LOGCTA_TEXT = '#5E636E';
@@ -1170,7 +1171,7 @@ function MealsCard({ stat, onLog }: { stat: RingStat; onLog(): void }) {
   return (
     <Card style={{ flex: 1 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
-        <Icon name="restaurant" size={18} color={theme.colors.textPrimary} stroke={2.3} />
+        <CardIcon name="restaurant" color={theme.colors.protein} />
         <AppText variant="cardTitle" style={{ fontSize: 15 }}>
           Meals
         </AppText>
@@ -1182,7 +1183,7 @@ function MealsCard({ stat, onLog }: { stat: RingStat; onLog(): void }) {
         </AppText>
       </View>
       <View style={{ marginTop: 10 }}>
-        <ProgressBar pct={stat.pct} color={theme.colors.textPrimary} height={6} />
+        <ProgressBar pct={stat.pct} color={theme.colors.protein} height={6} />
       </View>
       <Pressable
         onPress={() => {
@@ -1197,14 +1198,16 @@ function MealsCard({ stat, onLog }: { stat: RingStat; onLog(): void }) {
           alignItems: 'center',
           justifyContent: 'center',
           gap: 6,
-          paddingVertical: 8,
+          // .logcta with the frame's meal override: #FFF1E6 on protein, 38pt.
+          // Grey on grey made the one action on this card disappear into it.
+          height: 38,
           borderRadius: theme.radii.pill,
-          backgroundColor: theme.colors.surfaceAlt,
+          backgroundColor: MEAL_CTA_BG,
           opacity: pressed ? 0.7 : 1,
         })}
       >
-        <Icon name="add" size={14} color={theme.colors.textPrimary} stroke={2.6} />
-        <AppText variant="caption" style={{ fontWeight: '800', fontSize: 11.5 }}>
+        <Icon name="add" size={14} color={theme.colors.protein} stroke={2.6} />
+        <AppText variant="caption" style={{ fontWeight: '800', fontSize: 13, color: theme.colors.protein }}>
           Log a meal
         </AppText>
       </Pressable>
@@ -1248,17 +1251,7 @@ function HomeWeightPulseCard({
               box), radius 11, on the icon's OWN colour at 13% —
               color-mix(in srgb, currentColor 13%, transparent). A bare glyph
               left the title row visibly lighter than every other card header. */}
-          <View
-            style={{
-              padding: 8.5,
-              borderRadius: 11,
-              backgroundColor: WEIGHT_CHIP,
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Icon name="scale" size={18} color={theme.colors.weight} stroke={2.4} />
-          </View>
+<CardIcon name="scale" color={theme.colors.weight} stroke={2.4} />
           <AppText variant="cardTitle" style={{ fontSize: 15.5 }}>
             Weight
           </AppText>
@@ -1516,6 +1509,7 @@ function MacroRingCard({
   /** Opens the "ways to hit it" screen. Omitted where there is no such screen. */
   onExamples?: () => void;
 }) {
+  const theme = useTheme();
   const body = (
     <>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
@@ -1566,11 +1560,24 @@ function MacroRingCard({
           hitSlop={{ top: 8, bottom: 10, left: 20, right: 20 }}
           accessibilityRole="button"
           accessibilityLabel={`See ${title.toLowerCase()} examples`}
-          style={({ pressed }) => ({ marginTop: 10, alignSelf: 'center', opacity: pressed ? 0.6 : 1 })}
+          style={({ pressed }) => ({
+            // border-top:.5px solid var(--hair); padding-top:9px — the rule is
+            // what separates the link from the stepper above it.
+            marginTop: 10,
+            paddingTop: 9,
+            borderTopWidth: 0.5,
+            borderTopColor: theme.colors.border,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 3,
+            opacity: pressed ? 0.6 : 1,
+          })}
         >
-          <AppText variant="caption" style={{ fontSize: 11, fontWeight: '800', color }}>
+          <AppText variant="caption" style={{ fontSize: 11.5, fontWeight: '700', color }}>
             See examples
           </AppText>
+          <Icon name="chevron-forward" size={13} color={color} stroke={2.4} />
         </Pressable>
       ) : null}
     </Card>
