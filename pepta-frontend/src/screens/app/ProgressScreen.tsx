@@ -5,6 +5,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, RefreshControl, ScrollView, View } from 'react-native';
+import Svg, { Line, Rect, Text as SvgText } from 'react-native-svg';
 import { Icon } from "../../components/Icon";
 import * as Haptics from 'expo-haptics';
 import { useNavigation, type NavigationProp } from '@react-navigation/native';
@@ -26,6 +27,7 @@ import {
   CardIcon,
 } from '../../components';
 
+import { barPlot, monthDay } from '../../components/progressCharts';
 import { ProgressScopeMenu } from '../../components/ProgressScopeMenu';
 import { SideEffectsCard } from '../../components/SideEffectsCard';
 import { WhatToShowSheet } from '../../components/WhatToShowSheet';
@@ -67,6 +69,14 @@ const SCOPE_RANGE: Record<ProgressScopeKey, RangeKey> = {
   '90d': '90d',
   year: '1y',
 };
+
+// Every plot in the Progress frame is drawn to the same box, so the cards
+// stack as one instrument rather than three differently-scaled sketches:
+// 132 of plot, a 34pt gutter on the right for the value scale, and 20 below
+// for the dates. MedicationLevelChart already uses exactly these.
+const CHART_PLOT_HEIGHT = 132;
+const CHART_SCALE_GUTTER = 34;
+const CHART_AXIS_HEIGHT = 20;
 
 export function ProgressScreen() {
   const theme = useTheme();
@@ -291,8 +301,13 @@ export function ProgressScreen() {
           {/* to-goal + BMI + difference */}
           <Reveal delay={140} style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
             <Card style={{ flex: 1, alignItems: 'center' }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, alignSelf: 'flex-start' }}>
-                <Icon name="target" size={16} color={theme.colors.weight} />
+              {/* Chipped, per the frame: `<svg class="tin ic" style="color:
+                  var(--weight)">` beside `<span class="nm">To goal</span>`.
+                  The chip is specified entirely by the `.ic` class, so reading
+                  the inline style alone missed it and this one header shipped
+                  bare while every other card on the screen wore one. */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start' }}>
+                <CardIcon name="target" color={theme.colors.weight} />
                 <AppText variant="cardTitle" style={{ fontSize: 15 }}>
                   To goal
                 </AppText>
@@ -339,7 +354,8 @@ export function ProgressScreen() {
 
             <View style={{ flex: 1, gap: 12 }}>
               <Card>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+                {/* .ch { gap: 8px } — the frame's card-header row. */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <CardIcon name="heart-pulse" color={theme.colors.primary} />
                   <AppText variant="cardTitle" style={{ fontSize: 15 }}>
                     BMI
@@ -360,7 +376,7 @@ export function ProgressScreen() {
                 )}
               </Card>
               <Card>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <CardIcon name="arrow-down-right" color={theme.colors.fiber} />
                   <AppText variant="cardTitle" style={{ fontSize: 15 }}>
                     Difference
@@ -389,6 +405,73 @@ export function ProgressScreen() {
               </Card>
             </View>
           </Reveal>
+
+          {/* side effects — between the goal trio and What you're eating,
+              per the frame */}
+          {sections.sideEffects ? (
+            <Reveal delay={180} style={{ marginTop: 12 }}>
+              <SideEffectsCard
+                trend={sideEffects}
+                type={effectType}
+                onPickType={setEffectType}
+                onLog={() => openQuickLog('sideEffect')}
+              />
+            </Reveal>
+          ) : null}
+
+          {/* what you're eating — the frame's card, from /track's 30 days */}
+          {sections.eating ? (
+            <Reveal delay={200} style={{ marginTop: 12 }}>
+              <Card>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <CardIcon name="nutrition" color={theme.colors.fiber} />
+                  <AppText variant="cardTitle" style={{ fontSize: 15 }}>
+                    What you’re eating
+                  </AppText>
+                </View>
+                {!eating ? (
+                  // The card stays, and says what would fill it. Hiding it
+                  // entirely leaves a new user with no idea the feature exists.
+                  <EmptyState
+                    title="Nothing scanned yet"
+                    line="Start scanning your meals and we’ll keep track of your calories and protein here — and how they line up with your targets."
+                    action="Scan a meal"
+                    // Straight into the scanner, which is what the button says.
+                    onAction={() => openMeal(null, { start: 'scan' })}
+                  />
+                ) : (
+                <>
+                <View style={{ flexDirection: 'row', gap: 18, marginTop: 14 }}>
+                  <BigStat
+                    value={eating.caloriesPerDay?.toLocaleString() ?? '—'}
+                    unit="cal"
+                    note={eating.calorieTarget ? `a day · of ${eating.calorieTarget.toLocaleString()}` : 'a day'}
+                  />
+                  <BigStat
+                    value={eating.proteinPerDay != null ? String(eating.proteinPerDay) : '—'}
+                    unit="g"
+                    note={eating.proteinTarget ? `protein · of ${eating.proteinTarget}` : 'protein'}
+                  />
+                </View>
+                {/* One bar per day THEY LOGGED in the last week — a bar for a
+                    day with no logs would read as a day they ate nothing. */}
+                {eating.weekBars.length > 0 ? (
+                  <EatingBars bars={eating.weekBars} target={eating.proteinTarget} />
+                ) : null}
+                {eating.proteinHitOf > 0 ? (
+                  <AppText
+                    variant="caption"
+                    color="textSecondary"
+                    style={{ marginTop: 10, paddingTop: 9, borderTopWidth: 0.5, borderTopColor: theme.colors.border }}
+                  >
+                    Protein target hit on {eating.proteinHitDays} of {eating.proteinHitOf} days this week
+                  </AppText>
+                ) : null}
+                </>
+                )}
+              </Card>
+            </Reveal>
+          ) : null}
 
           {/* muscle protection (weekly retention engine) */}
           {/* Muscle protection with no score yet: the frame keeps the card and
@@ -518,93 +601,6 @@ export function ProgressScreen() {
                     </View>
                   ))}
                 </View>
-              </Card>
-            </Reveal>
-          ) : null}
-
-          {/* side effects — between the goal trio and What you're eating,
-              per the frame */}
-          {sections.sideEffects ? (
-            <Reveal delay={180} style={{ marginTop: 12 }}>
-              <SideEffectsCard
-                trend={sideEffects}
-                type={effectType}
-                onPickType={setEffectType}
-                onLog={() => openQuickLog('sideEffect')}
-              />
-            </Reveal>
-          ) : null}
-
-          {/* what you're eating — the frame's card, from /track's 30 days */}
-          {sections.eating ? (
-            <Reveal delay={200} style={{ marginTop: 12 }}>
-              <Card>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <CardIcon name="nutrition" color={theme.colors.fiber} />
-                  <AppText variant="cardTitle" style={{ fontSize: 15 }}>
-                    What you’re eating
-                  </AppText>
-                </View>
-                {!eating ? (
-                  // The card stays, and says what would fill it. Hiding it
-                  // entirely leaves a new user with no idea the feature exists.
-                  <EmptyState
-                    title="Nothing scanned yet"
-                    line="Start scanning your meals and we’ll keep track of your calories and protein here — and how they line up with your targets."
-                    action="Scan a meal"
-                    // Straight into the scanner, which is what the button says.
-                    onAction={() => openMeal(null, { start: 'scan' })}
-                  />
-                ) : (
-                <>
-                <View style={{ flexDirection: 'row', gap: 18, marginTop: 14 }}>
-                  <BigStat
-                    value={eating.caloriesPerDay?.toLocaleString() ?? '—'}
-                    unit="cal"
-                    note={eating.calorieTarget ? `a day · of ${eating.calorieTarget.toLocaleString()}` : 'a day'}
-                  />
-                  <BigStat
-                    value={eating.proteinPerDay != null ? String(eating.proteinPerDay) : '—'}
-                    unit="g"
-                    note={eating.proteinTarget ? `protein · of ${eating.proteinTarget}` : 'protein'}
-                  />
-                </View>
-                {/* One bar per day THEY LOGGED in the last week — a bar for a
-                    day with no logs would read as a day they ate nothing. */}
-                {eating.weekBars.length > 0 ? (
-                  <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 6, height: 64, marginTop: 14 }}>
-                    {eating.weekBars.map((bar) => {
-                      const ceiling = Math.max(eating.proteinTarget ?? 0, ...eating.weekBars.map((b) => b.grams));
-                      return (
-                        <View
-                          key={bar.day}
-                          accessible
-                          accessibilityLabel={`${bar.grams} g protein${bar.hit ? ', target hit' : ''}`}
-                          style={{ flex: 1, height: '100%', justifyContent: 'flex-end' }}
-                        >
-                          <View
-                            style={{
-                              height: `${Math.max(6, ceiling > 0 ? (bar.grams / ceiling) * 100 : 0)}%`,
-                              borderRadius: 6,
-                              backgroundColor: bar.hit ? theme.colors.fiber : theme.colors.surfaceAlt,
-                            }}
-                          />
-                        </View>
-                      );
-                    })}
-                  </View>
-                ) : null}
-                {eating.proteinHitOf > 0 ? (
-                  <AppText
-                    variant="caption"
-                    color="textSecondary"
-                    style={{ marginTop: 10, paddingTop: 9, borderTopWidth: 0.5, borderTopColor: theme.colors.border }}
-                  >
-                    Protein target hit on {eating.proteinHitDays} of {eating.proteinHitOf} days this week
-                  </AppText>
-                ) : null}
-                </>
-                )}
               </Card>
             </Reveal>
           ) : null}
@@ -814,6 +810,163 @@ function Centered({ children }: { children: React.ReactNode }) {
       <SafeAreaView style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: theme.spacing['2xl'] }}>
         {children}
       </SafeAreaView>
+    </View>
+  );
+}
+
+/** Width of "120 g target" at 8pt/800 — SVG text cannot be measured in RN, and
+ *  Hanken's digits and lowercase run close enough to 4.7pt at this size. */
+function targetLabelWidth(target: number): number {
+  return `${target} g target`.length * 4.7;
+}
+
+/**
+ * The eating card's daily bars, with the scale the shipped strip left out.
+ *
+ * It was 64pt of unlabelled bars: no axis, no baseline, no target rule, no
+ * dates. The frame draws this plot at the SAME size as the weight and side
+ * effect charts — 132 of plot over a 20pt date axis, with the value scale in a
+ * 34pt gutter — and rules the daily target across it as a dashed line. That
+ * line is the whole point of the card: bars alone say how much you ate, and
+ * only the rule says whether it was enough.
+ *
+ * DEVIATION FROM THE FRAME, stated plainly: the frame's bars are CALORIES
+ * against a 1,800 calorie target over 14 days. EatingView only exposes per-day
+ * PROTEIN (`weekBars`), so these are protein grams against the protein target
+ * over the logged days of the last week. Inventing a calorie series here would
+ * be worse than plotting the one we actually have.
+ */
+function EatingBars({
+  bars,
+  target,
+}: {
+  bars: { day: string; grams: number; hit: boolean }[];
+  target: number | null;
+}) {
+  const theme = useTheme();
+  const [width, setWidth] = useState(0);
+  const plotWidth = Math.max(0, width - CHART_SCALE_GUTTER);
+  const plot = barPlot(
+    bars.map((bar) => ({ day: bar.day, value: bar.grams, hit: bar.hit })),
+    target,
+    plotWidth,
+    CHART_PLOT_HEIGHT,
+  );
+  const hitDays = bars.filter((bar) => bar.hit).length;
+
+  return (
+    <View
+      onLayout={(event) => setWidth(Math.round(event.nativeEvent.layout.width))}
+      style={{ marginTop: 14 }}
+      accessible
+      accessibilityLabel={
+        target != null
+          ? `Protein by day. ${hitDays} of ${bars.length} logged days hit your ${target} gram target.`
+          : `Protein by day, ${bars.length} logged days.`
+      }
+    >
+      {plot ? (
+        <Svg width={width} height={CHART_PLOT_HEIGHT + CHART_AXIS_HEIGHT}>
+          {plot.gridlines.map((line) => (
+            <Line
+              key={line.label}
+              x1={0}
+              y1={line.y}
+              x2={plotWidth}
+              y2={line.y}
+              stroke={theme.colors.border}
+              strokeWidth={1}
+              strokeDasharray="3,4"
+            />
+          ))}
+          {/* Solid floor: the edge of the scale, not a value on it. */}
+          <Line
+            x1={0}
+            y1={plot.baselineY}
+            x2={plotWidth}
+            y2={plot.baselineY}
+            stroke={theme.colors.border}
+            strokeWidth={1}
+          />
+          {[...plot.gridlines, { y: plot.baselineY, label: plot.baselineLabel }].map((line) => (
+            <SvgText
+              key={`s${line.label}`}
+              x={plotWidth + 6}
+              y={line.y + 3.5}
+              fontSize={9}
+              fontWeight="600"
+              fill={theme.colors.textTertiary}
+            >
+              {line.label}
+            </SvgText>
+          ))}
+          {plot.bars.map((bar) => (
+            <Rect
+              key={bar.day}
+              x={bar.x}
+              y={bar.y}
+              width={bar.width}
+              height={bar.height}
+              rx={3}
+              fill={theme.colors.fiber}
+              // Under-target days stay the SAME colour at a lower opacity. The
+              // strip greyed them to surfaceAlt, which against a real scale
+              // reads as a day with no data rather than a day under target.
+              fillOpacity={bar.hit ? 0.78 : 0.3}
+            />
+          ))}
+          {plot.targetY != null && target != null ? (
+            <>
+              <Line
+                x1={0}
+                y1={plot.targetY}
+                x2={plotWidth}
+                y2={plot.targetY}
+                stroke={theme.colors.fiber}
+                strokeWidth={1.4}
+                strokeDasharray="5,4"
+              />
+              {/* The label rides ON the rule, on a card-coloured chip. The
+                  frame floats it over white because its sample week never
+                  crosses the target; a real week that beats it puts a bar
+                  straight through the text. */}
+              <Rect
+                x={plotWidth - targetLabelWidth(target) - 4}
+                y={plot.targetY - 6}
+                width={targetLabelWidth(target) + 4}
+                height={12}
+                rx={3}
+                fill={theme.colors.surface}
+              />
+              <SvgText
+                x={plotWidth - 2}
+                y={plot.targetY + 3}
+                fontSize={8}
+                fontWeight="800"
+                fill={theme.colors.fiber}
+                textAnchor="end"
+              >
+                {`${target} g target`}
+              </SvgText>
+            </>
+          ) : null}
+          {plot.ticks.map((tick) => (
+            <SvgText
+              key={`t${tick.x}`}
+              x={Math.min(Math.max(tick.x, 12), Math.max(12, plotWidth - 12))}
+              y={plot.baselineY + 15}
+              fontSize={8.5}
+              fontWeight={tick.isNow ? '800' : '600'}
+              fill={tick.isNow ? theme.colors.fiber : theme.colors.textTertiary}
+              textAnchor="middle"
+            >
+              {tick.isNow ? 'Today' : monthDay(tick.at)}
+            </SvgText>
+          ))}
+        </Svg>
+      ) : (
+        <View style={{ height: CHART_PLOT_HEIGHT + CHART_AXIS_HEIGHT }} />
+      )}
     </View>
   );
 }

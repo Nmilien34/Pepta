@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { effectLabel, severityChartModel, sideEffectTrend } from './sideEffectTrend';
+import { effectLabel, sideEffectTrend } from './sideEffectTrend';
 
 const NOW = new Date(2026, 7, 13, 14, 0, 0);
 const daysAgo = (n: number) => new Date(NOW.getTime() - n * 86_400_000).toISOString();
@@ -183,36 +183,3 @@ describe('the empty state', () => {
   });
 });
 
-describe('the chart', () => {
-  const weeks = [
-    { startedAt: NOW.getTime() - 3 * 7 * 86_400_000, average: 3.4, count: 4 },
-    { startedAt: NOW.getTime() - 7 * 86_400_000, average: 1.5, count: 3 },
-  ];
-
-  it('is always scaled 0 to 5, never to the data', () => {
-    const model = severityChartModel(weeks, [], 100, 100)!;
-
-    // 3.4 of 5 sits at 68% of the height, not at the top.
-    expect(model.points[0]!.y).toBeCloseTo(100 - 68, 0);
-    expect(model.points[1]!.y).toBeCloseTo(100 - 30, 0);
-    expect(model.gridlines).toHaveLength(5);
-  });
-
-  it('places dose markers on the same time axis', () => {
-    const midpoint = (weeks[0]!.startedAt + weeks[1]!.startedAt) / 2;
-    const model = severityChartModel(weeks, [midpoint], 100, 100)!;
-
-    expect(model.markers[0]).toBeCloseTo(50, 0);
-  });
-
-  it('drops a marker outside the plotted span rather than clamping it to the edge', () => {
-    const model = severityChartModel(weeks, [NOW.getTime() - 300 * 86_400_000], 100, 100)!;
-
-    expect(model.markers).toEqual([]);
-  });
-
-  it('draws nothing from a single week — one point is not a trend', () => {
-    expect(severityChartModel([weeks[0]!], [], 100, 100)).toBeNull();
-    expect(severityChartModel(weeks, [], 0, 100)).toBeNull();
-  });
-});

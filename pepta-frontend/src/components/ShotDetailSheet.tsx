@@ -10,13 +10,18 @@
 // change" and "we only have one weigh-in" are different statements, and only
 // one of them is true.
 
-import { View } from 'react-native';
+import { useState } from 'react';
+import { View, type LayoutChangeEvent } from 'react-native';
+import Svg, { Circle, Defs, LinearGradient, Line, Path, Stop } from 'react-native-svg';
 import { AppText } from './AppText';
 import { BottomSheet } from './BottomSheet';
 import { Icon } from './Icon';
-import { MedicationLevelChart } from './MedicationLevelChart';
 import { useTheme } from '../theme';
+import { windowSparkline } from './progressCharts';
 import { cadenceLabel, windowLabel, type ShotWindow } from '../screens/app/shotDetail';
+
+/** The frame's sheet plot: a 296×104 box, no printed scale. */
+const SPARK_HEIGHT = 104;
 
 export interface ShotDetailSheetProps {
   visible: boolean;
@@ -137,7 +142,9 @@ export function ShotDetailSheet({ visible, shot, onClose }: ShotDetailSheetProps
             </AppText>
           ) : null}
 
-          {shot.curve.length > 0 ? (
+          {/* Two samples, not one: a single point has no span to plot, and the
+              sheet would show a section header over an empty 104pt box. */}
+          {shot.curve.length > 1 ? (
             <View style={{ marginTop: 18 }}>
               <AppText
                 variant="sectionHeader"
@@ -148,10 +155,10 @@ export function ShotDetailSheet({ visible, shot, onClose }: ShotDetailSheetProps
               </AppText>
               {/* The same curve Track draws, sliced to this window — not a
                   second, client-side model of the pharmacokinetics. */}
-              <MedicationLevelChart
+              <WindowCurve
                 curve={shot.curve}
-                doses={[{ datetime: shot.datetime }]}
-                unit={shot.amountLabel.split(' ')[1] ?? 'mg'}
+                from={shot.windowStart}
+                to={shot.windowEnd}
               />
             </View>
           ) : (
@@ -162,6 +169,108 @@ export function ShotDetailSheet({ visible, shot, onClose }: ShotDetailSheetProps
         </View>
       ) : null}
     </BottomSheet>
+  );
+}
+
+/**
+ * The level across ONE closed window, as the frame draws it.
+ *
+ * This used to render MedicationLevelChart — Track's live chart — inside the
+ * sheet, and that was wrong twice over. Visually: 152pt of plot with a value
+ * gutter, a "From your logs / Projected" legend and a readout on top, in a
+ * sheet whose frame specifies a bare 104pt curve with two dashed rules and the
+ * window's two dates under it. Factually worse: that chart is built around NOW.
+ * `buildLevelChartModel` clamps `now` into the curve's span, so a shot from six
+ * weeks ago drew a "Today" marker pinned to the window's right edge and printed
+ * "Right now · <today>" over the level at the END OF THAT OLD WINDOW — a stale
+ * number presented as the user's current level. There is no now in a window
+ * that closed; the moment this sheet is about is the shot, so the frame rings
+ * the first point instead.
+ */
+function WindowCurve({
+  curve,
+  from,
+  to,
+}: {
+  curve: readonly { datetime: string; level: number }[];
+  from: string;
+  to: string;
+}) {
+  const theme = useTheme();
+  const [width, setWidth] = useState(0);
+  const plot = windowSparkline(curve, width, SPARK_HEIGHT);
+
+  return (
+    <View
+      style={{ marginTop: 10 }}
+      onLayout={(event: LayoutChangeEvent) => setWidth(Math.round(event.nativeEvent.layout.width))}
+    >
+      {plot ? (
+        <Svg width={width} height={SPARK_HEIGHT}>
+          <Defs>
+            <LinearGradient id="shotWindowFill" x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0%" stopColor={theme.colors.primary} stopOpacity={0.22} />
+              <Stop offset="100%" stopColor={theme.colors.primary} stopOpacity={0.02} />
+            </LinearGradient>
+          </Defs>
+          {plot.gridlines.map((y) => (
+            <Line
+              key={y}
+              x1={0}
+              y1={y}
+              x2={width}
+              y2={y}
+              stroke={theme.colors.border}
+              strokeWidth={1}
+              strokeDasharray="3,4"
+            />
+          ))}
+          <Line
+            x1={0}
+            y1={plot.baselineY}
+            x2={width}
+            y2={plot.baselineY}
+            stroke={theme.colors.border}
+            strokeWidth={1}
+          />
+          <Path d={plot.areaPath} fill="url(#shotWindowFill)" />
+          <Path
+            d={plot.linePath}
+            fill="none"
+            stroke={theme.colors.primary}
+            strokeWidth={2.6}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
+          <Circle
+            cx={plot.head.x}
+            cy={plot.head.y}
+            r={4.5}
+            fill={theme.colors.primary}
+            stroke={theme.colors.surface}
+            strokeWidth={2.5}
+          />
+        </Svg>
+      ) : (
+        <View style={{ height: SPARK_HEIGHT }} />
+      )}
+      {/* The window's own two dates. Without them the curve floats: it is the
+          only thing on the card that says which seven days this is. */}
+      <View
+        style={{
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          marginTop: 6,
+        }}
+      >
+        <AppText variant="caption" color="textTertiary" style={{ fontSize: 10 }}>
+          {formatDayOnly(from)}
+        </AppText>
+        <AppText variant="caption" color="textTertiary" style={{ fontSize: 10 }}>
+          {formatDayOnly(to)}
+        </AppText>
+      </View>
+    </View>
   );
 }
 

@@ -6,7 +6,7 @@
 import React, { useState } from 'react';
 import { CardIcon } from './CardIcon';
 import { Animated, Pressable, View, type LayoutChangeEvent } from 'react-native';
-import Svg, { Circle, Line, Path } from 'react-native-svg';
+import Svg, { Circle, Line, Path, Text as SvgText } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import { AppText } from './AppText';
 import { Card } from './Card';
@@ -14,13 +14,17 @@ import { Icon } from './Icon';
 import { Mascot } from './Mascot';
 import { useTheme } from '../theme';
 import { useChartEntrance } from './entranceMotion';
-import {
-  effectLabel,
-  severityChartModel,
-  type SideEffectTrend,
-} from '../screens/app/sideEffectTrend';
+import { monthDay, severityPlot } from './progressCharts';
+import { effectLabel, type SideEffectTrend } from '../screens/app/sideEffectTrend';
 
-const PLOT_HEIGHT = 96;
+// The frame draws this plot at the same size as Track's level chart and the
+// weight trend — 132 of plot, a 34pt gutter for the value scale, 20 for the
+// dates. It shipped at 96 with no gutter and no axis at all, which is why it
+// read as a decorative squiggle rather than a severity chart.
+const PLOT_HEIGHT = 132;
+/** Room on the right for the 5 / 3 / 1 / none scale, inside the card padding. */
+const SCALE_GUTTER = 34;
+const AXIS_HEIGHT = 20;
 
 export interface SideEffectsCardProps {
   trend: SideEffectTrend;
@@ -34,7 +38,8 @@ export function SideEffectsCard({ trend, type, onPickType, onLog }: SideEffectsC
   const theme = useTheme();
   const [width, setWidth] = useState(0);
   const entrance = useChartEntrance({ delay: 60 });
-  const model = severityChartModel(trend.weeks, trend.doseIncreases, width, PLOT_HEIGHT);
+  const plotWidth = Math.max(0, width - SCALE_GUTTER);
+  const model = severityPlot(trend.weeks, trend.doseIncreases, plotWidth, PLOT_HEIGHT);
 
   return (
     <Card>
@@ -43,6 +48,9 @@ export function SideEffectsCard({ trend, type, onPickType, onLog }: SideEffectsC
         <AppText variant="cardTitle" style={{ fontSize: 15 }}>
           Side effects
         </AppText>
+        {/* The frame's `.info` glyph — this card's number is a weekly mean of
+            a subjective 1-5, and the header is where it says so. */}
+        <Icon name="information-circle-outline" size={14} color={theme.colors.textTertiary} />
       </View>
 
       {trend.empty ? (
@@ -160,19 +168,56 @@ export function SideEffectsCard({ trend, type, onPickType, onLog }: SideEffectsC
                   ],
                 }}
               >
-              <Svg width={width} height={PLOT_HEIGHT}>
+              <Svg width={width} height={PLOT_HEIGHT + AXIS_HEIGHT}>
                 {model.gridlines.map((line) => (
                   <Line
-                    key={line.value}
+                    key={line.label}
                     x1={0}
                     y1={line.y}
-                    x2={width}
+                    x2={plotWidth}
                     y2={line.y}
                     stroke={theme.colors.border}
                     strokeWidth={1}
                     strokeDasharray="3,4"
                   />
                 ))}
+                {/* The floor is a solid rule, not another dashed gridline: it
+                    is the edge of the scale rather than a value inside it. */}
+                <Line
+                  x1={0}
+                  y1={model.baselineY}
+                  x2={plotWidth}
+                  y2={model.baselineY}
+                  stroke={theme.colors.border}
+                  strokeWidth={1}
+                />
+
+                {/* THE SCALE. Without it "1.5 of 5" is a caption beside a shape
+                    and the chart cannot be read at all — a dip to 2 and a dip
+                    to 4 look identical. */}
+                {model.gridlines.map((line) => (
+                  <SvgText
+                    key={`s${line.label}`}
+                    x={plotWidth + 6}
+                    y={line.y + 3.5}
+                    fontSize={9}
+                    fontWeight="600"
+                    fill={theme.colors.textTertiary}
+                  >
+                    {line.label}
+                  </SvgText>
+                ))}
+                <SvgText
+                  x={plotWidth + 6}
+                  y={model.baselineY + 3.5}
+                  fontSize={7.5}
+                  fontWeight="600"
+                  fill={theme.colors.textTertiary}
+                  fillOpacity={0.75}
+                >
+                  {model.baselineLabel}
+                </SvgText>
+
                 {/* Dose increases, behind the line: the question is what the
                     curve does AT them, so they must not sit on top of it. */}
                 {model.markers.map((x, index) => (
@@ -188,8 +233,9 @@ export function SideEffectsCard({ trend, type, onPickType, onLog }: SideEffectsC
                     strokeOpacity={0.7}
                   />
                 ))}
+                <Path d={model.areaPath} fill={theme.colors.primary} fillOpacity={0.16} />
                 <Path
-                  d={model.path}
+                  d={model.linePath}
                   fill="none"
                   stroke={theme.colors.primary}
                   strokeWidth={2.6}
@@ -197,12 +243,38 @@ export function SideEffectsCard({ trend, type, onPickType, onLog }: SideEffectsC
                   strokeLinejoin="round"
                 />
                 {model.points.map((point, index) => (
-                  <Circle key={`p${index}`} cx={point.x} cy={point.y} r={3} fill={theme.colors.primary} />
+                  <Circle key={`p${index}`} cx={point.x} cy={point.y} r={2.2} fill={theme.colors.primary} />
+                ))}
+                {/* This week, ringed — the number in the readout above is this
+                    dot, and the frame makes that link visible. */}
+                <Circle
+                  cx={model.head.x}
+                  cy={model.head.y}
+                  r={5}
+                  fill={theme.colors.primary}
+                  stroke={theme.colors.surface}
+                  strokeWidth={2.5}
+                />
+
+                {/* Dates. "Milder than your first month" is a claim about time,
+                    and the chart could not say when anything happened. */}
+                {model.ticks.map((tick) => (
+                  <SvgText
+                    key={`t${tick.x}`}
+                    x={Math.min(Math.max(tick.x, 12), Math.max(12, plotWidth - 12))}
+                    y={model.baselineY + 15}
+                    fontSize={8.5}
+                    fontWeight={tick.isNow ? '800' : '600'}
+                    fill={tick.isNow ? theme.colors.primary : theme.colors.textTertiary}
+                    textAnchor="middle"
+                  >
+                    {tick.isNow ? 'This week' : monthDay(tick.at)}
+                  </SvgText>
                 ))}
               </Svg>
               </Animated.View>
             ) : (
-              <View style={{ height: PLOT_HEIGHT }} />
+              <View style={{ height: PLOT_HEIGHT + AXIS_HEIGHT }} />
             )}
           </View>
 
