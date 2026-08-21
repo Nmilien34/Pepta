@@ -308,3 +308,137 @@ export function windowSparkline(
     baselineY,
   };
 }
+
+// ---------------------------------------------------------------------------
+// WEIGHT
+//
+// The weight card shipped as a chart-kit sparkline fed `points.map(p => p.value)`
+// — every timestamp discarded. That is failure #1 from levelChart's audit,
+// still live on a second chart: "Real data rendered as an unanchored shape."
+// Two weigh-ins a month apart drew identically to two on consecutive days, and
+// a gap where the user stopped weighing in was invisible.
+//
+// The frame specifies a real instrument, and its scale is the good idea: the
+// plot FLOOR IS THE GOAL WEIGHT. 200 sits at the top inset, 165 (the goal) at
+// the baseline, gridlines every 10 in between. So "how far down the card the
+// line has travelled" is literally "how much of the journey is done" — and the
+// line reaching the floor means arriving. A min→max autoscale cannot say that:
+// it makes a 0.4 lb wobble fill the frame exactly like a 30 lb loss.
+//
+// Straight segments between real weigh-ins, never bezier — the same rule
+// levelChart gives for a step function, for the same reason. We know the two
+// endpoints; the curve between them is invented.
+
+export interface WeightSample {
+  t: number;
+  value: number;
+}
+
+export interface WeightPlot {
+  /** Solid path through real weigh-ins. */
+  linePath: string;
+  areaPath: string;
+  /** Dashed path from the latest weigh-in to the goal, or null when unknown. */
+  projectedPath: string | null;
+  projectedAreaPath: string | null;
+  /** One dot per real weigh-in — where data actually exists. */
+  dots: ChartPoint[];
+  /** The latest weigh-in: the emphasised "you are here" dot. */
+  head: ChartPoint;
+  /** x of the latest weigh-in, for the vertical Today rule. */
+  todayX: number;
+  gridlines: ScaleLine[];
+  /** The goal line and its label, when a goal is set. */
+  goal: { y: number; label: string } | null;
+  baselineY: number;
+  topY: number;
+  plotWidth: number;
+  ticks: AxisTick[];
+}
+
+const WEIGHT_PLOT_WIDTH = 270 / 320;
+const WEIGHT_TOP = 8 / 124;
+const WEIGHT_BASELINE = 104 / 124;
+/** The frame rules four values; a fifth would crowd a 132pt plot. */
+const WEIGHT_GRIDLINES = 4;
+
+/** Round a weight span up to a step a person would print on an axis. */
+export function weightStep(span: number): number {
+  for (const step of [1, 2, 5, 10, 20, 25, 50]) {
+    if (span / step <= WEIGHT_GRIDLINES) return step;
+  }
+  return 100;
+}
+
+export function weightPlot(
+  samples: readonly WeightSample[],
+  goalValue: number | null,
+  goalAt: number | null,
+  width: number,
+  height: number,
+): WeightPlot | null {
+  const points = samples
+    .filter((sample) => Number.isFinite(sample.t) && Number.isFinite(sample.value))
+    .slice()
+    .sort((left, right) => left.t - right.t);
+  if (points.length === 0 || width <= 0 || height <= 0) return null;
+
+  const plotWidth = width * WEIGHT_PLOT_WIDTH;
+  const topY = height * WEIGHT_TOP;
+  const baselineY = height * WEIGHT_BASELINE;
+
+  const values = points.map((point) => point.value);
+  const highest = Math.max(...values);
+  const lowest = Math.min(...values, goalValue ?? Infinity);
+
+  // The floor is the goal when there is one. Without a goal the floor is the
+  // lowest reading, padded, so the line still has somewhere to go.
+  const step = weightStep(Math.max(1, highest - lowest));
+  const top = Math.ceil(highest / step) * step;
+  const floor = goalValue ?? Math.min(lowest, top - step * WEIGHT_GRIDLINES);
+  const range = top - floor;
+  if (!(range > 0)) return null;
+
+  const t0 = points[0]!.t;
+  const latest = points[points.length - 1]!;
+  // The x axis runs from the first weigh-in to the goal date, so "today" lands
+  // at its true position along the journey rather than at the right edge.
+  const tEnd = goalAt != null && goalAt > latest.t ? goalAt : latest.t;
+  const span = tEnd - t0;
+
+  // A single weigh-in, or several on one day, has no span to scale: pin it to
+  // the left rather than dividing by zero or stretching one reading across the
+  // whole card as though it were a trend.
+  const x = (t: number) => (span > 0 ? ((t - t0) / span) * plotWidth : 0);
+  const y = (value: number) =>
+    baselineY - ((Math.max(floor, Math.min(top, value)) - floor) / range) * (baselineY - topY);
+
+  const dots = points.map((point) => ({ x: x(point.t), y: y(point.value) }));
+  const head = dots[dots.length - 1]!;
+  const linePath = `M${dots.map((point) => `${point.x},${point.y}`).join(' L')}`;
+
+  const gridlines: ScaleLine[] = [];
+  for (let value = top; value > floor; value -= step) {
+    gridlines.push({ y: y(value), label: String(Math.round(value)) });
+  }
+
+  const hasProjection = goalValue != null && goalAt != null && goalAt > latest.t;
+
+  return {
+    linePath,
+    areaPath: `${linePath} L${head.x},${baselineY} L${dots[0]!.x},${baselineY} Z`,
+    projectedPath: hasProjection ? `M${head.x},${head.y} L${plotWidth},${y(goalValue)}` : null,
+    projectedAreaPath: hasProjection
+      ? `M${head.x},${head.y} L${plotWidth},${y(goalValue)} L${head.x},${baselineY} Z`
+      : null,
+    dots,
+    head,
+    todayX: head.x,
+    gridlines,
+    goal: goalValue != null ? { y: y(goalValue), label: String(Math.round(goalValue)) } : null,
+    baselineY,
+    topY,
+    plotWidth,
+    ticks: span > 0 ? timeTicks(t0, tEnd, plotWidth) : [],
+  };
+}

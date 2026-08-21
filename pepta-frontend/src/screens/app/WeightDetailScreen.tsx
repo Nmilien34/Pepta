@@ -79,7 +79,18 @@ export function WeightDetailScreen() {
                   <RangePicker value={range} onChange={setRange} />
                 </View>
                 {series.length > 0 ? (
-                  <WeightChart points={series} color={theme.colors.weight} unit={s?.weight.unit ?? profile?.weightUnit ?? 'lb'} formatDate={formatShortDate} />
+                  <WeightChart
+                    points={series}
+                    color={theme.colors.weight}
+                    unit={s?.weight.unit ?? profile?.weightUnit ?? 'lb'}
+                    formatDate={formatShortDate}
+                    goalValue={s?.weight.goalWeight ?? null}
+                    goalAt={
+                      profile?.estimatedGoalDate
+                        ? new Date(profile.estimatedGoalDate).getTime()
+                        : null
+                    }
+                  />
                 ) : (
                   <View style={{ paddingVertical: 34, alignItems: 'center' }}>
                     <AppText variant="bodyStrong" color="textSecondary">

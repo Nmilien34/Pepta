@@ -12,6 +12,8 @@ import {
   niceCeiling,
   scaleLabel,
   severityPlot,
+  weightPlot,
+  weightStep,
   windowSparkline,
 } from './progressCharts';
 
@@ -285,5 +287,173 @@ describe('monthDay', () => {
 
   it('returns empty rather than "Invalid Date" on the axis', () => {
     expect(monthDay(Number.NaN)).toBe('');
+  });
+});
+
+describe('weightPlot — time is real', () => {
+  // The defect this replaces: TrendLineChart got `points.map(p => p.value)`
+  // and spaced them evenly by index. A month-long gap drew exactly like an
+  // overnight one, which is the same failure levelChart's audit calls
+  // "real data rendered as an unanchored shape".
+  const DAY = 86_400_000;
+  const t0 = Date.UTC(2026, 5, 1);
+  const W = 320;
+  const H = 124;
+
+  it('places a point by its DATE, not its index', () => {
+    // Three weigh-ins: day 0, day 1, day 30. Index spacing would put the
+    // middle one at the halfway mark; real time puts it near the start.
+    const plot = weightPlot(
+      [
+        { t: t0, value: 200 },
+        { t: t0 + DAY, value: 199 },
+        { t: t0 + 30 * DAY, value: 190 },
+      ],
+      null,
+      null,
+      W,
+      H,
+    )!;
+
+    const [first, middle, last] = plot.dots;
+    const fraction = (middle!.x - first!.x) / (last!.x - first!.x);
+    expect(fraction).toBeCloseTo(1 / 30, 3);
+    // The index-spaced version put it at 0.5. Guard the regression directly.
+    expect(fraction).toBeLessThan(0.1);
+  });
+
+  it('leaves a visible gap where the user stopped weighing in', () => {
+    const steady = weightPlot(
+      [0, 1, 2, 3].map((d) => ({ t: t0 + d * DAY, value: 200 - d })),
+      null,
+      null,
+      W,
+      H,
+    )!;
+    const gapped = weightPlot(
+      [
+        { t: t0, value: 200 },
+        { t: t0 + DAY, value: 199 },
+        { t: t0 + 40 * DAY, value: 198 },
+        { t: t0 + 41 * DAY, value: 197 },
+      ],
+      null,
+      null,
+      W,
+      H,
+    )!;
+
+    const gaps = (plot: { dots: { x: number }[] }) =>
+      plot.dots.slice(1).map((dot, i) => dot.x - plot.dots[i]!.x);
+
+    // The property is WITHIN a series, not across two that both stretch to the
+    // same width: index spacing makes every gap identical no matter what the
+    // dates say. Genuinely even data does have a uniform pitch...
+    const even = gaps(steady);
+    expect(Math.max(...even) - Math.min(...even)).toBeCloseTo(0, 5);
+
+    // ...while the 39-day hole must dominate the two single-day steps beside
+    // it. Under the old index spacing this ratio was exactly 1.
+    const uneven = gaps(gapped);
+    expect(Math.max(...uneven) / Math.min(...uneven)).toBeGreaterThan(30);
+  });
+
+  it('puts the floor at the GOAL, so travel down the card is progress', () => {
+    const plot = weightPlot(
+      [
+        { t: t0, value: 200 },
+        { t: t0 + DAY, value: 165 },
+      ],
+      165,
+      t0 + 60 * DAY,
+      W,
+      H,
+    )!;
+
+    // Reaching the goal means reaching the baseline.
+    expect(plot.dots[1]!.y).toBeCloseTo(plot.baselineY, 5);
+    expect(plot.goal!.y).toBeCloseTo(plot.baselineY, 5);
+  });
+
+  it('does not let a tiny wobble fill the frame', () => {
+    // The autoscale failure in the other direction: min→max would draw
+    // 200.0 → 199.6 as a cliff from top to bottom.
+    const plot = weightPlot(
+      [
+        { t: t0, value: 200 },
+        { t: t0 + DAY, value: 199.6 },
+      ],
+      null,
+      null,
+      W,
+      H,
+    )!;
+
+    const travelled = Math.abs(plot.dots[1]!.y - plot.dots[0]!.y);
+    expect(travelled).toBeLessThan((plot.baselineY - plot.topY) * 0.25);
+  });
+
+  it('survives a single weigh-in without dividing by zero', () => {
+    // The state every new user is in, and the one that was on screen.
+    const plot = weightPlot([{ t: t0, value: 198 }], null, null, W, H)!;
+
+    expect(plot.dots).toHaveLength(1);
+    expect(Number.isFinite(plot.dots[0]!.x)).toBe(true);
+    expect(Number.isFinite(plot.dots[0]!.y)).toBe(true);
+    expect(plot.ticks).toEqual([]);
+    expect(plot.projectedPath).toBeNull();
+  });
+
+  it('projects to the goal date, and only when there is one ahead', () => {
+    const withGoal = weightPlot(
+      [{ t: t0, value: 200 }],
+      170,
+      t0 + 90 * DAY,
+      W,
+      H,
+    )!;
+    expect(withGoal.projectedPath).toContain(`L${withGoal.plotWidth},`);
+
+    // A goal date in the past is not a projection.
+    const past = weightPlot([{ t: t0, value: 200 }], 170, t0 - DAY, W, H)!;
+    expect(past.projectedPath).toBeNull();
+  });
+
+  it('draws one dot per real weigh-in', () => {
+    // So the chart shows where data EXISTS, not a continuous invention.
+    const plot = weightPlot(
+      [0, 5, 19].map((d) => ({ t: t0 + d * DAY, value: 200 - d })),
+      null,
+      null,
+      W,
+      H,
+    )!;
+
+    expect(plot.dots).toHaveLength(3);
+    expect(plot.head).toEqual(plot.dots[2]);
+  });
+
+  it('sorts unsorted input rather than drawing a zigzag', () => {
+    const plot = weightPlot(
+      [
+        { t: t0 + 2 * DAY, value: 198 },
+        { t: t0, value: 200 },
+        { t: t0 + DAY, value: 199 },
+      ],
+      null,
+      null,
+      W,
+      H,
+    )!;
+
+    expect(plot.dots.map((d) => Math.round(d.x))).toEqual(
+      [...plot.dots.map((d) => Math.round(d.x))].sort((a, b) => a - b),
+    );
+  });
+
+  it('picks an axis step a person would print', () => {
+    expect(weightStep(3)).toBe(1);
+    expect(weightStep(35)).toBe(10);
+    expect(weightStep(9)).toBe(5);
   });
 });

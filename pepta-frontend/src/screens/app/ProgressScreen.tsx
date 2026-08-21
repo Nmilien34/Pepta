@@ -281,7 +281,17 @@ export function ProgressScreen() {
                     {lastWeighIn ? `Last weigh-in · ${weighInDate(lastWeighIn)}` : 'No weigh-in yet'}
                   </AppText>
                 </View>
-                <WeightChart key={scope} points={series} color={theme.colors.weight} unit={s.weight.unit} formatDate={formatShortDate} />
+                <WeightChart
+                  key={scope}
+                  points={series}
+                  color={theme.colors.weight}
+                  unit={s.weight.unit}
+                  formatDate={formatShortDate}
+                  // The goal is the plot's FLOOR, and its date the right edge:
+                  // distance down the card becomes distance travelled.
+                  goalValue={s.weight.goalWeight}
+                  goalAt={s.estimatedGoalDate ? new Date(s.estimatedGoalDate).getTime() : null}
+                />
                 <View
                   style={{
                     flexDirection: 'row',

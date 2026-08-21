@@ -75,7 +75,6 @@ export {
   type WeightChartPoint,
   type WeightChartProps,
 } from "./WeightChart";
-export { TrendLineChart, type TrendLineChartProps } from "./TrendLineChart";
 export { WaterCup, type WaterCupProps } from "./WaterCup";
 export { BottomSheet, type BottomSheetProps } from "./BottomSheet";
 export { BarcodeScanner, type BarcodeScannerProps } from "./BarcodeScanner";
