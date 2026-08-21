@@ -11,6 +11,13 @@ const accents = {
   primary: "#7C5CFC",
   primaryGradientStart: "#6751E8",
   primaryGradientEnd: "#8C63F4",
+  // The hub's --g1/--g2. NOT the same ramp as primaryGradient above: that one
+  // is the darker button fill, this one is lighter and runs toward violet.
+  // The hub uses it for meters and progress fills (at 90deg, and 135deg on
+  // tiles), which is why a flat primary in its place reads as a disabled
+  // control rather than a filled one.
+  fillGradientStart: "#8B6CFF",
+  fillGradientEnd: "#C77DFF",
   // Data-type colors
   protein: "#FF8A3D", // orange — also streak
   streak: "#FF8A3D",

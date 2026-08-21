@@ -7,8 +7,17 @@
 // a stored per-item value.
 //
 // THE HEADER COLLAPSES, IT DOES NOT COLLIDE. The big title fades out as it
-// scrolls and the same name fades into a real nav bar, which sits inside the
-// safe area rather than sliding under the clock.
+// scrolls and the same name fades into a real nav bar — chevron, name, star,
+// left-aligned — which sits inside the safe area rather than sliding under the
+// clock. The white discs on the photo fade out as it arrives, so there is only
+// ever one back button on screen.
+//
+// THE SECTIONS ARE QUESTIONS, ASKED ON THE GROUND. "What this adds", "What it
+// does to today" and "Nutrition" are titles on the bare page with their card
+// below; only "How much" keeps its title inside its card. That is what makes
+// the screen read as answers rather than as a stack.
+//
+// THE CTA WEARS THE NUMBER IT MOVES — accent-filled, not the brand gradient.
 //
 // ONE OPINION, LABELLED. Every number here is a lookup with its source named
 // underneath; Pep's note is the only judgement on the screen and it says so.
@@ -18,11 +27,13 @@ import { Animated, Image, Pressable, View } from 'react-native';
 import { useNavigation, useRoute, type NavigationProp, type RouteProp } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { AppText, Button, Card } from '../../components';
+import { LinearGradient } from 'expo-linear-gradient';
+import { AppText, Card } from '../../components';
 import { Icon } from '../../components/Icon';
 import { usePeptaData } from '../../context/PeptaDataContext';
 import { useLogSheets } from '../../context/LogSheetsContext';
 import { useTheme } from '../../theme';
+import { tint } from '../../theme/tint';
 import { todayStat } from './homeView';
 import { useFavourites } from './useFavourites';
 import { favouriteId, isSaved } from './favourites';
@@ -145,6 +156,18 @@ export function ItemDetailScreen() {
     outputRange: [1, 0],
     extrapolate: 'clamp',
   });
+  // The white discs belong to the PHOTO. Once the collapsed bar has arrived it
+  // carries its own chevron and star, and the frame shows no discs there — two
+  // stacked back affordances is one too many. They fade out on exactly the
+  // interpolation the bar fades in on, so the swap happens in one motion.
+  // Opacity does not disable hit testing in RN, which is deliberate: the bar is
+  // pointerEvents="none", so the invisible discs stay the touch targets under
+  // the icons the user can see.
+  const heroButtonsOpacity = scrollY.interpolate({
+    inputRange: [collapseAt - 20, collapseAt],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.bg }}>
@@ -188,10 +211,16 @@ export function ItemDetailScreen() {
               </View>
             </View>
           )}
-          {/* Fades the photo into the sheet rather than cutting it off. */}
-          <View
+          {/* Fades the photo into the sheet rather than cutting it off. The
+              frame's `linear-gradient(to bottom, rgba(bg,0), bg)` over 70px.
+              This shipped as a flat View at opacity 0.001 — a fade in name
+              only, rendering nothing at all. tint(bg, 0) is the same hue at
+              zero alpha, so the ramp never travels through black on the way
+              down, which a bare 'transparent' would do. */}
+          <LinearGradient
             pointerEvents="none"
-            style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 70, backgroundColor: theme.colors.bg, opacity: 0.001 }}
+            colors={[tint(theme.colors.bg, 0), theme.colors.bg]}
+            style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 70 }}
           />
         </View>
 
@@ -230,13 +259,19 @@ export function ItemDetailScreen() {
             )}
           </Animated.View>
 
-          {/* How much — the stepper every other number depends on. */}
-          <Card style={{ marginTop: 14 }}>
-            <SectionLabel>How much</SectionLabel>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 }}>
-              <AppText variant="caption" color="textSecondary" style={{ flex: 1, fontSize: 12 }}>
-                {item.servingLabel}
-              </AppText>
+          {/* How much — the stepper every other number depends on. TWO lines,
+              not three: the frame stacks the title over the portion in a left
+              column with the stepper opposite, so the card that governs every
+              number below it stays the shortest one on the screen. The 13/16
+              padding is item-detail's own, not the global card token. */}
+          <Card padding={16} style={{ marginTop: 12, paddingVertical: 13 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <View style={{ flex: 1, minWidth: 0, paddingRight: 10 }}>
+                <Nm size={14}>How much</Nm>
+                <AppText variant="caption" color="textSecondary" style={{ fontSize: 10.5, marginTop: 2 }}>
+                  {item.servingLabel}
+                </AppText>
+              </View>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                 <StepButton icon="remove" label="One fewer" accent={accent} onPress={() => setServings((s) => stepServings(s, -1))} />
                 <AppText variant="cardTitle" style={{ fontSize: 14, minWidth: 78, textAlign: 'center' }}>
@@ -248,14 +283,9 @@ export function ItemDetailScreen() {
           </Card>
 
           {/* What this adds — the headline pair, then the rest. */}
-          <Card style={{ marginTop: 12 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <SectionLabel>What this adds</SectionLabel>
-              <AppText variant="caption" color="textTertiary" style={{ fontSize: 10.5 }}>
-                per {servingsLabel(servings, item.servingNoun)}
-              </AppText>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 18, marginTop: 10 }}>
+          <SectionHeader title="What this adds" trailing={`per ${servingsLabel(servings, item.servingNoun)}`} />
+          <Card style={{ marginTop: 10 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 18 }}>
               <Headline
                 value={isDrink ? scaled.ounces : key === 'protein' ? scaled.protein : scaled.fiber}
                 unit={isDrink ? 'oz' : 'g'}
@@ -271,20 +301,24 @@ export function ItemDetailScreen() {
 
           {/* What it does to today — two segments, so the user can see which
               part is already theirs and which part is the decision. */}
-          <Card style={{ marginTop: 12 }}>
-            <SectionLabel>What it does to today</SectionLabel>
-            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 10 }}>
-              <AppText variant="caption" color="textSecondary" style={{ fontSize: 12, fontWeight: '700' }}>
+          <SectionHeader title="What it does to today" />
+          <Card style={{ marginTop: 10 }}>
+            {/* ONE SENTENCE, PINNED RIGHT. The frame writes the whole
+                projection as a single 12/800 run — "74 → 109 of 120 g" — with
+                only the number it would become carrying the accent, opposite a
+                quiet 10.5 nutrient label. It shipped as a left-packed row of
+                four sizes in two greys with `to` blown up to 17, which read as
+                four separate facts instead of one before/after. */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <AppText variant="caption" color="textSecondary" style={{ fontSize: 10.5 }}>
                 {isDrink ? 'Water' : key === 'protein' ? 'Protein' : 'Fiber'}
               </AppText>
-              <AppText variant="caption" color="textTertiary" style={{ fontSize: 12 }}>
-                {projection.from} →
-              </AppText>
-              <AppText variant="cardTitle" style={{ fontSize: 17, color: accent }}>
-                {projection.to}
-              </AppText>
-              <AppText variant="caption" color="textTertiary" style={{ fontSize: 12 }}>
-                {projection.target != null ? `of ${projection.target} ${unit}` : unit}
+              <AppText variant="caption" style={{ fontSize: 12, fontWeight: '800' }}>
+                {projection.from} →{' '}
+                <AppText variant="caption" style={{ fontSize: 12, fontWeight: '800', color: accent }}>
+                  {projection.to}
+                </AppText>
+                {projection.target != null ? ` of ${projection.target} ${unit}` : ` ${unit}`}
               </AppText>
             </View>
             <View style={{ flexDirection: 'row', height: 7, borderRadius: 4, overflow: 'hidden', backgroundColor: theme.colors.surfaceAlt, marginTop: 10 }}>
@@ -365,7 +399,14 @@ export function ItemDetailScreen() {
       </Animated.ScrollView>
 
       {/* A nav bar that fades in as the photo scrolls away, so the title never
-          slides under the clock. */}
+          slides under the clock.
+
+          IT IS A NAV BAR, NOT A TITLE STRIP. The frame's collapsed state is a
+          left group of a plain 19pt chevron and the ellipsized name at 15, with
+          a plain star opposite — 8pt above the row, 12 below, hairline under.
+          It shipped as a centred 16pt title with 64pt of side padding and the
+          white photo discs still at full strength on top of it, which is two
+          back buttons and no left edge. */}
       <Animated.View
         pointerEvents="none"
         style={{
@@ -373,22 +414,30 @@ export function ItemDetailScreen() {
           top: 0,
           left: 0,
           right: 0,
-          paddingTop: insets.top,
-          paddingBottom: 10,
+          paddingTop: insets.top + 8,
+          paddingBottom: 12,
+          paddingHorizontal: 16,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
           backgroundColor: theme.colors.bg,
           borderBottomWidth: 0.5,
           borderBottomColor: theme.colors.border,
           opacity: navTitleOpacity,
         }}
       >
-        <AppText variant="cardTitle" style={{ fontSize: 16, textAlign: 'center', paddingHorizontal: 64 }} numberOfLines={1}>
-          {item.name}
-        </AppText>
+        <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 9 }}>
+          <Icon name="chevron-back" size={19} color={theme.colors.textPrimary} stroke={2.2} />
+          <AppText variant="cardTitle" style={{ flex: 1, fontSize: 15, letterSpacing: -0.1 }} numberOfLines={1}>
+            {item.name}
+          </AppText>
+        </View>
+        <Icon name="star" size={18} color={starred ? theme.colors.warning : theme.colors.textTertiary} stroke={2.2} />
       </Animated.View>
 
       {/* The two circles ride above both, so back and star are reachable at
           every scroll position. */}
-      <View
+      <Animated.View
         style={{
           position: 'absolute',
           top: insets.top + 12,
@@ -396,6 +445,7 @@ export function ItemDetailScreen() {
           right: 14,
           flexDirection: 'row',
           justifyContent: 'space-between',
+          opacity: heroButtonsOpacity,
         }}
       >
         <FloatingButton label="Back" onPress={() => navigation.goBack()}>
@@ -407,20 +457,47 @@ export function ItemDetailScreen() {
         >
           <Icon name="star" size={18} color={starred ? theme.colors.warning : theme.colors.textTertiary} stroke={2.2} />
         </FloatingButton>
-      </View>
+      </Animated.View>
 
-        <View
-          style={{
-            paddingHorizontal: 20,
-            paddingTop: 10,
-            paddingBottom: insets.bottom > 0 ? insets.bottom : 14,
-            borderTopWidth: 0.5,
-            borderTopColor: theme.colors.border,
-            backgroundColor: theme.colors.bg,
-          }}
+      {/* THE CTA WEARS THE NUMBER IT MOVES. All three frames fill this button
+          with the accent of the thing being logged — protein orange, fiber
+          green, water blue — at 17pt radius, 15pt vertical padding and a
+          14.5/800 label. It shipped as the shared primary Button: a 56pt
+          purple-gradient pill, the brand colour, which said nothing about
+          which of today's numbers was about to move. */}
+      <View
+        style={{
+          paddingHorizontal: 20,
+          paddingTop: 10,
+          paddingBottom: insets.bottom > 0 ? insets.bottom : 14,
+          borderTopWidth: 0.5,
+          borderTopColor: theme.colors.border,
+          backgroundColor: theme.colors.bg,
+        }}
+      >
+        <Pressable
+          onPress={logIt}
+          disabled={logging}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: logging }}
+          accessibilityLabel={logButtonLabel(item, servings)}
+          style={({ pressed }) => ({
+            alignItems: 'center',
+            justifyContent: 'center',
+            paddingVertical: 15,
+            borderRadius: 17,
+            backgroundColor: accent,
+            opacity: logging ? 0.5 : pressed ? 0.85 : 1,
+          })}
         >
-          <Button label={logButtonLabel(item, servings)} onPress={logIt} disabled={logging} />
-        </View>
+          <AppText
+            variant="cardTitle"
+            style={{ fontSize: 14.5, fontWeight: '800', letterSpacing: -0.1, color: theme.colors.onPrimary }}
+          >
+            {logButtonLabel(item, servings)}
+          </AppText>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -460,11 +537,34 @@ function FloatingButton({
   );
 }
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
+/** The frame's `.nm`: 700 weight, -0.1 tracking, size per site. */
+function Nm({ size, children }: { size: number; children: React.ReactNode }) {
   return (
-    <AppText variant="cardTitle" style={{ fontSize: 13 }}>
+    <AppText variant="cardTitle" style={{ fontSize: size, letterSpacing: -0.1 }}>
       {children}
     </AppText>
+  );
+}
+
+/**
+ * A section title on the page GROUND, with its card below.
+ *
+ * Only "How much" keeps its header inside the card; "What this adds", "What it
+ * does to today" and "Nutrition" lift out — the frame puts each of them on the
+ * bare ground with `.card mt10` underneath, so the eye reads the screen as
+ * three answered questions rather than one undifferentiated stack of cards.
+ * All three shipped nested inside their card at 13px instead of 15.
+ */
+function SectionHeader({ title, trailing }: { title: string; trailing?: string }) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16 }}>
+      <Nm size={15}>{title}</Nm>
+      {trailing ? (
+        <AppText variant="caption" color="textSecondary" style={{ fontSize: 10.5 }}>
+          {trailing}
+        </AppText>
+      ) : null}
+    </View>
   );
 }
 
@@ -497,6 +597,7 @@ function Headline({
 
 /** The secondary figures. A food shows macros; a drink shows electrolytes. */
 function Micros({ scaled, isDrink }: { scaled: ReturnType<typeof scaleItem>; isDrink: boolean }) {
+  const theme = useTheme();
   const rows: [string, string][] = [];
   const add = (label: string, value: number | undefined, unit: string) => {
     if (value != null) rows.push([label, `${value} ${unit}`]);
@@ -513,13 +614,26 @@ function Micros({ scaled, isDrink }: { scaled: ReturnType<typeof scaleItem>; isD
   }
   if (rows.length === 0) return null;
   return (
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginTop: 14 }}>
+    // A DIVIDED STRIP, NOT A CLUSTER. The frame rules the micros off from the
+    // headline pair with a hairline and gives every cell an equal, centred
+    // column — three for a drink, four for a food, always the full width. It
+    // shipped as a left-packed wrap with no rule, which made four macros look
+    // like a sentence that had run out of room.
+    <View
+      style={{
+        flexDirection: 'row',
+        marginTop: 12,
+        paddingTop: 11,
+        borderTopWidth: 0.5,
+        borderTopColor: theme.colors.border,
+      }}
+    >
       {rows.map(([label, value]) => (
-        <View key={label}>
-          <AppText variant="caption" color="textTertiary" style={{ fontSize: 9, fontWeight: '800', letterSpacing: 0.4 }}>
+        <View key={label} style={{ flex: 1 }}>
+          <AppText variant="caption" color="textSecondary" align="center" style={{ fontSize: 9, letterSpacing: 0.5 }}>
             {label}
           </AppText>
-          <AppText variant="caption" style={{ fontSize: 12.5, fontWeight: '700', marginTop: 2 }}>
+          <AppText variant="caption" align="center" style={{ fontSize: 13, fontWeight: '800', marginTop: 3 }}>
             {value}
           </AppText>
         </View>
@@ -554,31 +668,28 @@ function NutritionCard({
   if (rows.length === 0) return null;
 
   return (
-    <Card style={{ marginTop: 12 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <SectionLabel>Nutrition</SectionLabel>
-        <AppText variant="caption" color="textTertiary" style={{ fontSize: 10.5 }}>
-          per {servingsLabel(servings, item.servingNoun)}
-        </AppText>
-      </View>
-      <View style={{ marginTop: 6 }}>
-        {rows.map(([label, value], i) => (
-          <View
-            key={label}
-            style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              paddingVertical: 8,
-              borderBottomWidth: i === rows.length - 1 ? 0 : 0.5,
-              borderBottomColor: theme.colors.border,
-            }}
-          >
-            <AppText variant="caption" color="textSecondary" style={{ fontSize: 12.5 }}>{label}</AppText>
-            <AppText variant="caption" style={{ fontSize: 12.5, fontWeight: '700' }}>{value}</AppText>
-          </View>
-        ))}
-      </View>
-    </Card>
+    <>
+      <SectionHeader title="Nutrition" trailing={`per ${servingsLabel(servings, item.servingNoun)}`} />
+      <Card style={{ marginTop: 10 }}>
+        <View>
+          {rows.map(([label, value], i) => (
+            <View
+              key={label}
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                paddingVertical: 8,
+                borderBottomWidth: i === rows.length - 1 ? 0 : 0.5,
+                borderBottomColor: theme.colors.border,
+              }}
+            >
+              <AppText variant="caption" color="textSecondary" style={{ fontSize: 12.5 }}>{label}</AppText>
+              <AppText variant="caption" style={{ fontSize: 12.5, fontWeight: '700' }}>{value}</AppText>
+            </View>
+          ))}
+        </View>
+      </Card>
+    </>
   );
 }
 

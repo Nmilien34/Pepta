@@ -66,6 +66,11 @@ vi.mock("react-native", () => {
     View: passthrough("View"),
   };
 });
+// The Get started meter fills its lit segments with a real gradient, so
+// HomeScreen now pulls in expo-linear-gradient. Without this the whole suite
+// fails to transform. HomeScreen.hooks.test.tsx already carried this mock.
+vi.mock("expo-linear-gradient", () => ({ LinearGradient: "LinearGradient" }));
+
 vi.mock("react-native-svg", () => {
   const passthrough = (name: string) =>
     ({ children }: { children?: React.ReactNode }) => React.createElement(name, null, children);
@@ -124,6 +129,7 @@ vi.mock("../../theme", () => ({
       textTertiary: "#999", success: "#0a0", warning: "#fa0", danger: "#f00",
       primarySoft: "#eee", chipBg: "#eee", water: "#2FA8FF", fiber: "#34C759",
       protein: "#FF8A3D", weight: "#7C5CFC", activity: "#FF6B5A", streak: "#FF8A3D",
+      fillGradientStart: "#8B6CFF", fillGradientEnd: "#C77DFF",
     },
     spacing: { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 },
     radii: { sm: 8, md: 12, lg: 16, xl: 24, pill: 999 },

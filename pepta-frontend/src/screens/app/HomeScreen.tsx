@@ -10,6 +10,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Switch, View } from 'react-native';
 import { Icon } from "../../components/Icon";
 import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, type NavigationProp } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { HomeRangeKey } from '@pepta/shared';
@@ -345,15 +346,25 @@ export function HomeScreen() {
                   </View>
                 ) : null}
               </View>
+              {/* `.streak` is BARE — `display:inline-flex; align-items:center;
+                  gap:3px; font-weight:800; font-size:15px`, and that is the
+                  whole class. No background, no padding, no rim. It shipped
+                  inside a tinted GlassEdge pill, which put a third pill in a
+                  header the frame gives exactly one (`.today`) and made the
+                  count compete with the control beside it.
+
+                  The flame carries the colour (`--protein`, 18px); the COUNT is
+                  ink. `.streak` sets no colour, so the digit inherits `--tp` —
+                  the frame's own note about this screen is that true ink is
+                  reserved to mean "this is the value", and the streak count is
+                  a value. Orange-on-orange said the number was decoration. */}
               {view.streakDays > 0 ? (
-                <GlassEdge radius={theme.radii.pill} backgroundColor="#FFF1E8">
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 6, paddingHorizontal: 10 }}>
-                    <Icon name="fire" size={14} color={theme.colors.streak} />
-                    <AppText variant="caption" style={{ fontWeight: '700', color: theme.colors.streak }}>
-                      {view.streakDays}
-                    </AppText>
-                  </View>
-                </GlassEdge>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                  <Icon name="fire" size={18} color={theme.colors.streak} />
+                  <AppText style={{ fontWeight: '800', fontSize: 15 }}>
+                    {view.streakDays}
+                  </AppText>
+                </View>
               ) : null}
               <View style={{ width: 34, height: 34, borderRadius: theme.radii.pill, backgroundColor: theme.colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
                 <Icon name="sparkles" size={18} color={theme.colors.primary} />
@@ -445,11 +456,22 @@ export function HomeScreen() {
                   <View>
                     <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 5 }}>
                       <CountUp value={view.medication.estimate} format={(n) => n.toFixed(2)} variant="statBig" color="primary" />
-                      <AppText variant="caption" color="textSecondary">
+                      {/* `.unit` — 15px/700 in --ts, NOT `caption`. The frame
+                          writes the reading as `.big` and its unit as `.unit`:
+                          two different sizes on purpose. At caption (13/500)
+                          " mg" read as part of the same run of text as the
+                          number, flattening the one hierarchy this card has.
+                          The Weight card already does this correctly; this is
+                          its twin, and it was the one that got missed. */}
+                      <AppText variant="cardTitle" style={{ fontSize: 15, color: theme.colors.textSecondary }}>
                         {view.medication.unit}
                       </AppText>
                     </View>
-                    <AppText variant="caption" color="textTertiary" style={{ marginTop: 6 }}>
+                    {/* `.lab mt8` — 12.5px in --ts, 8 above. It shipped as
+                        textTertiary at 6: one step too faint for a caption the
+                        frame puts in secondary, and one step too close to the
+                        reading it labels. */}
+                    <AppText variant="caption" color="textSecondary" style={{ marginTop: 8, fontSize: 12.5 }}>
                       Current estimate
                     </AppText>
                   </View>
@@ -506,11 +528,15 @@ export function HomeScreen() {
                       <AppText variant="statBig" color="textTertiary">
                         —
                       </AppText>
-                      <AppText variant="caption" color="textTertiary">
+                      {/* Same `.unit` as the populated card. The frame greys the
+                          READING to --tt here (there is no level to report) but
+                          leaves the unit in --ts at 15/700 — the unit is not the
+                          thing that is missing. */}
+                      <AppText variant="cardTitle" style={{ fontSize: 15, color: theme.colors.textSecondary }}>
                         mg
                       </AppText>
                     </View>
-                    <AppText variant="caption" color="textTertiary" style={{ marginTop: 6 }}>
+                    <AppText variant="caption" color="textSecondary" style={{ marginTop: 8, fontSize: 12.5 }}>
                       Current estimate
                     </AppText>
                   </View>
@@ -913,6 +939,21 @@ const TASK_ICON: Record<string, string> = {
   weight: 'scale',
 };
 
+// `.seg`, the get-started meter. Two colours the frame states outright and the
+// theme has no token for — kept verbatim here rather than approximated:
+//
+//   .seg     { background:#E9E9EE }
+//   .seg.on  { background:linear-gradient(90deg,var(--g1),var(--g2)) }
+//
+// The OFF track is a COOL grey. It shipped as `--border` (#E9E4DB), which is
+// the warm hairline colour — right for a card edge, muddy as the ground under
+// a purple fill.
+//
+// A lit segment is theme.colors.fillGradient*, the hub's --g1→--g2. That is a
+// DIFFERENT ramp from the theme's primaryGradient (#6751E8→#8C63F4), which is
+// the darker button fill — using it here would have been the wrong purple.
+const SEG_TRACK = '#E9E9EE';
+
 function GettingStartedCard({ data, onTask }: { data: GettingStarted; onTask: (a: LogAction | null) => void }) {
   const theme = useTheme();
   return (
@@ -932,20 +973,31 @@ function GettingStartedCard({ data, onTask }: { data: GettingStarted; onTask: (a
           along am I" with a fraction; the segments answer "how many left" by
           being countable — which is the question a five-item checklist raises. */}
       <View style={{ flexDirection: 'row', gap: 5, marginTop: 12, marginBottom: 4 }}>
-        {data.tasks.map((task, i) => (
-          <View
-            key={task.key}
-            style={{
-              flex: 1,
-              height: 6,
-              borderRadius: 999,
-              // Fills left-to-right by COUNT, not per task: ticking off the
-              // fourth item must not light the fourth segment and leave holes.
-              // It is a meter reading "2 of 5", not a row of checkboxes.
-              backgroundColor: i < data.doneCount ? theme.colors.primary : theme.colors.border,
-            }}
-          />
-        ))}
+        {/* Fills left-to-right by COUNT, not per task: ticking off the fourth
+            item must not light the fourth segment and leave holes. It is a
+            meter reading "2 of 5", not a row of checkboxes.
+
+            A LIT SEGMENT IS A GRADIENT, not flat primary. `.seg.on` is
+            `linear-gradient(90deg,--g1,--g2)` and CSS paints that PER ELEMENT,
+            so each lit segment runs its own ramp left to right rather than one
+            ramp spread across the row — which is what stops five identical
+            purple capsules from reading as a disabled control. */}
+        {data.tasks.map((task, i) =>
+          i < data.doneCount ? (
+            <LinearGradient
+              key={task.key}
+              colors={[theme.colors.fillGradientStart, theme.colors.fillGradientEnd]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={{ flex: 1, height: 6, borderRadius: 999 }}
+            />
+          ) : (
+            <View
+              key={task.key}
+              style={{ flex: 1, height: 6, borderRadius: 999, backgroundColor: SEG_TRACK }}
+            />
+          ),
+        )}
       </View>
       {data.tasks.map((t, i) => {
         const tappable = !t.done && !!t.action;
@@ -1086,7 +1138,6 @@ const WEIGHT_GLOW = 'rgba(124,92,252,0.08)';
 // The frame's Log-weight label. Its own grey, not a theme token: the button
 // sits on --alt and the text is deliberately quieter than textSecondary.
 const LOGCTA_TEXT = '#5E636E';
-const ACTIVITY_WASH = 'rgba(255,107,90,0.10)';
 
 /**
  * The milestone track: where they stand, the round numbers between here and
@@ -1365,14 +1416,19 @@ function ActivityCard({
             alignItems: 'center',
             gap: 5,
             paddingVertical: 5,
-            paddingHorizontal: 10,
+            paddingHorizontal: 11,
             borderRadius: theme.radii.pill,
-            backgroundColor: ACTIVITY_WASH,
+            // `.pill` on --alt in --ts, both frames — the SAME quiet pill as
+            // "Steady" on the level card and "4.5 lb to go" on the weight card.
+            // It shipped on a 10% activity wash with orange text, which made the
+            // one routine action on this card the loudest thing in its header
+            // and put a second orange element next to the chip.
+            backgroundColor: theme.colors.surfaceAlt,
             opacity: pressed ? 0.7 : 1,
           })}
         >
-          <Icon name="add" size={13} color={theme.colors.activity} stroke={2.6} />
-          <AppText variant="caption" style={{ color: theme.colors.activity, fontWeight: '800', fontSize: 11 }}>
+          <Icon name="add" size={13} color={theme.colors.textSecondary} stroke={2.6} />
+          <AppText variant="caption" color="textSecondary" style={{ fontWeight: '600', fontSize: 11.5 }}>
             Log
           </AppText>
         </Pressable>
@@ -1421,13 +1477,22 @@ function ActivityCard({
           borderTopColor: theme.colors.border,
         }}
       >
-        <View style={{ flexShrink: 1 }}>
-          <AppText variant="caption" style={{ fontWeight: '700' }}>
-            Resistance today
-          </AppText>
-          <AppText variant="caption" color="textTertiary" style={{ fontSize: 10.5, marginTop: 2 }}>
-            Counts toward muscle protection
-          </AppText>
+        {/* `.ch` — gap 8, min-width 0 — and it LEADS WITH A GLYPH. The frame
+            puts a 17px barbell in --act ahead of the label in both Home frames;
+            the build dropped it, leaving the only switch on Home as two lines of
+            text with nothing to say what kind of thing it logs. The row is a log
+            entry like the bars above it, and every other logged thing on this
+            screen is announced by its icon. */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1, minWidth: 0 }}>
+          <Icon name="dumbbell" size={17} color={theme.colors.activity} stroke={2} />
+          <View style={{ flexShrink: 1 }}>
+            <AppText variant="caption" style={{ fontWeight: '700', fontSize: 13.5 }}>
+              Resistance today
+            </AppText>
+            <AppText variant="caption" color="textTertiary" style={{ fontSize: 10.5, marginTop: 2 }}>
+              Counts toward muscle protection
+            </AppText>
+          </View>
         </View>
         <Switch
           value={activity.resistanceToday}

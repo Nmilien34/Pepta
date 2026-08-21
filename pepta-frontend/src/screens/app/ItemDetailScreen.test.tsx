@@ -55,14 +55,13 @@ vi.mock("react-native-safe-area-context", () => ({
 }));
 vi.mock("../../components", () => {
   const p = (n: string) => ({ children }: { children?: React.ReactNode }) => React.createElement(n, null, children);
-  return {
-    AppText: p("AppText"),
-    Card: p("Card"),
-    Button: (props: { label: string; onPress: () => void; disabled?: boolean }) =>
-      React.createElement("Button", props),
-  };
+  // No Button: the log CTA is the screen's own accent-filled Pressable now.
+  return { AppText: p("AppText"), Card: p("Card") };
 });
 vi.mock("../../components/Icon", () => ({ Icon: (p: { name: string }) => React.createElement("Icon", p) }));
+// The hero's bottom fade is a real gradient now (it used to be a 0.001-opacity
+// View, i.e. nothing); react-native is mocked here, so the native one cannot load.
+vi.mock("expo-linear-gradient", () => ({ LinearGradient: "LinearGradient" }));
 vi.mock("../../theme", () => ({
   useTheme: () => ({
     colors: {
@@ -136,8 +135,13 @@ function texts(tree: TestRenderer.ReactTestRenderer): string {
   return out.join("|");
 }
 
-const button = (tree: TestRenderer.ReactTestRenderer) =>
-  tree.root.findAll((n) => String(n.type) === "Button")[0]!;
+// The log CTA is no longer the shared <Button>: the frame fills it with the
+// accent of the number it moves (protein orange, fiber green, water blue), so
+// it is a Pressable that announces itself with the same words it prints. It is
+// looked up through byLabel like every other control, which additionally
+// proves the label is unique — asserting the label exists is a slightly
+// stronger claim than reading it off whichever node came first.
+const button = (tree: TestRenderer.ReactTestRenderer, label: string) => one(tree, label);
 
 beforeEach(() => {
   Object.values(mocks).forEach((m) => typeof m === "function" && (m as ReturnType<typeof vi.fn>).mockReset?.());
@@ -157,26 +161,26 @@ describe("ItemDetailScreen · the stepper drives every number", () => {
 
   it("scales the macros, the projection and the button together", async () => {
     const tree = await render(chicken);
-    expect(button(tree).props.label).toBe("Log 1 serving");
+    expect(button(tree, "Log 1 serving")).toBeDefined();
     act(() => one(tree, "One more").props.onPress());
     const out = texts(tree);
     expect(out).toContain("69.4");   // protein doubled
     expect(out).toContain("370");    // calories doubled
     expect(out).toContain("143.4");  // 74 + 69.4 projected
-    expect(button(tree).props.label).toBe("Log 2 servings");
+    expect(button(tree, "Log 2 servings")).toBeDefined();
   });
 
   it("will not step below one — logging zero is not a log", async () => {
     const tree = await render(chicken);
     act(() => one(tree, "One fewer").props.onPress());
-    expect(button(tree).props.label).toBe("Log 1 serving");
+    expect(button(tree, "Log 1 serving")).toBeDefined();
   });
 
   it("says what a drink adds, in its own unit", async () => {
     const tree = await render(lmnt);
-    expect(button(tree).props.label).toBe("Log 1 stick · 16 oz");
+    expect(button(tree, "Log 1 stick · 16 oz")).toBeDefined();
     act(() => one(tree, "One more").props.onPress());
-    expect(button(tree).props.label).toBe("Log 2 sticks · 32 oz");
+    expect(button(tree, "Log 2 sticks · 32 oz")).toBeDefined();
     expect(texts(tree)).toContain("2000"); // sodium doubled
   });
 });
@@ -185,7 +189,7 @@ describe("ItemDetailScreen · the buttons do what they say", () => {
   it("logs a food as the meal it is, at the chosen amount", async () => {
     const tree = await render(chicken);
     act(() => one(tree, "One more").props.onPress());
-    await act(async () => button(tree).props.onPress());
+    await act(async () => button(tree, "Log 2 servings").props.onPress());
     expect(mocks.addMeal).toHaveBeenCalledTimes(1);
     expect(mocks.addMeal.mock.calls[0]![0]).toMatchObject({
       foodName: "Chicken breast",
@@ -199,7 +203,7 @@ describe("ItemDetailScreen · the buttons do what they say", () => {
 
   it("logs a drink as ounces, never as a meal", async () => {
     const tree = await render(lmnt);
-    await act(async () => button(tree).props.onPress());
+    await act(async () => button(tree, "Log 1 stick · 16 oz").props.onPress());
     expect(mocks.bumpWater).toHaveBeenCalledWith(16);
     expect(mocks.addMeal).not.toHaveBeenCalled();
   });
@@ -296,9 +300,9 @@ describe("ItemDetailScreen · the hero, per the frame", () => {
 describe("ItemDetailScreen · the drink side", () => {
   it("counts in the drink's own noun, not a generic serving", async () => {
     const tree = await render(lmnt);
-    expect(button(tree).props.label).toBe("Log 1 stick · 16 oz");
+    expect(button(tree, "Log 1 stick · 16 oz")).toBeDefined();
     act(() => one(tree, "One more").props.onPress());
-    expect(button(tree).props.label).toBe("Log 2 sticks · 32 oz");
+    expect(button(tree, "Log 2 sticks · 32 oz")).toBeDefined();
   });
 
   it("lists electrolytes where a food lists macros", async () => {
@@ -340,7 +344,7 @@ describe("an item the user made themselves", () => {
 
   it("still logs what it is worth, photo or not", async () => {
     const tree = await render(own);
-    await act(async () => { button(tree).props.onPress(); });
+    await act(async () => { button(tree, "Log 1 serving").props.onPress(); });
     expect(mocks.addMeal).toHaveBeenCalled();
   });
 
