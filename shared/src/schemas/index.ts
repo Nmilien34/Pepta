@@ -1193,6 +1193,12 @@ export const trackResponseSchema = z
     // field drops it rather than failing. Optional with a default so a NEW
     // client still parses an OLD backend's response during the deploy gap.
     weightLogs: z.array(weightLogResponseSchema).default([]),
+    // Fibre was WRITE-ONLY: the Home stepper created rows the user could then
+    // never see or delete, because Track never carried them. Safe to add for
+    // the same reason weightLogs was — this schema is .strip(), so a client
+    // that predates the field drops it, and the default covers a new client
+    // talking to an old backend during the deploy gap.
+    fiberLogs: z.array(fiberLogResponseSchema).default([]),
     sectionErrors: z.record(z.string()).default({}),
   })
   // Response schema: tolerate unknown/extra server fields (strip, not strict) so

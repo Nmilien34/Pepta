@@ -37,6 +37,7 @@ import type {
   WeightLogResponse,
 } from "@pepta/shared";
 import { api, type DeletableLogKind } from "../services/api";
+import { pickLogToUndo, type UndoableLog } from "../utils/undoBump";
 import { useAuth } from "./AuthContext";
 import { readSnapshot, writeSnapshot } from "../services/peptaSnapshotStore";
 import {
@@ -176,6 +177,7 @@ function emptyTrackResponse(): TrackResponse {
     sideEffectLogs: [],
     measurements: [],
     weightLogs: [],
+    fiberLogs: [],
     sectionErrors: {},
   };
 }
@@ -267,6 +269,13 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
   const saveLogRef = useRef<(kind: OutboxKind, payload: Record<string, unknown>) => Promise<SaveResult>>(
     async () => "saved",
   );
+  // Same reason as saveLogRef: the bump callbacks are defined above the real
+  // implementations, and reaching them through a ref keeps the declaration
+  // order intact without restructuring the provider.
+  const deleteLogRef = useRef<
+    (kind: DeletableLogKind, id: string) => Promise<boolean>
+  >(async () => false);
+  const refreshTrackRef = useRef<() => Promise<void>>(async () => undefined);
   const sessionEpoch = useRef(0);
   const [boundUserId, setBoundUserId] = useState<string | null>(userId);
   if (boundUserId !== userId) {
@@ -338,135 +347,169 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  // A minus tap is an undo of a plus tap, so it deletes the log the plus tap
+  // created rather than pretending. Before this, minus decremented the on-screen
+  // total and returned early — the number moved, nothing was persisted, and the
+  // next refresh silently restored the old total.
+  //
+  // Nothing to undo (no matching log today) is a genuine no-op: the displayed
+  // total stays put, which is the truth. See pickLogToUndo for why the match is
+  // exact-amount.
+  const undoBump = useCallback(
+    async <T extends UndoableLog>(
+      kind: DeletableLogKind,
+      rowsOf: (track: TrackResponse) => readonly T[],
+      amount: number,
+      amountOf: (row: T) => number,
+      applyDelta: (delta: number) => void,
+    ): Promise<void> => {
+      const epoch = sessionEpoch.current;
+      let current = trackRef.current;
+      if (!current) {
+        // Home is often the first screen touched, so Track may never have
+        // loaded. Without the rows there is nothing to match against.
+        await refreshTrackRef.current();
+        if (epoch !== sessionEpoch.current) return;
+        current = trackRef.current;
+      }
+      if (!current) return;
+
+      const target = pickLogToUndo(rowsOf(current), amount, amountOf);
+      if (!target) return;
+
+      applyDelta(-amount);
+      const deleted = await deleteLogRef.current(kind, target.id);
+      // deleteLog refreshes home on success, so truth replaces the optimistic
+      // number shortly after. Only a failure needs putting back.
+      if (!deleted && epoch === sessionEpoch.current) applyDelta(amount);
+    },
+    [],
+  );
+
   // Optimistic inline-stepper bumps. We update the on-screen total immediately,
-  // then persist a positive delta as a new log (the backend log model is
-  // append-only, so a negative "− " is treated as a local correction that the
-  // next refresh reconciles to server truth). On a failed POST we revert.
+  // then persist the delta — a plus as a new log, a minus as a deletion of the
+  // log it undoes. On a failed write we revert.
   const bumpProtein = useCallback(
     (grams: number) => {
+      const applyDelta = (delta: number) =>
+        setHome((h) =>
+          h
+            ? updateRangeTotals(
+                {
+                  ...h,
+                  todayProteinGrams: Math.max(0, h.todayProteinGrams + delta),
+                },
+                {
+                  proteinGrams: Math.max(
+                    0,
+                    (h.rangeTotals?.proteinGrams ?? h.todayProteinGrams) + delta,
+                  ),
+                },
+              )
+            : h,
+        );
+      if (grams < 0) {
+        void undoBump(
+          "protein",
+          (t) => t.proteinLogs,
+          -grams,
+          (row) => row.grams,
+          applyDelta,
+        );
+        return;
+      }
+      if (grams === 0) return;
       const epoch = sessionEpoch.current;
-      setHome((h) =>
-        h
-          ? updateRangeTotals(
-              {
-                ...h,
-                todayProteinGrams: Math.max(0, h.todayProteinGrams + grams),
-              },
-              {
-                proteinGrams: Math.max(
-                  0,
-                  (h.rangeTotals?.proteinGrams ?? h.todayProteinGrams) + grams,
-                ),
-              },
-            )
-          : h,
-      );
-      if (grams <= 0) return;
+      applyDelta(grams);
       // Durable: offline/5xx queues the log (optimistic total stays — the log
       // WILL land); only a final server rejection reverts the total.
       saveLogRef
         .current("protein", { grams, datetime: new Date().toISOString() })
         .catch(() => {
           if (epoch !== sessionEpoch.current) return;
-          setHome((h) =>
-            h
-              ? updateRangeTotals(
-                  {
-                    ...h,
-                    todayProteinGrams: Math.max(0, h.todayProteinGrams - grams),
-                  },
-                  {
-                    proteinGrams: Math.max(
-                      0,
-                      (h.rangeTotals?.proteinGrams ?? h.todayProteinGrams) -
-                        grams,
-                    ),
-                  },
-                )
-              : h,
-          );
+          applyDelta(-grams);
         });
     },
-    [updateRangeTotals],
+    [undoBump, updateRangeTotals],
   );
   const bumpWater = useCallback(
     (oz: number) => {
+      const applyDelta = (delta: number) =>
+        setHome((h) =>
+          h
+            ? updateRangeTotals(
+                { ...h, todayWaterOz: Math.max(0, h.todayWaterOz + delta) },
+                {
+                  waterOz: Math.max(
+                    0,
+                    (h.rangeTotals?.waterOz ?? h.todayWaterOz) + delta,
+                  ),
+                },
+              )
+            : h,
+        );
+      if (oz < 0) {
+        void undoBump(
+          "water",
+          (t) => t.waterLogs,
+          -oz,
+          (row) => row.amountOz,
+          applyDelta,
+        );
+        return;
+      }
+      if (oz === 0) return;
       const epoch = sessionEpoch.current;
-      setHome((h) =>
-        h
-          ? updateRangeTotals(
-              { ...h, todayWaterOz: Math.max(0, h.todayWaterOz + oz) },
-              {
-                waterOz: Math.max(
-                  0,
-                  (h.rangeTotals?.waterOz ?? h.todayWaterOz) + oz,
-                ),
-              },
-            )
-          : h,
-      );
-      if (oz <= 0) return;
+      applyDelta(oz);
       saveLogRef
         .current("water", { amountOz: oz, datetime: new Date().toISOString() })
         .catch(() => {
           if (epoch !== sessionEpoch.current) return;
-          setHome((h) =>
-            h
-              ? updateRangeTotals(
-                  { ...h, todayWaterOz: Math.max(0, h.todayWaterOz - oz) },
-                  {
-                    waterOz: Math.max(
-                      0,
-                      (h.rangeTotals?.waterOz ?? h.todayWaterOz) - oz,
-                    ),
-                  },
-                )
-              : h,
-          );
+          applyDelta(-oz);
         });
     },
-    [updateRangeTotals],
+    [undoBump, updateRangeTotals],
   );
   const bumpFiber = useCallback(
     (grams: number) => {
+      const applyDelta = (delta: number) =>
+        setHome((h) =>
+          h
+            ? updateRangeTotals(
+                {
+                  ...h,
+                  todayFiberGrams: Math.max(0, h.todayFiberGrams + delta),
+                },
+                {
+                  fiberGrams: Math.max(
+                    0,
+                    (h.rangeTotals?.fiberGrams ?? h.todayFiberGrams) + delta,
+                  ),
+                },
+              )
+            : h,
+        );
+      if (grams < 0) {
+        void undoBump(
+          "fiber",
+          (t) => t.fiberLogs ?? [],
+          -grams,
+          (row) => row.grams,
+          applyDelta,
+        );
+        return;
+      }
+      if (grams === 0) return;
       const epoch = sessionEpoch.current;
-      setHome((h) =>
-        h
-          ? updateRangeTotals(
-              { ...h, todayFiberGrams: Math.max(0, h.todayFiberGrams + grams) },
-              {
-                fiberGrams: Math.max(
-                  0,
-                  (h.rangeTotals?.fiberGrams ?? h.todayFiberGrams) + grams,
-                ),
-              },
-            )
-          : h,
-      );
-      if (grams <= 0) return;
+      applyDelta(grams);
       saveLogRef
         .current("fiber", { grams, datetime: new Date().toISOString() })
         .catch(() => {
           if (epoch !== sessionEpoch.current) return;
-          setHome((h) =>
-            h
-              ? updateRangeTotals(
-                  {
-                    ...h,
-                    todayFiberGrams: Math.max(0, h.todayFiberGrams - grams),
-                  },
-                  {
-                    fiberGrams: Math.max(
-                      0,
-                      (h.rangeTotals?.fiberGrams ?? h.todayFiberGrams) - grams,
-                    ),
-                  },
-                )
-              : h,
-          );
+          applyDelta(-grams);
         });
     },
-    [updateRangeTotals],
+    [undoBump, updateRangeTotals],
   );
 
   const refreshTrack = useCallback(async () => {
@@ -584,6 +627,7 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
               sideEffectLogs: mark(t.sideEffectLogs),
               weightLogs: mark(t.weightLogs),
               measurements: mark(t.measurements),
+              fiberLogs: mark(t.fiberLogs ?? []),
             }
           : t,
       );
@@ -719,6 +763,8 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
   );
 
   saveLogRef.current = saveLog;
+  deleteLogRef.current = deleteLog;
+  refreshTrackRef.current = refreshTrack;
 
   const runReplay = useCallback(async () => {
     if (!userId) return;

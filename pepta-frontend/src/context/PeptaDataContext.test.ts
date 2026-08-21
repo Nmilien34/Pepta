@@ -124,6 +124,7 @@ describe("trackWithAddedSideEffect", () => {
       ],
       measurements: [],
     weightLogs: [],
+      fiberLogs: [],
       sectionErrors: {},
     } as TrackResponse;
 

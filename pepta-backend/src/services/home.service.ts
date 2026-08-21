@@ -163,15 +163,26 @@ async function getStreak(userId: string, now: Date, tz: string | null) {
   // so a log that belongs to their earliest counted day may sit just outside a
   // UTC-cut window.
   const since = addUtcDays(startOfUtcDay(now), -91);
-  const [doses, meals, proteins, waterLogs, activities, weights] = await Promise.all([
+  const [doses, meals, proteins, waterLogs, activities, weights, fibers] =
+    await Promise.all([
     DoseLogModel.find({ userId, datetime: { $gte: since } }).select('datetime'),
     MealLogModel.find({ userId, datetime: { $gte: since } }).select('datetime'),
     ProteinLogModel.find({ userId, datetime: { $gte: since } }).select('datetime'),
     WaterLogModel.find({ userId, datetime: { $gte: since } }).select('datetime'),
     ActivityLogModel.find({ userId, datetime: { $gte: since } }).select('datetime'),
     WeightLogModel.find({ userId, datetime: { $gte: since } }).select('datetime'),
+    // Fibre counts as logging activity like everything else the app tracks.
+    FiberLogModel.find({ userId, datetime: { $gte: since } }).select('datetime'),
   ]);
-  const logs = [...doses, ...meals, ...proteins, ...waterLogs, ...activities, ...weights].map(
+  const logs = [
+    ...doses,
+    ...meals,
+    ...proteins,
+    ...waterLogs,
+    ...activities,
+    ...weights,
+    ...fibers,
+  ].map(
     (log) => ({ datetime: log.datetime }),
   );
 

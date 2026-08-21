@@ -232,6 +232,9 @@ export const LOG_PATHS = {
   activity: "/activity-logs",
   sideEffect: "/side-effect-logs",
   measurement: "/measurements",
+  // Fibre was missing here, so a row the Home stepper created could never be
+  // deleted — the backend has served /fiber-logs all along.
+  fiber: "/fiber-logs",
 } as const;
 
 export type DeletableLogKind = keyof typeof LOG_PATHS;

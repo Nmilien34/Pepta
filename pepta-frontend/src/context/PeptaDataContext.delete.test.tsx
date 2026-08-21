@@ -55,6 +55,7 @@ const trackFixture = () => ({
   activityLogs: [],
   sideEffectLogs: [],
   weightLogs: [],
+  fiberLogs: [],
   measurements: [],
   sectionErrors: {},
 });
