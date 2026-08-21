@@ -33,15 +33,14 @@ import {
   stepServings,
   todayProjection,
   type DetailItem,
+  heroCollapseAt,
+  HERO_HEIGHT,
 } from './itemDetail';
 
 export type ItemDetailParams = { item: DetailItem };
 
-/** The photo's height, and where the title hands over to the nav bar. */
-const HERO_HEIGHT = 212;
 /** The sheet rides up over the photo by this much, per the frame. */
 const SHEET_OVERLAP = 26;
-const COLLAPSE_AT = HERO_HEIGHT - 80;
 
 export function ItemDetailScreen() {
   const theme = useTheme();
@@ -133,13 +132,16 @@ export function ItemDetailScreen() {
     navigation.goBack();
   };
 
+  // The hero sits BELOW the status bar, so the point at which it has scrolled
+  // away moves with the inset — see heroCollapseAt.
+  const collapseAt = heroCollapseAt(insets.top);
   const navTitleOpacity = scrollY.interpolate({
-    inputRange: [COLLAPSE_AT - 20, COLLAPSE_AT],
+    inputRange: [collapseAt - 20, collapseAt],
     outputRange: [0, 1],
     extrapolate: 'clamp',
   });
   const heroOpacity = scrollY.interpolate({
-    inputRange: [0, COLLAPSE_AT],
+    inputRange: [0, collapseAt],
     outputRange: [1, 0],
     extrapolate: 'clamp',
   });
@@ -147,7 +149,11 @@ export function ItemDetailScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.bg }}>
       <Animated.ScrollView
-        contentContainerStyle={{ paddingBottom: 24 }}
+        // paddingTop, not a SafeAreaView: the nav bar and the floating
+        // back/star buttons are absolutely positioned and already inset, so
+        // wrapping would double the offset. Without this the 212pt hero began
+        // at y=0 and a Dynamic Island ate the top of every packshot.
+        contentContainerStyle={{ paddingTop: insets.top, paddingBottom: 24 }}
         showsVerticalScrollIndicator={false}
         scrollEventThrottle={16}
         onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {

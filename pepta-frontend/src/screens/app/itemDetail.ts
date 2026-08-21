@@ -217,3 +217,21 @@ export function itemFromFavourite(fav: Favourite): DetailItem {
     ...(fav.photoUrl ? { photo: { uri: fav.photoUrl } } : {}),
   };
 }
+
+/** The photo band's height, and the distance the title travels before the nav takes over. */
+export const HERO_HEIGHT = 212;
+
+/**
+ * The scroll offset at which the hero has gone and the nav bar owns the title.
+ *
+ * TAKES THE TOP INSET because the hero is pushed down by it. The photo band used
+ * to start at y=0, so on a device with a Dynamic Island the top of every
+ * packshot sat behind the clock — a `contain` image centred in a 212pt band
+ * whose first ~59pt were covered. Padding the content down fixes that, but the
+ * hero then leaves the screen `insetTop` later, and a threshold that ignores it
+ * fades the nav bar in while the photo is still on screen. The two have to move
+ * together, which is why this is a function and not a constant.
+ */
+export function heroCollapseAt(insetTop: number, heroHeight: number = HERO_HEIGHT): number {
+  return heroHeight + insetTop - 80;
+}
