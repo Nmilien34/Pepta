@@ -17,9 +17,12 @@
 // is a promise we have not earned yet.
 
 import React, { useEffect, useRef } from 'react';
-import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Image, StyleSheet, Text, View } from 'react-native';
+import { Mascot } from '../../components/Mascot';
 import { convo } from '../../components/onboarding/convoTokens';
 import { typography } from '../../theme/typography';
+// The slide's whole claim is "we recognise your food" — so it shows the food.
+import SCAN_PHOTO from '../../../assets/nutrients/chicken.jpg';
 
 const SLIDE_W = 200;
 const GAP = 10;
@@ -100,9 +103,17 @@ export const PROOF_SLIDES: readonly ProofSlide[] = [
     sub: 'Protein and calories without typing a thing.',
     render: () => (
       <>
-        <View style={styles.thumb} />
-        <Text style={styles.cardTitle}>Chicken breast</Text>
-        <Text style={styles.cardNote}>4 oz · scanned</Text>
+        {/* A REAL PHOTOGRAPH, in a row beside the name — frame:
+            row gap:9 align:center, .im5 52x52 radius 12 object-fit cover.
+            This shipped as a flat 74px grey block stacked above the text, on
+            the one slide whose entire argument is "we recognise your food". */}
+        <View style={styles.scanRow}>
+          <Image source={SCAN_PHOTO} style={styles.scanThumb} resizeMode="cover" />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={[styles.cardTitle, styles.scanName]}>Chicken breast</Text>
+            <Text style={[styles.cardNote, styles.scanNote]}>4 oz · scanned</Text>
+          </View>
+        </View>
         <View style={styles.chipRow}>
           <Text style={[styles.chip, styles.chipProtein]}>35 g protein</Text>
           <Text style={styles.chip}>185 cal</Text>
@@ -134,8 +145,16 @@ export const PROOF_SLIDES: readonly ProofSlide[] = [
     sub: 'Straight answers about your protocol, cited.',
     render: () => (
       <>
-        <Text style={styles.cardLabel}>PEP</Text>
-        <Text style={styles.cardTitle}>Why does it get harder?</Text>
+        {/* Pep himself, beside the label — frame: row gap:8 align:flex-start,
+            then a column with the PEP eyebrow and the question. The card is
+            called "Ask Pep anything" and shipped without Pep in it. */}
+        <View style={styles.pepRow}>
+          <Mascot size={30} />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={styles.cardLabel}>PEP</Text>
+            <Text style={[styles.cardTitle, styles.pepQuestion]}>Why does it get harder?</Text>
+          </View>
+        </View>
         <View style={styles.quote}>
           <Text style={styles.quoteText}>
             Your level climbs for the first weeks, then plateaus…
@@ -268,7 +287,15 @@ const styles = StyleSheet.create({
   track: { height: 6, borderRadius: 3, backgroundColor: 'rgba(14,14,18,0.08)', marginTop: 12 },
   trackFill: { height: 6, borderRadius: 3, backgroundColor: '#1E96EF' },
 
-  thumb: { height: 74, borderRadius: 10, backgroundColor: 'rgba(14,14,18,0.06)' },
+  scanRow: { flexDirection: 'row', gap: 9, alignItems: 'center' },
+  // The shared cardTitle stacks under a block (marginTop 6); in a centered row
+  // that offsets the column off-axis. Frame: .nm 12, .lab 9.5 marginTop 1.
+  scanName: { fontSize: 12, marginTop: 0 },
+  scanNote: { fontSize: 9.5, marginTop: 1 },
+  scanThumb: { width: 52, height: 52, borderRadius: 12 },
+  pepRow: { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
+  // Frame: .nm 11.5, line-height 1.3, marginTop 2 under the eyebrow.
+  pepQuestion: { fontSize: 11.5, lineHeight: 15, marginTop: 2 },
   chipRow: { flexDirection: 'row', gap: 6, marginTop: 8 },
   chip: {
     fontFamily: typography.fonts.bold,

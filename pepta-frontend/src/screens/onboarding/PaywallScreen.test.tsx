@@ -89,6 +89,8 @@ vi.mock("react-native", () => ({
   Linking: {
     openURL: mocks.openURL,
   },
+  // The proof carousel shows a real food photo on its scan slide.
+  Image: "Image",
   Pressable: ({
     children,
     ...props
@@ -211,6 +213,12 @@ vi.mock("../../components", () => ({
 
 vi.mock("../../components/Icon", () => ({
   Icon: "Icon",
+}));
+
+// The proof carousel draws Pep on its last slide; the real Mascot pulls
+// react-native-svg, which does not load under a plain node transform.
+vi.mock("../../components/Mascot", () => ({
+  Mascot: "Mascot",
 }));
 
 vi.mock("../../context/AuthContext", () => ({
