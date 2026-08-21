@@ -280,7 +280,11 @@ const mealScanSchema = new Schema<MealScanDocument>(
       type: Schema.Types.ObjectId,
       ref: "MediaAsset",
       required: true,
-      unique: true,
+      // Uniqueness is declared as a PARTIAL index below, not here. `unique`
+      // on the path builds a plain unique index across every document, and
+      // `required` only governs new writes — the mealscans that predate the
+      // media pipeline have no such field at all, so the index saw a run of
+      // duplicate nulls and failed to build on every single boot.
     },
     imageMimeType: {
       type: String,
@@ -325,6 +329,15 @@ const mealScanSchema = new Schema<MealScanDocument>(
   },
 );
 
+// One scan per media asset — but ONLY over documents that actually carry one.
+// $type: "objectId" excludes both missing and explicitly-null values, which a
+// plain `sparse: true` would not (sparse still indexes an explicit null). The
+// legacy scans have no field at all today; the stricter predicate means a null
+// written by some future bug cannot resurrect the E11000 either.
+mealScanSchema.index(
+  { photoMediaId: 1 },
+  { unique: true, partialFilterExpression: { photoMediaId: { $type: "objectId" } } },
+);
 mealScanSchema.index({ userId: 1, createdAt: -1 });
 mealScanSchema.index(
   { userId: 1, idempotencyKey: 1 },
