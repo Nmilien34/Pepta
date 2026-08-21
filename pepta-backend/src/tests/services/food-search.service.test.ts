@@ -154,3 +154,64 @@ describe("food search service", () => {
     expect(mocks.createCompletion).toHaveBeenCalledTimes(1);
   });
 });
+
+// The query is user-controlled text that becomes the prompt's user message
+// verbatim. Both of these guard what reaches the model, and what we pay for.
+describe("the query the model actually receives", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    clearFoodSearchCacheForTests();
+    mocks.openAI.mockImplementation(() => ({
+      chat: { completions: { create: mocks.createCompletion } },
+    }));
+    mocks.createCompletion.mockResolvedValue({
+      choices: [{ message: { content: JSON.stringify({ results: [] }) } }],
+    });
+  });
+
+  it("is truncated to a food-name-sized string, however long the input", async () => {
+    await searchFoods(`${"a".repeat(5000)} chicken`);
+
+    const sent = mocks.createCompletion.mock.calls[0]![0].messages[1].content;
+    expect(sent.length).toBeLessThanOrEqual(120);
+  });
+
+  it("clamps implausible macros a model returns rather than passing them on", async () => {
+    mocks.createCompletion.mockResolvedValue({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              results: [
+                {
+                  foodName: "Kimchi jjigae",
+                  servingSize: "1 bowl",
+                  // A misplaced decimal or a per-case figure looks exactly
+                  // like this, and nothing downstream bounds it: the app
+                  // posts it to /meal-logs, whose schema only asks for
+                  // nonnegative.
+                  protein: 999_999,
+                  calories: 1e9,
+                  carbs: 50_000,
+                  fat: 9_000,
+                  fiber: 4_000,
+                },
+              ],
+            }),
+          },
+        },
+      ],
+    });
+
+    // A dish with no local entry, so the answer really is the model's.
+    const result = await searchFoods("kimchi jjigae");
+
+    expect(result.results[0]).toMatchObject({
+      protein: 300,
+      calories: 3000,
+      carbs: 500,
+      fat: 250,
+      fiber: 100,
+    });
+  });
+});

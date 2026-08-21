@@ -21,6 +21,12 @@ router.post(
     windowMs: 60 * 1000,
     maxRequests: 12,
     message: "Pep needs a breather — try again in a minute",
+    // Per USER, like every other authenticated AI route. Keying on IP is
+    // wrong in both directions on mobile: users sharing a carrier NAT or
+    // sitting behind our own proxy would share one 12/min budget and cut
+    // each other off, while a single user's IP changes as they move between
+    // networks and hands them a fresh budget each time.
+    keyBy: "userOrIp",
   }),
   validateBody(pepChatRequestSchema),
   asyncHandler(async (req, res) => {

@@ -5,6 +5,7 @@ import type {
 } from "@pepta/shared";
 import OpenAI from "openai";
 import { env } from "../config/env";
+import { clampNutrition } from "../lib/nutritionBounds";
 import { NotFoundError } from "../lib/errors";
 import { logger } from "../lib/logger";
 import { ProductNutritionCacheModel } from "../models";
@@ -167,15 +168,19 @@ function parseOpenFoodFactsProduct(
         url: sourceUrl,
       },
     ],
+    // Clamped for the same reason as the model paths: Open Food Facts is
+    // crowd-sourced, and bad rows are a known hazard there (energy entered in
+    // kJ as kcal, per-kilo figures filed as per-serving). The numbers land in
+    // the user's meal log either way, so they get the same plausibility band.
     analysis: {
       foodName: name.slice(0, 120),
       servingSize:
         (usedServing && cleanString(product.serving_size, 80)) || "100 g",
-      protein: roundOne(protein ?? 0),
-      calories: roundOne(calories ?? 0),
-      carbs: roundOne(carbs),
-      fat: roundOne(fat),
-      fiber: roundOne(fiber),
+      protein: roundOne(clampNutrition("protein", protein ?? 0)),
+      calories: roundOne(clampNutrition("calories", calories ?? 0)),
+      carbs: roundOne(clampNutrition("carbs", carbs)),
+      fat: roundOne(clampNutrition("fat", fat)),
+      fiber: roundOne(clampNutrition("fiber", fiber)),
       confidence: usedServing ? 0.88 : 0.7,
     },
   };
@@ -335,14 +340,18 @@ function parseOpenAIProductJson(
       ...(brand ? { brand } : {}),
       ...(productName ? { productName } : {}),
       citations,
+      // Macros are clamped like every other estimator (lib/nutritionBounds).
+      // A web-search answer is no more trustworthy than a vision estimate —
+      // it can read a per-100g panel as a per-serving one, or pick up a
+      // wholesale case listing — and nothing downstream bounds these.
       analysis: {
         foodName,
         servingSize,
-        protein: roundOne(protein),
-        calories: roundOne(calories),
-        carbs: roundOne(carbs),
-        fat: roundOne(fat),
-        fiber: roundOne(fiber),
+        protein: roundOne(clampNutrition("protein", protein)),
+        calories: roundOne(clampNutrition("calories", calories)),
+        carbs: roundOne(clampNutrition("carbs", carbs)),
+        fat: roundOne(clampNutrition("fat", fat)),
+        fiber: roundOne(clampNutrition("fiber", fiber)),
         confidence: clamp(confidence ?? 0.62, 0, 1),
       },
     };

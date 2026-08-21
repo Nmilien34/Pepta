@@ -5,6 +5,13 @@ import { AppError } from "../../lib/errors";
 const mocks = vi.hoisted(() => ({
   getHome: vi.fn(),
   getPepMemoryForChat: vi.fn(),
+  profileFindOne: vi.fn(),
+}));
+
+vi.mock("../../models", () => ({
+  UserProfileModel: {
+    findOne: (...args: unknown[]) => mocks.profileFindOne(...args),
+  },
 }));
 
 vi.mock("../../services/home.service", () => ({
@@ -35,6 +42,9 @@ const messages: PepChatMessage[] = [
 describe("getPepChatReply", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.profileFindOne.mockReturnValue({
+      select: () => Promise.resolve({ timezone: "America/Los_Angeles" }),
+    });
   });
 
   it("returns the model's grounded reply and forwards the context", async () => {
@@ -145,5 +155,52 @@ describe("getPepChatReply", () => {
       statusCode: 503,
     });
     await expect(getPepChatReply("user-1", messages)).rejects.toBeInstanceOf(AppError);
+  });
+});
+
+// Pep answers questions like "how much protein have I had today?". If the
+// server's day and the user's day disagree, Pep contradicts the Home screen
+// the user is looking at — the totals are computed over a different 24 hours.
+describe("the chat context is grounded in the user's own day", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.getPepMemoryForChat.mockResolvedValue(null);
+    mocks.getHome.mockResolvedValue({ medicationLevels: [], nextDose: null });
+  });
+
+  it("passes the profile's timezone to getHome", async () => {
+    mocks.profileFindOne.mockReturnValue({
+      select: () => Promise.resolve({ timezone: "America/Los_Angeles" }),
+    });
+
+    await getPepChatReply("user-1", messages, {
+      generateReply: async () => JSON.stringify({ reply: "ok", refused: false }),
+    });
+
+    expect(mocks.getHome).toHaveBeenCalledWith(
+      "user-1",
+      expect.any(Date),
+      "today",
+      expect.objectContaining({ tz: "America/Los_Angeles" }),
+    );
+  });
+
+  it("still answers when the profile has no timezone to offer", async () => {
+    mocks.profileFindOne.mockReturnValue({
+      select: () => Promise.resolve(null),
+    });
+
+    const result = await getPepChatReply("user-1", messages, {
+      generateReply: async () => JSON.stringify({ reply: "ok", refused: false }),
+    });
+
+    // getHome falls back to its own default; the chat must not break.
+    expect(result.reply).toBe("ok");
+    expect(mocks.getHome).toHaveBeenCalledWith(
+      "user-1",
+      expect.any(Date),
+      "today",
+      expect.objectContaining({ tz: undefined }),
+    );
   });
 });

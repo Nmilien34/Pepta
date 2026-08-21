@@ -15,6 +15,7 @@
 // these" rather than implying precision the model does not have.
 
 import OpenAI from "openai";
+import { clampNumber, clampNutrition } from "../lib/nutritionBounds";
 import type { RecipeComposeResponse } from "@pepta/shared";
 import { env } from "../config/env";
 
@@ -23,9 +24,8 @@ const RECIPE_COMPOSE_MODEL = "gpt-4o-mini";
 const RECIPE_COMPOSE_TIMEOUT_MS = 9_000;
 const MAX_INGREDIENTS = 20;
 
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
+// Confidence keeps a local clamp; the macro bounds are shared.
+const clamp = clampNumber;
 
 function num(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
@@ -58,9 +58,9 @@ export function parseRecipeComposeJson(
       return {
         name: name.slice(0, 120),
         amount: amount.slice(0, 60),
-        protein: clamp(protein, 0, 300),
-        calories: clamp(calories, 0, 3000),
-        ...(fiber !== null ? { fiber: clamp(fiber, 0, 100) } : {}),
+        protein: clampNutrition("protein", protein),
+        calories: clampNutrition("calories", calories),
+        ...(fiber !== null ? { fiber: clampNutrition("fiber", fiber) } : {}),
       };
     })
     .filter((i): i is NonNullable<typeof i> => i !== null)

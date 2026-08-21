@@ -3,6 +3,7 @@ import type { HomeResponse, TrackResponse } from "@pepta/shared";
 import { env } from "../config/env";
 import { logger } from "../lib/logger";
 import { doseNoun } from "../lib/dose-noun";
+import { UserProfileModel } from "../models";
 import { getHome } from "./home.service";
 import { buildPepSideEffectTip } from "./pepSideEffectTips.service";
 import { getTrack } from "./track.service";
@@ -305,8 +306,17 @@ export async function loadPepPushContext(
   userId: string,
   now = new Date(),
 ): Promise<PepPushContext> {
+  // Nudges are about the user's day ("you're 40g short of protein today"), so
+  // the totals behind them have to be measured over the user's day. Without a
+  // tz these were server-local, which for most of the user base means the
+  // nudge judged the wrong 24 hours — and fired hardest right when the two
+  // days disagreed.
+  const profile = await UserProfileModel.findOne({ userId }).select({ timezone: 1 });
   const [home, track] = await Promise.all([
-    getHome(userId, now, "today", { allowAIInsightProse: false }),
+    getHome(userId, now, "today", {
+      allowAIInsightProse: false,
+      tz: profile?.timezone,
+    }),
     getTrack(userId, { limit: 25 }),
   ]);
   return buildPepPushContextFromResponses(home, track, now);

@@ -228,14 +228,28 @@ describe("Pep memory service", () => {
     });
 
     expect(generateSummary).not.toHaveBeenCalled();
-    expect(mocks.pepMemoryFindOneAndUpdate).toHaveBeenCalledWith(
-      { userId },
-      {
-        $set: expect.objectContaining({ aiSummary: null }),
-        $setOnInsert: { userId },
-      },
-      { new: true, upsert: true, runValidators: true },
-    );
+    // ...and it must not WRITE aiSummary at all. A refresh that generated no
+    // summary has nothing to say about the stored one; $set-ing null here
+    // erased the consented summary on every log create and delete, which is
+    // why Pep chat almost never had one. Absence is "no news", not "forget".
+    const [, update] = mocks.pepMemoryFindOneAndUpdate.mock.calls[0]!;
+    expect(update.$set).not.toHaveProperty("aiSummary");
+    // A brand-new row still starts explicitly empty rather than undefined.
+    expect(update.$setOnInsert).toEqual({ userId, aiSummary: null });
+  });
+
+  it("writes the summary through when one was actually generated", async () => {
+    await refreshPepMemory(userId, now, {
+      aiPushCopyConsent: true,
+      loadContext: async () => context(),
+      generateSummary: async () => "Two doses logged, protein on track.",
+    });
+
+    const [, update] = mocks.pepMemoryFindOneAndUpdate.mock.calls[0]!;
+    expect(update.$set.aiSummary).toMatchObject({
+      text: "Two doses logged, protein on track.",
+    });
+    expect(update.$setOnInsert).toEqual({ userId });
   });
 
   it("refreshes memory after log creation without changing the log response", async () => {

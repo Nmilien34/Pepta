@@ -1,14 +1,11 @@
 import OpenAI from "openai";
+import { clampNutrition } from "../lib/nutritionBounds";
 import type { MealScanAnalysis } from "@pepta/shared";
 import { env } from "../config/env";
 
 export const MEAL_SCAN_TEXT_ENGINE_VERSION = "meal-scan-text-v1";
 const MEAL_SCAN_TEXT_MODEL = "gpt-4o-mini";
 const MEAL_SCAN_TEXT_TIMEOUT_MS = 7_000;
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
 
 function optionalNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
@@ -42,12 +39,12 @@ export function parseMealTextJson(content: string): MealScanAnalysis {
   return {
     foodName: foodName.slice(0, 120),
     servingSize: servingSize.slice(0, 80),
-    protein: clamp(protein, 0, 300),
-    calories: clamp(calories, 0, 3000),
-    carbs: clamp(carbs, 0, 500),
-    fat: clamp(fat, 0, 250),
-    fiber: clamp(fiber, 0, 100),
-    confidence: clamp(confidence, 0, 1),
+    protein: clampNutrition("protein", protein),
+    calories: clampNutrition("calories", calories),
+    carbs: clampNutrition("carbs", carbs),
+    fat: clampNutrition("fat", fat),
+    fiber: clampNutrition("fiber", fiber),
+    confidence: clampNutrition("confidence", confidence),
   };
 }
 

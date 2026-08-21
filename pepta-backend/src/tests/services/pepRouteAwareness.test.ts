@@ -60,6 +60,11 @@ describe("chat context carries the user's medications and routes", () => {
       getPepMemoryForChat: async () => null,
       PEP_MEMORY_SUMMARY_SYSTEM_PROMPT: "",
     }));
+    vi.doMock("../../models", () => ({
+      UserProfileModel: {
+        findOne: () => ({ select: async () => ({ timezone: "America/Los_Angeles" }) }),
+      },
+    }));
 
     let captured = "";
     const { getPepChatReply } = await import("../../services/pepChat.service");
@@ -87,6 +92,11 @@ describe("chat context carries the user's medications and routes", () => {
     vi.doMock("../../services/pepMemory.service", () => ({
       getPepMemoryForChat: async () => null,
       PEP_MEMORY_SUMMARY_SYSTEM_PROMPT: "",
+    }));
+    vi.doMock("../../models", () => ({
+      UserProfileModel: {
+        findOne: () => ({ select: async () => ({ timezone: "America/Los_Angeles" }) }),
+      },
     }));
 
     let captured = "";

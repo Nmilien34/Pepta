@@ -280,14 +280,33 @@ async function upsertPepMemory(
   userId: string,
   snapshot: PepMemorySnapshot,
 ): Promise<void> {
+  // A refresh that did not GENERATE a summary must not DELETE the one already
+  // stored. Only the push scheduler passes consent, so every other refresh —
+  // and one runs after every single log create and delete — arrives with
+  // aiSummary null. Writing that null over the stored summary meant the
+  // consented, paid-for summary survived only until the user logged a glass
+  // of water, and Pep chat almost never saw one.
+  //
+  // Absence of a summary is "nothing new to say", not "forget what you knew".
+  // Clearing it is a separate, explicit act — see clearPepMemoryAiSummary.
+  const { aiSummary, ...rest } = snapshot;
   await PepMemoryModel.findOneAndUpdate(
     { userId },
     {
-      $set: snapshot,
-      $setOnInsert: { userId },
+      $set: aiSummary ? { ...rest, aiSummary } : rest,
+      $setOnInsert: { userId, ...(aiSummary ? {} : { aiSummary: null }) },
     },
     { new: true, upsert: true, runValidators: true },
   );
+}
+
+/**
+ * Drops the stored AI summary. Consent withdrawal is the reason this exists:
+ * once a user turns AI copy off, the text generated under it must go, and the
+ * refresh path deliberately no longer clears it as a side effect.
+ */
+export async function clearPepMemoryAiSummary(userId: string): Promise<void> {
+  await PepMemoryModel.updateOne({ userId }, { $set: { aiSummary: null } });
 }
 
 export async function refreshPepMemoryFromContext(

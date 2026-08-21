@@ -2,6 +2,7 @@ import type { MealScanAnalysis, MealScanInput } from '@pepta/shared';
 import OpenAI from 'openai';
 import { env } from '../config/env';
 import { AppError } from '../lib/errors';
+import { clampNutrition } from '../lib/nutritionBounds';
 
 export const MEAL_SCAN_VISION_ENGINE_VERSION = 'meal-scan-vision-v1';
 const MEAL_SCAN_VISION_MODEL = 'gpt-4o-mini';
@@ -71,15 +72,19 @@ export function parseMealScanVisionJson(content: string): MealScanAnalysis {
       throw new Error('Meal scan JSON did not include the expected nutrition fields');
     }
 
+    // Clamped, like every other estimator (see lib/nutritionBounds). Nothing
+    // downstream bounds these: the app posts them straight to /meal-logs,
+    // whose schema only requires nonnegative, so an unclamped hallucination
+    // would land in the user's day totals and charts as fact.
     return {
       foodName,
       servingSize,
-      protein,
-      calories,
-      carbs,
-      fat,
-      fiber,
-      confidence: parsedConfidence,
+      protein: clampNutrition('protein', protein),
+      calories: clampNutrition('calories', calories),
+      carbs: clampNutrition('carbs', carbs),
+      fat: clampNutrition('fat', fat),
+      fiber: clampNutrition('fiber', fiber),
+      confidence: clampNutrition('confidence', parsedConfidence),
     };
   } catch (error) {
     throw mealScanVisionFailed('OpenAI returned malformed meal scan JSON', {

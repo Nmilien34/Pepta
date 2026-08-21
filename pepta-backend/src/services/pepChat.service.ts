@@ -10,6 +10,7 @@ import type { PepChatMessage, PepChatResponse } from "@pepta/shared";
 import { env } from "../config/env";
 import { AppError } from "../lib/errors";
 import { logger } from "../lib/logger";
+import { UserProfileModel } from "../models";
 import { getHome } from "./home.service";
 import { getPepMemoryForChat } from "./pepMemory.service";
 
@@ -45,8 +46,14 @@ function getOpenAIClient(): OpenAI | null {
 // questions (current level, next dose, today's totals, latest weight) without
 // shipping the entire payload to the model.
 async function defaultLoadContext(userId: string): Promise<unknown> {
+  // THE USER'S DAY, NOT THE SERVER'S. Without a tz, getHome falls back to
+  // server-local day boundaries, so "today's protein" was computed over a
+  // different 24 hours than the Home screen shows — Pep would tell a user in
+  // California at 6pm that they had logged nothing today, because UTC had
+  // already rolled over. The profile carries an IANA zone; use it.
+  const profile = await UserProfileModel.findOne({ userId }).select({ timezone: 1 });
   const [home, pepMemory] = await Promise.all([
-    getHome(userId, new Date(), "today", {}),
+    getHome(userId, new Date(), "today", { tz: profile?.timezone }),
     getPepMemoryForChat(userId),
   ]);
   const snapshot = home as Partial<Record<string, unknown>>;

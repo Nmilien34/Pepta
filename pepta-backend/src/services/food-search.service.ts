@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { clampNutrition } from "../lib/nutritionBounds";
 import { z } from "zod";
 import { env } from "../config/env";
 import { AppError } from "../lib/errors";
@@ -293,8 +294,14 @@ function searchUnavailable(message: string, details?: unknown): AppError {
   });
 }
 
+// A search box holds a food name, not an essay. The query is user-controlled
+// text that becomes the prompt's user message verbatim, so it gets a hard
+// ceiling here rather than being trusted to stay short: it bounds the tokens
+// we pay for and the amount of attacker-chosen text that reaches the model.
+const MAX_QUERY_LENGTH = 120;
+
 function normalizeQuery(query: string): string {
-  return query.replace(/\s+/g, " ").trim();
+  return query.replace(/\s+/g, " ").trim().slice(0, MAX_QUERY_LENGTH);
 }
 
 function normalizeSearchText(value: string): string {
@@ -309,10 +316,6 @@ function normalizeSearchText(value: string): string {
 
 function roundOne(value: number): number {
   return Math.round(value * 10) / 10;
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
 }
 
 function isFiniteNumber(value: unknown): value is number {
@@ -557,11 +560,11 @@ function sanitizeResult(
   return {
     foodName,
     servingSize,
-    protein: roundOne(clamp(raw.protein, 0, 300)),
-    calories: roundOne(clamp(raw.calories, 0, 3000)),
-    carbs: roundOne(clamp(carbs, 0, 500)),
-    fat: roundOne(clamp(fat, 0, 250)),
-    fiber: roundOne(clamp(fiber, 0, 100)),
+    protein: roundOne(clampNutrition("protein", raw.protein)),
+    calories: roundOne(clampNutrition("calories", raw.calories)),
+    carbs: roundOne(clampNutrition("carbs", carbs)),
+    fat: roundOne(clampNutrition("fat", fat)),
+    fiber: roundOne(clampNutrition("fiber", fiber)),
   };
 }
 
