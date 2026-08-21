@@ -40,10 +40,21 @@
 // each only ever produced a one-line conversational echo — a question's worth
 // of friction for a sentence. `momentum` also opened "Last one. Be honest."
 // while six screens still followed it.
-// KEPT, deliberately: `needs`. It looks like the same case on paper (also
-// absent from the payload) but it is not — `buildCraftingSteps` leads the
-// crafting checklist with the user's own picks, so the answer visibly comes
-// back. It moved late instead, next to that payoff.
+//
+// ALSO DROPPED (2026-08-21): `needs`, the "what would help most" multi-select,
+// which had been kept on the argument that buildCraftingSteps led the crafting
+// checklist with the user's own words. Two of the three reasons its own header
+// gave for existing were never wired: the paywall renders as
+// `<PaywallScreen onComplete={goNext} />` and never received the picks, and
+// nothing ever POSTed them or logged an event, so the promised "product-
+// priority signal in aggregate" did not exist. What remained was three lines
+// in a 3.7-second animation, bought with a MANDATORY screen (the CTA was
+// disabled until you picked) two turns before the paywall — and for an active
+// weekly injector who picked `schedule`, one of those lines duplicated the
+// shot-day row the checklist already appended.
+// The checklist rows are now DERIVED from answers we already hold — see
+// buildCraftingSteps in OnboardingNavigator. Wire it back only if the paywall
+// really will lead with the picks; that was the trade, and it was not taken.
 import type { SideEffectType } from '@pepta/shared';
 import { symptomForWeekBeat } from './symptomWeek';
 
@@ -120,11 +131,6 @@ export const ONBOARDING_STEPS = [
   // Conviction beat. Collect the worry, then draw it. Skipped for "none yet"
   // and for picks that do not follow a post-dose arc — see symptomForWeekBeat.
   'symptomWeek',
-  // Kept, and moved to sit two steps before `crafting`: this answer is what the
-  // crafting checklist leads with, ticking off the user's own words. Asked at
-  // step 5 that payoff was twenty screens away and read as a throwaway; here
-  // the loop closes almost immediately.
-  'needs',
   'notifications',
   'crafting',
   // The standalone `auth` turn was MERGED INTO `reveal` (2026-07-29): the

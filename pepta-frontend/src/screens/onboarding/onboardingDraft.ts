@@ -33,6 +33,11 @@ export function serializeDraft(step: string, answers: Record<string, unknown>): 
  */
 const LEGACY_STEP_MAP: Record<string, string> = {
   auth: 'reveal',
+  // 'needs' was cut 2026-08-21. This entry is not optional politeness: the
+  // navigator only restores a draft whose step still EXISTS, so without it
+  // anyone parked on that screen when the build lands loses every answer and
+  // restarts the quiz from welcome. Resume on the turn that followed it.
+  needs: 'notifications',
 };
 
 export function migrateLegacyStep(step: string): string {

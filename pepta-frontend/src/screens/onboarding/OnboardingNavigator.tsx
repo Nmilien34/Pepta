@@ -23,10 +23,10 @@ import { OnboardingMotionContext, convo } from '../../components';
 import { StepFade } from './StepFade';
 import { ONBOARDING_DRAFT_KEY, migrateLegacyStep, parseDraft, rewindResumeStep, rewindToUnansweredGate, serializeDraft } from './onboardingDraft';
 import { echoFor, instrumentContext, companyContext, leanMassContext } from './onboardingEcho';
+import { DAY_PLURAL, DEFAULT_BODY, buildCraftingSteps, resolveWeights } from './craftingSteps';
 import { symptomForWeekBeat } from './symptomWeek';
 import { MeetPepScreen } from './MeetPepScreen';
 import { NameCompanionScreen } from './NameCompanionScreen';
-import { NeedsScreen, type NeedType } from './NeedsScreen';
 import { WelcomeScreen } from '../auth/WelcomeScreen';
 import { NotAloneScreen } from './NotAloneScreen';
 import { SignInScreen } from '../auth/SignInScreen';
@@ -67,7 +67,7 @@ import type { ActivityLevel, BiggestWorry, DiscoverySource, InjectionDeviceType,
 import type { MedicationOption } from '../../data/medicationCatalog';
 import type { MedicationRoute } from './RouteScreen';
 import { RouteScreen } from './RouteScreen';
-import { toDateParts, formatShortDate, type DateParts } from '../../utils/dateParts';
+import { toDateParts, type DateParts } from '../../utils/dateParts';
 import { kgToLb, lbToKg, type BodyMeasure } from '../../utils/units';
 import { projectGoal } from '../../utils/goalProjection';
 import { previewTargets } from '../../utils/planPreview';
@@ -81,18 +81,15 @@ import { deriveReminderGroups, defaultReminderState } from '../app/reminderSetti
 import { requestReminderPermission, saveReminderState, syncReminderNotifications } from '../../services/reminderNotification.service';
 import { logDiscoverySourceReported, logOnboardingCompleted, logOnboardingStarted, logOnboardingStep } from '../../services/funnelEvents';
 
-const DEFAULT_BODY: BodyMeasure = { units: 'imperial', height: 66, weight: 184 };
-const DAY_PLURAL = ['Sundays', 'Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays', 'Saturdays'];
 
 function defaultBirthday(): DateParts {
   return { year: new Date().getFullYear() - 30, month: 0, day: 1 };
 }
 
-interface FlowAnswers {
+export interface FlowAnswers {
   journeyStage?: JourneyStage;
   discoverySource?: DiscoverySource;
   companionName?: string;
-  needs?: NeedType[];
   medication?: MedicationOption;
   route?: MedicationRoute;
   deviceType?: InjectionDeviceType;
@@ -122,10 +119,6 @@ function toggleEffect(effects: SideEffectType[], effect: SideEffectType): SideEf
   return effects.includes(effect) ? effects.filter((e) => e !== effect) : [...effects, effect];
 }
 
-function toggleNeed(needs: NeedType[], need: NeedType): NeedType[] {
-  return needs.includes(need) ? needs.filter((n) => n !== need) : [...needs, need];
-}
-
 // Toggle a day in/out of the multi-select set, kept sorted.
 function toggleDay(days: number[], day: number): number[] {
   return days.includes(day) ? days.filter((d) => d !== day) : [...days, day].sort((a, b) => a - b);
@@ -144,60 +137,6 @@ function ctxFromAnswers(a: FlowAnswers): FlowContext {
     frequency: a.frequency,
     sideEffects: a.sideEffects,
   };
-}
-
-// Resolve current + goal weight into the body's unit (goal may be in a toggled unit).
-function resolveWeights(answers: FlowAnswers) {
-  const body = answers.body ?? DEFAULT_BODY;
-  const bodyUnit: WeightUnit = body.units === 'metric' ? 'kg' : 'lb';
-  const goalUnit = answers.goalWeightUnit ?? bodyUnit;
-  const goalRaw =
-    answers.goalWeight ?? (goalUnit === 'kg' ? Math.max(32, body.weight - 7) : Math.max(70, body.weight - 15));
-  const goalInBodyUnit =
-    goalUnit === bodyUnit ? goalRaw : Math.round(bodyUnit === 'kg' ? lbToKg(goalRaw) : kgToLb(goalRaw));
-  return { body, bodyUnit, goalInBodyUnit };
-}
-
-// Crafting rows lead with the user's own T3c needs picks (verbatim, checked off
-// one by one), then the standard proof rows built from their numbers.
-/** Crafting-list noun. Oral users are not promised shot-day anything. */
-function craftNoun(answers: FlowAnswers): 'Shot' | 'Dose' {
-  return answers.route === 'oral' ? 'Dose' : 'Shot';
-}
-
-function buildCraftingSteps(answers: FlowAnswers): string[] {
-  const NEED_ROW: Record<NeedType, string> = {
-    whats_working: 'Progress signals — what’s actually working',
-    logging: 'One-tap logging — so it gets done',
-    schedule: `${craftNoun(answers)}-day reminders — timed to you`,
-    multiple_compounds: 'Multi-compound tracking — side by side',
-    dose_math: 'Dose & mixing math — calculator armed',
-    doctor_reports: 'Doctor-ready reports — export anytime',
-  };
-  const rows = (answers.needs ?? []).slice(0, 3).map((need) => NEED_ROW[need]);
-
-  const { body, bodyUnit, goalInBodyUnit } = resolveWeights(answers);
-  const projection = projectGoal({
-    currentWeight: body.weight,
-    goalWeight: goalInBodyUnit,
-    pace: answers.pace ?? 0.5,
-    now: new Date(),
-  });
-  const targets = previewTargets({
-    currentWeight: body.weight,
-    unit: bodyUnit,
-    activityLevel: answers.activityLevel,
-    weeklyLoss: projection.weeklyLoss,
-  });
-  rows.push(`Muscle guard — ${targets.proteinG} g protein a day`);
-  const goalPath = projection.estimatedDate
-    ? `Goal path — ${body.weight} → ${goalInBodyUnit} by ${formatShortDate(projection.estimatedDate)}`
-    : `Goal path — holding at ${goalInBodyUnit} ${bodyUnit}`;
-  rows.push(goalPath);
-  if (answers.journeyStage === 'active' && (answers.shotDays?.length ?? 0) > 0) {
-    rows.push(`${craftNoun(answers)}-day reminders — ${DAY_PLURAL[answers.shotDays![0]!]}`);
-  }
-  return rows;
 }
 
 // A session-level cache of the flow position (module-level, like the progress
@@ -498,17 +437,6 @@ export function OnboardingNavigator() {
       );
     case 'journeyStage':
       return <JourneyStageScreen progress={progress} onBack={goBack} onAnswer={(journeyStage) => commit({ journeyStage })} />;
-    case 'needs':
-      return (
-        <NeedsScreen
-          progress={progress}
-          onBack={goBack}
-          context={context}
-          values={answers.needs ?? []}
-          onToggle={(need) => setAnswers((a) => ({ ...a, needs: toggleNeed(a.needs ?? [], need) }))}
-          onContinue={goNext}
-        />
-      );
     case 'medication':
       return (
         <MedicationPickerScreen

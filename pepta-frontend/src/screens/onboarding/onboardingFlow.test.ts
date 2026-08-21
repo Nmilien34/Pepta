@@ -101,7 +101,8 @@ describe('onboarding flow', () => {
     expect(nextStep('goalPace')).toBe('company');
     expect(nextStep('company')).toBe('dailyRoutine');
     expect(nextStep('sideEffects')).toBe('symptomWeek');
-    expect(nextStep('symptomWeek')).toBe('needs');
+    expect(nextStep('symptomWeek')).toBe('notifications');
+    expect(nextStep('notifications')).toBe('crafting');
   });
 
   it('names the problem early: the worry, then the answer, before any dosing', () => {
@@ -187,15 +188,16 @@ describe('onboarding flow', () => {
     expect(stepIndex('nameCompanion') - stepIndex('meetPep')).toBe(1);
   });
 
-  it('drops the echo-only turns but keeps the one that pays off', () => {
+  it('carries no ask whose answer the app never uses', () => {
     // experience / alsoTracking / momentum each produced a single echo line.
-    for (const gone of ['experience', 'alsoTracking', 'momentum']) {
+    // `needs` outlived them on the argument that the crafting checklist led
+    // with its picks — but the paywall never received them and nothing ever
+    // reported them, so a MANDATORY screen two turns from the wall bought
+    // three lines of a 3.7-second animation. Cut 2026-08-21; the checklist
+    // rows are derived from answers we already hold.
+    for (const gone of ['experience', 'alsoTracking', 'momentum', 'needs']) {
       expect(ONBOARDING_STEPS).not.toContain(gone);
     }
-    // `needs` stays — buildCraftingSteps leads the checklist with these picks —
-    // and now sits beside that payoff instead of twenty screens away.
-    expect(ONBOARDING_STEPS).toContain('needs');
-    expect(stepIndex('crafting') - stepIndex('needs')).toBeLessThanOrEqual(3);
   });
 
   it('returns null past the last step', () => {
@@ -282,7 +284,7 @@ describe('shouldSkipStep', () => {
 
   it('keeps the remaining profile turns for everyone', () => {
     for (const stage of ['active', 'starting_soon', 'none'] as const) {
-      expect(shouldSkipStep('needs', { journeyStage: stage })).toBe(false);
+      expect(shouldSkipStep('notifications', { journeyStage: stage })).toBe(false);
       expect(shouldSkipStep('company', { journeyStage: stage })).toBe(false);
       expect(shouldSkipStep('fearAnswered', { journeyStage: stage })).toBe(false);
     }
