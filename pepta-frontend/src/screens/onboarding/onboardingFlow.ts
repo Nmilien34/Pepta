@@ -52,10 +52,17 @@ export const ONBOARDING_STEPS = [
   // The gift, given before anything is asked. Was the welcome screen's payload
   // until the carousel took screen 1 — see NotAloneScreen.
   'notAlone',
-  'meetPep',
-  // Optional, never a gate — the default stays 'Pep'. Sits here so the
-  // introduction is still on screen; asking later would feel bolted on.
-  'nameCompanion',
+  // ASK ABOUT THEM BEFORE INTRODUCING THE MASCOT (moved 2026-08-21, Nick).
+  // Pep used to be screens 3–4, immediately after "you're not the only one
+  // doing this" — a cartoon shown to someone the app had not yet said one
+  // useful thing to. journeyStage is self-identifying and biggestWorry is the
+  // question people actually want asked, so they earn the screen that
+  // reassurance alone does not.
+  //
+  // NOTE THE PAIR: biggestWorry → fearAnswered stay ADJACENT. The straight
+  // 3-4 ↔ 5-6 swap would have put meetPep + nameCompanion between the fear and
+  // its answer, which is the one thing in this block worth protecting — see
+  // finding (1) below for why fearAnswered was dragged up here at all.
   'journeyStage',
   'biggestWorry',
   'fearAnswered',
@@ -66,6 +73,22 @@ export const ONBOARDING_STEPS = [
   // Never skipped; "Somewhere else" is the out. Pure insertion — draft key
   // stays pepta.onboarding.v2.
   'discoverySource',
+  // Pep now arrives AFTER the app has named the user's fear and answered it,
+  // so the introduction lands as "the thing that just helped you" rather than
+  // as a mascot handed to a stranger. Better entrance than the old slot,
+  // independent of the bounce argument.
+  //
+  // AND IT LOAD-BEARS: this beat is what keeps the dosing run at 7. The first
+  // draft of this reorder put the pair BEFORE discoverySource, which left
+  // nameCompanion adjacent to it and made the run to the leanMass beat 8 asks
+  // long — a reorder meant to cut early friction that quietly added some. The
+  // run-length test caught it. Do not move meetPep past nameCompanion.
+  'meetPep',
+  // Optional, never a gate — the default stays 'Pep'. Sits here so the
+  // introduction is still on screen; asking later would feel bolted on.
+  // Nothing before this reads companionName (first use is the leanMass beat),
+  // so moving the pair down from steps 3–4 costs no downstream copy.
+  'nameCompanion',
   'medication',
   'route',
   'currentDose',

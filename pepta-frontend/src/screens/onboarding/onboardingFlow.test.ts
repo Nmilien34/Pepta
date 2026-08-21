@@ -15,7 +15,7 @@ describe('onboarding flow', () => {
     expect(ONBOARDING_STEPS[1]).toBe('notAlone');
     expect(ONBOARDING_STEPS[ONBOARDING_STEPS.length - 1]).toBe('welcomeIn');
     expect(nextStep('welcome')).toBe('notAlone');
-    expect(nextStep('notAlone')).toBe('meetPep');
+    expect(nextStep('notAlone')).toBe('journeyStage');
     // The rating ask is post-purchase (WelcomeInScreen), never a quiz turn.
     expect(nextStep('reveal')).toBe('trialOffer'); // the warm-up sits between auth and the wall
     expect(nextStep('trialCarousel')).toBe('paywall');
@@ -91,7 +91,7 @@ describe('onboarding flow', () => {
 
   it('advances forward in order through the new turns', () => {
     expect(nextStep('meetPep')).toBe('nameCompanion');
-    expect(nextStep('nameCompanion')).toBe('journeyStage');
+    expect(nextStep('nameCompanion')).toBe('medication');
     expect(nextStep('deviceType')).toBe('concentration');
     expect(nextStep('frequency')).toBe('leanMass');
     expect(nextStep('leanMass')).toBe('lastShot');
@@ -111,15 +111,33 @@ describe('onboarding flow', () => {
     expect(nextStep('journeyStage')).toBe('biggestWorry');
     expect(nextStep('biggestWorry')).toBe('fearAnswered');
     // The discovery ask (2026-08-06, Nick's placement) rides the trust peak
-    // right after the answered worry, before the medication block.
+    // after the answered worry and the Pep introduction, before the
+    // medication block.
     expect(nextStep('fearAnswered')).toBe('discoverySource');
-    expect(nextStep('discoverySource')).toBe('medication');
+    expect(nextStep('discoverySource')).toBe('meetPep');
+    expect(nextStep('nameCompanion')).toBe('medication');
     expect(stepIndex('fearAnswered')).toBeLessThan(stepIndex('currentDose'));
-    // 6 since `notAlone` was inserted at step 2 (2026-08-17). The guard is
-    // about how much the user is ASKED before hearing a reason to care;
-    // the new turn asks nothing, so the count of input turns before the
-    // problem is named is the same as when this was 5.
-    expect(stepIndex('fearAnswered')).toBeLessThanOrEqual(6);
+    // Down to 4 (2026-08-21): the Pep pair moved BEHIND the answered worry,
+    // so the problem is now named after exactly two asks. The guard is about
+    // how much the user is ASKED before hearing a reason to care.
+    expect(stepIndex('fearAnswered')).toBeLessThanOrEqual(4);
+  });
+
+  it('never separates the worry from its answer', () => {
+    // These two are a unit: ask what scares them, answer it in their own
+    // words. The 2026-08-21 reorder was proposed as a straight 3-4 ↔ 5-6 swap,
+    // which would have parked meetPep + nameCompanion between them. Anything
+    // inserted here breaks the only reason fearAnswered was dragged forward.
+    expect(stepIndex('fearAnswered') - stepIndex('biggestWorry')).toBe(1);
+  });
+
+  it('asks about the user before introducing the mascot', () => {
+    // A cartoon shown before the app has said one useful thing is a bounce,
+    // not an introduction. Pep arrives after the fear is named AND answered,
+    // so it reads as the thing that just helped.
+    expect(stepIndex('journeyStage')).toBeLessThan(stepIndex('meetPep'));
+    expect(stepIndex('biggestWorry')).toBeLessThan(stepIndex('meetPep'));
+    expect(stepIndex('fearAnswered')).toBeLessThan(stepIndex('meetPep'));
   });
 
   it('never runs more than 9 input turns without a payoff', () => {
@@ -142,7 +160,10 @@ describe('onboarding flow', () => {
 
     // 12 before the 2026-07-27 restructure, 9 after it, 7 once the lean-mass
     // beat split the dosing block. The discovery ask (2026-08-06) kept this
-    // at 7 for the dosing path — the beats still break every stretch.
+    // at 7 for the dosing path — the beats still break every stretch. The
+    // 2026-08-21 mascot reorder briefly made it 8 (nameCompanion landed next
+    // to discoverySource) until meetPep was moved between them; this number
+    // is the reason that pair sits where it does.
     expect(runLength(ONBOARDING_STEPS)).toBeLessThanOrEqual(7);
 
     // The non-dosing path is one longer since the discovery ask: its skip
@@ -182,9 +203,10 @@ describe('onboarding flow', () => {
   });
 
   it('walks back, with no step before the first', () => {
-    expect(prevStep('journeyStage')).toBe('nameCompanion');
     expect(prevStep('nameCompanion')).toBe('meetPep');
-    expect(prevStep('meetPep')).toBe('notAlone');
+    expect(prevStep('meetPep')).toBe('discoverySource');
+    expect(prevStep('discoverySource')).toBe('fearAnswered');
+    expect(prevStep('journeyStage')).toBe('notAlone');
     expect(prevStep('notAlone')).toBe('welcome');
     expect(prevStep('welcome')).toBeNull();
   });
@@ -198,9 +220,9 @@ describe('onboarding flow', () => {
     const n = ONBOARDING_STEPS.length;
     expect(progressForStep('welcome')).toBeCloseTo(1 / n, 5);
     expect(progressForStep('notAlone')).toBeCloseTo(2 / n, 5);
-    expect(progressForStep('meetPep')).toBeCloseTo(3 / n, 5);
-    expect(progressForStep('nameCompanion')).toBeCloseTo(4 / n, 5);
-    expect(progressForStep('journeyStage')).toBeCloseTo(5 / n, 5);
+    expect(progressForStep('journeyStage')).toBeCloseTo(3 / n, 5);
+    expect(progressForStep('biggestWorry')).toBeCloseTo(4 / n, 5);
+    expect(progressForStep('fearAnswered')).toBeCloseTo(5 / n, 5);
     expect(progressForStep('welcomeIn')).toBe(1);
   });
 });
