@@ -85,3 +85,38 @@ describe('the serving size keeps its one home', () => {
     expect(rendered).toHaveLength(1);
   });
 });
+
+describe('recipe copy never promises what the recipe path refuses to do', () => {
+  // The compiler guarantees every view HAS recipe wording; it cannot check the
+  // wording is true. commit() saves a recipe and leaves today alone, so no
+  // string in the recipe table may talk about logging, today, or Home.
+  //
+  // This is the rule the old code broke in three separate places.
+  const recipeTable = (() => {
+    const start = source.indexOf('  recipe: {', source.indexOf('const HEADINGS'));
+    expect(start, 'the recipe copy table moved').toBeGreaterThan(-1);
+    // to the closing brace of the recipe record
+    const end = source.indexOf('\n  },\n};', start);
+    return stripComments(source.slice(start, end));
+  })();
+
+  it.each([
+    ['add it to today', /add it to today/i],
+    ['macros landing on Home', /land on Home/i],
+    ['logging', /\blog(ged|ging|s)?\b/i],
+    ['what you ate', /what you ate/i],
+  ])('says nothing about %s', (_label, pattern) => {
+    expect(recipeTable).not.toMatch(pattern);
+  });
+
+  it('is a full table, not a partial one — omission must not compile', () => {
+    // Partial<Record<…>> was the first attempt at this fix and it let a view
+    // silently keep the meal copy, which is the entire bug.
+    expect(source).toContain('Record<SheetIntent, Record<View_, Heading>>');
+    expect(source).not.toContain('Partial<Record<View_');
+  });
+
+  it('derives the intent once rather than re-deriving per view', () => {
+    expect(source).toContain('const intent: SheetIntent = keepAsRecipe ? "recipe" : "meal"');
+  });
+});

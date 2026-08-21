@@ -456,7 +456,9 @@ export function MealLogSheet({
   };
 
   // Recipe mode overrides the meal wording where the two flows share a view.
-  const heading = (keepAsRecipe ? RECIPE_HEADINGS[view] : undefined) ?? HEADINGS[view];
+  // One derivation, used everywhere the two flows differ in wording.
+  const intent: SheetIntent = keepAsRecipe ? "recipe" : "meal";
+  const heading = HEADINGS[intent][view];
 
   const logResult = () => {
     const a = scaledAnalysis();
@@ -638,7 +640,7 @@ export function MealLogSheet({
             <Pressable
               onPress={back}
               accessibilityRole="button"
-              accessibilityLabel="Back to meal log options"
+              accessibilityLabel={intent === "recipe" ? "Back to recipe options" : "Back to meal log options"}
               hitSlop={{ bottom: 14, left: 14, right: 14, top: 14 }}
               style={{
                 width: 30,
@@ -672,7 +674,7 @@ export function MealLogSheet({
                 else onClose();
               }}
               accessibilityRole="button"
-              accessibilityLabel="Close meal log"
+              accessibilityLabel={intent === "recipe" ? "Close new recipe" : "Close meal log"}
               hitSlop={8}
               style={{
                 width: 30,
@@ -856,51 +858,82 @@ export function MealLogSheet({
 
 type Theme = ReturnType<typeof useTheme>;
 
-const HEADINGS: Record<View_, { title: string; sub: string }> = {
-  chooser: {
-    title: "Log a meal",
-    sub: "Scan, describe, or enter it — macros land on Home.",
+// THE SHEET HAS TWO INTENTS, AND THE COPY IS PART OF THE BEHAVIOUR.
+//
+// Both flows share every view here: the same camera, the same model, the same
+// consent gate. The only real difference is what commit() does at the end —
+// a meal lands on today, a recipe is kept for later and today is untouched.
+//
+// That difference was carried by a BOOLEAN each view had to remember to
+// honour, and most did not. The estimate screen said "Review, then add it to
+// today." over a button reading "Confirm & log" while saving a recipe; the
+// chooser promised "macros land on Home", which is precisely what the recipe
+// path refuses to do. Three separate surfaces, one missing prop each.
+//
+// So the intent is a TYPE and the copy is a total function of it. Both records
+// are `Record<View_, …>` rather than Partial, which means adding a view to
+// View_ FAILS TO COMPILE until its recipe wording exists. The next person
+// cannot reintroduce this class of bug by forgetting — only by deciding.
+type SheetIntent = "meal" | "recipe";
+
+type Heading = { title: string; sub: string };
+
+const HEADINGS: Record<SheetIntent, Record<View_, Heading>> = {
+  meal: {
+    chooser: {
+      title: "Log a meal",
+      sub: "Scan, describe, or enter it — macros land on Home.",
+    },
+    voice: { title: "Say what you ate", sub: "Tap the mic, or type a sentence." },
+    manual: { title: "Enter a meal", sub: "Food name + macros." },
+    search: { title: "Search foods", sub: "Find a food and add it." },
+    recipeReview: {
+      title: "Save as a recipe",
+      sub: "Check the parts, drop anything wrong, then save.",
+    },
+    aiConsent: {
+      title: "AI data sharing",
+      sub: "Review before using AI features.",
+    },
+    analyzing: {
+      title: "Analyzing…",
+      sub: "Estimating protein, calories & fiber.",
+    },
+    result: {
+      title: "Here’s the estimate",
+      sub: "Review, then add it to today.",
+    },
+    error: { title: "Hmm", sub: "That didn’t work." },
   },
-  voice: { title: "Say what you ate", sub: "Tap the mic, or type a sentence." },
-  manual: { title: "Enter a meal", sub: "Food name + macros." },
-  recipeReview: {
-    title: "Save as a recipe",
-    sub: "Check the parts, drop anything wrong, then save.",
+  recipe: {
+    // Nothing here lands on Home, so nothing here says it will.
+    chooser: {
+      title: "New recipe",
+      sub: "Scan, describe, or search — the result is saved for later.",
+    },
+    voice: { title: "Say what’s in it", sub: "Tap the mic, or type a sentence." },
+    manual: { title: "Enter the recipe", sub: "Name + macros." },
+    search: { title: "Search foods", sub: "Find a food to save as a recipe." },
+    recipeReview: {
+      title: "Save as a recipe",
+      sub: "Check the parts, drop anything wrong, then save.",
+    },
+    aiConsent: {
+      title: "AI data sharing",
+      sub: "Review before using AI features.",
+    },
+    analyzing: {
+      title: "Analyzing…",
+      sub: "Estimating protein, calories & fiber.",
+    },
+    result: {
+      title: "Here’s the estimate",
+      sub: "Review, then save it as a recipe.",
+    },
+    error: { title: "Hmm", sub: "That didn’t work." },
   },
-  search: { title: "Search foods", sub: "Find a food and add it." },
-  aiConsent: {
-    title: "AI data sharing",
-    sub: "Review before using AI features.",
-  },
-  analyzing: {
-    title: "Analyzing…",
-    sub: "Estimating protein, calories & fiber.",
-  },
-  result: {
-    title: "Here’s the estimate",
-    sub: "Review, then add it to today.",
-  },
-  error: { title: "Hmm", sub: "That didn’t work." },
 };
 
-// WHEN THE SHEET IS BUILDING A RECIPE, THE MEAL COPY IS A LIE.
-//
-// `keepAsRecipe` reaches commit(), which saves a recipe and deliberately does
-// NOT add anything to today ("Keeping it as a recipe is NOT also logging it").
-// The screen around that correct behaviour still read "Review, then add it to
-// today" above a button marked "Confirm & log" — so the one moment the user
-// needs to trust what the button does, every word on screen told them it was
-// about to put a meal they have not eaten into their diary.
-//
-// Only the two views that can be reached in recipe mode need overriding; the
-// manual view already took a saveLabel, and recipeReview is recipe-only.
-const RECIPE_HEADINGS: Partial<Record<View_, { title: string; sub: string }>> = {
-  result: {
-    title: "Here’s the estimate",
-    sub: "Review, then save it as a recipe.",
-  },
-  search: { title: "Search foods", sub: "Find a food to save as a recipe." },
-};
 
 function AIConsentView({
   theme,
