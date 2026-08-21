@@ -47,7 +47,15 @@ import {
   type FavouriteKind,
 } from './favourites';
 
-export type FavouritesParams = { kind?: FavouriteKind };
+export type FavouritesParams = {
+  kind?: FavouriteKind;
+  /**
+   * Open the "add your own" sheet on arrival. Water's Yours card offers "Add
+   * your own" as its own row, and that row means the sheet — landing on the
+   * list and making the user hunt for it would be a second tap for nothing.
+   */
+  addNew?: boolean;
+};
 
 /** Warm peach behind food, pale blue behind drinks — the frame's tints. */
 const DRINK_TINT = '#E8F4FF';
@@ -66,7 +74,7 @@ export function FavouritesScreen() {
   const [tab, setTab] = useState<FavouriteKind>(route.params?.kind === 'drink' ? 'drink' : 'food');
   const [editing, setEditing] = useState(false);
   const [editingPortion, setEditingPortion] = useState<Favourite | null>(null);
-  const [addingItem, setAddingItem] = useState(false);
+  const [addingItem, setAddingItem] = useState(route.params?.addNew === true);
 
   const counts = countsByKind(favourites);
   const rows = favouritesOf(favourites, tab);
@@ -117,7 +125,10 @@ export function FavouritesScreen() {
           >
             <Icon name="chevron-back" size={25} color={theme.colors.textSecondary} stroke={2.4} />
           </Pressable>
-          <AppText variant="screenTitle">Favourites</AppText>
+          {/* 24, not the 34 of `screenTitle`: all four Favourites frames set
+              `.h1` to font-size:24px inline, the same as Recipes and New
+              recipe. These three stack screens share one title size. */}
+          <AppText variant="screenTitle" style={{ fontSize: 24 }}>Favourites</AppText>
           {rows.length > 0 ? (
             <Pressable
               onPress={() => {
@@ -284,11 +295,38 @@ export function FavouritesScreen() {
               ))}
             </Card>
           ) : (
-            <Card style={{ marginTop: 12 }}>
-              <AppText variant="cardTitle" style={{ fontSize: 15 }}>
+            /* The frame's empty card is CENTRED around a star tile:
+                 .card, padding:26px 18px, text-align:center
+                 52x52 tile, border-radius:18, background var(--alt)
+                 star glyph 23px in var(--tt)
+                 .nm mt12  font-size:15px
+                 .lab mt6  font-size:11px, line-height:1.45
+               It shipped as left-aligned text with no tile, which made the
+               one state a new user always sees look like a failed load. The
+               tile is NOT a CardIcon: `.ic` is 18px on a 35pt box tinted from
+               its own accent, this is a 52pt --alt square with a grey glyph. */
+            <Card style={{ marginTop: 12, paddingVertical: 26, paddingHorizontal: 18, alignItems: 'center' }}>
+              <View
+                style={{
+                  width: 52,
+                  height: 52,
+                  borderRadius: 18,
+                  backgroundColor: theme.colors.surfaceAlt,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Icon name="star" size={23} color={theme.colors.textTertiary} stroke={2} />
+              </View>
+              <AppText variant="cardTitle" style={{ fontSize: 15, marginTop: 12, textAlign: 'center' }}>
                 Nothing saved yet
               </AppText>
-              <AppText variant="caption" color="textSecondary" style={{ marginTop: 6, lineHeight: 17 }}>
+              {/* 11px at 1.45 = 16. */}
+              <AppText
+                variant="caption"
+                color="textSecondary"
+                style={{ fontSize: 11, marginTop: 6, lineHeight: 16, textAlign: 'center' }}
+              >
                 Star anything as you log it and it lands here, with the portion you used. After
                 that it is one tap.
               </AppText>

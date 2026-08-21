@@ -87,7 +87,7 @@ export function WaterScreen() {
           </Pressable>
           {/* Chevron then title — the design carries no droplet here, and the
               glass right below already says what the screen is about. */}
-          <AppText variant="screenTitle">Water</AppText>
+          <AppText variant="screenTitle" style={{ fontSize: 24 }}>Water</AppText>
         </View>
 
         <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 28 }} showsVerticalScrollIndicator={false}

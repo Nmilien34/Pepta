@@ -137,7 +137,7 @@ export function NutrientWaysScreen() {
           >
             <Icon name="chevron-back" size={25} color={theme.colors.textSecondary} stroke={2.4} />
           </Pressable>
-          <AppText variant="screenTitle">{TITLES[kind]}</AppText>
+          <AppText variant="screenTitle" style={{ fontSize: 24 }}>{TITLES[kind]}</AppText>
         </View>
 
         <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 28 }} showsVerticalScrollIndicator={false}
