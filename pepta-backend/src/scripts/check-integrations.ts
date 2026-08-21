@@ -251,15 +251,32 @@ async function probeApple(): Promise<ProbeResult> {
 }
 
 async function probeRevenueCat(): Promise<ProbeResult> {
-  if (!optionalEnv("REVENUECAT_WEBHOOK_SECRET")) {
+  // TWO SEPARATE SECRETS, and this check used to report PASS on the wrong one.
+  // The WEBHOOK secret authenticates inbound events; the SERVER API key is
+  // what requireActiveAccess needs to verify entitlement — and that gate is
+  // the app's only entitlement check. An operator running preflight on a
+  // deployment with no server key got a green RevenueCat line while every
+  // premium route was ungated.
+  const webhookSecret = optionalEnv("REVENUECAT_WEBHOOK_SECRET");
+  const serverKey = optionalEnv("REVENUECAT_SECRET_API_KEY");
+
+  if (!serverKey) {
     return result(
       "RevenueCat",
-      "warn",
-      "webhook secret is unset; subscription webhooks remain deferred",
+      "fail",
+      "REVENUECAT_SECRET_API_KEY is unset — entitlement cannot be verified against RevenueCat",
     );
   }
 
-  return result("RevenueCat", "pass", "webhook secret is configured");
+  if (!webhookSecret) {
+    return result(
+      "RevenueCat",
+      "warn",
+      "server key is configured but REVENUECAT_WEBHOOK_SECRET is unset; subscription webhooks are rejected",
+    );
+  }
+
+  return result("RevenueCat", "pass", "server key and webhook secret are configured");
 }
 
 function printResult(probeResult: ProbeResult): void {

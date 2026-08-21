@@ -70,6 +70,11 @@ const envSchema = z
       'OPENAI_API_KEY',
       'TOGETHER_API_KEY',
       'REVENUECAT_WEBHOOK_SECRET',
+      // The server key is what lets the backend VERIFY entitlement against
+      // RevenueCat. requireActiveAccess is the only entitlement check in the
+      // app, so booting production without this key used to mean every
+      // premium route was free. Fail at boot rather than silently.
+      'REVENUECAT_SECRET_API_KEY',
     ] as const;
 
     // Complimentary-access hardening (audit H2): once the RevenueCat server
