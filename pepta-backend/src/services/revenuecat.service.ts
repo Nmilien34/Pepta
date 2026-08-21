@@ -6,6 +6,7 @@ import { AppError } from '../lib/errors';
 import { logger } from '../lib/logger';
 import { ProcessedWebhookEventModel, UserModel, type UserDocument } from '../models';
 import { reconcileUserEntitlement } from './entitlement-reconciler.service';
+import { isUsableAppUserId } from './revenuecat.client';
 
 const DOWNGRADE_STATUSES: SubscriptionStatus[] = [
   'active_canceled',
@@ -166,6 +167,31 @@ function revenueCatIdsToAssociate(event: RevenueCatEvent): string[] {
   ]);
 }
 
+/**
+ * The id we are willing to STORE as this user's RevenueCat customer.
+ *
+ * revenueCatCustomerId is what the reconciler hands to getSubscriber, and
+ * getSubscriber refuses anonymous or empty ids with a TERMINAL error — so an
+ * unusable value here does not degrade reconciliation, it ends it: every
+ * later resolveAccess throws and the account reads temporarily_unavailable
+ * forever. An event whose app_user_id is null (the schema allows it) falls
+ * through to original_app_user_id, which after an SDK logIn is normally the
+ * device's anonymous id — which is exactly how that used to happen.
+ *
+ * A usable id already on the record is never replaced by an unusable one.
+ */
+function usableCustomerId(
+  event: RevenueCatEvent,
+  current: string | undefined,
+): string | undefined {
+  const candidates = event.type === 'TRANSFER'
+    ? [...(event.transferred_to ?? []), event.app_user_id, event.original_app_user_id]
+    : [event.app_user_id, event.original_app_user_id];
+  const usable = uniqueNonEmptyStrings(candidates).find(isUsableAppUserId);
+  if (usable) return usable;
+  return isUsableAppUserId(current) ? current : undefined;
+}
+
 function primaryRevenueCatId(event: RevenueCatEvent): string | undefined {
   if (event.type === 'TRANSFER') {
     return uniqueNonEmptyStrings([
@@ -260,7 +286,7 @@ async function recordProcessedEvent(
 }
 
 function applyRevenueCatIdsToUser(user: UserDocument, event: RevenueCatEvent): void {
-  const primaryId = primaryRevenueCatId(event);
+  const primaryId = usableCustomerId(event, user.entitlement.revenueCatCustomerId);
   const revenueCatAppUserIds = uniqueNonEmptyStrings([
     ...(user.entitlement.revenueCatAppUserIds ?? []),
     ...revenueCatIdsToAssociate(event),
@@ -378,7 +404,10 @@ export async function applyRevenueCatWebhook(input: RevenueCatWebhook): Promise<
   }
 
   if (!isStaleDowngrade) {
-    const revenueCatCustomerId = primaryRevenueCatId(event) ?? customerId;
+    const revenueCatCustomerId = usableCustomerId(
+      event,
+      user.entitlement.revenueCatCustomerId,
+    );
     const revenueCatAppUserIds = uniqueNonEmptyStrings([
       ...(user.entitlement.revenueCatAppUserIds ?? []),
       ...revenueCatIdsToAssociate(event),
@@ -394,7 +423,9 @@ export async function applyRevenueCatWebhook(input: RevenueCatWebhook): Promise<
     user.entitlement.willRenew = isPromotionalEvent
       ? false
       : !['CANCELLATION', 'EXPIRATION', 'REFUND'].includes(event.type);
-    user.entitlement.revenueCatCustomerId = revenueCatCustomerId;
+    if (revenueCatCustomerId) {
+      user.entitlement.revenueCatCustomerId = revenueCatCustomerId;
+    }
     user.entitlement.revenueCatAppUserIds = revenueCatAppUserIds;
     user.entitlement.revenueCatEntitlement = event.entitlement_id ?? undefined;
     // The event alone is a hint until reconciliation confirms it.

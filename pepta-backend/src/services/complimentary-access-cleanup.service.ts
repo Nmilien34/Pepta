@@ -128,6 +128,59 @@ export async function prepareComplimentaryCleanupForDeletion(
   await runCleanupTask(task, "system").catch(() => undefined);
 }
 
+/**
+ * Marks a grant revoked once its promotional entitlement is confirmed gone.
+ * No-op for the account-deletion path, where the grant is already deleted.
+ */
+async function finalizeRevokedGrant(appUserId: string): Promise<void> {
+  const grant = await ComplimentaryAccessGrantModel.findOne({
+    userId: appUserId,
+    status: "revoking",
+  });
+  if (!grant) return;
+  grant.status = "revoked";
+  grant.revokedAt = new Date();
+  await grant.save();
+}
+
+/**
+ * Queues a durable promotional revocation WITHOUT deleting the grant.
+ *
+ * revokeInvite uses this when it cannot complete the revocation itself — no
+ * RevenueCat key configured, or the call failed. Before this, revoke marked
+ * the grant 'revoked' and wrote an audit trail saying so while the
+ * entitlement stayed live at RevenueCat for the rest of the window: the
+ * record, the audit log and the operator all believed access was gone.
+ */
+export async function queueComplimentaryRevocation(
+  appUserId: string,
+): Promise<void> {
+  const entitlementId = env.revenueCat.proEntitlementId;
+  const task = await ComplimentaryAccessCleanupModel.findOneAndUpdate(
+    { revenueCatAppUserId: appUserId, entitlementId },
+    {
+      $setOnInsert: {
+        revenueCatAppUserId: appUserId,
+        entitlementId,
+        status: "pending",
+        attemptCount: 0,
+        nextAttemptAt: new Date(),
+      },
+    },
+    { new: true, upsert: true },
+  );
+  await auditCleanup({
+    previousStatus: "revoking",
+    nextStatus: "cleanup_queued",
+    actor: "admin",
+    reason: "operator revoke — durable promotional cleanup recorded",
+  });
+  if (task) {
+    // Best-effort immediate attempt; the scheduler owns the retries.
+    await runCleanupTask(task, "admin").catch(() => undefined);
+  }
+}
+
 async function runCleanupTask(
   task: ComplimentaryAccessCleanupDocument,
   actor: "system" | "worker" | "admin",
@@ -173,6 +226,19 @@ async function runCleanupTask(
     await ComplimentaryAccessCleanupModel.deleteOne({
       _id: leased._id,
       leaseId,
+    });
+    // An operator-initiated revoke leaves its grant in 'revoking' until the
+    // entitlement is actually gone. Closing that loop here is what makes the
+    // record honest — the grant only reads 'revoked' once RevenueCat has
+    // confirmed it.
+    // Bookkeeping AFTER the business-critical act already succeeded: the
+    // entitlement is gone. Failing the task here would re-revoke something
+    // already revoked, so this is logged rather than propagated.
+    await finalizeRevokedGrant(leased.revenueCatAppUserId).catch((error) => {
+      logger.warn(
+        { appUserId: leased.revenueCatAppUserId, error: (error as Error).message },
+        "[complimentary-cleanup] entitlement revoked but the grant record was not finalized",
+      );
     });
     await auditCleanup({
       previousStatus: "processing",

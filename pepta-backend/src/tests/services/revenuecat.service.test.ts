@@ -573,3 +573,80 @@ describe('a transfer does not bind the two accounts together', () => {
     });
   });
 });
+
+// revenueCatCustomerId is what the reconciler passes to getSubscriber, and
+// getSubscriber REFUSES anonymous/empty ids with a terminal error. Persisting
+// one therefore breaks reconciliation for that account permanently: every
+// resolveAccess throws terminal and returns temporarily_unavailable forever.
+describe('the stored customer id stays usable', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.processedFindOne.mockResolvedValue(null);
+    mocks.processedCreate.mockResolvedValue(undefined);
+  });
+
+  it('does not adopt an anonymous id when app_user_id is absent', async () => {
+    const userId = new Types.ObjectId().toString();
+    const user = userDocument({
+      id: userId,
+      revenueCatCustomerId: userId,
+      revenueCatAppUserIds: [userId],
+    });
+    mocks.userFindById.mockResolvedValue(user);
+    mocks.userFindOne.mockResolvedValue(user);
+
+    await applyRevenueCatWebhook({
+      event: {
+        id: 'evt_anon',
+        type: 'RENEWAL',
+        // RevenueCat sends null for fields that do not apply, and after an
+        // SDK logIn the ORIGINAL id is the device's anonymous one.
+        app_user_id: null,
+        original_app_user_id: '$RCAnonymousID:8f3c1b2a',
+        aliases: [userId],
+        entitlement_id: 'pepta_plus',
+        expiration_at_ms: Date.parse('2027-01-01T00:00:00.000Z'),
+      },
+    } as never);
+
+    expect(user.entitlement.revenueCatCustomerId).toBe(userId);
+    expect(user.entitlement.revenueCatCustomerId).not.toMatch(/anonymous/i);
+  });
+
+  it('keeps a usable stored id rather than replacing it with an unusable one', async () => {
+    const userId = new Types.ObjectId().toString();
+    const user = userDocument({
+      id: userId,
+      revenueCatCustomerId: userId,
+      revenueCatAppUserIds: [userId],
+    });
+    mocks.userFindById.mockResolvedValue(user);
+    mocks.userFindOne.mockResolvedValue(user);
+
+    await applyRevenueCatWebhook({
+      event: {
+        id: 'evt_anon2',
+        type: 'RENEWAL',
+        app_user_id: '$RCAnonymousID:aaaa',
+        original_app_user_id: null,
+        aliases: [userId],
+        entitlement_id: 'pepta_plus',
+        expiration_at_ms: Date.parse('2027-01-01T00:00:00.000Z'),
+      },
+    } as never);
+
+    expect(user.entitlement.revenueCatCustomerId).toBe(userId);
+  });
+
+  it('still adopts a real id when there is no usable one stored yet', async () => {
+    const userId = new Types.ObjectId().toString();
+    const user = userDocument({ id: userId });
+    mocks.userFindById.mockResolvedValue(user);
+
+    await applyRevenueCatWebhook(
+      event({ id: 'evt_real', type: 'RENEWAL', appUserId: userId }),
+    );
+
+    expect(user.entitlement.revenueCatCustomerId).toBe(userId);
+  });
+});
