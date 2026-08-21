@@ -455,6 +455,9 @@ export function MealLogSheet({
     };
   };
 
+  // Recipe mode overrides the meal wording where the two flows share a view.
+  const heading = (keepAsRecipe ? RECIPE_HEADINGS[view] : undefined) ?? HEADINGS[view];
+
   const logResult = () => {
     const a = scaledAnalysis();
     if (!a || !result) return;
@@ -655,10 +658,10 @@ export function MealLogSheet({
           ) : null}
           <View style={{ flex: 1 }}>
             <AppText variant="cardTitle" style={{ fontSize: 17 }}>
-              {HEADINGS[view].title}
+              {heading.title}
             </AppText>
             <AppText variant="caption" color="textSecondary">
-              {HEADINGS[view].sub}
+              {heading.sub}
             </AppText>
           </View>
           {view === "chooser" ? (
@@ -738,6 +741,7 @@ export function MealLogSheet({
             onPortion={setPortion}
             onLog={logResult}
             onEdit={editResult}
+            keepAsRecipe={keepAsRecipe}
           />
         ) : null}
 
@@ -877,6 +881,25 @@ const HEADINGS: Record<View_, { title: string; sub: string }> = {
     sub: "Review, then add it to today.",
   },
   error: { title: "Hmm", sub: "That didn’t work." },
+};
+
+// WHEN THE SHEET IS BUILDING A RECIPE, THE MEAL COPY IS A LIE.
+//
+// `keepAsRecipe` reaches commit(), which saves a recipe and deliberately does
+// NOT add anything to today ("Keeping it as a recipe is NOT also logging it").
+// The screen around that correct behaviour still read "Review, then add it to
+// today" above a button marked "Confirm & log" — so the one moment the user
+// needs to trust what the button does, every word on screen told them it was
+// about to put a meal they have not eaten into their diary.
+//
+// Only the two views that can be reached in recipe mode need overriding; the
+// manual view already took a saveLabel, and recipeReview is recipe-only.
+const RECIPE_HEADINGS: Partial<Record<View_, { title: string; sub: string }>> = {
+  result: {
+    title: "Here’s the estimate",
+    sub: "Review, then save it as a recipe.",
+  },
+  search: { title: "Search foods", sub: "Find a food to save as a recipe." },
 };
 
 function AIConsentView({
@@ -1158,6 +1181,7 @@ function ResultView({
   source,
   portion,
   onPortion,
+  keepAsRecipe = false,
   onLog,
   onEdit,
 }: {
@@ -1167,6 +1191,8 @@ function ResultView({
   source: MealSource;
   portion: number;
   onPortion: (n: number) => void;
+  /** Recipe mode: the button saves a recipe and adds nothing to today. */
+  keepAsRecipe?: boolean;
   onLog: () => void;
   onEdit: () => void;
 }) {
@@ -1455,7 +1481,11 @@ function ResultView({
       ) : null}
 
       <View style={{ marginTop: 16 }}>
-        <Button label="Confirm & log" onPress={onLog} />
+        {/* The button must name what it does. commit() saves a recipe here and
+            deliberately adds nothing to today, so "Confirm & log" described
+            the opposite of the behaviour — on the one control where the user
+            has to trust the label. "Save recipe" matches the manual view. */}
+        <Button label={keepAsRecipe ? "Save recipe" : "Confirm & log"} onPress={onLog} />
       </View>
       <Pressable
         onPress={onEdit}

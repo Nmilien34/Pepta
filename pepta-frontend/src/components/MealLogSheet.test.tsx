@@ -580,6 +580,76 @@ describe("MealLogSheet", () => {
     }
   });
 
+  it("names what the button does when the sheet is building a RECIPE", async () => {
+    // commit() saves a recipe here and deliberately adds nothing to today
+    // ("Keeping it as a recipe is NOT also logging it"). The screen around
+    // that correct behaviour said "Review, then add it to today." above a
+    // button marked "Confirm & log" — so at the one moment the user has to
+    // trust the control, every word promised the opposite: a meal they have
+    // not eaten, dropped into their diary.
+    await testStorage.setItem(AI_CONSENT_STORAGE_KEY, "accepted");
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+
+    await act(async () => {
+      tree = TestRenderer.create(
+        <MealLogSheet visible={true} onClose={vi.fn()} keepAsRecipe />,
+      );
+    });
+
+    await act(async () => {
+      tree!.root
+        .findByProps({ accessibilityLabel: "Barcode meal log" })
+        .props.onPress();
+    });
+    await act(async () => {
+      await tree!.root
+        .find((node) => String(node.type) === "BarcodeScanner")
+        .props.onScanned("081212903020");
+    });
+
+    const words: string[] = [];
+    const walk = (n: TestRenderer.ReactTestInstance) => {
+      for (const c of n.children) {
+        if (typeof c === "string") words.push(c);
+        else walk(c);
+      }
+    };
+    walk(tree!.root);
+    const copy = words.join(" ");
+
+    // The button, and the sentence above it, both say recipe.
+    expect(tree!.root.findByProps({ label: "Save recipe" })).toBeTruthy();
+    expect(() => tree!.root.findByProps({ label: "Confirm & log" })).toThrow();
+    expect(copy).toContain("save it as a recipe");
+    expect(copy).not.toContain("add it to today");
+  });
+
+  it("still says log when it really is logging a meal", async () => {
+    // The other half: the override must not leak into the meal flow.
+    await testStorage.setItem(AI_CONSENT_STORAGE_KEY, "accepted");
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+
+    await act(async () => {
+      tree = TestRenderer.create(
+        <MealLogSheet visible={true} onClose={vi.fn()} />,
+      );
+    });
+
+    await act(async () => {
+      tree!.root
+        .findByProps({ accessibilityLabel: "Barcode meal log" })
+        .props.onPress();
+    });
+    await act(async () => {
+      await tree!.root
+        .find((node) => String(node.type) === "BarcodeScanner")
+        .props.onScanned("081212903020");
+    });
+
+    expect(tree!.root.findByProps({ label: "Confirm & log" })).toBeTruthy();
+    expect(() => tree!.root.findByProps({ label: "Save recipe" })).toThrow();
+  });
+
   it("uses the barcode endpoint and logs barcode meals with barcode source", async () => {
     await testStorage.setItem(AI_CONSENT_STORAGE_KEY, "accepted");
     let tree: TestRenderer.ReactTestRenderer | undefined;
