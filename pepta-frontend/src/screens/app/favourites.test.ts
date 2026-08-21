@@ -386,17 +386,18 @@ describe('what a new item needs before it can be saved', () => {
 });
 
 describe('a photo the user attached to their own item', () => {
-  it('carries the key, so the server can find the file again', () => {
+  it('carries the opaque media id, never a storage key', () => {
     const fav = favouriteFromDraft(
-      { kind: 'food', name: 'Desk lunch', portion: '1 box', protein: 30, photoS3Key: 'favourites/u1/abc.jpg' },
+      { kind: 'food', name: 'Desk lunch', portion: '1 box', protein: 30, photoMediaId: '507f1f77bcf86cd799439011' },
       '2026-08-19T12:00:00.000Z',
     );
-    expect(fav.photoS3Key).toBe('favourites/u1/abc.jpg');
+    expect(fav.photoMediaId).toBe('507f1f77bcf86cd799439011');
+    expect(fav).not.toHaveProperty('photoS3Key');
   });
 
   it('shows the local file straight away, before the signed URL comes back', () => {
     const fav = favouriteFromDraft(
-      { kind: 'drink', name: 'Desk bottle', portion: '21 oz', ounces: 21, photoS3Key: 'k', photoUri: 'file:///tmp/a.jpg' },
+      { kind: 'drink', name: 'Desk bottle', portion: '21 oz', ounces: 21, photoMediaId: '507f1f77bcf86cd799439011', photoUri: 'file:///tmp/a.jpg' },
       '2026-08-19T12:00:00.000Z',
     );
     expect(fav.photoUrl).toBe('file:///tmp/a.jpg');
@@ -407,7 +408,7 @@ describe('a photo the user attached to their own item', () => {
       { kind: 'food', name: 'Plain', portion: '1 cup', calories: 100 },
       '2026-08-19T12:00:00.000Z',
     );
-    expect(fav.photoS3Key).toBeUndefined();
+    expect(fav.photoMediaId).toBeUndefined();
     expect(fav.photoUrl).toBeUndefined();
   });
 
@@ -418,11 +419,11 @@ describe('a photo the user attached to their own item', () => {
 
   it('survives a portion edit — the photo is not part of what changed', () => {
     const fav = favouriteFromDraft(
-      { kind: 'food', name: 'Desk lunch', portion: '1 box', protein: 30, photoS3Key: 'k', photoUri: 'file:///a.jpg' },
+      { kind: 'food', name: 'Desk lunch', portion: '1 box', protein: 30, photoMediaId: '507f1f77bcf86cd799439011', photoUri: 'file:///a.jpg' },
       '2026-08-19T12:00:00.000Z',
     );
     const { next } = applyPortionEdit(fav, { portion: '2 boxes', protein: 60, calories: undefined, ounces: undefined, fiber: undefined }, '2026-08-19T13:00:00.000Z');
-    expect(next.photoS3Key).toBe('k');
+    expect(next.photoMediaId).toBe('507f1f77bcf86cd799439011');
     expect(next.photoUrl).toBe('file:///a.jpg');
   });
 });

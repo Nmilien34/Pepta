@@ -5,12 +5,15 @@ import type {
 } from "@pepta/shared";
 import OpenAI from "openai";
 import { env } from "../config/env";
+import { clampNutrition } from "../lib/nutritionBounds";
+import { parseModelJson } from "../lib/parseModelJson";
 import { NotFoundError } from "../lib/errors";
 import { logger } from "../lib/logger";
 import { ProductNutritionCacheModel } from "../models";
 import type { ProductScanClues } from "./product-scan-vision.service";
 
 const LOOKUP_TIMEOUT_MS = 7_000;
+const PRODUCT_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const OPENAI_PRODUCT_TIMEOUT_MS = 12_000;
 const OFF_FIELDS =
   "product_name,brands,nutriments,serving_size,serving_quantity,code,url";
@@ -51,6 +54,26 @@ function cleanString(value: unknown, maxLength = 180): string | undefined {
   if (typeof value !== "string") return undefined;
   const trimmed = value.trim();
   return trimmed ? trimmed.slice(0, maxLength) : undefined;
+}
+
+/**
+ * A citation URL we are willing to store and later serve.
+ *
+ * mealProductCitationSchema requires z.string().url(), and the cache is
+ * global: one model-authored non-URL written here made every subsequent read
+ * of that product fail to serialize — a permanent 500 on that barcode for
+ * every user, with no way to clear it short of editing the database.
+ */
+function cleanHttpUrl(value: unknown): string | undefined {
+  const raw = cleanString(value, 500);
+  if (!raw) return undefined;
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return undefined;
+    return raw;
+  } catch {
+    return undefined;
+  }
 }
 
 function cleanBarcode(value: unknown): string | undefined {
@@ -167,15 +190,19 @@ function parseOpenFoodFactsProduct(
         url: sourceUrl,
       },
     ],
+    // Clamped for the same reason as the model paths: Open Food Facts is
+    // crowd-sourced, and bad rows are a known hazard there (energy entered in
+    // kJ as kcal, per-kilo figures filed as per-serving). The numbers land in
+    // the user's meal log either way, so they get the same plausibility band.
     analysis: {
       foodName: name.slice(0, 120),
       servingSize:
         (usedServing && cleanString(product.serving_size, 80)) || "100 g",
-      protein: roundOne(protein ?? 0),
-      calories: roundOne(calories ?? 0),
-      carbs: roundOne(carbs),
-      fat: roundOne(fat),
-      fiber: roundOne(fiber),
+      protein: roundOne(clampNutrition("protein", protein ?? 0)),
+      calories: roundOne(clampNutrition("calories", calories ?? 0)),
+      carbs: roundOne(clampNutrition("carbs", carbs)),
+      fat: roundOne(clampNutrition("fat", fat)),
+      fiber: roundOne(clampNutrition("fiber", fiber)),
       confidence: usedServing ? 0.88 : 0.7,
     },
   };
@@ -237,6 +264,13 @@ async function readCache(
   try {
     const hit = await ProductNutritionCacheModel.findOne({ cacheKey }).lean();
     if (!hit) return null;
+    // Product data is not permanent truth. Formulations change, and a wrong
+    // web-search answer written once would otherwise be served to every user
+    // forever. Past the TTL we look it up again.
+    const updatedAt = (hit as { updatedAt?: Date }).updatedAt;
+    if (updatedAt && Date.now() - updatedAt.getTime() > PRODUCT_CACHE_TTL_MS) {
+      return null;
+    }
     return {
       source: "cache",
       ...(hit.barcode ? { barcode: hit.barcode } : {}),
@@ -298,7 +332,17 @@ function parseOpenAIProductJson(
   content: string,
 ): ProductNutritionResult | null {
   try {
-    const parsed = JSON.parse(content) as Record<string, unknown>;
+    // Fence-tolerant: a fenced or prose-prefixed reply used to throw here and
+    // be reported to the user as "we couldn't find nutrition facts", with
+    // nothing in the logs to distinguish it from a genuine miss.
+    const parsed = parseModelJson<Record<string, unknown>>(content);
+    if (!parsed) {
+      logger.warn(
+        { contentPreview: content.slice(0, 200) },
+        "[product] OpenAI response was not parseable JSON",
+      );
+      return null;
+    }
     const brand = cleanString(parsed.brand);
     const productName = cleanString(parsed.productName);
     const foodName =
@@ -317,7 +361,11 @@ function parseOpenAIProductJson(
             if (!citation || typeof citation !== "object") return null;
             const value = citation as Record<string, unknown>;
             const title = cleanString(value.title, 160);
-            const url = cleanString(value.url, 500);
+            const url = cleanHttpUrl(value.url);
+            // A citation whose url is not a real URL is dropped, not stored.
+            // mealProductCitationSchema requires z.string().url(), so caching
+            // one made every later read of that product throw on serialize —
+            // a permanent 500 for that barcode, for every user.
             return title && url ? { title, url } : null;
           })
           .filter((citation): citation is MealProductCitation =>
@@ -335,14 +383,18 @@ function parseOpenAIProductJson(
       ...(brand ? { brand } : {}),
       ...(productName ? { productName } : {}),
       citations,
+      // Macros are clamped like every other estimator (lib/nutritionBounds).
+      // A web-search answer is no more trustworthy than a vision estimate —
+      // it can read a per-100g panel as a per-serving one, or pick up a
+      // wholesale case listing — and nothing downstream bounds these.
       analysis: {
         foodName,
         servingSize,
-        protein: roundOne(protein),
-        calories: roundOne(calories),
-        carbs: roundOne(carbs),
-        fat: roundOne(fat),
-        fiber: roundOne(fiber),
+        protein: roundOne(clampNutrition("protein", protein)),
+        calories: roundOne(clampNutrition("calories", calories)),
+        carbs: roundOne(clampNutrition("carbs", carbs)),
+        fat: roundOne(clampNutrition("fat", fat)),
+        fiber: roundOne(clampNutrition("fiber", fiber)),
         confidence: clamp(confidence ?? 0.62, 0, 1),
       },
     };
@@ -401,18 +453,25 @@ export async function resolveProductNutrition(
   clues: ProductScanClues,
 ): Promise<ProductNutritionResult> {
   const barcode = cleanBarcode(clues.barcodeText);
-  const cacheKey = productCacheKey({
-    barcode,
+  // THE KEY MUST MATCH THE EVIDENCE. A single key was computed up front from
+  // the barcode and then reused for the name-text fallbacks, so a result
+  // identified only from label text — or invented by the model — was stored as
+  // that BARCODE's nutrition facts, globally. The next user to scan the same
+  // barcode got a different product's macros, marked source: "cache", and
+  // logged them. Each path now writes under the key it actually resolved by.
+  const barcodeKey = barcode ? productCacheKey({ barcode }) : null;
+  const queryKey = productCacheKey({
     brand: clues.brand,
     productName: clues.productName,
   });
-  const cached = await readCache(cacheKey);
+
+  const cached = (await readCache(barcodeKey)) ?? (await readCache(queryKey));
   if (cached) return cached;
 
   if (barcode) {
     const offBarcode = await lookupOpenFoodFactsBarcode(barcode);
     if (offBarcode) {
-      return writeCache(cacheKey, offBarcode);
+      return writeCache(barcodeKey, offBarcode);
     }
   }
 
@@ -420,7 +479,12 @@ export async function resolveProductNutrition(
   if (query) {
     const offQuery = await lookupOpenFoodFactsQuery(query);
     if (offQuery) {
-      return writeCache(cacheKey, offQuery);
+      // Resolved by NAME. Only claim the barcode when Open Food Facts came
+      // back with that same barcode on the product it matched.
+      return writeCache(
+        offQuery.barcode && offQuery.barcode === barcode ? barcodeKey : queryKey,
+        offQuery,
+      );
     }
   }
 
@@ -434,7 +498,16 @@ export async function resolveProductNutrition(
         ? { productName: clues.productName }
         : {}),
     };
-    return writeCache(cacheKey, enriched);
+    // A web-search guess earns the barcode key only when the model reported
+    // that same barcode back — otherwise it is filed under the label text it
+    // was actually derived from, and a mis-read barcode cannot poison a real
+    // product for everyone else.
+    return writeCache(
+      openAiResult.barcode && openAiResult.barcode === barcode
+        ? barcodeKey
+        : (queryKey ?? barcodeKey),
+      enriched,
+    );
   }
 
   throw new NotFoundError(

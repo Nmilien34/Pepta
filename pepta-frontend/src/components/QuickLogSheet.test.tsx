@@ -96,17 +96,20 @@ const dataMocks = vi.hoisted(() => ({
   // Per-test route for the single active compound. undefined = legacy record
   // with no route — which must behave exactly like injection.
   compoundRoute: undefined as "oral" | "injection" | undefined,
+  // Stable across renders so a test can count how many saves one sheet made.
+  saveLog: vi.fn(async () => "saved" as const),
+  bumpWater: vi.fn(),
 }));
 
 vi.mock("../context/PeptaDataContext", () => ({
   usePeptaData: () => ({
-    saveLog: vi.fn(async () => "saved" as const),
+    saveLog: dataMocks.saveLog,
     addDoseLog: vi.fn(),
     addMeasurement: vi.fn(),
     addSideEffectLog: vi.fn(),
     addWeightLog: vi.fn(),
     bumpProtein: vi.fn(),
-    bumpWater: vi.fn(),
+    bumpWater: dataMocks.bumpWater,
     home: {
       activeCompounds: [
         {
@@ -367,5 +370,58 @@ describe("QuickLogSheet", () => {
       );
     }
     dataMocks.compoundRoute = undefined;
+  });
+
+  // close() only starts the dismiss animation, so the CTA stays mounted and
+  // hittable for the duration. Two taps used to mean two independently-keyed
+  // logs — two doses on the chart from one intent, and the idempotency key
+  // cannot dedupe them because each press mints its own.
+  it("saves once no matter how many times the CTA is pressed", async () => {
+    dataMocks.saveLog.mockClear();
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+    await act(async () => {
+      tree = TestRenderer.create(
+        <QuickLogSheet visible={true} onClose={vi.fn()} onMeal={vi.fn()} />,
+      );
+    });
+
+    const shotButton = tree!.root.findByProps({ label: "Save shot now" });
+    await act(async () => {
+      shotButton.props.onPress();
+      shotButton.props.onPress();
+      shotButton.props.onPress();
+    });
+
+    expect(dataMocks.saveLog).toHaveBeenCalledTimes(1);
+  });
+
+  it("re-arms the CTA when the sheet is opened again", async () => {
+    dataMocks.saveLog.mockClear();
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+    await act(async () => {
+      tree = TestRenderer.create(
+        <QuickLogSheet visible={true} onClose={vi.fn()} onMeal={vi.fn()} />,
+      );
+    });
+    await act(async () => {
+      tree!.root.findByProps({ label: "Save shot now" }).props.onPress();
+    });
+
+    // Close, then reopen — the next log is a new intent, not a double tap.
+    await act(async () => {
+      tree!.update(
+        <QuickLogSheet visible={false} onClose={vi.fn()} onMeal={vi.fn()} />,
+      );
+    });
+    await act(async () => {
+      tree!.update(
+        <QuickLogSheet visible={true} onClose={vi.fn()} onMeal={vi.fn()} />,
+      );
+    });
+    await act(async () => {
+      tree!.root.findByProps({ label: "Save shot now" }).props.onPress();
+    });
+
+    expect(dataMocks.saveLog).toHaveBeenCalledTimes(2);
   });
 });

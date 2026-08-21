@@ -65,12 +65,24 @@ export function ActivityLogScreen() {
       entry.sourceIds.map((id) => deleteLog(entry.kind, id)),
     );
     setRemoving(false);
-    if (outcomes.every(Boolean)) {
+    const removed = outcomes.filter(Boolean).length;
+    if (removed === outcomes.length) {
       setPendingRemoval(null);
       return;
     }
-    // The optimistic marks already rolled back, so the rows are still there.
-    setRemoveError('That did not go through. Nothing was removed.');
+    if (removed === 0) {
+      // The optimistic marks already rolled back, so the rows are still there.
+      setRemoveError('That did not go through. Nothing was removed.');
+      return;
+    }
+    // PARTIAL. One feed row can stand for a dozen separate log rows, and some
+    // of them are now permanently gone. Saying "nothing was removed" here was
+    // a lie that sent people looking for records that no longer exist — and
+    // invited a retry that would delete a different subset again.
+    setPendingRemoval(null);
+    setRemoveError(
+      `Removed ${removed} of ${outcomes.length}. The rest are still here — pull to refresh and try again.`,
+    );
   };
   const filtered = isFiltered(filter);
 

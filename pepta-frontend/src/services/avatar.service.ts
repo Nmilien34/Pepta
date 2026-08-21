@@ -1,8 +1,8 @@
-import type { AvatarUploadIntentRequest, User } from "@pepta/shared";
+import type { MediaContentType, User } from "@pepta/shared";
 import * as ImagePicker from "expo-image-picker";
 import { api as peptaApi } from "./api";
 
-type AvatarContentType = AvatarUploadIntentRequest["contentType"];
+type AvatarContentType = MediaContentType;
 
 export type AvatarSource = "library" | "camera";
 
@@ -71,33 +71,19 @@ export async function pickAvatar(
 }
 
 interface AvatarApi {
-  createAvatarUploadIntent: typeof peptaApi.createAvatarUploadIntent;
+  uploadMediaPhoto: typeof peptaApi.uploadMediaPhoto;
   confirmAvatarUpload: typeof peptaApi.confirmAvatarUpload;
 }
 
 export async function uploadAvatar(
   picked: PickedAvatar,
-  deps: { api?: AvatarApi; fetchImpl?: typeof fetch } = {},
+  deps: { api?: AvatarApi } = {},
 ): Promise<User> {
   const api = deps.api ?? peptaApi;
-  const fetchImpl = deps.fetchImpl ?? fetch;
-
-  const fileResponse = await fetchImpl(picked.uri);
-  const blob = await fileResponse.blob();
-  const intent = await api.createAvatarUploadIntent({
+  const ready = await api.uploadMediaPhoto({
+    intent: "avatar",
+    uri: picked.uri,
     contentType: picked.contentType,
-    sizeBytes: blob.size || undefined,
   });
-
-  const uploadResponse = await fetchImpl(intent.uploadUrl, {
-    method: "PUT",
-    headers: { "Content-Type": picked.contentType },
-    body: blob,
-  });
-
-  if (!uploadResponse.ok) {
-    throw new Error("Profile photo upload failed. Please try again.");
-  }
-
-  return api.confirmAvatarUpload({ key: intent.key });
+  return api.confirmAvatarUpload({ mediaId: ready.mediaId });
 }

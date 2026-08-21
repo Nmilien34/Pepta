@@ -14,6 +14,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Modal, Pressable, TextInput, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { api } from '../services/api';
+import { discardLocalCapture } from '../services/localCaptures';
 import * as Haptics from 'expo-haptics';
 import { AppText, Button } from './index';
 import { useTheme } from '../theme';
@@ -46,23 +47,37 @@ export function NewItemSheet({ visible, initialKind, onCancel, onSave }: NewItem
   const [calories, setCalories] = useState('');
   const [ounces, setOunces] = useState('');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
-  const [photoS3Key, setPhotoS3Key] = useState<string | null>(null);
+  const [photoMediaId, setPhotoMediaId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [photoError, setPhotoError] = useState('');
   /**
-   * The uploaded key nothing points at yet. A ref, not state, because the
+   * The uploaded media id nothing points at yet. A ref, not state, because the
    * cleanup below has to read it at the moment the sheet closes — a stale
    * closure would strand exactly the photo it is there to collect.
    */
   const pending = useRef<string | null>(null);
+  /**
+   * The device-side twin of `pending`: the cache file behind photoUri, while
+   * this sheet is what displays it. Saving hands the URI to the optimistic
+   * row in the list, so — exactly like `pending` — saving clears it first
+   * and the close-time sweep only ever deletes a file nothing renders.
+   */
+  const capture = useRef<string | null>(null);
+  /**
+   * Bumped on every close. An upload that was still in flight when the sheet
+   * closed lands in a session that no longer exists — without this check it
+   * would repopulate the refs AFTER the close-time sweep ran, and both the
+   * media id and the cache file would leak into the next item's session.
+   */
+  const session = useRef(0);
 
   /**
    * An upload nothing ended up pointing at. Best-effort — a failed cleanup
    * leaves one stray file, and there is nothing useful to tell the user about
    * a photo they had already walked away from.
    */
-  const discard = (key: string | null) => {
-    if (key) void api.discardFavouritePhoto(key).catch(() => undefined);
+  const discard = (mediaId: string | null) => {
+    if (mediaId) void api.discardMedia(mediaId).catch(() => undefined);
   };
 
   // Cleared on every open, or the next item starts as a copy of the last.
@@ -74,8 +89,11 @@ export function NewItemSheet({ visible, initialKind, onCancel, onSave }: NewItem
   // photo is never swept up.
   useEffect(() => {
     if (!visible) {
+      session.current += 1;
       discard(pending.current);
       pending.current = null;
+      discardLocalCapture(capture.current);
+      capture.current = null;
       return;
     }
     setKind(initialKind);
@@ -85,7 +103,7 @@ export function NewItemSheet({ visible, initialKind, onCancel, onSave }: NewItem
     setCalories('');
     setOunces('');
     setPhotoUri(null);
-    setPhotoS3Key(null);
+    setPhotoMediaId(null);
     setUploading(false);
     setPhotoError('');
   }, [visible, initialKind]);
@@ -93,16 +111,27 @@ export function NewItemSheet({ visible, initialKind, onCancel, onSave }: NewItem
   // Navigating away with the sheet open never trips the effect above — React
   // runs cleanups on unmount, not effect bodies. Its own effect, so it fires
   // once at the end rather than on every dependency change.
-  useEffect(() => () => discard(pending.current), []);
+  useEffect(
+    () => () => {
+      discard(pending.current);
+      discardLocalCapture(capture.current);
+    },
+    [],
+  );
 
   /**
-   * Picks, then uploads to a presigned URL. The local URI is shown the moment
+   * Picks, then uploads through the opaque media API. The local URI is shown the moment
    * it is chosen — waiting on a round trip to show a photo the user is already
-   * looking at feels broken — and the key it resolves to is what gets saved.
+   * looking at feels broken — and the media id it resolves to is what gets saved.
    */
   const pickPhoto = async () => {
+    if (uploading) return;
     Haptics.selectionAsync().catch(() => undefined);
     setPhotoError('');
+    const previousUri = photoUri;
+    const previousMediaId = pending.current;
+    const mySession = session.current;
+    let pickedUri: string | null = null;
     try {
       const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!perm.granted) {
@@ -112,22 +141,47 @@ export function NewItemSheet({ visible, initialKind, onCancel, onSave }: NewItem
       const res = await ImagePicker.launchImageLibraryAsync({ quality: 0.6, mediaTypes: ['images'] });
       const asset = res.canceled ? null : res.assets[0];
       if (!asset?.uri) return;
+      pickedUri = asset.uri;
       setPhotoUri(asset.uri);
       setUploading(true);
       const contentType =
-        asset.mimeType === 'image/png' || asset.mimeType === 'image/webp' ? asset.mimeType : 'image/jpeg';
-      const intent = await api.createFavouritePhotoIntent({ contentType });
-      await api.uploadToPresignedUrl(intent.uploadUrl, asset.uri, contentType);
-      // The one this replaces is now referenced by nothing. Fire and forget:
-      // it is housekeeping, and the photo they just picked is what matters.
-      discard(pending.current);
-      pending.current = intent.photoS3Key;
-      setPhotoS3Key(intent.photoS3Key);
+        asset.mimeType === 'image/png' ||
+        asset.mimeType === 'image/webp' ||
+        asset.mimeType === 'image/heic'
+          ? asset.mimeType
+          : 'image/jpeg';
+      const ready = await api.uploadMediaPhoto({
+        intent: 'favourite_photo',
+        uri: asset.uri,
+        contentType,
+      });
+      if (session.current !== mySession) {
+        // The sheet closed while this upload was in flight, and the close
+        // sweep already collected the session's refs. This result belongs to
+        // nothing — writing it into the refs would leak it into the NEXT
+        // item's session, so it is cleaned up here instead.
+        discard(ready.mediaId);
+        discardLocalCapture(asset.uri);
+        return;
+      }
+      // The one this replaces is now referenced by nothing — the server copy
+      // AND the cache file behind it. Fire and forget: it is housekeeping,
+      // and the photo they just picked is what matters.
+      discard(previousMediaId);
+      if (previousUri && previousUri !== asset.uri) discardLocalCapture(previousUri);
+      pending.current = ready.mediaId;
+      capture.current = asset.uri;
+      setPhotoMediaId(ready.mediaId);
     } catch {
+      // The failed pick is displayed nowhere either way; its cache copy can
+      // go (the kept previous photo's file is what capture holds).
+      if (pickedUri && pickedUri !== previousUri) discardLocalCapture(pickedUri);
+      if (session.current !== mySession) return;
       // The item is still saveable — the photo is the optional part, and
       // losing what they typed because an upload failed would be the worse
       // outcome.
-      setPhotoS3Key(null);
+      setPhotoUri(previousMediaId ? previousUri : null);
+      setPhotoMediaId(previousMediaId);
       setPhotoError('That photo did not upload. You can save without it, or try another.');
     } finally {
       setUploading(false);
@@ -140,7 +194,7 @@ export function NewItemSheet({ visible, initialKind, onCancel, onSave }: NewItem
     kind,
     name,
     portion,
-    ...(photoS3Key ? { photoS3Key, photoUri: photoUri ?? undefined } : {}),
+    ...(photoMediaId ? { photoMediaId, photoUri: photoUri ?? undefined } : {}),
     ...(kind === 'drink'
       ? { ounces: num(ounces) }
       : { protein: num(protein), calories: num(calories) }),
@@ -306,8 +360,11 @@ export function NewItemSheet({ visible, initialKind, onCancel, onSave }: NewItem
               disabled={!isNewItemValid(draft) || uploading}
               onPress={() => {
                 Haptics.selectionAsync().catch(() => undefined);
-                // The item owns the photo now, so the cleanup must not take it.
+                // The item owns the photo now, so the cleanup must not take
+                // it — and the optimistic row keeps rendering the local file,
+                // so the close-time sweep must not take that either.
                 pending.current = null;
+                capture.current = null;
                 onSave(draft);
               }}
             />

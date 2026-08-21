@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   bindVerifiedProviderEmail: vi.fn(),
   loggerError: vi.fn(),
+  loggerWarn: vi.fn(),
+  refreshGoogleAvatar: vi.fn(),
   userCreate: vi.fn(),
   userFindOne: vi.fn(),
   verifyAppleIdentityToken: vi.fn(),
@@ -21,8 +23,12 @@ vi.mock("../../services/provider-identity-binding.service", () => ({
   bindVerifiedProviderEmail: mocks.bindVerifiedProviderEmail,
 }));
 
+vi.mock("../../services/provider-avatar.service", () => ({
+  refreshGoogleAvatar: mocks.refreshGoogleAvatar,
+}));
+
 vi.mock("../../lib/logger", () => ({
-  logger: { error: mocks.loggerError },
+  logger: { error: mocks.loggerError, warn: mocks.loggerWarn },
 }));
 
 vi.mock("../../models", () => ({
@@ -83,6 +89,7 @@ describe("auth service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.bindVerifiedProviderEmail.mockResolvedValue(undefined);
+    mocks.refreshGoogleAvatar.mockResolvedValue(undefined);
   });
 
   it("creates a user from a Google identity and returns a valid Pepta JWT", async () => {
@@ -101,7 +108,6 @@ describe("auth service", () => {
         email: "user@example.com",
         emailVerified: true,
         displayName: "Pepta User",
-        avatarUrl: "https://example.com/avatar.png",
         authProviders: [
           {
             provider: "google",
@@ -119,7 +125,6 @@ describe("auth service", () => {
         email: "user@example.com",
         emailVerified: true,
         displayName: "Pepta User",
-        avatarUrl: "https://example.com/avatar.png",
         onboardingComplete: false,
         entitlement: {
           status: "free",

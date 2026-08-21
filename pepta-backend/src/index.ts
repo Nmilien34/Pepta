@@ -4,6 +4,7 @@ import { env } from './config/env';
 import { logger } from './lib/logger';
 import { PepPushScheduler } from './services/pepPushScheduler.service';
 import { ComplimentaryCleanupScheduler } from './services/complimentary-access-cleanup.scheduler';
+import { MediaCleanupScheduler } from './services/media-cleanup.scheduler';
 
 export async function start(): Promise<void> {
   await connect();
@@ -13,10 +14,12 @@ export async function start(): Promise<void> {
   });
   const scheduler = PepPushScheduler.getInstance();
   const cleanupScheduler = ComplimentaryCleanupScheduler.getInstance();
+  const mediaCleanupScheduler = MediaCleanupScheduler.getInstance();
 
   if (!env.isTest) {
     scheduler.start();
     cleanupScheduler.start();
+    mediaCleanupScheduler.start();
   }
 
   const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
@@ -24,6 +27,7 @@ export async function start(): Promise<void> {
     server.close(async () => {
       scheduler.stop();
       cleanupScheduler.stop();
+      mediaCleanupScheduler.stop();
       await disconnect();
       process.exit(0);
     });

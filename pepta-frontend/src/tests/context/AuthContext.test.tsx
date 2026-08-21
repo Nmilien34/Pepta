@@ -9,8 +9,9 @@ import { mockAuthResponse, makeAuthResponse } from "../../mocks/auth";
 
 // AuthProvider uses the api singleton directly, so replace the whole module with
 // a controllable mock (the methods AuthContext calls).
-const { mockApi, mockAppsFlyer, mockRevenueCat } = vi.hoisted(() => ({
+const { mockApi, mockAppsFlyer, mockRevenueCat, mockClearSnapshot } = vi.hoisted(() => ({
   mockApi: {
+    linkRevenueCatAppUserId: vi.fn(async () => ({ state: "active" })),
     signInWithGoogle: vi.fn(),
     signInWithApple: vi.fn(),
     signInWithDemo: vi.fn(),
@@ -21,8 +22,10 @@ const { mockApi, mockAppsFlyer, mockRevenueCat } = vi.hoisted(() => ({
     initialize: vi.fn(),
     logCompleteRegistration: vi.fn(),
   },
+  mockClearSnapshot: vi.fn(async () => undefined),
   mockRevenueCat: {
     configure: vi.fn(),
+    currentAppUserId: vi.fn(() => "u1"),
     identify: vi.fn(),
     reset: vi.fn(),
   },
@@ -30,6 +33,9 @@ const { mockApi, mockAppsFlyer, mockRevenueCat } = vi.hoisted(() => ({
 vi.mock("../../services/api", () => ({ api: mockApi }));
 vi.mock("../../services/appsflyer", () => ({ appsFlyer: mockAppsFlyer }));
 vi.mock("../../services/revenueCat", () => ({ revenueCat: mockRevenueCat }));
+vi.mock("../../services/peptaSnapshotStore", () => ({
+  clearSnapshot: mockClearSnapshot,
+}));
 
 type AuthValue = ReturnType<typeof useAuth>;
 
@@ -190,6 +196,10 @@ describe("AuthContext", () => {
     expect(harness.value().user).toBeNull();
     expect(mockApi.setAuthToken).toHaveBeenLastCalledWith(null);
     expect(mockRevenueCat.reset).toHaveBeenCalledTimes(1);
+    // The offline snapshot holds this user's medications, doses, weights and
+    // side effects in plaintext. Signing out on a shared or resold device must
+    // not leave it behind.
+    expect(mockClearSnapshot).toHaveBeenCalledWith("user_1");
     expect(testStorage.snapshot()).toEqual({});
   });
 

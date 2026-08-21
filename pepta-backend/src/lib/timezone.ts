@@ -4,24 +4,54 @@
 // zone — including across DST shifts. Standard two-pass offset technique via
 // Intl.DateTimeFormat.
 
+// KEYED ON THE CANONICAL ZONE, AND BOUNDED.
+//
+// Intl accepts any casing of a valid zone — "america/new_york",
+// "AMERICA/NEW_YORK", "AmErIcA/nEw_YoRk" all resolve to the same place. Keyed
+// on the raw request string, each spelling became its own permanent entry
+// holding an ICU formatter, so one authenticated client looping
+// GET /home?tz=<random casing> grew the server's heap without bound. There are
+// thousands of spellings of a single real zone.
+//
+// resolvedOptions().timeZone gives the canonical IANA name, so every spelling
+// now collapses onto one entry. The size cap is belt and braces: the real
+// world has a few hundred zones, so passing this bound means something is
+// wrong rather than something is busy.
 const partsFormatterCache = new Map<string, Intl.DateTimeFormat>();
+const MAX_CACHED_FORMATTERS = 600;
 
 function partsFormatter(timeZone: string): Intl.DateTimeFormat {
-  let formatter = partsFormatterCache.get(timeZone);
-  if (!formatter) {
-    formatter = new Intl.DateTimeFormat("en-US", {
-      timeZone,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: false,
-    });
-    partsFormatterCache.set(timeZone, formatter);
+  const cached = partsFormatterCache.get(timeZone);
+  if (cached) return cached;
+
+  // Throws for an unusable zone, before anything is cached.
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+
+  const canonical = formatter.resolvedOptions().timeZone;
+  const existing = partsFormatterCache.get(canonical);
+  if (existing) return existing;
+
+  if (partsFormatterCache.size >= MAX_CACHED_FORMATTERS) {
+    // Drop the oldest rather than growing. Map preserves insertion order.
+    const oldest = partsFormatterCache.keys().next();
+    if (!oldest.done) partsFormatterCache.delete(oldest.value);
   }
+  partsFormatterCache.set(canonical, formatter);
   return formatter;
+}
+
+/** Test seam: the number of distinct formatters currently held. */
+export function cachedFormatterCountForTests(): number {
+  return partsFormatterCache.size;
 }
 
 export function isValidTimeZone(timeZone: string): boolean {
@@ -68,6 +98,14 @@ export function dateOnlyInTz(at: Date, timeZone: string): string {
   const get = (type: string) =>
     parts.find((part) => part.type === type)?.value ?? "00";
   return `${get("year")}-${get("month")}-${get("day")}`;
+}
+
+/** Hour of day (0-23) the instant falls on in the zone. */
+export function hourInTz(at: Date, timeZone: string): number {
+  const parts = partsFormatter(timeZone).formatToParts(at);
+  const hour = parts.find((part) => part.type === "hour")?.value ?? "0";
+  // hourCycle h23 keeps midnight as 0 rather than 24.
+  return Number.parseInt(hour, 10) % 24;
 }
 
 /** Day-of-week (0 = Sunday) for a date-only string — timezone-free math. */

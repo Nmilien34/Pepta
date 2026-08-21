@@ -6,6 +6,9 @@ const mocks = vi.hoisted(() => ({
   deleteCurrentUser: vi.fn(),
   requireActiveAccess: vi.fn(),
   resolveAccess: vi.fn(),
+  createMediaUploadIntent: vi.fn(),
+  confirmMediaUpload: vi.fn(),
+  discardMedia: vi.fn(),
 }));
 
 vi.mock("../middleware/require-active-access", () => ({
@@ -24,6 +27,12 @@ vi.mock("../services/user.service", async (importOriginal) => ({
   deleteCurrentUser: mocks.deleteCurrentUser,
 }));
 
+vi.mock("../services/media.service", () => ({
+  createMediaUploadIntent: mocks.createMediaUploadIntent,
+  confirmMediaUpload: mocks.confirmMediaUpload,
+  discardMedia: mocks.discardMedia,
+}));
+
 import { createApp } from "../app";
 import { issueSessionJwt } from "../auth/jwt";
 import { env } from "../config/env";
@@ -40,6 +49,20 @@ describe("Pepta app", () => {
     mocks.resolveAccess.mockResolvedValue({ state: "inactive" });
     mocks.deleteCurrentUser.mockReset();
     mocks.deleteCurrentUser.mockResolvedValue(undefined);
+    mocks.createMediaUploadIntent.mockReset();
+    mocks.createMediaUploadIntent.mockResolvedValue({
+      mediaId: "507f1f77bcf86cd799439011",
+      uploadUrl: "https://bucket.example",
+      fields: { key: "opaque" },
+      expiresAt: "2026-08-19T12:10:00.000Z",
+    });
+    mocks.confirmMediaUpload.mockReset();
+    mocks.confirmMediaUpload.mockResolvedValue({
+      mediaId: "507f1f77bcf86cd799439011",
+      status: "ready",
+    });
+    mocks.discardMedia.mockReset();
+    mocks.discardMedia.mockResolvedValue(undefined);
   });
 
   it("serves the public health check", async () => {
@@ -195,6 +218,105 @@ describe("Pepta app", () => {
     expect(response.body.error.code).toBe("RATE_LIMITED");
     expect(response.headers["retry-after"]).toBeDefined();
   });
+
+  it("requires authentication for media upload operations", async () => {
+    const app = createApp({ healthCheck: async () => true });
+
+    const response = await request(app)
+      .post("/media/upload-intent")
+      .send({
+        intent: "favourite_photo",
+        contentType: "image/jpeg",
+        sizeBytes: 2048,
+      })
+      .expect(401);
+
+    expect(response.body.error.code).toBe("AUTH_MISSING_TOKEN");
+    expect(mocks.createMediaUploadIntent).not.toHaveBeenCalled();
+  });
+
+  it("returns an opaque upload contract without exposing an S3 key", async () => {
+    const app = createApp({ healthCheck: async () => true });
+    const token = issueSessionJwt("507f1f77bcf86cd799439012");
+
+    const response = await request(app)
+      .post("/media/upload-intent")
+      .set("authorization", `Bearer ${token}`)
+      .send({
+        intent: "favourite_photo",
+        contentType: "image/jpeg",
+        sizeBytes: 2048,
+      })
+      .expect(200);
+
+    expect(response.body.data).toEqual({
+      mediaId: "507f1f77bcf86cd799439011",
+      uploadUrl: "https://bucket.example",
+      fields: { key: "opaque" },
+      expiresAt: "2026-08-19T12:10:00.000Z",
+    });
+    expect(mocks.createMediaUploadIntent).toHaveBeenCalledWith(
+      "507f1f77bcf86cd799439012",
+      {
+        intent: "favourite_photo",
+        contentType: "image/jpeg",
+        sizeBytes: 2048,
+      },
+    );
+  });
+
+  it.each(["/media/upload-intent", "/media/confirm", "/media/discard"])(
+    "strictly validates %s bodies",
+    async (route) => {
+      const app = createApp({ healthCheck: async () => true });
+      const token = issueSessionJwt("507f1f77bcf86cd799439012");
+
+      const response = await request(app)
+        .post(route)
+        .set("authorization", `Bearer ${token}`)
+        .send(
+          route.endsWith("upload-intent")
+            ? {
+                intent: "favourite_photo",
+                contentType: "image/jpeg",
+                sizeBytes: 2048,
+                storageKey: "caller-controlled",
+              }
+            : {
+                mediaId: "507f1f77bcf86cd799439011",
+                storageKey: "caller-controlled",
+              },
+        )
+        .expect(400);
+
+      expect(response.body.error.code).toBe("VALIDATION");
+    },
+  );
+
+  it("rate limits media upload intents per authenticated user", async () => {
+    const app = createApp({ healthCheck: async () => true });
+    const token = issueSessionJwt("507f1f77bcf86cd799439012");
+    const body = {
+      intent: "favourite_photo",
+      contentType: "image/jpeg",
+      sizeBytes: 2048,
+    };
+
+    for (let index = 0; index < 20; index += 1) {
+      await request(app)
+        .post("/media/upload-intent")
+        .set("authorization", `Bearer ${token}`)
+        .send(body)
+        .expect(200);
+    }
+
+    const response = await request(app)
+      .post("/media/upload-intent")
+      .set("authorization", `Bearer ${token}`)
+      .send(body)
+      .expect(429);
+    expect(response.body.error.code).toBe("RATE_LIMITED");
+  });
 });
 
 describe("access route matrix (audit H3)", () => {
@@ -225,6 +347,7 @@ describe("access route matrix (audit H3)", () => {
     "/measurements",
     "/research-library",
     "/progress-photos",
+    "/media/upload-intent",
   ];
 
   beforeEach(() => {

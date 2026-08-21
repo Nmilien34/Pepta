@@ -1,19 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  progressPhotoFind: vi.fn(),
+  listProgressPhotos: vi.fn(),
   weeklyRetentionFind: vi.fn(),
   measurementList: vi.fn(),
   weightList: vi.fn(),
 }));
 
 vi.mock("../../models", () => ({
-  ProgressPhotoModel: {
-    find: mocks.progressPhotoFind,
-  },
   WeeklyRetentionModel: {
     find: mocks.weeklyRetentionFind,
   },
+}));
+
+vi.mock("../../services/progress-photo.service", () => ({
+  listProgressPhotos: mocks.listProgressPhotos,
 }));
 
 vi.mock("../../services/logs.service", () => ({
@@ -51,9 +52,7 @@ describe("progress service", () => {
     vi.clearAllMocks();
     mocks.weightList.mockResolvedValue([]);
     mocks.measurementList.mockResolvedValue([]);
-    mocks.progressPhotoFind.mockReturnValue({
-      sort: vi.fn().mockResolvedValue([]),
-    });
+    mocks.listProgressPhotos.mockResolvedValue([]);
     mocks.weeklyRetentionFind.mockReturnValue({
       sort: vi.fn().mockReturnValue({
         limit: vi.fn().mockResolvedValue([
@@ -84,5 +83,34 @@ describe("progress service", () => {
         contribution: 12,
       },
     ]);
+  });
+
+  it("uses the uploaded-only signed progress-photo reader", async () => {
+    mocks.listProgressPhotos.mockResolvedValueOnce([
+      {
+        id: "507f1f77bcf86cd799439012",
+        userId: "507f1f77bcf86cd799439011",
+        mediaId: "507f1f77bcf86cd799439013",
+        captureDate: "2026-06-22",
+        contentType: "image/jpeg",
+        sizeBytes: 777,
+        kind: "body",
+        status: "uploaded",
+        viewUrl: "https://signed.example/view",
+        createdAt: "2026-06-22T00:00:00.000Z",
+        updatedAt: "2026-06-22T00:00:00.000Z",
+      },
+    ]);
+
+    const result = await getProgress("507f1f77bcf86cd799439011");
+
+    expect(mocks.listProgressPhotos).toHaveBeenCalledWith(
+      "507f1f77bcf86cd799439011",
+    );
+    expect(result.progressPhotos[0]).toMatchObject({
+      status: "uploaded",
+      viewUrl: "https://signed.example/view",
+    });
+    expect(result.progressPhotos[0]).not.toHaveProperty("s3Key");
   });
 });

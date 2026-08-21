@@ -9,7 +9,9 @@ import { AppError } from "../lib/errors";
 
 const MEAL_TRANSCRIPTION_MODEL = "gpt-4o-mini-transcribe";
 const MEAL_TRANSCRIPT_CLEANUP_MODEL = "gpt-4o-mini";
-const MEAL_TRANSCRIPTION_TIMEOUT_MS = 15_000;
+// Bounded to fit the app's 15s abort with no retries — see the note in
+// meal-scan-vision.service.
+const MEAL_TRANSCRIPTION_TIMEOUT_MS = 12_000;
 const MAX_AUDIO_BYTES = 10 * 1024 * 1024;
 
 const MEAL_TRANSCRIPT_CLEANUP_SYSTEM_PROMPT = `
@@ -141,6 +143,7 @@ export async function transcribeMealAudio(
   const openai = new OpenAI({
     apiKey: env.openai.apiKey,
     timeout: MEAL_TRANSCRIPTION_TIMEOUT_MS,
+    maxRetries: 0,
   });
 
   try {

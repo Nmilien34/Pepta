@@ -1,6 +1,5 @@
 import {
   avatarConfirmRequestSchema,
-  avatarUploadIntentRequestSchema,
   discoverySourceInputSchema,
   mergeCompoundsInputSchema,
   nudgeDismissInputSchema,
@@ -17,9 +16,8 @@ import { asyncHandler } from "../lib/async-handler";
 import { sendData, sendNoContent } from "../lib/responses";
 import { validateBody } from "../middleware/validate.middleware";
 import {
-  confirmAvatarUpload,
-  createAvatarUploadIntent,
   getAvatarViewUrl,
+  setAvatarMedia,
 } from "../services/avatar.service";
 import {
   deleteCurrentUser,
@@ -29,6 +27,7 @@ import {
   recordDiscoverySource,
   updateCurrentUser,
   updateProfileSettings,
+  serializeUser,
 } from "../services/user.service";
 import {
   getNotificationPreferences,
@@ -63,14 +62,6 @@ router.get(
   "/",
   asyncHandler(async (req, res) => {
     sendData(res, await getCurrentUser(req.user!.id));
-  }),
-);
-
-router.post(
-  "/avatar/upload-intent",
-  validateBody(avatarUploadIntentRequestSchema),
-  asyncHandler(async (req, res) => {
-    sendData(res, await createAvatarUploadIntent(req.user!.id, req.body));
   }),
 );
 
@@ -175,7 +166,8 @@ router.post(
   "/avatar",
   validateBody(avatarConfirmRequestSchema),
   asyncHandler(async (req, res) => {
-    sendData(res, await confirmAvatarUpload(req.user!.id, req.body));
+    const user = await setAvatarMedia(req.user!.id, req.body.mediaId);
+    sendData(res, await serializeUser(user));
   }),
 );
 

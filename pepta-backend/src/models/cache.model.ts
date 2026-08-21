@@ -9,20 +9,21 @@ import { applyApiTransforms } from "./model-utils";
 
 export interface ProgressPhotoDocument extends Document<Types.ObjectId> {
   userId: Types.ObjectId;
+  mediaId: Types.ObjectId;
   captureDate: string;
   contentType: "image/jpeg" | "image/png" | "image/heic" | "image/webp";
   sizeBytes?: number;
   kind: "body" | "face";
   faceFullness?: number;
-  s3Key: string;
   status: "pending_upload" | "uploaded" | "deleted";
+  expiresAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
 
 export interface MealScanDocument extends Document<Types.ObjectId> {
   userId: Types.ObjectId;
-  photoS3Key: string;
+  photoMediaId: Types.ObjectId;
   imageMimeType: "image/jpeg" | "image/png" | "image/webp";
   analysis: MealScanAnalysis | null;
   coachContent: MealScanCoachContent | null;
@@ -50,6 +51,8 @@ export interface InsightDocument extends Document<Types.ObjectId> {
   cta?: string;
   deterministicSignal: Record<string, unknown>;
   generatedAt: Date;
+  /** True when headline/body came from the model rather than the fallback. */
+  aiCopy: boolean;
   copyVersion?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -94,10 +97,39 @@ export interface ResearchArticleDocument extends Document<Types.ObjectId> {
   updatedAt: Date;
 }
 
+/**
+ * A RECEIPT for a payment-provider event we have finished processing.
+ *
+ * Two jobs. It is the idempotency key that stops a redelivered event being
+ * applied twice — and it is the only record on our side that a charge ever
+ * reached us. It used to carry neither the money nor the person: no event
+ * type, product, transaction or price, and not the resolved Mongo user, only
+ * whatever app_user_id the event happened to use. That made a missing purchase
+ * uninvestigable.
+ *
+ * Retention: kept after the account is deleted, stripped to the financial-record
+ * core (see stripProcessedWebhookEventsForDeletedUser). Apple disputes and
+ * chargebacks arrive after deletion, and defending one needs the transaction,
+ * not the person.
+ */
 export interface ProcessedWebhookEventDocument extends Document<Types.ObjectId> {
   provider: "revenuecat";
   eventId: string;
+  /** The provider's own customer id — survives account deletion. */
   appUserId?: string;
+  /** Resolved Pepta user. Cleared when the account is deleted. */
+  userId?: Types.ObjectId | null;
+  eventType?: string;
+  productId?: string;
+  transactionId?: string;
+  /** As charged, in the purchase currency. */
+  price?: number | null;
+  currency?: string;
+  environment?: string;
+  store?: string;
+  periodType?: string;
+  /** True once the account this belonged to was deleted and PII stripped. */
+  detached?: boolean;
   processedAt: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -110,6 +142,12 @@ const progressPhotoSchema = new Schema<ProgressPhotoDocument>(
       ref: "User",
       required: true,
       index: true,
+    },
+    mediaId: {
+      type: Schema.Types.ObjectId,
+      ref: "MediaAsset",
+      required: true,
+      unique: true,
     },
     captureDate: {
       type: String,
@@ -137,12 +175,6 @@ const progressPhotoSchema = new Schema<ProgressPhotoDocument>(
       min: 1,
       max: 5,
     },
-    s3Key: {
-      type: String,
-      required: true,
-      trim: true,
-      unique: true,
-    },
     status: {
       type: String,
       enum: ["pending_upload", "uploaded", "deleted"],
@@ -150,6 +182,7 @@ const progressPhotoSchema = new Schema<ProgressPhotoDocument>(
       default: "pending_upload",
       index: true,
     },
+    expiresAt: { type: Date },
   },
   {
     timestamps: true,
@@ -158,6 +191,7 @@ const progressPhotoSchema = new Schema<ProgressPhotoDocument>(
 );
 
 progressPhotoSchema.index({ userId: 1, captureDate: -1, status: 1 });
+progressPhotoSchema.index({ status: 1, expiresAt: 1 });
 
 const mealScanAnalysisSchema = new Schema<MealScanAnalysis>(
   {
@@ -242,10 +276,10 @@ const mealScanSchema = new Schema<MealScanDocument>(
       required: true,
       index: true,
     },
-    photoS3Key: {
-      type: String,
+    photoMediaId: {
+      type: Schema.Types.ObjectId,
+      ref: "MediaAsset",
       required: true,
-      trim: true,
       unique: true,
     },
     imageMimeType: {
@@ -350,6 +384,19 @@ const insightSchema = new Schema<InsightDocument>(
       required: true,
       default: () => new Date(),
       index: true,
+    },
+    // Whether headline/body were WRITTEN BY THE MODEL or are the deterministic
+    // fallback. Internal only — it never reaches the API response.
+    //
+    // Without it a cached row cannot say where its copy came from, and the
+    // background sweeps (which deliberately run with AI prose off) would fill
+    // the cache with fallback text that then satisfied the freshness check for
+    // a consented reader — so consented users saw boilerplate for the whole
+    // TTL and effectively never got the AI copy they opted into.
+    aiCopy: {
+      type: Boolean,
+      required: true,
+      default: false,
     },
     copyVersion: {
       type: String,
@@ -523,6 +570,21 @@ const processedWebhookEventSchema = new Schema<ProcessedWebhookEventDocument>(
       trim: true,
       index: true,
     },
+    userId: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+      index: true,
+    },
+    eventType: { type: String, trim: true, index: true },
+    productId: { type: String, trim: true },
+    transactionId: { type: String, trim: true, index: true },
+    price: { type: Number, default: null },
+    currency: { type: String, trim: true },
+    environment: { type: String, trim: true },
+    store: { type: String, trim: true },
+    periodType: { type: String, trim: true },
+    detached: { type: Boolean, default: false },
     processedAt: {
       type: Date,
       required: true,
@@ -535,10 +597,11 @@ const processedWebhookEventSchema = new Schema<ProcessedWebhookEventDocument>(
   },
 );
 
-processedWebhookEventSchema.index(
-  { processedAt: 1 },
-  { expireAfterSeconds: 60 * 60 * 24 * 90 },
-);
+// NO TTL. This was expiring after 90 days, which is inside the window where an
+// Apple dispute or a "I paid and have no access" support request still
+// arrives — and it is the only local record of the charge.
+
+processedWebhookEventSchema.index({ userId: 1, processedAt: -1 });
 
 applyApiTransforms(progressPhotoSchema);
 applyApiTransforms(mealScanSchema);

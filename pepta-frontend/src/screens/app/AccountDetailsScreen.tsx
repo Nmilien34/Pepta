@@ -7,6 +7,7 @@ import { AppText, Card, EditableAvatar } from "../../components";
 import { BottomSheet } from "../../components/BottomSheet";
 import { Icon } from "../../components/Icon";
 import { useAuth } from "../../context/AuthContext";
+import { clearSnapshot } from "../../services/peptaSnapshotStore";
 import { usePeptaData } from "../../context/PeptaDataContext";
 import { api } from "../../services/api";
 import { useTheme } from "../../theme";
@@ -94,6 +95,15 @@ export function AccountDetailsScreen() {
     setDeleting(true);
     try {
       await api.deleteAccount();
+      // Erasure is what the user asked for, so the on-device copy goes too and
+      // we WAIT for it. logout() purges the snapshot as well, but leaving the
+      // deletion path to inherit that implicitly would make it easy to lose in
+      // a later refactor — the health data is the point of the request.
+      if (user?.id) {
+        await clearSnapshot(user.id).catch((error: unknown) => {
+          console.warn("[account] Could not clear the offline snapshot.", error);
+        });
+      }
       logout();
     } catch {
       Alert.alert(

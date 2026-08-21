@@ -19,6 +19,7 @@ import type {
   referralClaimRequestSchema,
   referralClaimResponseSchema,
   pepChatRequestSchema,
+  revenueCatLinkInputSchema,
   pepChatResponseSchema,
   injectionDeviceTypeSchema,
   compoundResponseSchema,
@@ -56,6 +57,13 @@ import type {
   mealTranscriptResponseSchema,
   mealTranscriptionInputSchema,
   mealVoiceInputSchema,
+  mediaConfirmInputSchema,
+  mediaContentTypeSchema,
+  mediaDiscardInputSchema,
+  mediaIntentSchema,
+  mediaReadyResponseSchema,
+  mediaUploadIntentInputSchema,
+  mediaUploadIntentResponseSchema,
   medicationCatalogItemSchema,
   medicationFrequencySchema,
   medicationLevelResponseSchema,
@@ -132,6 +140,7 @@ export type CompoundInput = z.infer<typeof compoundInputSchema>;
 export type InjectionDeviceType = z.infer<typeof injectionDeviceTypeSchema>;
 export type PepChatMessage = z.infer<typeof pepChatMessageSchema>;
 export type PepChatRequest = z.infer<typeof pepChatRequestSchema>;
+export type RevenueCatLinkInput = z.infer<typeof revenueCatLinkInputSchema>;
 export type PepChatResponse = z.infer<typeof pepChatResponseSchema>;
 export type CompoundPatch = z.infer<typeof compoundPatchSchema>;
 export type CompoundResponse = z.infer<typeof compoundResponseSchema>;
@@ -177,6 +186,17 @@ export type MealTranscriptionInput = z.infer<
   typeof mealTranscriptionInputSchema
 >;
 export type MealVoiceInput = z.infer<typeof mealVoiceInputSchema>;
+export type MediaConfirmInput = z.infer<typeof mediaConfirmInputSchema>;
+export type MediaContentType = z.infer<typeof mediaContentTypeSchema>;
+export type MediaDiscardInput = z.infer<typeof mediaDiscardInputSchema>;
+export type MediaIntent = z.infer<typeof mediaIntentSchema>;
+export type MediaReadyResponse = z.infer<typeof mediaReadyResponseSchema>;
+export type MediaUploadIntentInput = z.infer<
+  typeof mediaUploadIntentInputSchema
+>;
+export type MediaUploadIntentResponse = z.infer<
+  typeof mediaUploadIntentResponseSchema
+>;
 export type MedicationCatalogItem = z.infer<typeof medicationCatalogItemSchema>;
 export type MedicationFrequency = z.infer<typeof medicationFrequencySchema>;
 export type MedicationLevelResponse = z.infer<

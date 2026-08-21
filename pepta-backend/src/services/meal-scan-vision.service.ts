@@ -2,10 +2,18 @@ import type { MealScanAnalysis, MealScanInput } from '@pepta/shared';
 import OpenAI from 'openai';
 import { env } from '../config/env';
 import { AppError } from '../lib/errors';
+import { clampNutrition } from '../lib/nutritionBounds';
 
 export const MEAL_SCAN_VISION_ENGINE_VERSION = 'meal-scan-vision-v1';
 const MEAL_SCAN_VISION_MODEL = 'gpt-4o-mini';
-const MEAL_SCAN_VISION_TIMEOUT_MS = 15_000;
+// THE APP ABORTS AT 15s. This call used to be given that entire budget on its
+// own, and the SDK retries twice by default — so a slow model could occupy
+// ~45s server-side while the user had long since seen "Couldn't analyze that
+// photo". The scan often SUCCEEDED after they gave up, and every tap of Try
+// again paid for another full attempt. Sized to leave room for the upload,
+// the snapshot queries and the note.
+const MEAL_SCAN_VISION_TIMEOUT_MS = 9_000;
+const MEAL_SCAN_VISION_MAX_RETRIES = 0;
 const MEAL_SCAN_VISION_MAX_TOKENS = 450;
 
 const MEAL_SCAN_VISION_SYSTEM_PROMPT = `
@@ -71,15 +79,19 @@ export function parseMealScanVisionJson(content: string): MealScanAnalysis {
       throw new Error('Meal scan JSON did not include the expected nutrition fields');
     }
 
+    // Clamped, like every other estimator (see lib/nutritionBounds). Nothing
+    // downstream bounds these: the app posts them straight to /meal-logs,
+    // whose schema only requires nonnegative, so an unclamped hallucination
+    // would land in the user's day totals and charts as fact.
     return {
       foodName,
       servingSize,
-      protein,
-      calories,
-      carbs,
-      fat,
-      fiber,
-      confidence: parsedConfidence,
+      protein: clampNutrition('protein', protein),
+      calories: clampNutrition('calories', calories),
+      carbs: clampNutrition('carbs', carbs),
+      fat: clampNutrition('fat', fat),
+      fiber: clampNutrition('fiber', fiber),
+      confidence: clampNutrition('confidence', parsedConfidence),
     };
   } catch (error) {
     throw mealScanVisionFailed('OpenAI returned malformed meal scan JSON', {
@@ -99,6 +111,7 @@ export async function generateMealScanVision(
   const openai = new OpenAI({
     apiKey: env.openai.apiKey,
     timeout: MEAL_SCAN_VISION_TIMEOUT_MS,
+    maxRetries: MEAL_SCAN_VISION_MAX_RETRIES,
   });
 
   try {

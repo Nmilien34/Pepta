@@ -161,12 +161,19 @@ export function QuickLogSheet({
 
   const backdrop = useRef(new Animated.Value(0)).current;
   const slide = useRef(new Animated.Value(OFFSCREEN)).current;
+  // close() only starts the dismiss animation, so the CTA stays mounted and
+  // hittable for ~220ms after the first press. A second tap in that window
+  // used to enqueue a second, independently-keyed log — two doses on the
+  // chart from one intent. Latched here rather than in `completing` state
+  // because setState is async and the second tap can land before the render.
+  const committing = useRef(false);
   const sheetMaxHeight =
     Math.round(window.height * QUICK_LOG_SHEET_MAX_RATIO) + insets.bottom;
 
   useEffect(() => {
     if (visible) {
       setRender(true);
+      committing.current = false;
       setMode(initialMode ?? "chooser");
       if (initialMode === "dose") setDose(defaultDoseDraft(home, track));
       setSeTypes([]);
@@ -227,6 +234,16 @@ export function QuickLogSheet({
 
   const close = () => onClose();
 
+  /**
+   * Claims the sheet's one save. Returns false for every press after the
+   * first, until the sheet is opened again. See `committing`.
+   */
+  const claimCommit = () => {
+    if (committing.current) return false;
+    committing.current = true;
+    return true;
+  };
+
   // Optimistic commit: apply the local update + close instantly, then save
   // durably in the background.
   //   saved  → refresh: reconcile to server truth (which now holds the row).
@@ -241,6 +258,7 @@ export function QuickLogSheet({
     serverCall: () => Promise<"saved" | "queued">,
     refresh: () => Promise<void>,
   ) => {
+    if (!claimCommit()) return;
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
       () => undefined,
     );
@@ -297,13 +315,16 @@ export function QuickLogSheet({
         refreshHomeProgress,
       );
     } else if (mode === "protein") {
-      // bumpProtein is already optimistic + persists its own POST.
+      // bumpProtein is already optimistic + persists its own POST — it does not
+      // go through commit(), so it claims the sheet's one save itself.
+      if (!claimCommit()) return;
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
         () => undefined,
       );
       bumpProtein(protein);
       close();
     } else if (mode === "water") {
+      if (!claimCommit()) return;
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
         () => undefined,
       );

@@ -17,7 +17,7 @@ const home = (over: Record<string, unknown> = {}) =>
 const track = (over: Record<string, unknown> = {}) =>
   ({
     doseLogs: [], mealLogs: [], waterLogs: [], proteinLogs: [],
-    activityLogs: [], sideEffectLogs: [], measurements: [], weightLogs: [],
+    activityLogs: [], sideEffectLogs: [], measurements: [], weightLogs: [], fiberLogs: [],
     sectionErrors: {}, ...over,
   }) as never;
 

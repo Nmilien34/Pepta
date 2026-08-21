@@ -72,9 +72,11 @@ function insightDocument(overrides: {
   deterministicSignal?: Record<string, unknown>;
   generatedAt?: Date;
   copyVersion?: string | null;
+  aiCopy?: boolean;
 } = {}) {
   return {
     _id: `insight-${overrides.type ?? 'medication_level'}`,
+    aiCopy: overrides.aiCopy ?? false,
     type: overrides.type ?? 'medication_level',
     headline: overrides.headline ?? 'Fallback headline',
     body: overrides.body ?? 'Fallback body',
@@ -252,5 +254,107 @@ describe('insights service', () => {
       'side_effect_pattern',
       'stall',
     ]);
+  });
+});
+
+// The background sweeps — the push cron, and the memory refresh that runs
+// after EVERY log create and delete — deliberately call getHome with AI prose
+// off. Their writes must not be mistaken for the AI copy a consented user
+// opted into, or those users are served boilerplate for the whole TTL.
+describe('insight cache provenance', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.getMedicationLevels.mockResolvedValue([medicationLevel()]);
+    mocks.insightFindOne.mockResolvedValue(null);
+    mocks.doseFindOne.mockReturnValue({ sort: vi.fn().mockResolvedValue(null) });
+    mocks.scheduleFindOne.mockResolvedValue(null);
+    mocks.sideEffectFind.mockResolvedValue([]);
+    mocks.weightFind.mockReturnValue({ sort: vi.fn().mockResolvedValue([]) });
+    mockNoProteinTrend();
+    mockCacheWrites();
+  });
+
+  it('records that fallback copy came from the fallback, not the model', async () => {
+    mocks.insightFindOne.mockResolvedValue(null);
+
+    await getInsights('user-1', now, { generateProse: async () => null });
+
+    expect(mocks.insightFindOneAndUpdate.mock.calls[0]![1].$set.aiCopy).toBe(false);
+  });
+
+  it('records model-written copy as AI copy', async () => {
+    mocks.insightFindOne.mockResolvedValue(null);
+
+    await getInsights('user-1', now, {
+      allowAIProse: true,
+      generateProse: async () => ({ headline: 'AI headline', body: 'AI body' }),
+    });
+
+    expect(mocks.insightFindOneAndUpdate.mock.calls[0]![1].$set.aiCopy).toBe(true);
+  });
+
+  it('regenerates for a consented reader when the cached copy is only the fallback', async () => {
+    // Exactly the poisoned state a sweep leaves behind: same signal, well
+    // within TTL, but the text is boilerplate.
+    mocks.insightFindOne.mockResolvedValue(
+      insightDocument({
+        aiCopy: false,
+        generatedAt: new Date(now.getTime() - 60 * 60 * 1000),
+      }),
+    );
+    const generateProse = vi.fn().mockResolvedValue({
+      headline: 'AI headline',
+      body: 'AI body',
+    });
+
+    const result = await getInsights('user-1', now, { allowAIProse: true, generateProse });
+
+    expect(generateProse).toHaveBeenCalled();
+    expect(result[0]).toMatchObject({ headline: 'AI headline' });
+  });
+
+  it('reuses a fallback row for a NON-consented reader rather than churning', async () => {
+    mocks.insightFindOne.mockResolvedValue(
+      insightDocument({
+        aiCopy: false,
+        generatedAt: new Date(now.getTime() - 60 * 60 * 1000),
+      }),
+    );
+
+    await getInsights('user-1', now, { generateProse: async () => null });
+
+    expect(mocks.insightFindOneAndUpdate).not.toHaveBeenCalled();
+  });
+
+  it('does not retry the model on every load while it is failing', async () => {
+    // A fallback row written moments ago is reused briefly, so an OpenAI
+    // outage cannot turn every Home load into a fresh attempt.
+    mocks.insightFindOne.mockResolvedValue(
+      insightDocument({
+        aiCopy: false,
+        generatedAt: new Date(now.getTime() - 60 * 1000),
+      }),
+    );
+    const generateProse = vi.fn().mockResolvedValue(null);
+
+    await getInsights('user-1', now, { allowAIProse: true, generateProse });
+
+    expect(generateProse).not.toHaveBeenCalled();
+  });
+
+  it('still serves AI copy from cache without regenerating', async () => {
+    mocks.insightFindOne.mockResolvedValue(
+      insightDocument({
+        aiCopy: true,
+        headline: 'Cached AI headline',
+        generatedAt: new Date(now.getTime() - 60 * 60 * 1000),
+      }),
+    );
+    const generateProse = vi.fn();
+
+    const result = await getInsights('user-1', now, { allowAIProse: true, generateProse });
+
+    expect(generateProse).not.toHaveBeenCalled();
+    expect(result[0]).toMatchObject({ headline: 'Cached AI headline' });
   });
 });

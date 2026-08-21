@@ -7,6 +7,8 @@ import {
   weightLogResponseSchema,
 } from '@pepta/shared';
 import { addUtcDays, startOfUtcDay } from '../lib/dates';
+import { withDeadline } from '../lib/deadline';
+import { logger } from '../lib/logger';
 import { parseHomeTimezone, resolveHomeWindow } from '../lib/homeRange';
 import { consecutiveActivityStreak } from '../lib/streak';
 import {
@@ -24,6 +26,10 @@ import { getInsights } from './insights.service';
 import { getMedicationLevels, getNextDoseCandidates } from './medication-level.service';
 import { getWeeklyRetention } from './muscle-retention.service';
 import { serializeWithSchema } from './serializers';
+
+// The app aborts its own requests at 15s. Insights get a slice of that well
+// inside the budget, leaving room for the rest of the payload.
+const HOME_INSIGHTS_DEADLINE_MS = 4_000;
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Section failed';
@@ -152,21 +158,35 @@ async function getLatestWeight(userId: string) {
   return latestWeight ? serializeWithSchema(weightLogResponseSchema, latestWeight) : null;
 }
 
-async function getStreak(userId: string, now: Date) {
-  const since = addUtcDays(startOfUtcDay(now), -90);
-  const [doses, meals, proteins, waterLogs, activities, weights] = await Promise.all([
+async function getStreak(userId: string, now: Date, tz: string | null) {
+  // One extra day of slack: the user's local day can start before the UTC one,
+  // so a log that belongs to their earliest counted day may sit just outside a
+  // UTC-cut window.
+  const since = addUtcDays(startOfUtcDay(now), -91);
+  const [doses, meals, proteins, waterLogs, activities, weights, fibers] =
+    await Promise.all([
     DoseLogModel.find({ userId, datetime: { $gte: since } }).select('datetime'),
     MealLogModel.find({ userId, datetime: { $gte: since } }).select('datetime'),
     ProteinLogModel.find({ userId, datetime: { $gte: since } }).select('datetime'),
     WaterLogModel.find({ userId, datetime: { $gte: since } }).select('datetime'),
     ActivityLogModel.find({ userId, datetime: { $gte: since } }).select('datetime'),
     WeightLogModel.find({ userId, datetime: { $gte: since } }).select('datetime'),
+    // Fibre counts as logging activity like everything else the app tracks.
+    FiberLogModel.find({ userId, datetime: { $gte: since } }).select('datetime'),
   ]);
-  const logs = [...doses, ...meals, ...proteins, ...waterLogs, ...activities, ...weights].map(
+  const logs = [
+    ...doses,
+    ...meals,
+    ...proteins,
+    ...waterLogs,
+    ...activities,
+    ...weights,
+    ...fibers,
+  ].map(
     (log) => ({ datetime: log.datetime }),
   );
 
-  return consecutiveActivityStreak(logs, now);
+  return consecutiveActivityStreak(logs, now, tz);
 }
 
 /**
@@ -219,9 +239,23 @@ export async function getHome(
     getRangeTotals(userId, now, 'today', tz),
     getRangeAvailability(userId, now, tz),
     getLatestWeight(userId),
-    getInsights(userId, now, { allowAIProse: options.allowAIInsightProse === true }),
+    // Insights are the ONE part of /home that can reach a language model, and
+    // they are the least important thing on the screen. Promise.allSettled
+    // below guards their errors but not their latency, and the SDK's own
+    // timeout bounds a single attempt rather than the call — with retries a
+    // slow model outlasts the app's 15s request abort, so the user gets the
+    // Home error state instead of their rings, levels and next dose.
+    //
+    // Past the deadline the screen renders without insights; the generation
+    // keeps running and populates the cache for the next load.
+    withDeadline(
+      getInsights(userId, now, { allowAIProse: options.allowAIInsightProse === true }),
+      HOME_INSIGHTS_DEADLINE_MS,
+      [],
+      () => logger.warn({ userId }, '[home] insights exceeded their deadline; serving without them'),
+    ),
     getWeeklyRetention(userId, now),
-    getStreak(userId, now),
+    getStreak(userId, now, tz),
     getNextDoseCandidates(userId, now),
   ]);
   const sectionErrors: Record<string, string> = {};
@@ -296,10 +330,18 @@ export async function getHome(
         : {}),
     },
     rangeAvailability: results.rangeAvailability,
-    todayProteinGrams: results.totals.protein,
-    todayFiberGrams: results.totals.fiber,
-    todayCalories: results.totals.calories,
-    todayWaterOz: results.totals.waterOz,
+    // TODAY's totals, from the 'today' window computed above — NOT
+    // results.totals, which is the SELECTED range. These four feed
+    // todayStat() on the client, whose whole job is "today's number against
+    // today's target, whatever range Home is showing", plus the widget
+    // preview and the report export. Wired to the range totals, switching
+    // Home to Monthly made the Protein screen read a month of grams against
+    // a daily target — the exact claim todayStat's comment says is
+    // impossible. rangeTotals below is where the range's numbers belong.
+    todayProteinGrams: results.todayTotals.protein,
+    todayFiberGrams: results.todayTotals.fiber,
+    todayCalories: results.todayTotals.calories,
+    todayWaterOz: results.todayTotals.waterOz,
     streakDays: results.streakDays,
     setupProgress: {
       loggedItems,

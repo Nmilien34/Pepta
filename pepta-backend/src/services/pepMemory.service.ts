@@ -243,7 +243,18 @@ export function buildPepMemorySnapshot(input: {
   };
 }
 
+/**
+ * How long a stored AI summary is considered current.
+ *
+ * The scheduler sweeps every 15 minutes, so without this the summary was
+ * regenerated ~96 times a day per consenting user — a paid model call each
+ * time — to restate a rolling narrative that barely moves between sweeps, and
+ * almost none of which ever became a notification anyone saw.
+ */
+const AI_SUMMARY_MAX_AGE_MS = 6 * 60 * 60 * 1000;
+
 async function maybeGenerateAISummary(input: {
+  userId: string;
   context: PepPushContext;
   candidate: PepPushCandidate | null;
   aiPushCopyConsent: boolean;
@@ -251,6 +262,25 @@ async function maybeGenerateAISummary(input: {
   generateSummary?: GeneratePepMemorySummary;
 }): Promise<PepMemorySnapshot["aiSummary"]> {
   if (!input.aiPushCopyConsent) return null;
+
+  // Reuse a summary that is still current rather than paying to rewrite it.
+  // Returning the stored one (rather than null) matters: the upsert only
+  // preserves what it is given or leaves the field untouched, and this keeps
+  // the snapshot honest about what Pep actually knows.
+  const existing = await PepMemoryModel.findOne({ userId: input.userId })
+    .select({ aiSummary: 1 })
+    .lean();
+  const stored = (existing as { aiSummary?: PepMemorySnapshot["aiSummary"] } | null)
+    ?.aiSummary;
+  if (
+    stored?.text &&
+    stored.copyVersion === PEP_MEMORY_SUMMARY_VERSION &&
+    stored.generatedAt &&
+    input.now.getTime() - new Date(stored.generatedAt).getTime() < AI_SUMMARY_MAX_AGE_MS
+  ) {
+    return stored;
+  }
+
   const generateSummary = input.generateSummary ?? defaultGenerateSummary;
 
   try {
@@ -280,14 +310,43 @@ async function upsertPepMemory(
   userId: string,
   snapshot: PepMemorySnapshot,
 ): Promise<void> {
+  // A refresh that did not GENERATE a summary must not DELETE the one already
+  // stored. Only the push scheduler passes consent, so every other refresh —
+  // and one runs after every single log create and delete — arrives with
+  // aiSummary null. Writing that null over the stored summary meant the
+  // consented, paid-for summary survived only until the user logged a glass
+  // of water, and Pep chat almost never saw one.
+  //
+  // Absence of a summary is "nothing new to say", not "forget what you knew".
+  // Clearing it is a separate, explicit act — see clearPepMemoryAiSummary.
+  //
+  // lastNotification is carried by the same rule, for the same reason: it is
+  // written by the push path and only ever passed in by it, so a refresh from
+  // a log write arrived with null and erased the record of what Pep had just
+  // nudged about. Pep could then repeat or contradict a notification it had
+  // sent minutes earlier, with no idea it had sent one.
+  const { aiSummary, lastNotification, ...rest } = snapshot;
+  const carried: Record<string, unknown> = { ...rest };
+  const onInsert: Record<string, unknown> = { userId };
+  if (aiSummary) carried.aiSummary = aiSummary;
+  else onInsert.aiSummary = null;
+  if (lastNotification) carried.lastNotification = lastNotification;
+  else onInsert.lastNotification = null;
+
   await PepMemoryModel.findOneAndUpdate(
     { userId },
-    {
-      $set: snapshot,
-      $setOnInsert: { userId },
-    },
+    { $set: carried, $setOnInsert: onInsert },
     { new: true, upsert: true, runValidators: true },
   );
+}
+
+/**
+ * Drops the stored AI summary. Consent withdrawal is the reason this exists:
+ * once a user turns AI copy off, the text generated under it must go, and the
+ * refresh path deliberately no longer clears it as a side effect.
+ */
+export async function clearPepMemoryAiSummary(userId: string): Promise<void> {
+  await PepMemoryModel.updateOne({ userId }, { $set: { aiSummary: null } });
 }
 
 export async function refreshPepMemoryFromContext(
@@ -301,6 +360,7 @@ export async function refreshPepMemoryFromContext(
       ? selectPepPushCandidate(context, now)
       : options.candidate;
   const aiSummary = await maybeGenerateAISummary({
+    userId,
     context,
     candidate,
     aiPushCopyConsent: options.aiPushCopyConsent === true,

@@ -125,31 +125,37 @@ describe('useFavourites', () => {
     expect(sent).not.toHaveProperty('calories');
   });
 
-  it('sends the photo key, and reads back the signed URL the server signs', async () => {
+  it('sends the opaque media id, and reads back the signed URL the server signs', async () => {
     mocks.getFavourites.mockResolvedValue({
-      favourites: [{ ...row, photoS3Key: 'favourites/u1/a.jpg', photoUrl: 'https://s3/signed' }],
+      favourites: [{ ...row, photoMediaId: '507f1f77bcf86cd799439011', photoUrl: 'https://s3/signed' }],
     });
     const hook = await mount();
     expect(hook().favourites[0]!.photoUrl).toBe('https://s3/signed');
 
     await act(async () => {
-      hook().save({ ...chicken, photoS3Key: 'favourites/u1/b.jpg' });
+      hook().save({ ...chicken, photoMediaId: '507f1f77bcf86cd799439012' });
     });
-    expect(mocks.saveFavourite.mock.calls[0]![0]).toMatchObject({ photoS3Key: 'favourites/u1/b.jpg' });
+    expect(mocks.saveFavourite.mock.calls[0]![0]).toMatchObject({
+      photoMediaId: '507f1f77bcf86cd799439012',
+    });
   });
 
-  it('does not send a photo key for an item saved without one', async () => {
+  it('does not send a media id for an item saved without one', async () => {
     const hook = await mount();
     await act(async () => {
       hook().save(chicken);
     });
-    expect(mocks.saveFavourite.mock.calls[0]![0]).not.toHaveProperty('photoS3Key');
+    expect(mocks.saveFavourite.mock.calls[0]![0]).not.toHaveProperty('photoMediaId');
   });
 
-  it('never sends the signed URL back — it expires, the key does not', async () => {
+  it('never sends the signed URL back — it expires, the media id does not', async () => {
     const hook = await mount();
     await act(async () => {
-      hook().save({ ...chicken, photoS3Key: 'k', photoUrl: 'https://s3/signed' });
+      hook().save({
+        ...chicken,
+        photoMediaId: '507f1f77bcf86cd799439011',
+        photoUrl: 'https://s3/signed',
+      });
     });
     expect(mocks.saveFavourite.mock.calls[0]![0]).not.toHaveProperty('photoUrl');
   });

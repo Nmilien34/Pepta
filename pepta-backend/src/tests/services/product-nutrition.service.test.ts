@@ -192,3 +192,156 @@ describe("product nutrition service", () => {
     expect(mocks.cacheUpdateOne).not.toHaveBeenCalled();
   });
 });
+
+// The product cache is GLOBAL — one row serves every user who scans that
+// product — so anything written into it is written on everyone's behalf.
+describe("what the product cache is allowed to believe", () => {
+  const offMiss = { status: 0 };
+
+  function openAIReturns(text: string) {
+    mocks.responsesCreate.mockResolvedValue({ output_text: text });
+    mocks.openAI.mockImplementation(() => ({
+      responses: { create: mocks.responsesCreate },
+    }));
+  }
+
+  const modelProduct = {
+    brand: "Acme",
+    productName: "Protein Bar",
+    servingSize: "1 bar",
+    protein: 20,
+    calories: 210,
+    carbs: 22,
+    fat: 7,
+    fiber: 3,
+    confidence: 0.7,
+    citations: [{ title: "Acme nutrition", url: "https://acme.example/bar" }],
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.cacheFindOne.mockReturnValue({ lean: () => Promise.resolve(null) });
+    mocks.cacheUpdateOne.mockResolvedValue({});
+    mocks.fetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve(offMiss),
+    });
+  });
+
+  it("still reads a product whose answer arrived inside a markdown fence", async () => {
+    // The web search is the LAST resort — it only runs when Open Food Facts
+    // misses, which is common for US products. A fence used to throw here and
+    // surface as "we couldn't find nutrition facts", logged as a normal miss.
+    openAIReturns("```json\n" + JSON.stringify(modelProduct) + "\n```");
+
+    const result = await resolveProductNutrition({
+      brand: "Acme",
+      productName: "Protein Bar",
+      confidence: 0.9,
+    });
+
+    expect(result.analysis.protein).toBe(20);
+    expect(result.source).toBe("openai_web_search");
+  });
+
+  it("drops a citation whose url is not a url, instead of caching it", async () => {
+    // mealProductCitationSchema requires a real URL. Caching a non-URL made
+    // every later read of that product fail to serialize — a permanent 500 on
+    // that product, for every user.
+    openAIReturns(
+      JSON.stringify({
+        ...modelProduct,
+        citations: [
+          { title: "Made up", url: "see the label" },
+          { title: "Real", url: "https://acme.example/bar" },
+        ],
+      }),
+    );
+
+    const result = await resolveProductNutrition({
+      brand: "Acme",
+      productName: "Protein Bar",
+      confidence: 0.9,
+    });
+
+    expect(result.citations).toEqual([
+      { title: "Real", url: "https://acme.example/bar" },
+    ]);
+  });
+
+  it("does NOT file a name-resolved guess under the scanned barcode", async () => {
+    // The model answered from label text and reported no barcode. Storing
+    // that under barcode:<scanned> would serve one product's macros to the
+    // next user who scans that barcode.
+    openAIReturns(JSON.stringify(modelProduct));
+
+    await resolveProductNutrition({
+      barcodeText: "0123456789012",
+      brand: "Acme",
+      productName: "Protein Bar",
+      confidence: 0.9,
+    });
+
+    const key = mocks.cacheUpdateOne.mock.calls[0]![0].cacheKey;
+    expect(key).not.toContain("barcode:0123456789012");
+    expect(key).toContain("query:");
+  });
+
+  it("does file under the barcode when the model confirms that same barcode", async () => {
+    openAIReturns(JSON.stringify({ ...modelProduct, barcode: "0123456789012" }));
+
+    await resolveProductNutrition({
+      barcodeText: "0123456789012",
+      brand: "Acme",
+      productName: "Protein Bar",
+      confidence: 0.9,
+    });
+
+    expect(mocks.cacheUpdateOne.mock.calls[0]![0].cacheKey).toBe(
+      "barcode:0123456789012",
+    );
+  });
+
+  it("re-looks-up a cache row that has gone stale", async () => {
+    mocks.cacheFindOne.mockReturnValue({
+      lean: () =>
+        Promise.resolve({
+          cacheKey: "query:acme protein bar",
+          analysis: { foodName: "Stale", servingSize: "1", protein: 1, calories: 1, carbs: 0, fat: 0, fiber: 0, confidence: 0.5 },
+          citations: [],
+          updatedAt: new Date(Date.now() - 400 * 24 * 60 * 60 * 1000),
+        }),
+    });
+    openAIReturns(JSON.stringify(modelProduct));
+
+    const result = await resolveProductNutrition({
+      brand: "Acme",
+      productName: "Protein Bar",
+      confidence: 0.9,
+    });
+
+    expect(result.analysis.foodName).not.toBe("Stale");
+  });
+
+  it("serves a cache row that is still fresh", async () => {
+    mocks.cacheFindOne.mockReturnValue({
+      lean: () =>
+        Promise.resolve({
+          cacheKey: "query:acme protein bar",
+          analysis: { foodName: "Fresh", servingSize: "1", protein: 1, calories: 1, carbs: 0, fat: 0, fiber: 0, confidence: 0.5 },
+          citations: [],
+          updatedAt: new Date(),
+        }),
+    });
+
+    const result = await resolveProductNutrition({
+      brand: "Acme",
+      productName: "Protein Bar",
+      confidence: 0.9,
+    });
+
+    expect(result.analysis.foodName).toBe("Fresh");
+    expect(result.source).toBe("cache");
+  });
+});

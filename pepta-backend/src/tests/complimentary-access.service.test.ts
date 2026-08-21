@@ -7,6 +7,7 @@ import {
   normalizeEmail,
   linkAppleInvite,
   resolveComplimentaryAccessForUser,
+  revokeInvite,
 } from "../services/complimentary-access.service";
 import {
   ComplimentaryAccessGrantModel,
@@ -16,8 +17,10 @@ import {
   getSubscriber,
   grantPromotionalEntitlement,
   isRevenueCatConfigured,
+  revokePromotionalEntitlement,
   RevenueCatClientError,
 } from "../services/revenuecat.client";
+import { queueComplimentaryRevocation } from "../services/complimentary-access-cleanup.service";
 import { reconcileUserEntitlement } from "../services/entitlement-reconciler.service";
 import { UserModel } from "../models/user.model";
 import type { UserDocument } from "../models/user.model";
@@ -47,6 +50,13 @@ vi.mock("../services/revenuecat.client", async (importOriginal) => {
     revokePromotionalEntitlement: vi.fn(),
   };
 });
+
+// The durable revocation queue is exercised in the cleanup service's own
+// tests; here it only needs to be observable and instant.
+vi.mock("../services/complimentary-access-cleanup.service", () => ({
+  prepareComplimentaryCleanupForDeletion: vi.fn(async () => undefined),
+  queueComplimentaryRevocation: vi.fn(async () => undefined),
+}));
 
 vi.mock("../services/entitlement-reconciler.service", () => ({
   reconcileUserEntitlement: vi.fn(() => Promise.resolve(null)),
@@ -711,5 +721,67 @@ describe("linkAppleInvite", () => {
         reason: "x",
       }),
     ).rejects.toThrow(/another complimentary grant/);
+  });
+});
+
+// "Revoked" is a claim about RevenueCat, not about our intent. The old code
+// skipped the remote call entirely when RevenueCat was unconfigured and then
+// marked the grant revoked and wrote an audit trail saying so — while the
+// promotional entitlement stayed live for the rest of the window.
+describe("revokeInvite only claims what it achieved", () => {
+  beforeEach(() => {
+    vi.mocked(ComplimentaryAccessGrantModel.findOne).mockReset();
+    vi.mocked(revokePromotionalEntitlement).mockReset();
+    vi.mocked(isRevenueCatConfigured).mockReturnValue(true);
+  });
+
+  it("does not report revoked when RevenueCat is not configured", async () => {
+    const grant = makeGrant({ status: "active", userId: "507f1f77bcf86cd799439011" });
+    vi.mocked(ComplimentaryAccessGrantModel.findOne).mockResolvedValue(grant as never);
+    vi.mocked(isRevenueCatConfigured).mockReturnValue(false);
+
+    const result = await revokeInvite("creator@example.com", "admin");
+
+    expect(result).toBe("revoke_pending");
+    expect(grant.status).not.toBe("revoked");
+    expect(revokePromotionalEntitlement).not.toHaveBeenCalled();
+    // Queued durably so the cleanup worker finishes the job.
+    expect(queueComplimentaryRevocation).toHaveBeenCalledWith(
+      "507f1f77bcf86cd799439011",
+    );
+  });
+
+  it("does not report revoked when the remote call fails", async () => {
+    const grant = makeGrant({ status: "active", userId: "507f1f77bcf86cd799439011" });
+    vi.mocked(ComplimentaryAccessGrantModel.findOne).mockResolvedValue(grant as never);
+    vi.mocked(revokePromotionalEntitlement).mockRejectedValueOnce(new Error("503"));
+
+    const result = await revokeInvite("creator@example.com", "admin");
+
+    expect(result).toBe("revoke_pending");
+    expect(grant.status).not.toBe("revoked");
+  });
+
+  it("reports revoked once RevenueCat has actually revoked it", async () => {
+    const grant = makeGrant({ status: "active", userId: "507f1f77bcf86cd799439011" });
+    vi.mocked(ComplimentaryAccessGrantModel.findOne).mockResolvedValue(grant as never);
+    vi.mocked(revokePromotionalEntitlement).mockResolvedValue(undefined as never);
+
+    const result = await revokeInvite("creator@example.com", "admin");
+
+    expect(result).toBe("revoked");
+    expect(grant.status).toBe("revoked");
+    expect(revokePromotionalEntitlement).toHaveBeenCalled();
+  });
+
+  it("still revokes a grant that never reached a customer", async () => {
+    // No userId means nothing was ever provisioned remotely.
+    const grant = makeGrant({ status: "retryable_failure" });
+    vi.mocked(ComplimentaryAccessGrantModel.findOne).mockResolvedValue(grant as never);
+
+    const result = await revokeInvite("creator@example.com", "admin");
+
+    expect(result).toBe("revoked");
+    expect(revokePromotionalEntitlement).not.toHaveBeenCalled();
   });
 });

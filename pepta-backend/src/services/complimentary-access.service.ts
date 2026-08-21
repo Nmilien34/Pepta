@@ -34,6 +34,7 @@ import {
   decisionFromPersistedState,
   registerComplimentaryResolver,
 } from "./access-decision.service";
+import { queueComplimentaryRevocation } from "./complimentary-access-cleanup.service";
 import { reconcileUserEntitlement } from "./entitlement-reconciler.service";
 import { normalizeEmail } from "./provider-identity-binding.service";
 import {
@@ -233,8 +234,39 @@ async function provision(
     const subscriber = await getSubscriber(appUserId);
     const existing = subscriber.entitlements?.[entitlementId];
     const existingExpiry = existing?.expires_date ? new Date(existing.expires_date) : null;
-    const alreadyGranted =
-      existingExpiry != null && existingExpiry.getTime() > Date.now();
+    const live = existingExpiry != null && existingExpiry.getTime() > Date.now();
+
+    // WHOSE entitlement is live matters. This check used to treat ANY live pro
+    // entitlement as "the grant already went out" — including a PAID
+    // subscription. An invited creator who already subscribes had their invite
+    // consumed and marked active while no promotional entitlement was ever
+    // issued, so when their paid period ended they had nothing.
+    const productId = existing?.product_identifier;
+    const backing = productId ? subscriber.subscriptions?.[productId] : undefined;
+    const existingIsPromotional =
+      (productId?.startsWith("rc_promo") ?? false) ||
+      backing?.store?.toLowerCase() === "promotional";
+
+    if (live && !existingIsPromotional) {
+      // They are paying. Granting free access on top would be thrown away, so
+      // the grant STACKS: it stays unconsumed and provisions when the paid
+      // period ends. The saga's own retry clock carries it there.
+      grant.nextAttemptAt = existingExpiry!;
+      grant.lastErrorCode = "PAID_SUBSCRIPTION_ACTIVE";
+      grant.leaseId = undefined;
+      grant.leaseExpiresAt = undefined;
+      await grant.save();
+      logger.info(
+        { userId: String(user._id), until: existingExpiry!.toISOString() },
+        "[complimentary] paid subscription active; grant deferred to its end",
+      );
+      // Their access right now is the paid one — reconcile so the projection
+      // reflects it, and return that rather than a paywall.
+      await reconcileUserEntitlement(user);
+      return decisionFromPersistedState(user.entitlement);
+    }
+
+    const alreadyGranted = live && existingIsPromotional;
 
     if (!alreadyGranted) {
       await grantPromotionalEntitlement(appUserId, entitlementId, grant.expiresAt!);
@@ -792,15 +824,53 @@ export async function revokeInvite(email: string, actorLabel: string): Promise<s
   await grant.save();
   await audit({ grant, previousStatus: previous, nextStatus: "revoking", actor: "admin", subject: actorLabel });
 
-  if (grant.userId && isRevenueCatConfigured()) {
-    await revokePromotionalEntitlement(
-      String(grant.userId),
-      env.revenueCat.proEntitlementId,
+  // REVOKED MEANS THE ENTITLEMENT IS GONE, not that we intended it to be.
+  //
+  // This used to skip the remote call entirely when RevenueCat was
+  // unconfigured — and then mark the grant 'revoked' and write an audit trail
+  // saying so anyway, while the promotional entitlement stayed live for the
+  // rest of the window (up to three months of free premium). The same thing
+  // happened when the call threw: the exception escaped and left the grant
+  // stranded in 'revoking' with nothing queued to finish the job.
+  //
+  // Now the claim follows the fact. If the revocation cannot be completed
+  // here, it is QUEUED durably and the grant stays 'revoking' until the
+  // cleanup worker confirms the entitlement is gone (see finalizeRevokedGrant).
+  if (!grant.userId) {
+    // Nothing was ever provisioned against a customer, so there is nothing
+    // remote to revoke.
+    grant.status = "revoked";
+    grant.revokedAt = new Date();
+    await grant.save();
+    await audit({ grant, previousStatus: "revoking", nextStatus: "revoked", actor: "admin", subject: actorLabel });
+    return "revoked";
+  }
+
+  const appUserId = String(grant.userId);
+
+  if (!isRevenueCatConfigured()) {
+    await queueComplimentaryRevocation(appUserId);
+    logger.warn(
+      { grantId: String(grant._id) },
+      "[complimentary] revoke queued — RevenueCat is not configured in this environment",
     );
-    const user = await UserModel.findById(grant.userId);
-    if (user) {
-      await reconcileUserEntitlement(user).catch(() => undefined);
-    }
+    return "revoke_pending";
+  }
+
+  try {
+    await revokePromotionalEntitlement(appUserId, env.revenueCat.proEntitlementId);
+  } catch (error) {
+    await queueComplimentaryRevocation(appUserId);
+    logger.warn(
+      { grantId: String(grant._id), error: (error as Error).message },
+      "[complimentary] remote revoke failed — queued for retry",
+    );
+    return "revoke_pending";
+  }
+
+  const user = await UserModel.findById(grant.userId);
+  if (user) {
+    await reconcileUserEntitlement(user).catch(() => undefined);
   }
 
   grant.status = "revoked";

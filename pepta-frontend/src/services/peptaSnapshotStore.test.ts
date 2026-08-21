@@ -35,6 +35,7 @@ describe("cached scheduling", () => {
     sideEffectLogs: [],
     measurements: [],
     weightLogs: [],
+    fiberLogs: [],
     sectionErrors: {},
   };
   const schedule = {

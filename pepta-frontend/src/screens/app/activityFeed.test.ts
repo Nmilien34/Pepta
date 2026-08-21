@@ -11,7 +11,7 @@ const home = (compounds: unknown[] = [{ id: 'c1', name: 'Zepbound', route: 'inje
 const track = (over: Record<string, unknown> = {}) =>
   ({
     doseLogs: [], mealLogs: [], waterLogs: [], proteinLogs: [],
-    activityLogs: [], sideEffectLogs: [], measurements: [], weightLogs: [],
+    activityLogs: [], sideEffectLogs: [], measurements: [], weightLogs: [], fiberLogs: [],
     sectionErrors: {}, ...over,
   }) as never;
 
@@ -474,5 +474,52 @@ describe('what a Remove confirmation says', () => {
     }
     const water = feed[0]!.entries.find((item) => item.kind === 'water')!;
     expect(water.sourceIds.sort()).toEqual(['h1', 'h2']);
+  });
+});
+
+// Fibre was the app's only write-only log kind: the Home stepper created rows,
+// GET /track never carried them, and so nothing could show or delete them.
+describe('fibre is a real record, not a number that vanishes', () => {
+  it('shows the day’s fibre and carries every row id for deletion', () => {
+    const feed = buildActivityFeed({
+      home: home(),
+      now: NOW,
+      track: track({
+        fiberLogs: [
+          { id: 'f1', grams: 5, datetime: at(13, 9), deletedAt: null },
+          { id: 'f2', grams: 3, datetime: at(13, 11), deletedAt: null },
+        ],
+      }),
+    });
+
+    const fiber = feed[0]!.entries.find((item) => item.kind === 'fiber')!;
+    expect(fiber.title).toBe('8 g fibre');
+    // One row per day, like water — the stepper logs it +1g at a time.
+    expect(fiber.sourceIds.sort()).toEqual(['f1', 'f2']);
+    expect(fiber.timeLabel).toBe('All day');
+  });
+
+  it('NEVER resurrects a soft-deleted fibre row', () => {
+    const feed = buildActivityFeed({
+      home: home(),
+      now: NOW,
+      track: track({
+        fiberLogs: [{ id: 'f1', grams: 5, datetime: at(13, 9), deletedAt: at(13, 10) }],
+      }),
+    });
+
+    expect(feed.flatMap((day) => day.entries).some((e) => e.kind === 'fiber')).toBe(false);
+  });
+
+  it('survives a backend that predates fiberLogs', () => {
+    // The field is optional-with-default in the shared schema, but a cached
+    // snapshot written by an older client has no key at all.
+    const feed = buildActivityFeed({
+      home: home(),
+      now: NOW,
+      track: track({ fiberLogs: undefined }),
+    });
+
+    expect(feed).toEqual([]);
   });
 });

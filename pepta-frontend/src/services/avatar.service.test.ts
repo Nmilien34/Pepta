@@ -9,20 +9,14 @@ vi.mock("expo-image-picker", () => ({
 }));
 
 describe("avatar.service", () => {
-  it("uploads picked avatar bytes through the presigned S3 flow", async () => {
-    const blob = new Blob(["avatar-bytes"], { type: "image/png" });
-    const fetchImpl = vi
-      .fn()
-      .mockResolvedValueOnce({ blob: () => Promise.resolve(blob) })
-      .mockResolvedValueOnce({ ok: true });
+  it("uploads through the common media pipeline and activates only its media id", async () => {
     const api = {
-      createAvatarUploadIntent: vi.fn().mockResolvedValue({
-        key: "pepta/avatars/user-1/avatar.png",
-        uploadUrl: "https://signed.example/upload",
-        expiresAt: "2026-06-21T00:10:00.000Z",
+      uploadMediaPhoto: vi.fn().mockResolvedValue({
+        mediaId: "507f1f77bcf86cd799439011",
+        status: "ready",
       }),
       confirmAvatarUpload: vi.fn().mockResolvedValue({
-        id: "user-1",
+        id: "507f1f77bcf86cd799439012",
         emailVerified: true,
         hasAvatar: true,
         authProviders: [],
@@ -35,25 +29,18 @@ describe("avatar.service", () => {
 
     const result = await uploadAvatar(
       { uri: "file:///tmp/avatar.png", contentType: "image/png" },
-      { api, fetchImpl: fetchImpl as unknown as typeof fetch },
+      { api },
     );
 
-    expect(api.createAvatarUploadIntent).toHaveBeenCalledWith({
+    expect(api.uploadMediaPhoto).toHaveBeenCalledWith({
+      intent: "avatar",
+      uri: "file:///tmp/avatar.png",
       contentType: "image/png",
-      sizeBytes: blob.size,
     });
-    expect(fetchImpl).toHaveBeenNthCalledWith(
-      2,
-      "https://signed.example/upload",
-      {
-        method: "PUT",
-        headers: { "Content-Type": "image/png" },
-        body: blob,
-      },
-    );
     expect(api.confirmAvatarUpload).toHaveBeenCalledWith({
-      key: "pepta/avatars/user-1/avatar.png",
+      mediaId: "507f1f77bcf86cd799439011",
     });
+    expect(api.confirmAvatarUpload.mock.calls[0]?.[0]).not.toHaveProperty("key");
     expect(result.hasAvatar).toBe(true);
   });
 });

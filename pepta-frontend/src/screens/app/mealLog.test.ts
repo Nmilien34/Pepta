@@ -17,7 +17,7 @@ const analysis: MealScanAnalysis = {
 
 describe('analysisToMealLog', () => {
   it('maps analysis macros + source + datetime', () => {
-    expect(analysisToMealLog(analysis, 'scan', NOW, 's3/key.jpg')).toEqual({
+    expect(analysisToMealLog(analysis, 'scan', NOW, 'media-1')).toEqual({
       foodName: 'Grilled chicken bowl',
       servingSize: '1 bowl',
       protein: 42,
@@ -27,11 +27,11 @@ describe('analysisToMealLog', () => {
       fiber: 8,
       source: 'scan',
       datetime: NOW,
-      photoS3Key: 's3/key.jpg',
+      photoMediaId: 'media-1',
     });
   });
-  it('omits photoS3Key when absent', () => {
-    expect(analysisToMealLog(analysis, 'voice', NOW)).not.toHaveProperty('photoS3Key');
+  it('omits photoMediaId when absent', () => {
+    expect(analysisToMealLog(analysis, 'voice', NOW)).not.toHaveProperty('photoMediaId');
   });
 });
 

@@ -3,10 +3,12 @@ import { Router } from 'express';
 import { requireAuth } from '../auth/middleware';
 import { asyncHandler } from '../lib/async-handler';
 import { sendData } from '../lib/responses';
+import { createInMemoryRateLimiter } from '../middleware/rate-limit.middleware';
 import { validateBody } from '../middleware/validate.middleware';
 import {
   createRecipe,
   deleteRecipe,
+  getRecipe,
   listRecipes,
 } from '../services/recipe.service';
 import { composeRecipe } from '../services/recipe-compose.service';
@@ -34,11 +36,29 @@ router.post(
 
 // Proposes a recipe from what the user said or what the scan identified.
 // Saves nothing: the client shows the proposal and the user accepts it.
+//
+// Rate-limited because it reaches a language model: it was the one AI-backed
+// endpoint with no ceiling, so a retry loop on the New recipe screen could run
+// up unbounded spend — and the resulting 429s from OpenAI would spill onto
+// every other feature sharing the key.
 router.post(
   '/compose',
+  createInMemoryRateLimiter({
+    windowMs: 60 * 1000,
+    maxRequests: 15,
+    message: "Give the recipe a moment — try again shortly",
+    keyBy: "userOrIp",
+  }),
   validateBody(recipeComposeInputSchema),
   asyncHandler(async (req, res) => {
     sendData(res, await composeRecipe(req.body.text, req.body.name));
+  }),
+);
+
+router.get(
+  '/:id',
+  asyncHandler(async (req, res) => {
+    sendData(res, await getRecipe(req.user!.id, req.params.id as string));
   }),
 );
 

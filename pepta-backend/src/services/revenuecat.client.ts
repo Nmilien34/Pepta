@@ -135,6 +135,24 @@ async function request<T>(
  *   - The id must be a real, resolved user identifier. If you do not have
  *     one, the correct behavior is to not make the call.
  */
+/**
+ * Whether an app user id is one RevenueCat's server API will accept.
+ *
+ * Exported because the guard below is not the only place that needs it: the
+ * webhook must not PERSIST an id it would later be refused for. Storing an
+ * anonymous id as the customer id made every subsequent reconciliation throw
+ * terminal, so the account resolved temporarily_unavailable forever.
+ */
+export function isUsableAppUserId(appUserId: unknown): appUserId is string {
+  const id = typeof appUserId === "string" ? appUserId.trim() : "";
+  return (
+    id.length > 0 &&
+    !/anonymous/i.test(id) &&
+    id !== "undefined" &&
+    id !== "null"
+  );
+}
+
 export async function getSubscriber(
   appUserId: string,
 ): Promise<RevenueCatSubscriber> {
@@ -145,7 +163,7 @@ export async function getSubscriber(
   // Pattern, not literal: this also refuses RevenueCat's own device-side
   // anonymous ids ($RCAnonymousID:…), which must never be passed from the
   // server — an anonymous customer belongs to a device, not to our backend.
-  if (id.length === 0 || /anonymous/i.test(id) || id === "undefined" || id === "null") {
+  if (!isUsableAppUserId(id)) {
     throw new RevenueCatClientError(
       "terminal",
       null,

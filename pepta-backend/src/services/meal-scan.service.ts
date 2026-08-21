@@ -9,9 +9,11 @@ import {
   type MealScanInput,
   type MealVoiceInput,
 } from "@pepta/shared";
-import { randomUUID } from "node:crypto";
 import { isValidObjectId } from "mongoose";
-import { addUtcDays, startOfUtcDay, startOfUtcWeek } from "../lib/dates";
+import { startOfUtcWeek } from "../lib/dates";
+import { withDeadline } from "../lib/deadline";
+import { parseHomeTimezone, resolveHomeWindow } from "../lib/homeRange";
+import { addDaysDateOnly, dateOnlyInTz, dayOfWeekOf, zonedTimeToUtc } from "../lib/timezone";
 import { AppError, NotFoundError } from "../lib/errors";
 import { logger } from "../lib/logger";
 import {
@@ -21,6 +23,11 @@ import {
   UserProfileModel,
   type MealScanDocument,
 } from "../models";
+import {
+  discardMedia,
+  getMediaViewUrl,
+  persistMealScanMedia,
+} from "./media.service";
 import {
   generateMealScanNote,
   type MealScanProteinSnapshot,
@@ -41,9 +48,11 @@ import {
   generateProductCluesFromImage,
   PRODUCT_SCAN_VISION_ENGINE_VERSION,
 } from "./product-scan-vision.service";
-import { createPresignedGetUrl, putS3Object } from "./s3.service";
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+// The note is optional garnish with a deterministic fallback; it must not
+// push the scan past the app's own request abort.
+const MEAL_SCAN_NOTE_DEADLINE_MS = 3_000;
 const MEAL_SCAN_COACH_COPY_VERSION = "meal-scan-coach-v1";
 const MIN_PROTEIN_AFFIRMATION_GRAMS = 25;
 
@@ -71,34 +80,16 @@ function storageFailed(): AppError {
   });
 }
 
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
-
 function roundOne(value: number): number {
   return Math.round(value * 10) / 10;
 }
 
-function imageExtension(
-  mimeType: MealScanInput["imageMimeType"],
-): "jpg" | "png" | "webp" {
-  if (mimeType === "image/png") {
-    return "png";
-  }
-
-  if (mimeType === "image/webp") {
-    return "webp";
-  }
-
-  return "jpg";
-}
-
-export function buildMealScanObjectKey(
-  userId: string,
-  imageMimeType: MealScanInput["imageMimeType"],
-  uploadId = randomUUID(),
-): string {
-  return `pepta/meal-scans/${userId}/${uploadId}.${imageExtension(imageMimeType)}`;
+/** Monday 00:00 of the local week containing `at`. */
+function startOfLocalWeek(at: Date, timeZone: string): Date {
+  const today = dateOnlyInTz(at, timeZone);
+  const weekday = dayOfWeekOf(today); // 0 = Sunday
+  const daysSinceMonday = weekday === 0 ? 6 : weekday - 1;
+  return zonedTimeToUtc(addDaysDateOnly(today, -daysSinceMonday), "00:00", timeZone);
 }
 
 function isDuplicateIdempotencyError(
@@ -221,9 +212,21 @@ async function computeProteinSnapshot(input: {
     });
   }
 
-  const todayStart = startOfUtcDay(input.capturedAt);
-  const tomorrowStart = addUtcDays(todayStart, 1);
-  const weekStart = startOfUtcWeek(input.capturedAt);
+  // THE USER'S DAY, NOT THE SERVER'S. These windows decide the "you'd be at
+  // Xg of Yg protein today" figure that the AI note then states as fact. On
+  // UTC boundaries a user in Los Angeles scanning dinner at 6pm was already
+  // into the next UTC day, so the snapshot counted only what they had logged
+  // since 5pm local and the note contradicted their own Home screen.
+  const timeZone = parseHomeTimezone(profile.timezone);
+  const { start: todayStart, end: tomorrowStart } = resolveHomeWindow(
+    "today",
+    input.capturedAt,
+    timeZone,
+  );
+  // Week-to-date, Monday-anchored, in the same zone.
+  const weekStart = timeZone
+    ? startOfLocalWeek(input.capturedAt, timeZone)
+    : startOfUtcWeek(input.capturedAt);
   const elapsedWeekDays =
     Math.floor(
       (todayStart.getTime() - weekStart.getTime()) / (24 * 60 * 60 * 1000),
@@ -282,20 +285,22 @@ async function resolveTrackerNote(input: {
   snapshot: MealScanProteinSnapshot;
   biggestWorry?: string;
 }): Promise<string> {
-  try {
-    const generated = await generateMealScanNote(
-      input.analysis,
-      input.snapshot,
-      {
-        biggestWorry: input.biggestWorry,
-      },
-    );
+  // The note is the garnish on the scan, and a deterministic version of it
+  // already exists — so it gets a hard deadline. Without one it could spend
+  // its own timeout (times the SDK's retries) on top of the vision call and
+  // push the whole scan past the app's 15s abort, losing the user a result
+  // the server had already computed.
+  const generated = await withDeadline(
+    generateMealScanNote(input.analysis, input.snapshot, {
+      biggestWorry: input.biggestWorry,
+    }),
+    MEAL_SCAN_NOTE_DEADLINE_MS,
+    null,
+    () => logger.warn("[meal-scan] note generation exceeded its deadline"),
+  );
 
-    if (generated) {
-      return generated;
-    }
-  } catch (error) {
-    logger.warn({ error }, "[meal-scan] note generation failed");
+  if (generated) {
+    return generated;
   }
 
   return fallbackNote(input.analysis, input.snapshot);
@@ -344,7 +349,9 @@ function serializeScan(scan: MealScanDocument | Record<string, unknown>) {
 
   return mealScanResponseSchema.parse({
     scanId: String(value.id ?? value._id),
-    photoS3Key: value.photoS3Key,
+    ...(value.photoMediaId
+      ? { photoMediaId: String(value.photoMediaId) }
+      : {}),
     analysis,
     coachContent:
       (value.coachContent as MealScanCoachContent | null | undefined) ?? null,
@@ -382,18 +389,7 @@ export async function analyzeMealScan(userId: string, input: MealScanInput) {
     input.imageMimeType,
   );
   const normalizedImage = input.imageData.trim();
-  const photoS3Key = buildMealScanObjectKey(userId, input.imageMimeType);
   const capturedAt = input.capturedAt ? new Date(input.capturedAt) : new Date();
-
-  try {
-    await putS3Object({
-      key: photoS3Key,
-      body: imageBytes,
-      contentType: input.imageMimeType,
-    });
-  } catch {
-    throw storageFailed();
-  }
 
   const analysis = await generateMealScanVision(
     normalizedImage,
@@ -406,11 +402,21 @@ export async function analyzeMealScan(userId: string, input: MealScanInput) {
   });
   const coachContent = buildCoachContent(analysis);
   const note = await resolveTrackerNote({ analysis, snapshot, biggestWorry });
+  let media: Awaited<ReturnType<typeof persistMealScanMedia>>;
+  try {
+    media = await persistMealScanMedia(userId, {
+      bytes: imageBytes,
+      contentType: input.imageMimeType,
+    });
+  } catch (error) {
+    if (error instanceof AppError) throw error;
+    throw storageFailed();
+  }
 
   try {
     const scan = await MealScanModel.create({
       userId,
-      photoS3Key,
+      photoMediaId: media.mediaId,
       imageMimeType: input.imageMimeType,
       analysis,
       coachContent,
@@ -422,6 +428,12 @@ export async function analyzeMealScan(userId: string, input: MealScanInput) {
 
     return serializeScan(scan);
   } catch (error) {
+    await discardMedia(userId, media.mediaId).catch((discardError) => {
+      logger.warn(
+        { error: discardError, mediaId: media.mediaId },
+        "[meal-scan] failed to queue uncommitted media",
+      );
+    });
     if (input.idempotencyKey && isDuplicateIdempotencyError(error)) {
       const idempotentScan = await findSuccessfulIdempotentScan(
         userId,
@@ -437,27 +449,21 @@ export async function analyzeMealScan(userId: string, input: MealScanInput) {
 }
 
 export async function parseVoiceMeal(userId: string, input: MealVoiceInput) {
-  let analysis: MealScanAnalysis;
-  let visionEngineVersion = MEAL_SCAN_TEXT_ENGINE_VERSION;
+  const visionEngineVersion = MEAL_SCAN_TEXT_ENGINE_VERSION;
 
-  try {
-    analysis = await generateMealTextAnalysis(input.transcript);
-  } catch (error) {
-    logger.warn({ error }, "[meal-scan] voice parse failed");
-    const words = input.transcript.trim().split(/\s+/).length;
-    const estimatedCalories = clamp(words * 12, 0, 1200);
-    analysis = {
-      foodName: input.transcript.slice(0, 80),
-      servingSize: "voice estimate",
-      protein: 0,
-      calories: estimatedCalories,
-      carbs: 0,
-      fat: 0,
-      fiber: 0,
-      confidence: 0.25,
-    };
-    visionEngineVersion = "voice-log-fallback-v1";
-  }
+  // NO FABRICATED FALLBACK. This used to catch any model failure and invent
+  // an analysis: protein/carbs/fat/fiber all zero, calories derived from the
+  // TRANSCRIPT'S WORD COUNT (words * 12). The user saw an ordinary review
+  // card — "grilled chicken breast with rice and broccoli, 0 g protein,
+  // 84 cal" with a confidence badge — and logging it wrote those numbers
+  // into their day as a real meal. In a protein-tracking app for GLP-1
+  // users, silently recording 0 g of protein for a chicken dinner is worse
+  // than any error message.
+  //
+  // The failure now propagates. generateMealTextAnalysis raises an
+  // actionable 503, and the app already handles it: "Couldn't read that
+  // description. Try again, or log it manually."
+  const analysis = await generateMealTextAnalysis(input.transcript);
 
   const capturedAt = input.recordedAt ? new Date(input.recordedAt) : new Date();
   const { snapshot, biggestWorry } = await computeProteinSnapshot({
@@ -510,18 +516,7 @@ export async function analyzeProductScan(
     input.imageMimeType,
   );
   const normalizedImage = input.imageData.trim();
-  const photoS3Key = buildMealScanObjectKey(userId, input.imageMimeType);
   const capturedAt = input.capturedAt ? new Date(input.capturedAt) : new Date();
-
-  try {
-    await putS3Object({
-      key: photoS3Key,
-      body: imageBytes,
-      contentType: input.imageMimeType,
-    });
-  } catch {
-    throw storageFailed();
-  }
 
   const clues = await generateProductCluesFromImage(
     normalizedImage,
@@ -537,11 +532,21 @@ export async function analyzeProductScan(
   const coachContent = buildCoachContent(analysis);
   const note = await resolveTrackerNote({ analysis, snapshot, biggestWorry });
   const product = productMetadata("product_scan", nutrition);
+  let media: Awaited<ReturnType<typeof persistMealScanMedia>>;
+  try {
+    media = await persistMealScanMedia(userId, {
+      bytes: imageBytes,
+      contentType: input.imageMimeType,
+    });
+  } catch (error) {
+    if (error instanceof AppError) throw error;
+    throw storageFailed();
+  }
 
   try {
     const scan = await MealScanModel.create({
       userId,
-      photoS3Key,
+      photoMediaId: media.mediaId,
       imageMimeType: input.imageMimeType,
       analysis,
       coachContent,
@@ -554,6 +559,12 @@ export async function analyzeProductScan(
 
     return serializeScan(scan);
   } catch (error) {
+    await discardMedia(userId, media.mediaId).catch((discardError) => {
+      logger.warn(
+        { error: discardError, mediaId: media.mediaId },
+        "[meal-scan] failed to queue uncommitted media",
+      );
+    });
     if (input.idempotencyKey && isDuplicateIdempotencyError(error)) {
       const idempotentScan = await findSuccessfulIdempotentScan(
         userId,
@@ -608,7 +619,7 @@ export async function getMealLogScanDetail(userId: string, mealLogId: string) {
     throw new NotFoundError("Meal log not found");
   }
 
-  if (!log.photoS3Key) {
+  if (!log.photoMediaId) {
     return mealLogScanDetailResponseSchema.parse({
       photoViewUrl: null,
       analysis: null,
@@ -617,9 +628,10 @@ export async function getMealLogScanDetail(userId: string, mealLogId: string) {
     });
   }
 
+  const photoMediaId = log.photoMediaId.toString();
   const [photoViewUrl, scan] = await Promise.all([
-    createPresignedGetUrl({ key: log.photoS3Key }),
-    MealScanModel.findOne({ userId, photoS3Key: log.photoS3Key }),
+    getMediaViewUrl(userId, photoMediaId),
+    MealScanModel.findOne({ userId, photoMediaId }),
   ]);
   const scanValue = scan ? toPlainRecord(scan) : null;
 

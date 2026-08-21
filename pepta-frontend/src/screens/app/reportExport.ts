@@ -57,7 +57,7 @@ export interface PeptaReportExportPayload {
   };
 }
 
-export type SanitizedMealLog = Omit<MealLogResponse, "photoS3Key">;
+export type SanitizedMealLog = Omit<MealLogResponse, "photoMediaId">;
 
 export interface ProgressPhotoExportMetadata {
   id: string;
@@ -150,7 +150,7 @@ export function buildPeptaReportExportShareContent(
 
 function toSanitizedMealLog(meal: MealLogResponse): SanitizedMealLog {
   const safeMeal: Partial<MealLogResponse> = { ...meal };
-  delete safeMeal.photoS3Key;
+  delete safeMeal.photoMediaId;
   return safeMeal as SanitizedMealLog;
 }
 

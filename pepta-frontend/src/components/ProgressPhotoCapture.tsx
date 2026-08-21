@@ -30,6 +30,22 @@ function todayDateOnly(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+interface ProgressPhotoUploadApi {
+  uploadProgressPhoto: typeof api.uploadProgressPhoto;
+}
+
+export async function uploadCapturedProgressPhoto(
+  uri: string,
+  deps: { api?: ProgressPhotoUploadApi; captureDate?: string } = {},
+) {
+  return (deps.api ?? api).uploadProgressPhoto({
+    uri,
+    captureDate: deps.captureDate ?? todayDateOnly(),
+    contentType: "image/jpeg",
+    kind: "body",
+  });
+}
+
 export function ProgressPhotoCapture({ visible, onClose, onSaved, recentPhotos }: ProgressPhotoCaptureProps) {
   const theme = useTheme();
   const [permission, requestPermission] = useCameraPermissions();
@@ -53,9 +69,7 @@ export function ProgressPhotoCapture({ visible, onClose, onSaved, recentPhotos }
       const pic = await cameraRef.current?.takePictureAsync({ quality: 0.6 });
       if (!pic?.uri) return;
       setStage('uploading');
-      const intent = await api.createPhotoUploadIntent({ captureDate: todayDateOnly(), contentType: 'image/jpeg', kind: 'body' });
-      await api.uploadToPresignedUrl(intent.uploadUrl, pic.uri, 'image/jpeg');
-      await api.confirmPhoto({ photoId: intent.photo.id });
+      await uploadCapturedProgressPhoto(pic.uri);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
       onSaved();
       setStage('saved');

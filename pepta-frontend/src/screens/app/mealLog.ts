@@ -9,7 +9,7 @@ export function analysisToMealLog(
   analysis: MealScanAnalysis,
   source: MealSource,
   nowIso: string,
-  photoS3Key?: string,
+  photoMediaId?: string,
 ): MealLogInput {
   return {
     foodName: analysis.foodName,
@@ -21,7 +21,7 @@ export function analysisToMealLog(
     fiber: analysis.fiber,
     source,
     datetime: nowIso,
-    ...(photoS3Key ? { photoS3Key } : {}),
+    ...(photoMediaId ? { photoMediaId } : {}),
   };
 }
 
@@ -33,6 +33,7 @@ export interface ManualMeal {
   carbs?: number;
   fat?: number;
   fiber?: number;
+  photoMediaId?: string;
 }
 
 export function isManualMealValid(m: ManualMeal): boolean {
@@ -48,6 +49,7 @@ export function toManualMealLog(m: ManualMeal, nowIso: string): MealLogInput {
     ...(m.carbs != null ? { carbs: m.carbs } : {}),
     ...(m.fat != null ? { fat: m.fat } : {}),
     ...(m.fiber != null ? { fiber: m.fiber } : {}),
+    ...(m.photoMediaId ? { photoMediaId: m.photoMediaId } : {}),
     source: 'manual',
     datetime: nowIso,
   };

@@ -3,12 +3,14 @@ import TestRenderer, { act, type ReactTestInstance } from "react-test-renderer";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MealCamera } from "./MealCamera";
 import { ProgressPhotoCapture } from "./ProgressPhotoCapture";
+import { uploadCapturedProgressPhoto } from "./ProgressPhotoCapture";
 
 const mocks = vi.hoisted(() => ({
   cameraPermission: {
     current: { granted: false, status: "undetermined" },
   },
   requestPermission: vi.fn(),
+  uploadProgressPhoto: vi.fn(),
 }));
 
 vi.mock("react-native", () => ({
@@ -80,9 +82,7 @@ vi.mock("../theme", () => ({
 
 vi.mock("../services/api", () => ({
   api: {
-    createPhotoUploadIntent: vi.fn(),
-    uploadToPresignedUrl: vi.fn(),
-    confirmPhoto: vi.fn(),
+    uploadProgressPhoto: mocks.uploadProgressPhoto,
   },
 }));
 
@@ -119,6 +119,7 @@ describe("camera permission prompts", () => {
       status: "undetermined",
     };
     mocks.requestPermission.mockClear();
+    mocks.uploadProgressPhoto.mockReset();
   });
 
   it("uses a neutral Continue button before meal camera permission", async () => {
@@ -201,5 +202,24 @@ describe("camera permission prompts", () => {
     expect(text).toContain("Open Settings");
     expect(text).toContain("Close");
     expect(text).not.toContain("Continue");
+  });
+
+  it("routes captured progress photos through the opaque POST helper", async () => {
+    mocks.uploadProgressPhoto.mockResolvedValueOnce({
+      id: "507f1f77bcf86cd799439012",
+      status: "uploaded",
+    });
+
+    await uploadCapturedProgressPhoto("file:///captured.jpg", {
+      api: { uploadProgressPhoto: mocks.uploadProgressPhoto },
+      captureDate: "2026-08-19",
+    });
+
+    expect(mocks.uploadProgressPhoto).toHaveBeenCalledWith({
+      uri: "file:///captured.jpg",
+      captureDate: "2026-08-19",
+      contentType: "image/jpeg",
+      kind: "body",
+    });
   });
 });

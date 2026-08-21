@@ -12,7 +12,9 @@ const mocks = vi.hoisted(() => ({
   auth: {
     isLoading: false,
     isAuthenticated: true,
-    user: { onboardingComplete: true } as { onboardingComplete?: boolean } | null,
+    user: { id: "user-1", onboardingComplete: true } as
+      | { id?: string; onboardingComplete?: boolean }
+      | null,
     logout: vi.fn(),
   },
   access: {
@@ -86,7 +88,7 @@ describe("AccessGate", () => {
   beforeEach(() => {
     mocks.auth.isLoading = false;
     mocks.auth.isAuthenticated = true;
-    mocks.auth.user = { onboardingComplete: true };
+    mocks.auth.user = { id: "user-1", onboardingComplete: true };
     mocks.access.decision = null;
   });
 
@@ -106,7 +108,7 @@ describe("AccessGate", () => {
   });
 
   it("active + not onboarded → funnel (which now skips referral/paywall)", () => {
-    mocks.auth.user = { onboardingComplete: false };
+    mocks.auth.user = { id: "user-1", onboardingComplete: false };
     mocks.access.decision = ACTIVE;
     expect(surface(render())).toBe("OnboardingNavigator");
   });
@@ -163,7 +165,7 @@ describe("AccessGate", () => {
     // The welcomeIn rating bug (2026-08-05): the device confirmed a purchase
     // but the backend's webhook-fed decision still reads 'inactive'. The
     // just-paid user must land in the app, not back on a paywall.
-    markPurchaseSuccess();
+    markPurchaseSuccess("user-1");
     mocks.access.decision = {
       state: "inactive",
       reason: "never_entitled",
@@ -184,7 +186,7 @@ describe("AccessGate", () => {
   });
 
   it("positively-resolved inactive NEW user → normal funnel", () => {
-    mocks.auth.user = { onboardingComplete: false };
+    mocks.auth.user = { id: "user-1", onboardingComplete: false };
     mocks.access.decision = {
       state: "inactive",
       reason: "never_entitled",

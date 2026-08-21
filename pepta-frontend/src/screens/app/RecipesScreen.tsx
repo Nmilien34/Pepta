@@ -97,6 +97,11 @@ export function RecipesScreen() {
                     key={recipe.id}
                     recipe={recipe}
                     last={i === recipes.length - 1}
+                    onOpen={() =>
+                      navigation.navigate('RecipeDetail', {
+                        recipeId: recipe.id,
+                      })
+                    }
                     action={
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                         <Pressable
@@ -155,6 +160,11 @@ export function RecipesScreen() {
                     key={starter.id}
                     recipe={starter}
                     last={i === starters.length - 1}
+                    onOpen={() =>
+                      navigation.navigate('RecipeDetail', {
+                        recipeId: starter.id,
+                      })
+                    }
                     action={
                       <Pressable
                         onPress={() => keepStarter(starter)}
@@ -200,10 +210,12 @@ function RecipeRow({
   recipe,
   last,
   action,
+  onOpen,
 }: {
   recipe: RecipeResponse;
   last: boolean;
   action: React.ReactNode;
+  onOpen: () => void;
 }) {
   const theme = useTheme();
   // Summed here, every render — never read from a stored field.
@@ -219,7 +231,23 @@ function RecipeRow({
         borderBottomColor: theme.colors.border,
       }}
     >
-      <View style={{ flex: 1, minWidth: 0 }}>
+      <Pressable
+        onPress={() => {
+          Haptics.selectionAsync().catch(() => undefined);
+          onOpen();
+        }}
+        accessibilityRole="button"
+        accessibilityLabel={
+          recipe.isStarter
+            ? `Open ${recipe.name} starter`
+            : `Open ${recipe.name}`
+        }
+        style={({ pressed }) => ({
+          flex: 1,
+          minWidth: 0,
+          opacity: pressed ? 0.68 : 1,
+        })}
+      >
         <AppText variant="cardTitle" style={{ fontSize: 14.5 }} numberOfLines={1}>
           {recipe.name}
         </AppText>
@@ -239,7 +267,7 @@ function RecipeRow({
             </AppText>
           ) : null}
         </View>
-      </View>
+      </Pressable>
       {action}
     </View>
   );

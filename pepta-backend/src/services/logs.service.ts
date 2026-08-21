@@ -1,7 +1,6 @@
 import {
   activityLogResponseSchema,
   doseLogResponseSchema,
-  mealLogResponseSchema,
   measurementResponseSchema,
   proteinLogResponseSchema,
   fiberLogResponseSchema,
@@ -12,7 +11,6 @@ import {
 import {
   ActivityLogModel,
   DoseLogModel,
-  MealLogModel,
   MeasurementModel,
   ProteinLogModel,
   FiberLogModel,
@@ -26,7 +24,7 @@ export const weightLogService = createCrudService({
   model: WeightLogModel,
   responseSchema: weightLogResponseSchema,
   name: 'Weight log',
-  hasIdempotencyKey: false,
+  hasIdempotencyKey: true,
 });
 
 export const doseLogService = createCrudService({
@@ -36,12 +34,7 @@ export const doseLogService = createCrudService({
   hasIdempotencyKey: true,
 });
 
-export const mealLogService = createCrudService({
-  model: MealLogModel,
-  responseSchema: mealLogResponseSchema,
-  name: 'Meal log',
-  hasIdempotencyKey: true,
-});
+export { mealLogService } from "./meal-log.service";
 
 export const waterLogService = createCrudService({
   model: WaterLogModel,

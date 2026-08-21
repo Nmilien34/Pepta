@@ -12,7 +12,12 @@ describe("Pep push scheduler service", () => {
         tokens: [{ token: "ExponentPushToken[abc123]", platform: "ios" }],
       },
     ]);
-    const loadContext = vi.fn(async () => ({ userId: "user-1" }));
+    // The scheduler holds nudges outside the user's waking hours, so the
+    // context needs a zone; 14:00 UTC is 10:00 in New York.
+    const loadContext = vi.fn(async () => ({
+      userId: "user-1",
+      timezone: "America/New_York",
+    }));
     const createNotification = vi.fn(async () => ({
       candidate: {
         priorityId: "dose_due",
@@ -45,7 +50,7 @@ describe("Pep push scheduler service", () => {
     expect(createNotification).toHaveBeenCalledWith({
       userId: "user-1",
       aiPushCopyConsent: true,
-      context: { userId: "user-1" },
+      context: { userId: "user-1", timezone: "America/New_York" },
       now,
     });
     expect(sendNotifications).toHaveBeenCalledWith([
@@ -74,6 +79,7 @@ describe("Pep push scheduler service", () => {
       skipped: 0,
       duplicates: 0,
       noCandidate: 0,
+      quietHours: 0,
     });
   });
 
@@ -88,7 +94,10 @@ describe("Pep push scheduler service", () => {
           tokens: [{ token: "ExponentPushToken[abc123]", platform: "ios" }],
         },
       ],
-      loadContext: async () => ({ userId: "user-1" }),
+      loadContext: async () => ({
+        userId: "user-1",
+        timezone: "America/New_York",
+      }),
       createNotification: async () => ({
         candidate: {
           priorityId: "dose_due",
@@ -121,7 +130,10 @@ describe("Pep push scheduler service", () => {
           tokens: [{ token: "ExponentPushToken[abc123]", platform: "ios" }],
         },
       ],
-      loadContext: async () => ({ userId: "user-1" }),
+      loadContext: async () => ({
+        userId: "user-1",
+        timezone: "America/New_York",
+      }),
       createNotification: async () => ({
         candidate: {
           priorityId: "hydration_check",
@@ -140,5 +152,99 @@ describe("Pep push scheduler service", () => {
 
     expect(sendNotifications).not.toHaveBeenCalled();
     expect(result.skipped).toBe(1);
+  });
+});
+
+// The sweep runs every 15 minutes around the clock. Without a gate it had no
+// idea what time it was where the user is, so an audible nudge could land at
+// 12:15am — right after their day rolled over, before they could have logged
+// anything — or a dose reminder at 4am for an 8am dose.
+describe("quiet hours", () => {
+  function deps(overrides: Record<string, unknown> = {}) {
+    return {
+      loadEligibleUsers: async () => [
+        {
+          userId: "user-1",
+          aiPushCopyConsent: true,
+          tokens: [{ token: "ExponentPushToken[abc123]", platform: "ios" }],
+        },
+      ],
+      loadContext: async () => ({
+        userId: "user-1",
+        timezone: "America/New_York",
+      }),
+      createNotification: async () => ({
+        candidate: {
+          priorityId: "protein_anchor",
+          importance: "high",
+          pushEligible: true,
+          windowKey: "protein_anchor:2026-06-21",
+        } as const,
+        title: "Pep: protein checkpoint",
+        body: "You're 150g from today's protein target.",
+        source: "deterministic" as const,
+      }),
+      hasDeliveryForWindow: async () => false,
+      sendNotifications: vi.fn(async () => ({
+        sent: 1,
+        skipped: 0,
+        tickets: [{ status: "ok", id: "t1" }],
+      })),
+      recordDelivery: async () => undefined,
+      ...overrides,
+    };
+  }
+
+  it("holds a nudge that would land just after the user's midnight", async () => {
+    const sendNotifications = vi.fn(async () => ({ sent: 0, skipped: 0, tickets: [] }));
+    // 04:15 UTC = 00:15 in New York.
+    const result = await runPepPushMaintenance(
+      new Date("2026-06-21T04:15:00.000Z"),
+      deps({ sendNotifications }) as never,
+    );
+
+    expect(sendNotifications).not.toHaveBeenCalled();
+    expect(result.quietHours).toBe(1);
+    expect(result.sent).toBe(0);
+  });
+
+  it("holds one that would land before the user is up", async () => {
+    const sendNotifications = vi.fn(async () => ({ sent: 0, skipped: 0, tickets: [] }));
+    // 11:00 UTC = 07:00 in New York, still inside quiet hours.
+    await runPepPushMaintenance(
+      new Date("2026-06-21T11:00:00.000Z"),
+      deps({ sendNotifications }) as never,
+    );
+
+    expect(sendNotifications).not.toHaveBeenCalled();
+  });
+
+  it("sends during the user's waking hours", async () => {
+    const sendNotifications = vi.fn(async () => ({
+      sent: 1,
+      skipped: 0,
+      tickets: [{ status: "ok", id: "t1" }],
+    }));
+    // 17:00 UTC = 13:00 in New York.
+    const result = await runPepPushMaintenance(
+      new Date("2026-06-21T17:00:00.000Z"),
+      deps({ sendNotifications }) as never,
+    );
+
+    expect(sendNotifications).toHaveBeenCalled();
+    expect(result.sent).toBe(1);
+  });
+
+  it("holds rather than guesses when the context has no usable zone", async () => {
+    const sendNotifications = vi.fn(async () => ({ sent: 0, skipped: 0, tickets: [] }));
+    await runPepPushMaintenance(
+      new Date("2026-06-21T17:00:00.000Z"),
+      deps({
+        loadContext: async () => ({ userId: "user-1" }),
+        sendNotifications,
+      }) as never,
+    );
+
+    expect(sendNotifications).not.toHaveBeenCalled();
   });
 });

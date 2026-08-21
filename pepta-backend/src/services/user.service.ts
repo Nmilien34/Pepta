@@ -11,6 +11,7 @@ import {
 import type { DiscoverySource } from "@pepta/shared";
 import type { ProviderIdentity } from "../auth/google";
 import { AppError, NotFoundError } from "../lib/errors";
+import { logger } from "../lib/logger";
 import { prepareComplimentaryCleanupForDeletion } from "./complimentary-access-cleanup.service";
 import { computeProfileTargets } from "../lib/profile-targets";
 import {
@@ -19,6 +20,7 @@ import {
   DiscoverySourceModel,
   CycleModel,
   DoseLogModel,
+  FavouriteModel,
   FiberLogModel,
   InsightModel,
   MealLogModel,
@@ -32,6 +34,7 @@ import {
   ProteinLogModel,
   PushTokenModel,
   ReferralClaimModel,
+  RecipeModel,
   ScheduleModel,
   SideEffectLogModel,
   UserModel,
@@ -41,8 +44,13 @@ import {
   WeightLogModel,
   type UserDocument,
 } from "../models";
-import { deleteS3Object } from "./s3.service";
+import {
+  getMediaViewUrl,
+  queueAllUserMediaForDeletion,
+} from "./media.service";
+import { sweepLegacyMediaForDeletion } from "./media-legacy.service";
 import { serializeWithSchema } from "./serializers";
+import { refreshGoogleAvatar } from "./provider-avatar.service";
 
 function documentObject(document: unknown): Record<string, unknown> {
   if (document && typeof document === "object") {
@@ -157,10 +165,6 @@ function applyIdentityToUser(
     user.displayName = identity.name;
   }
 
-  if (identity.picture && user.avatarUrl !== identity.picture) {
-    user.avatarUrl = identity.picture;
-  }
-
   if (provider) {
     provider.linkedAt = new Date();
     return;
@@ -181,8 +185,16 @@ function providerConflict(message: string): AppError {
   });
 }
 
-export function serializeUser(user: UserDocument): User {
+export async function serializeUser(user: UserDocument): Promise<User> {
   const value = documentObject(user);
+  const userId = idToString(value.id ?? value._id);
+  const avatarMediaId = idToString(value.avatarMediaId);
+  let avatarUrl: string | undefined;
+  if (avatarMediaId) {
+    avatarUrl = await getMediaViewUrl(userId, avatarMediaId).catch(
+      () => undefined,
+    );
+  }
   const entitlement = isRecord(value.entitlement) ? value.entitlement : {};
   const authProviders = Array.isArray(value.authProviders)
     ? value.authProviders
@@ -197,12 +209,12 @@ export function serializeUser(user: UserDocument): User {
     notificationPreferences.aiPushCopyConsent === true;
 
   return userResponseSchema.parse({
-    id: idToString(value.id ?? value._id),
+    id: userId,
     email: optionalString(value.email),
     emailVerified: value.emailVerified === true,
     displayName: optionalString(value.displayName),
-    avatarUrl: optionalString(value.avatarUrl),
-    hasAvatar: optionalString(value.avatarKey) !== undefined,
+    avatarUrl,
+    hasAvatar: Boolean(avatarMediaId),
     authProviders: authProviders.map((provider) => {
       const providerRecord = isRecord(provider) ? provider : {};
 
@@ -245,6 +257,25 @@ interface UpsertUserFromIdentityResult {
   isNewUser: boolean;
 }
 
+async function refreshTrustedProviderAvatar(
+  user: UserDocument,
+  identity: ProviderIdentity,
+): Promise<void> {
+  if (identity.provider !== "google" || !identity.picture) return;
+  try {
+    await refreshGoogleAvatar(user, identity.picture);
+  } catch (error) {
+    logger.warn(
+      {
+        userId: user._id.toString(),
+        provider: identity.provider,
+        errorName: error instanceof Error ? error.name : "UnknownError",
+      },
+      "[auth] provider avatar refresh failed",
+    );
+  }
+}
+
 export async function upsertUserFromIdentityWithResult(
   identity: ProviderIdentity,
 ): Promise<UpsertUserFromIdentityResult> {
@@ -260,6 +291,7 @@ export async function upsertUserFromIdentityWithResult(
   if (existingByProvider) {
     applyIdentityToUser(existingByProvider, identity);
     await existingByProvider.save();
+    await refreshTrustedProviderAvatar(existingByProvider, identity);
     return { user: existingByProvider, isNewUser: false };
   }
 
@@ -273,6 +305,7 @@ export async function upsertUserFromIdentityWithResult(
   if (existingByEmail) {
     applyIdentityToUser(existingByEmail, identity);
     await existingByEmail.save();
+    await refreshTrustedProviderAvatar(existingByEmail, identity);
     return { user: existingByEmail, isNewUser: false };
   }
 
@@ -280,7 +313,6 @@ export async function upsertUserFromIdentityWithResult(
     email,
     emailVerified: emailIsVerified,
     displayName: identity.name,
-    avatarUrl: identity.picture,
     authProviders: [
       {
         provider: identity.provider,
@@ -295,6 +327,8 @@ export async function upsertUserFromIdentityWithResult(
     },
     onboardingComplete: false,
   });
+
+  await refreshTrustedProviderAvatar(user, identity);
 
   return { user, isNewUser: true };
 }
@@ -344,6 +378,7 @@ export async function linkProviderIdentityToUser(
 
   applyIdentityToUser(user, identity);
   await user.save();
+  await refreshTrustedProviderAvatar(user, identity);
   return user;
 }
 
@@ -370,10 +405,6 @@ export async function updateCurrentUser(
   if ("displayName" in patch) {
     update.displayName = patch.displayName;
   }
-  if ("avatarUrl" in patch) {
-    update.avatarUrl = patch.avatarUrl;
-  }
-
   const user = await UserModel.findByIdAndUpdate(
     userId,
     { $set: update },
@@ -387,37 +418,24 @@ export async function updateCurrentUser(
   return serializeUser(user);
 }
 
-function optionalS3Key(value: unknown): string | null {
-  return typeof value === "string" && value.trim().length > 0 ? value : null;
-}
-
-async function collectAccountS3Keys(
-  userId: string,
-  user: UserDocument,
-): Promise<string[]> {
-  const [progressPhotos, mealScans, mealLogs] = await Promise.all([
-    ProgressPhotoModel.find({ userId }),
-    MealScanModel.find({ userId }),
-    MealLogModel.find({ userId, deletedAt: { $exists: true } }),
-  ]);
-  const keys = new Set<string>();
-  const avatarKey = optionalS3Key(documentObject(user).avatarKey);
-  if (avatarKey) keys.add(avatarKey);
-
-  for (const photo of progressPhotos) {
-    const key = optionalS3Key(documentObject(photo).s3Key);
-    if (key) keys.add(key);
-  }
-  for (const scan of mealScans) {
-    const key = optionalS3Key(documentObject(scan).photoS3Key);
-    if (key) keys.add(key);
-  }
-  for (const meal of mealLogs) {
-    const key = optionalS3Key(documentObject(meal).photoS3Key);
-    if (key) keys.add(key);
-  }
-
-  return [...keys];
+/**
+ * Strips a deleted account's payment receipts to a financial-records core.
+ *
+ * The receipts are KEPT — Apple disputes and chargebacks arrive after someone
+ * deletes their account, and defending one needs the transaction, not the
+ * person. What goes is everything that ties a receipt to this human: the
+ * Pepta user reference. What stays is the money: transaction id, product,
+ * price and currency, event type, store, environment, timestamps, and the
+ * RevenueCat customer id the charge was actually made against.
+ *
+ * `detached` makes "this belonged to an account that no longer exists" a fact
+ * on the row rather than something inferred from a null.
+ */
+async function stripPaymentReceiptsForDeletedUser(userId: string): Promise<void> {
+  await ProcessedWebhookEventModel.updateMany(
+    { $or: [{ userId }, { appUserId: userId }] },
+    { $set: { userId: null, detached: true } },
+  );
 }
 
 export async function deleteCurrentUser(userId: string): Promise<void> {
@@ -426,8 +444,11 @@ export async function deleteCurrentUser(userId: string): Promise<void> {
     throw new NotFoundError("User not found");
   }
 
-  const s3Keys = await collectAccountS3Keys(userId, user);
-  await Promise.all(s3Keys.map((key) => deleteS3Object(key)));
+  // Legacy raw-key sweep MUST run before the deleteMany fan-out below: the
+  // raw keys live on the product rows, and once those are gone nothing can
+  // ever rediscover the S3 objects they pointed at. No S3 calls in here.
+  await sweepLegacyMediaForDeletion(userId);
+  await queueAllUserMediaForDeletion(userId);
 
   await Promise.all([
     UserProfileModel.deleteMany({ userId }),
@@ -440,6 +461,7 @@ export async function deleteCurrentUser(userId: string): Promise<void> {
     WaterLogModel.deleteMany({ userId }),
     ProteinLogModel.deleteMany({ userId }),
     FiberLogModel.deleteMany({ userId }),
+    FavouriteModel.deleteMany({ userId }),
     ActivityLogModel.deleteMany({ userId }),
     SideEffectLogModel.deleteMany({ userId }),
     MeasurementModel.deleteMany({ userId }),
@@ -449,11 +471,18 @@ export async function deleteCurrentUser(userId: string): Promise<void> {
     WeeklyRetentionModel.deleteMany({ userId }),
     PushTokenModel.deleteMany({ userId }),
     ReferralClaimModel.deleteMany({ userId }),
+    RecipeModel.deleteMany({ userId }),
     PepMemoryModel.deleteMany({ userId }),
     PepPushDeliveryModel.deleteMany({ userId }),
     DismissedNudgeModel.deleteMany({ userId }),
-    ProcessedWebhookEventModel.deleteMany({ appUserId: userId }),
+    // NOT deleted — see stripPaymentReceiptsForDeletedUser below.
   ]);
+
+  // Payment receipts are RETAINED, stripped to a financial-records core.
+  // Apple disputes and chargebacks arrive after a user deletes their account,
+  // and defending one needs the transaction, not the person. Everything that
+  // ties a receipt to this human goes; the money facts stay.
+  await stripPaymentReceiptsForDeletedUser(userId);
 
   // Audit H1: after user-owned data is removed, record durable promotional
   // cleanup immediately before the user document disappears. RevenueCat

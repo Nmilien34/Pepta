@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MealLogSheet } from "./MealLogSheet";
 import { api } from "../services/api";
 import { AI_CONSENT_STORAGE_KEY } from "../services/aiConsent";
+import { discardLocalCapture } from "../services/localCaptures";
 import { testStorage } from "../tests/testStorage";
 
 const saveLogMock = vi.hoisted(() => vi.fn(async () => "saved" as const));
@@ -83,6 +84,10 @@ vi.mock("expo-file-system", () => ({
     base64: audioMocks.fileBase64,
   })),
 }));
+
+// Capture-file housekeeping is its own unit (localCaptures.test.ts); here it
+// just needs to be inert so preview transitions don't touch a filesystem.
+vi.mock("../services/localCaptures", () => ({ discardLocalCapture: vi.fn() }));
 
 vi.mock("expo-linear-gradient", () => ({
   LinearGradient: "LinearGradient",
@@ -706,6 +711,28 @@ describe("MealLogSheet · keeping the result as a recipe", () => {
     });
   });
 
+  it("reuses the identified meal media when saving it as a recipe", async () => {
+    const tree = await commit({
+      keepAsRecipe: true,
+      seed: {
+        foodName: "Overnight oats",
+        servingSize: "1 bowl",
+        protein: 40,
+        calories: 440,
+        photoMediaId: "media-1",
+      },
+    });
+    await act(async () => {
+      tree.root.findByProps({ label: "Save recipe" }).props.onPress();
+    });
+
+    expect(apiMock.createRecipe).toHaveBeenCalledWith({
+      name: composed.name,
+      ingredients: composed.ingredients,
+      photoMediaId: "media-1",
+    });
+  });
+
   it("drops a row the model invented, and the total follows", async () => {
     const tree = await commit({ keepAsRecipe: true });
     expect(texts(tree)).toContain("29 g protein"); // 5 + 24
@@ -738,5 +765,131 @@ describe("MealLogSheet · keeping the result as a recipe", () => {
     await commit({});
     expect(apiMock.composeRecipe).not.toHaveBeenCalled();
     expect(apiMock.createRecipe).not.toHaveBeenCalled();
+  });
+});
+
+// The capture file behind the preview: deleted exactly when nothing renders
+// it any more — a replaced capture, a closed sheet, an unmounted screen —
+// and NEVER by clearing visible state mid-dismissal.
+describe("MealLogSheet · the capture file behind the preview", () => {
+  const discardCapture = vi.mocked(discardLocalCapture);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    testStorage.clear();
+  });
+
+  async function openProductCapture(
+    tree: TestRenderer.ReactTestRenderer,
+    uri: string,
+  ) {
+    await act(async () => {
+      tree.root
+        .findByProps({ accessibilityLabel: "Product meal log" })
+        .props.onPress();
+    });
+    await act(async () => {
+      tree.root
+        .find((node) => String(node.type) === "MealCamera")
+        .props.onCapture(uri);
+    });
+  }
+
+  async function renderSheet() {
+    await testStorage.setItem(AI_CONSENT_STORAGE_KEY, "accepted");
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+    await act(async () => {
+      tree = TestRenderer.create(<MealLogSheet visible={true} onClose={vi.fn()} />);
+    });
+    return tree!;
+  }
+
+  it("deletes the replaced capture when a second one comes in, not the new one", async () => {
+    const tree = await renderSheet();
+    await openProductCapture(tree, "file:///cache/capture-a.png");
+    await act(async () => {
+      tree.root
+        .findByProps({ accessibilityLabel: "Back to meal log options" })
+        .props.onPress();
+    });
+    await openProductCapture(tree, "file:///cache/capture-b.png");
+
+    expect(discardCapture).toHaveBeenCalledWith("file:///cache/capture-a.png");
+    expect(discardCapture).not.toHaveBeenCalledWith("file:///cache/capture-b.png");
+  });
+
+  it("deletes the capture when the sheet closes, without blanking the still-animating photo", async () => {
+    const tree = await renderSheet();
+    await openProductCapture(tree, "file:///cache/capture-a.png");
+
+    await act(async () => {
+      tree.update(<MealLogSheet visible={false} onClose={vi.fn()} />);
+    });
+
+    expect(discardCapture).toHaveBeenCalledWith("file:///cache/capture-a.png");
+    // The preview STATE must survive the close — the sheet keeps rendering
+    // through its slide-out, and clearing it pops the photo to the
+    // placeholder mid-animation.
+    const stillShown = tree.root
+      .findAll((node) => String(node.type) === "Image")
+      .some((node) => node.props.source?.uri === "file:///cache/capture-a.png");
+    expect(stillShown).toBe(true);
+  });
+
+  it("deletes the capture exactly once across a close-then-reopen", async () => {
+    const tree = await renderSheet();
+    await openProductCapture(tree, "file:///cache/capture-a.png");
+    await act(async () => {
+      tree.update(<MealLogSheet visible={false} onClose={vi.fn()} />);
+    });
+    await act(async () => {
+      tree.update(<MealLogSheet visible={true} onClose={vi.fn()} />);
+    });
+
+    const forA = discardCapture.mock.calls.filter(
+      (call) => call[0] === "file:///cache/capture-a.png",
+    );
+    expect(forA).toHaveLength(1);
+  });
+
+  it("deletes the capture when the screen unmounts under the open sheet", async () => {
+    const tree = await renderSheet();
+    await openProductCapture(tree, "file:///cache/capture-a.png");
+    await act(async () => {
+      tree.unmount();
+    });
+
+    expect(discardCapture).toHaveBeenCalledWith("file:///cache/capture-a.png");
+  });
+
+  it("deletes nothing when no photo was ever captured", async () => {
+    const tree = await renderSheet();
+    await act(async () => {
+      tree.update(<MealLogSheet visible={false} onClose={vi.fn()} />);
+    });
+
+    const realCalls = discardCapture.mock.calls.filter((call) => call[0] != null);
+    expect(realCalls).toHaveLength(0);
+  });
+
+  it("keeps the capture when the sheet steps aside for the camera — that dismissal is not a close", async () => {
+    const tree = await renderSheet();
+    await openProductCapture(tree, "file:///cache/capture-a.png");
+
+    // Re-opening the camera hides the sheet and fires the SAME onDismissed
+    // the real close uses; only the close branch may sweep the file, or the
+    // photo the user is about to retake would vanish under them.
+    await act(async () => {
+      tree.root
+        .findByProps({ accessibilityLabel: "Back to meal log options" })
+        .props.onPress();
+    });
+    await act(async () => {
+      tree.root
+        .findByProps({ accessibilityLabel: "Product meal log" })
+        .props.onPress();
+    });
+
+    expect(discardCapture).not.toHaveBeenCalledWith("file:///cache/capture-a.png");
   });
 });

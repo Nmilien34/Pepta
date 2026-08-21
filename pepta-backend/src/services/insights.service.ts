@@ -10,6 +10,7 @@ import {
   detectStall,
   type DetectorSeverity,
 } from '../lib/insight-detectors';
+import { parseModelJson } from '../lib/parseModelJson';
 import { daysSinceDose, cycleDayFromShotDay } from '../lib/week';
 import { logger } from '../lib/logger';
 import {
@@ -26,6 +27,10 @@ import { getMedicationLevels } from './medication-level.service';
 
 export const INSIGHT_COPY_VERSION = 'insight-copy-v1';
 const INSIGHT_CACHE_TTL_MS = 12 * 60 * 60 * 1000;
+// How long a fallback-authored row is reused before a consented reader tries
+// the model again. Without a floor, an OpenAI outage would mean a fresh
+// attempt on every single Home load.
+const AI_RETRY_BACKOFF_MS = 15 * 60 * 1000;
 
 type InsightType =
   | 'medication_level'
@@ -120,20 +125,19 @@ function isInsightCopy(value: unknown): value is InsightCopy {
 }
 
 function parseInsightCopy(outputText: string): InsightCopy | null {
-  try {
-    const parsed = JSON.parse(outputText) as unknown;
+  // Fence-tolerant, like the product parser. A fenced reply used to fail here
+  // and degrade silently to the canned fallback, so the user saw boilerplate
+  // and nothing said why.
+  const parsed = parseModelJson<unknown>(outputText);
 
-    if (!isInsightCopy(parsed)) {
-      return null;
-    }
-
-    return {
-      headline: parsed.headline.trim(),
-      body: parsed.body.trim(),
-    };
-  } catch {
+  if (!isInsightCopy(parsed)) {
     return null;
   }
+
+  return {
+    headline: parsed.headline.trim(),
+    body: parsed.body.trim(),
+  };
 }
 
 function getOpenAIClient(): OpenAI | null {
@@ -176,7 +180,7 @@ async function generateOpenAIInsightProse(input: InsightProseInput): Promise<Ins
 async function resolveCopy(input: {
   draft: InsightDraft;
   generateProse: (draft: InsightProseInput) => Promise<InsightCopy | null>;
-}): Promise<InsightCopy> {
+}): Promise<{ copy: InsightCopy; fromAI: boolean }> {
   try {
     const generated = await input.generateProse({
       ...input.draft,
@@ -184,13 +188,15 @@ async function resolveCopy(input: {
     });
 
     if (generated?.headline && generated.body) {
-      return generated;
+      return { copy: generated, fromAI: true };
     }
   } catch (error) {
     logger.warn({ error, insightType: input.draft.type }, '[insights] prose generation failed');
   }
 
-  return copyFromFallback(input.draft);
+  // The caller needs to know this is fallback text, not model text — see
+  // resolveInsightDocument's freshness rule.
+  return { copy: copyFromFallback(input.draft), fromAI: false };
 }
 
 async function proteinTrendDraft(userId: string, now: Date): Promise<InsightDraft | null> {
@@ -355,23 +361,35 @@ async function resolveInsightDocument(input: {
   draft: InsightDraft;
   now: Date;
   cacheTtlMs: number;
+  allowAIProse: boolean;
   generateProse: (draft: InsightProseInput) => Promise<InsightCopy | null>;
 }) {
   const cached = await InsightModel.findOne({
     userId: input.userId,
     type: input.draft.type,
   });
+  const ageMs = cached ? input.now.getTime() - cached.generatedAt.getTime() : 0;
   const cacheFresh =
     cached &&
-    input.now.getTime() - cached.generatedAt.getTime() <= input.cacheTtlMs &&
+    ageMs <= input.cacheTtlMs &&
     cached.copyVersion === INSIGHT_COPY_VERSION &&
-    signalsMatch(cached.deterministicSignal, input.draft.deterministicSignal);
+    signalsMatch(cached.deterministicSignal, input.draft.deterministicSignal) &&
+    // A consented reader must not be served fallback text just because a
+    // background sweep got here first. The sweeps (the push cron, and the
+    // memory refresh after EVERY log write) run with AI prose off, so without
+    // this they filled the cache with deterministic copy that stayed "fresh"
+    // for the full TTL — and the user who opted into AI copy never saw any.
+    //
+    // AI_RETRY_BACKOFF_MS keeps that from becoming a request-per-load retry
+    // storm while OpenAI is unavailable: a fallback row is reused for a short
+    // while before we try the model again.
+    (cached.aiCopy === true || !input.allowAIProse || ageMs <= AI_RETRY_BACKOFF_MS);
 
   if (cacheFresh) {
     return cached;
   }
 
-  const copy = await resolveCopy({
+  const { copy, fromAI } = await resolveCopy({
     draft: input.draft,
     generateProse: input.generateProse,
   });
@@ -387,6 +405,7 @@ async function resolveInsightDocument(input: {
         deterministicSignal: input.draft.deterministicSignal,
         copyVersion: INSIGHT_COPY_VERSION,
         generatedAt: input.now,
+        aiCopy: fromAI,
         userId: input.userId,
       },
     },
@@ -445,6 +464,7 @@ export async function getInsights(
         draft,
         now,
         cacheTtlMs: options.cacheTtlMs ?? INSIGHT_CACHE_TTL_MS,
+        allowAIProse: options.allowAIProse === true,
         generateProse,
       }),
     ),

@@ -15,6 +15,7 @@ import {
   uploadAvatar,
   type AvatarSource,
 } from "../services/avatar.service";
+import { discardLocalCapture } from "../services/localCaptures";
 import { useTheme } from "../theme";
 import { Icon } from "./Icon";
 import { UserAvatar } from "./UserAvatar";
@@ -29,10 +30,15 @@ export function EditableAvatar({ size = 62 }: EditableAvatarProps) {
   const [busy, setBusy] = useState(false);
 
   const runUpload = async (source: AvatarSource) => {
+    // The picker's cache copy (or camera capture). The avatar itself renders
+    // from the server URL, so once the upload settles — either way — nothing
+    // shows this file again and it can go.
+    let capturedUri: string | null = null;
     try {
       setBusy(true);
       const picked = await pickAvatar(source);
       if (!picked) return;
+      capturedUri = picked.uri;
       const updated = await uploadAvatar(picked);
       updateCachedUser(updated);
     } catch (error) {
@@ -40,6 +46,7 @@ export function EditableAvatar({ size = 62 }: EditableAvatarProps) {
         error instanceof Error ? error.message : "Try again in a moment.";
       Alert.alert("Couldn’t update photo", message);
     } finally {
+      discardLocalCapture(capturedUri);
       setBusy(false);
     }
   };

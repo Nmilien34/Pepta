@@ -7,7 +7,9 @@ import {
   type PushTokenRegistrationResponse,
 } from "@pepta/shared";
 import { NotFoundError } from "../lib/errors";
+import { logger } from "../lib/logger";
 import { PushTokenModel, UserModel } from "../models";
+import { clearPepMemoryAiSummary } from "./pepMemory.service";
 
 function documentObject(document: unknown): Record<string, unknown> {
   if (document && typeof document === "object") {
@@ -116,6 +118,20 @@ export async function updateNotificationPreferences(
 
   if (!user) {
     throw new NotFoundError("User not found");
+  }
+
+  // Withdrawing consent has to remove the text already generated under it,
+  // not just stop generating more. The memory refresh deliberately preserves
+  // an existing summary (it runs constantly and would otherwise erase one it
+  // never regenerated), so this is the explicit erase.
+  if (!patch.aiPushCopyConsent) {
+    try {
+      await clearPepMemoryAiSummary(userId);
+    } catch (error) {
+      // The consent flag is already false, so nothing new is generated; a
+      // failed erase is worth knowing about but must not fail the opt-out.
+      logger.error({ error, userId }, "[pep-memory] failed to clear AI summary on consent withdrawal");
+    }
   }
 
   return serializeNotificationPreferences(

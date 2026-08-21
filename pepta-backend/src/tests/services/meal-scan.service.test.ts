@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  createPresignedGetUrl: vi.fn(),
+  discardMedia: vi.fn(),
   generateMealScanNote: vi.fn(),
   generateMealTextAnalysis: vi.fn(),
   generateMealScanVision: vi.fn(),
@@ -13,7 +13,8 @@ const mocks = vi.hoisted(() => ({
   proteinFind: vi.fn(),
   resolveProductNutrition: vi.fn(),
   userProfileFindOne: vi.fn(),
-  putS3Object: vi.fn(),
+  getMediaViewUrl: vi.fn(),
+  persistMealScanMedia: vi.fn(),
 }));
 
 vi.mock("../../models", () => ({
@@ -33,9 +34,10 @@ vi.mock("../../models", () => ({
   },
 }));
 
-vi.mock("../../services/s3.service", () => ({
-  createPresignedGetUrl: mocks.createPresignedGetUrl,
-  putS3Object: mocks.putS3Object,
+vi.mock("../../services/media.service", () => ({
+  discardMedia: mocks.discardMedia,
+  getMediaViewUrl: mocks.getMediaViewUrl,
+  persistMealScanMedia: mocks.persistMealScanMedia,
 }));
 
 vi.mock("../../services/meal-scan-vision.service", () => ({
@@ -142,8 +144,12 @@ describe("meal scan service", () => {
     mocks.generateMealScanNote.mockResolvedValue(
       "This would put you at 96g of 120g protein today.",
     );
-    mocks.putS3Object.mockResolvedValue(undefined);
-    mocks.createPresignedGetUrl.mockResolvedValue(
+    mocks.discardMedia.mockResolvedValue(undefined);
+    mocks.persistMealScanMedia.mockResolvedValue({
+      mediaId: "media-1",
+      status: "ready",
+    });
+    mocks.getMediaViewUrl.mockResolvedValue(
       "https://signed.example/photo.jpg",
     );
     mocks.mealScanFindOne.mockResolvedValue(null);
@@ -167,27 +173,28 @@ describe("meal scan service", () => {
     );
   });
 
-  it("stores the uploaded image, analyzes it with OpenAI vision, and persists the scan", async () => {
+  it("analyzes first, then persists canonical media and the scan", async () => {
     const result = await analyzeMealScan("user-1", {
       imageData: onePixelPng,
       imageMimeType: "image/png",
       idempotencyKey: "scan-key-1",
     });
 
-    expect(mocks.putS3Object).toHaveBeenCalledWith(
-      expect.objectContaining({
-        key: expect.stringMatching(/^pepta\/meal-scans\/user-1\/.+\.png$/),
-        body: expect.any(Uint8Array),
-        contentType: "image/png",
-      }),
-    );
     expect(mocks.generateMealScanVision).toHaveBeenCalledWith(
       onePixelPng,
       "image/png",
     );
+    expect(mocks.persistMealScanMedia).toHaveBeenCalledWith("user-1", {
+      bytes: expect.any(Uint8Array),
+      contentType: "image/png",
+    });
+    expect(mocks.generateMealScanVision.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.persistMealScanMedia.mock.invocationCallOrder[0]!,
+    );
     expect(mocks.mealScanCreate).toHaveBeenCalledWith(
       expect.objectContaining({
         userId: "user-1",
+        photoMediaId: "media-1",
         imageMimeType: "image/png",
         analysis,
         idempotencyKey: "scan-key-1",
@@ -196,7 +203,7 @@ describe("meal scan service", () => {
     );
     expect(result).toEqual({
       scanId: "scan-1",
-      photoS3Key: expect.stringMatching(/^pepta\/meal-scans\/user-1\/.+\.png$/),
+      photoMediaId: "media-1",
       analysis,
       coachContent: expect.objectContaining({
         mode: "affirmation",
@@ -223,7 +230,7 @@ describe("meal scan service", () => {
       document({
         id: "scan-existing",
         userId: "user-1",
-        photoS3Key: "pepta/meal-scans/user-1/existing.png",
+        photoMediaId: "media-existing",
         imageMimeType: "image/png",
         analysis,
         coachContent: null,
@@ -239,10 +246,10 @@ describe("meal scan service", () => {
       idempotencyKey: "scan-key-1",
     });
 
-    expect(mocks.putS3Object).not.toHaveBeenCalled();
+    expect(mocks.persistMealScanMedia).not.toHaveBeenCalled();
     expect(mocks.generateMealScanVision).not.toHaveBeenCalled();
     expect(result.scanId).toBe("scan-existing");
-    expect(result.photoS3Key).toBe("pepta/meal-scans/user-1/existing.png");
+    expect(result.photoMediaId).toBe("media-existing");
     expect(result.note).toBe("Cached tracker note");
   });
 
@@ -263,19 +270,13 @@ describe("meal scan service", () => {
     expect(result.visionEngineVersion).toBe("meal-scan-text-v1");
   });
 
-  it("stores a product photo, resolves packaged-food nutrition, and persists product metadata", async () => {
+  it("resolves product nutrition before persisting its canonical media", async () => {
     const result = await analyzeProductScan("user-1", {
       imageData: onePixelPng,
       imageMimeType: "image/png",
       idempotencyKey: "product-scan-key-1",
     });
 
-    expect(mocks.putS3Object).toHaveBeenCalledWith(
-      expect.objectContaining({
-        key: expect.stringMatching(/^pepta\/meal-scans\/user-1\/.+\.png$/),
-        contentType: "image/png",
-      }),
-    );
     expect(mocks.generateProductCluesFromImage).toHaveBeenCalledWith(
       onePixelPng,
       "image/png",
@@ -287,9 +288,13 @@ describe("meal scan service", () => {
         barcodeText: "081212903020",
       }),
     );
+    expect(mocks.resolveProductNutrition.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.persistMealScanMedia.mock.invocationCallOrder[0]!,
+    );
     expect(mocks.mealScanCreate).toHaveBeenCalledWith(
       expect.objectContaining({
         userId: "user-1",
+        photoMediaId: "media-1",
         imageMimeType: "image/png",
         idempotencyKey: "product-scan-key-1",
         visionEngineVersion: "product-scan-v1",
@@ -339,7 +344,7 @@ describe("meal scan service", () => {
       barcode: "081212903020",
     });
 
-    expect(mocks.putS3Object).not.toHaveBeenCalled();
+    expect(mocks.persistMealScanMedia).not.toHaveBeenCalled();
     expect(mocks.resolveProductNutrition).toHaveBeenCalledWith(
       expect.objectContaining({
         barcodeText: "081212903020",
@@ -360,19 +365,30 @@ describe("meal scan service", () => {
     );
   });
 
-  it("falls back safely when voice meal parsing is unavailable", async () => {
+  it("surfaces the failure instead of inventing nutrition when voice parsing is unavailable", async () => {
+    // This used to return a fabricated analysis: protein/carbs/fat/fiber all
+    // zero and calories derived from the transcript's WORD COUNT, shown to
+    // the user as an ordinary review card with a confidence badge. Logging
+    // it wrote 0 g of protein for a real meal into their day. In a
+    // protein-tracking app that is worse than any error message.
     mocks.generateMealTextAnalysis.mockRejectedValueOnce(
       new Error("OpenAI unavailable"),
     );
 
-    const result = await parseVoiceMeal("user-1", {
-      transcript: "small yogurt",
-    });
+    await expect(
+      parseVoiceMeal("user-1", { transcript: "grilled chicken breast with rice" }),
+    ).rejects.toThrow("OpenAI unavailable");
+  });
 
-    expect(result.analysis.foodName).toBe("small yogurt");
-    expect(result.analysis.confidence).toBeLessThan(0.3);
-    expect(result.note).toContain("Review this estimate");
-    expect(result.visionEngineVersion).toBe("voice-log-fallback-v1");
+  it("writes nothing to the user's log when voice parsing fails", async () => {
+    mocks.generateMealTextAnalysis.mockRejectedValueOnce(
+      new Error("OpenAI unavailable"),
+    );
+
+    await expect(
+      parseVoiceMeal("user-1", { transcript: "grilled chicken breast with rice" }),
+    ).rejects.toThrow();
+    expect(mocks.mealScanCreate).not.toHaveBeenCalled();
   });
 
   it("rejects image bytes that do not match the declared mime type", async () => {
@@ -386,21 +402,80 @@ describe("meal scan service", () => {
       statusCode: 400,
     });
 
-    expect(mocks.putS3Object).not.toHaveBeenCalled();
+    expect(mocks.persistMealScanMedia).not.toHaveBeenCalled();
     expect(mocks.generateMealScanVision).not.toHaveBeenCalled();
+  });
+
+  it("does not create media when vision analysis fails", async () => {
+    mocks.generateMealScanVision.mockRejectedValueOnce(new Error("vision failed"));
+
+    await expect(
+      analyzeMealScan("user-1", {
+        imageData: onePixelPng,
+        imageMimeType: "image/png",
+      }),
+    ).rejects.toThrow("vision failed");
+
+    expect(mocks.persistMealScanMedia).not.toHaveBeenCalled();
+    expect(mocks.mealScanCreate).not.toHaveBeenCalled();
+  });
+
+  it("discards newly persisted media when the scan row cannot be created", async () => {
+    const databaseError = new Error("database unavailable");
+    mocks.mealScanCreate.mockRejectedValueOnce(databaseError);
+
+    await expect(
+      analyzeMealScan("user-1", {
+        imageData: onePixelPng,
+        imageMimeType: "image/png",
+      }),
+    ).rejects.toBe(databaseError);
+
+    expect(mocks.discardMedia).toHaveBeenCalledWith("user-1", "media-1");
+  });
+
+  it("discards losing media and returns the winner of an idempotency race", async () => {
+    mocks.mealScanCreate.mockRejectedValueOnce({
+      code: 11000,
+      keyPattern: { idempotencyKey: 1 },
+    });
+    mocks.mealScanFindOne
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(
+        document({
+          id: "scan-existing",
+          userId: "user-1",
+          photoMediaId: "media-existing",
+          imageMimeType: "image/png",
+          analysis,
+          coachContent: null,
+          note: "Winner note",
+          idempotencyKey: "scan-key-1",
+          visionEngineVersion: "meal-scan-vision-v1",
+        }),
+      );
+
+    const result = await analyzeMealScan("user-1", {
+      imageData: onePixelPng,
+      imageMimeType: "image/png",
+      idempotencyKey: "scan-key-1",
+    });
+
+    expect(mocks.discardMedia).toHaveBeenCalledWith("user-1", "media-1");
+    expect(result.photoMediaId).toBe("media-existing");
   });
 
   it("returns signed photo URL and saved analysis for a scanned meal log", async () => {
     mocks.mealLogFindOne.mockResolvedValue({
       _id: "meal-1",
       userId: "user-1",
-      photoS3Key: "pepta/meal-scans/user-1/scan.png",
+      photoMediaId: "media-1",
     });
     mocks.mealScanFindOne.mockResolvedValue(
       document({
         id: "scan-1",
         userId: "user-1",
-        photoS3Key: "pepta/meal-scans/user-1/scan.png",
+        photoMediaId: "media-1",
         imageMimeType: "image/png",
         analysis,
         coachContent: null,
@@ -414,8 +489,10 @@ describe("meal scan service", () => {
       "507f1f77bcf86cd799439011",
     );
 
-    expect(mocks.createPresignedGetUrl).toHaveBeenCalledWith({
-      key: "pepta/meal-scans/user-1/scan.png",
+    expect(mocks.getMediaViewUrl).toHaveBeenCalledWith("user-1", "media-1");
+    expect(mocks.mealScanFindOne).toHaveBeenCalledWith({
+      userId: "user-1",
+      photoMediaId: "media-1",
     });
     expect(result).toEqual({
       photoViewUrl: "https://signed.example/photo.jpg",
@@ -435,7 +512,7 @@ describe("meal scan service", () => {
     mocks.mealLogFindOne.mockResolvedValue({
       _id: "meal-1",
       userId: "user-1",
-      photoS3Key: "pepta/meal-scans/user-1/scan.png",
+      photoMediaId: "media-1",
     });
     mocks.mealScanFindOne.mockResolvedValue({
       _id: "scan-1",
@@ -457,5 +534,79 @@ describe("meal scan service", () => {
 
     expect(result.analysis).toEqual(analysis);
     expect(result.coachContent).toEqual(coachContent);
+  });
+});
+
+// The snapshot decides the "you'd be at Xg of Yg protein today" figure that
+// the AI note states as fact. Measured over UTC days it contradicted the
+// user's own Home screen for most of the evening.
+describe("the protein snapshot is measured in the user's day", () => {
+  beforeEach(() => {
+    // Self-contained: this block sits outside the suite above, so it sets up
+    // (and clears) everything it needs itself.
+    vi.clearAllMocks();
+    mocks.generateMealTextAnalysis.mockResolvedValue({
+      foodName: "Chicken and rice",
+      servingSize: "1 bowl",
+      protein: 42,
+      calories: 640,
+      carbs: 72,
+      fat: 18,
+      fiber: 7,
+      confidence: 0.76,
+    });
+    mocks.generateMealScanNote.mockResolvedValue("note");
+    mocks.mealScanFindOne.mockResolvedValue(null);
+    mocks.mealScanCreate.mockImplementation((payload: Record<string, unknown>) =>
+      Promise.resolve(document({
+        id: "scan-1",
+        ...payload,
+        createdAt: "2026-06-22T00:00:00.000Z",
+        updatedAt: "2026-06-22T00:00:00.000Z",
+      })),
+    );
+    mocks.mealFind.mockResolvedValue([]);
+    mocks.proteinFind.mockResolvedValue([]);
+    mocks.userProfileFindOne.mockResolvedValue({
+      dailyProteinTargetGrams: 120,
+      dailyCalorieTarget: 1800,
+      timezone: "America/Los_Angeles",
+    });
+  });
+
+  it("counts from local midnight, not UTC midnight", async () => {
+    // 6pm PDT on 20 Aug is 01:00 UTC on 21 Aug — already "tomorrow" in UTC.
+    const capturedAt = new Date("2026-08-21T01:00:00.000Z");
+    mocks.mealFind.mockResolvedValue([]);
+    mocks.proteinFind.mockResolvedValue([]);
+
+    await parseVoiceMeal("user-1", {
+      transcript: "chicken and rice",
+      recordedAt: capturedAt.toISOString(),
+    });
+
+    const dayFilter = mocks.mealFind.mock.calls[0]![0].datetime;
+    // Local midnight in Los Angeles = 07:00 UTC that morning, so breakfast
+    // and lunch are inside the window rather than left in "yesterday".
+    expect(dayFilter.$gte.toISOString()).toBe("2026-08-20T07:00:00.000Z");
+    expect(dayFilter.$lt.toISOString()).toBe("2026-08-21T07:00:00.000Z");
+  });
+
+  it("falls back to UTC days when the profile has no usable zone", async () => {
+    mocks.userProfileFindOne.mockResolvedValue({
+      dailyProteinTargetGrams: 120,
+      dailyCalorieTarget: 1800,
+      timezone: "Not/AZone",
+    });
+    mocks.mealFind.mockResolvedValue([]);
+    mocks.proteinFind.mockResolvedValue([]);
+
+    await parseVoiceMeal("user-1", {
+      transcript: "chicken and rice",
+      recordedAt: "2026-08-21T01:00:00.000Z",
+    });
+
+    const dayFilter = mocks.mealFind.mock.calls[0]![0].datetime;
+    expect(dayFilter.$gte.toISOString()).toBe("2026-08-21T00:00:00.000Z");
   });
 });

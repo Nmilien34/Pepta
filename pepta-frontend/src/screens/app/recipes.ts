@@ -61,6 +61,7 @@ export function recipeAsMealSeed(recipe: RecipeResponse): {
   protein: number;
   calories: number;
   fiber?: number;
+  photoMediaId?: string;
 } {
   const totals = recipeTotals(recipe.ingredients);
   return {
@@ -69,6 +70,7 @@ export function recipeAsMealSeed(recipe: RecipeResponse): {
     protein: totals.protein,
     calories: totals.calories,
     ...(totals.fiber > 0 ? { fiber: totals.fiber } : {}),
+    ...(recipe.photoMediaId ? { photoMediaId: recipe.photoMediaId } : {}),
   };
 }
 

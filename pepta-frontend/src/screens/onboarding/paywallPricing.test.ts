@@ -28,10 +28,10 @@ describe("buildPaywallPricing", () => {
     expect(pricing.yearly.badge).toBe("SAVE 67%");
     // 3.1.2(c): the billed amount stays explicit in the footer too.
     expect(pricing.footer.yearly).toBe(
-      "$39.99/year. Cancel anytime · Terms & Privacy",
+      "$39.99/year, auto-renews until cancelled. Cancel anytime · Terms & Privacy",
     );
     expect(pricing.footer.monthly).toBe(
-      "$9.99/month. Cancel anytime · Terms & Privacy",
+      "$9.99/month, auto-renews until cancelled. Cancel anytime · Terms & Privacy",
     );
     expect(pricing.footer.yearly.toLowerCase()).not.toContain("/mo");
     expect(pricing.footer.yearly.toLowerCase()).not.toContain("free");
@@ -61,10 +61,10 @@ describe("buildPaywallPricing", () => {
     // Last-resort constants, aligned to the Aug 5 2026 US list prices.
     expect(pricing.yearly.badge).toBe("SAVE 50%");
     expect(pricing.footer.yearly).toBe(
-      "$59.99/year. Cancel anytime · Terms & Privacy",
+      "$59.99/year, auto-renews until cancelled. Cancel anytime · Terms & Privacy",
     );
     expect(pricing.footer.monthly).toBe(
-      "$9.99/month. Cancel anytime · Terms & Privacy",
+      "$9.99/month, auto-renews until cancelled. Cancel anytime · Terms & Privacy",
     );
     expect(pricing.footer.yearly.toLowerCase()).not.toContain("/mo");
     expect(pricing.footer.yearly.toLowerCase()).not.toContain("free");
@@ -104,7 +104,7 @@ describe("buildPaywallPricing", () => {
     // The annual plan is identical on both arms — including its footer.
     expect(pricing.cta.yearly).toEqual({ label: "Start my year — $40.00" });
     expect(pricing.footer.yearly).toBe(
-      "$40.00/year. Cancel anytime · Terms & Privacy",
+      "$40.00/year, auto-renews until cancelled. Cancel anytime · Terms & Privacy",
     );
   });
 

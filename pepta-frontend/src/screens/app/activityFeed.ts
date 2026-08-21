@@ -26,6 +26,7 @@ export type ActivityKind =
   | 'weight'
   | 'protein'
   | 'water'
+  | 'fiber'
   | 'meal'
   | 'sideEffect'
   | 'activity'
@@ -254,6 +255,35 @@ export function buildActivityFeed({
       detail: targetFor(home?.profile?.dailyWaterTargetOz, latest, 'oz'),
       // Sorted by the day's last pour so it lands where it belongs in the
       // day, while reading as what it is.
+      datetime: latest,
+      timeLabel: 'All day',
+    });
+  }
+
+  // Fibre gets water's one-row-per-day treatment for the same reason: the Home
+  // stepper logs it +1g at a time. Until now it appeared here not at all —
+  // GET /track never carried fiberLogs, so the rows the stepper created were
+  // invisible and undeletable, the only write-only log kind in the app.
+  const fiberByDay = new Map<string, { total: number; latest: string; ids: string[] }>();
+  for (const fiber of live(track.fiberLogs ?? [])) {
+    const day = localDay(fiber.datetime);
+    if (!day) continue;
+    const running = fiberByDay.get(day);
+    if (running) {
+      running.total += fiber.grams;
+      running.ids.push(fiber.id);
+      if (fiber.datetime > running.latest) running.latest = fiber.datetime;
+    } else {
+      fiberByDay.set(day, { total: fiber.grams, latest: fiber.datetime, ids: [fiber.id] });
+    }
+  }
+  for (const [day, { total, latest, ids }] of fiberByDay) {
+    entries.push({
+      id: `fiber-${day}`,
+      kind: 'fiber',
+      sourceIds: ids,
+      title: `${Math.round(total * 10) / 10} g fibre`,
+      detail: targetFor(home?.profile?.dailyFiberTargetGrams, latest, 'g'),
       datetime: latest,
       timeLabel: 'All day',
     });

@@ -12,6 +12,15 @@ interface InMemoryRateLimiterOptions {
   maxRequests: number;
   message?: string;
   keyBy?: "ip" | "userOrIp";
+  /**
+   * Names this limiter's own counter.
+   *
+   * Without it the key is just the mount path plus the principal, so two
+   * limiters on the SAME mount share one counter no matter how differently
+   * they are configured — the cheap endpoint silently spends the expensive
+   * one's allowance. Give every limiter that shares a mount its own bucket.
+   */
+  bucket?: string;
 }
 
 const store = new Map<string, RateLimitEntry>();
@@ -41,7 +50,7 @@ export function createInMemoryRateLimiter(
       options.keyBy === "userOrIp" && req.user?.id
         ? `user:${req.user.id}`
         : `ip:${req.ip ?? "unknown"}`;
-    const key = `${req.baseUrl}:${principal}`;
+    const key = `${req.baseUrl}:${options.bucket ?? "default"}:${principal}`;
     const current = store.get(key);
 
     if (!current || current.resetAt <= now) {

@@ -22,10 +22,16 @@
     "access:revoke": "tsx src/scripts/access-admin.ts revoke",
     "access:link-apple": "tsx src/scripts/access-admin.ts link-apple",
     "access:cleanup-list": "tsx src/scripts/access-admin.ts cleanup-list",
-    "access:cleanup-retry": "tsx src/scripts/access-admin.ts cleanup-retry"
+    "access:cleanup-retry": "tsx src/scripts/access-admin.ts cleanup-retry",
+    "media:reconcile": "tsx src/scripts/media-admin.ts reconcile",
+    "media:orphans": "tsx src/scripts/media-admin.ts orphans",
+    "media:failed": "tsx src/scripts/media-admin.ts failed",
+    "media:retry": "tsx src/scripts/media-admin.ts retry",
+    "media:check": "tsx src/scripts/media-admin.ts check"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.758.0",
+    "@aws-sdk/s3-presigned-post": "3.1073.0",
     "@aws-sdk/s3-request-presigner": "^3.758.0",
     "@pepta/shared": "0.1.0",
     "@types/cors": "^2.8.17",
@@ -44,6 +50,7 @@
     "node-cron": "^3.0.3",
     "openai": "^6.41.0",
     "pino": "^9.6.0",
+    "sharp": "0.35.3",
     "zod": "^3.25.67"
   },
   "devDependencies": {

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  clearPepMemoryAiSummary: vi.fn(async () => undefined),
   pushTokenFindOneAndUpdate: vi.fn(),
   userFindByIdAndUpdate: vi.fn(),
 }));
@@ -12,6 +13,12 @@ vi.mock("../../models", () => ({
   UserModel: {
     findByIdAndUpdate: mocks.userFindByIdAndUpdate,
   },
+}));
+
+// Withdrawing consent erases the stored AI summary; the memory service is
+// mocked so this file stays about preferences, not about memory internals.
+vi.mock("../../services/pepMemory.service", () => ({
+  clearPepMemoryAiSummary: mocks.clearPepMemoryAiSummary,
 }));
 
 import {
@@ -149,5 +156,55 @@ describe("push token service", () => {
       { new: true, runValidators: true },
     );
     expect(result.aiPushCopyConsent).toBe(false);
+  });
+});
+
+// The refresh path deliberately stopped erasing the stored AI summary, so
+// the opt-out is now the only thing that removes it. If this ever regresses,
+// text generated under consent outlives the consent.
+describe("withdrawing AI copy consent", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.userFindByIdAndUpdate.mockResolvedValue({
+      notificationPreferences: {
+        aiPushCopyConsent: false,
+        aiPushCopyConsentAt: null,
+        aiPushCopyConsentRevokedAt: now,
+      },
+    });
+  });
+
+  it("erases the summary generated under it", async () => {
+    await updateNotificationPreferences("user-1", { aiPushCopyConsent: false }, now);
+
+    expect(mocks.clearPepMemoryAiSummary).toHaveBeenCalledWith("user-1");
+  });
+
+  it("still reports the opt-out when the erase fails", async () => {
+    mocks.clearPepMemoryAiSummary.mockRejectedValueOnce(new Error("mongo down"));
+
+    const result = await updateNotificationPreferences(
+      "user-1",
+      { aiPushCopyConsent: false },
+      now,
+    );
+
+    // Consent is already false in the database, so nothing further is
+    // generated; failing the request would strand the user opted-in in the UI.
+    expect(result.aiPushCopyConsent).toBe(false);
+  });
+
+  it("leaves the summary alone when consent is GRANTED", async () => {
+    mocks.userFindByIdAndUpdate.mockResolvedValue({
+      notificationPreferences: {
+        aiPushCopyConsent: true,
+        aiPushCopyConsentAt: now,
+        aiPushCopyConsentRevokedAt: null,
+      },
+    });
+
+    await updateNotificationPreferences("user-1", { aiPushCopyConsent: true }, now);
+
+    expect(mocks.clearPepMemoryAiSummary).not.toHaveBeenCalled();
   });
 });

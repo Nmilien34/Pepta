@@ -15,6 +15,8 @@
 // these" rather than implying precision the model does not have.
 
 import OpenAI from "openai";
+import { AppError } from "../lib/errors";
+import { NUTRITION_BOUNDS, clampNumber, clampNutrition } from "../lib/nutritionBounds";
 import type { RecipeComposeResponse } from "@pepta/shared";
 import { env } from "../config/env";
 
@@ -23,9 +25,23 @@ const RECIPE_COMPOSE_MODEL = "gpt-4o-mini";
 const RECIPE_COMPOSE_TIMEOUT_MS = 9_000;
 const MAX_INGREDIENTS = 20;
 
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
+/**
+ * An actionable 503, like the sibling estimators. Raw Errors reach the user as
+ * an unexposed 500 "Internal server error" — indistinguishable from an app
+ * bug, with nothing telling them to just try again.
+ */
+function recipeComposeFailed(message: string, details?: unknown): AppError {
+  return new AppError({
+    code: "RECIPE_COMPOSE_FAILED",
+    message,
+    statusCode: 503,
+    details,
+    expose: true,
+  });
 }
+
+// Confidence keeps a local clamp; the macro bounds are shared.
+const clamp = clampNumber;
 
 function num(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
@@ -58,16 +74,37 @@ export function parseRecipeComposeJson(
       return {
         name: name.slice(0, 120),
         amount: amount.slice(0, 60),
-        protein: clamp(protein, 0, 300),
-        calories: clamp(calories, 0, 3000),
-        ...(fiber !== null ? { fiber: clamp(fiber, 0, 100) } : {}),
+        protein: clampNutrition("protein", protein),
+        calories: clampNutrition("calories", calories),
+        ...(fiber !== null ? { fiber: clampNutrition("fiber", fiber) } : {}),
       };
     })
     .filter((i): i is NonNullable<typeof i> => i !== null)
     .slice(0, MAX_INGREDIENTS);
 
   if (ingredients.length === 0) {
-    throw new Error("Recipe compose JSON contained no usable ingredients");
+    throw recipeComposeFailed("Recipe compose JSON contained no usable ingredients");
+  }
+
+  // Each ingredient is bounded, but a recipe is the SUM of up to 20 of them —
+  // so per-ingredient clamping alone allowed a proposal totalling thousands of
+  // grams of protein. The user reviews this on screen and can save it as a
+  // recipe they log repeatedly, so a proposal whose totals are not a plausible
+  // meal is refused outright rather than shown as a credible suggestion.
+  const totals = ingredients.reduce(
+    (sum, item) => ({
+      protein: sum.protein + item.protein,
+      calories: sum.calories + item.calories,
+    }),
+    { protein: 0, calories: 0 },
+  );
+  if (
+    totals.protein > NUTRITION_BOUNDS.protein.max ||
+    totals.calories > NUTRITION_BOUNDS.calories.max
+  ) {
+    throw recipeComposeFailed(
+      "Recipe compose returned implausible totals for a single meal",
+    );
   }
 
   const confidence = num(parsed.confidence);
@@ -85,7 +122,7 @@ export async function composeRecipe(
   name?: string,
 ): Promise<RecipeComposeResponse> {
   if (!env.openai.apiKey) {
-    throw new Error("OPENAI_API_KEY is not configured");
+    throw recipeComposeFailed("OPENAI_API_KEY is not configured");
   }
 
   const openai = new OpenAI({
@@ -117,7 +154,7 @@ export async function composeRecipe(
 
   const content = completion.choices[0]?.message?.content?.trim();
   if (!content) {
-    throw new Error("OpenAI returned an empty recipe compose response");
+    throw recipeComposeFailed("OpenAI returned an empty recipe compose response");
   }
 
   return parseRecipeComposeJson(content, name ?? "");

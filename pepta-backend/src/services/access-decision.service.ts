@@ -49,6 +49,29 @@ interface LiveSourceEvaluation {
 }
 
 /**
+ * How long a single source stays honoured, in milliseconds since the epoch.
+ * Null means open-ended.
+ *
+ * A RENEWING store subscription gets PAID_VERIFICATION_GRACE_MS past its last
+ * known period end. That end ALWAYS passes before the RENEWAL webhook can land
+ * — RevenueCat only learns of the renewal after Apple charges — so without the
+ * grace a paying subscriber is refused every premium route at every renewal
+ * boundary until the webhook catches up.
+ *
+ * Nothing else gets grace. Promotional access ends exactly when it says, and a
+ * cancelled subscription's period end is the real end: there is no pending
+ * renewal to wait for, so extending it would be giving access away.
+ */
+function sourceHonouredUntil(source: AccountSourceLike): number | null {
+  if (source.expiresAt === null) return null;
+  const end = source.expiresAt.getTime();
+  const renewing = source.kind !== "promotional" && source.willRenew;
+  return renewing ? end + PAID_VERIFICATION_GRACE_MS : end;
+}
+
+type AccountSourceLike = Pick<AccessSourceDocument, "kind" | "expiresAt" | "willRenew">;
+
+/**
  * Evaluate the persisted sources AT READ TIME. This is what enforces the
  * exact promotional expiration everywhere (client timers may lag; webhooks
  * may be delayed) without another RevenueCat call.
@@ -58,9 +81,11 @@ export function evaluatePersistedSources(
   now: Date = new Date(),
 ): LiveSourceEvaluation {
   const sources = entitlement.sources ?? [];
-  const activeSources = sources.filter(
-    (s) => s.active && (s.expiresAt === null || s.expiresAt.getTime() > now.getTime()),
-  );
+  const activeSources = sources.filter((s) => {
+    if (!s.active) return false;
+    const until = sourceHonouredUntil(s);
+    return until === null || until > now.getTime();
+  });
   if (activeSources.length === 0) {
     return { activeSources, label: null, expiresAt: null, willRenew: false };
   }
@@ -91,13 +116,9 @@ export function offlineValidUntil(
   let latest: number | null = null;
   for (const source of sources) {
     if (!source.active) continue;
-    let boundary: number | null = null;
-    if (source.kind === "promotional") {
-      boundary = source.expiresAt ? source.expiresAt.getTime() : null;
-    } else if (source.expiresAt) {
-      boundary =
-        source.expiresAt.getTime() + (source.willRenew ? PAID_VERIFICATION_GRACE_MS : 0);
-    }
+    // Same rule as the online path — one definition, so the offline window
+    // can never disagree with what the gate honours.
+    const boundary = sourceHonouredUntil(source);
     if (boundary !== null && boundary > now.getTime()) {
       latest = latest === null ? boundary : Math.max(latest, boundary);
     }
@@ -256,6 +277,32 @@ export async function resolveAccess(userId: string): Promise<AccessDecision> {
   }
 
   return decisionFromPersistedState(user.entitlement, now);
+}
+
+/**
+ * Records the RevenueCat customer the DEVICE is identified as.
+ *
+ * This is what makes a lost purchase recoverable. reconciliation is gated on
+ * hasRevenueCatEvidence(), and a first-time subscriber whose INITIAL_PURCHASE
+ * webhook never landed has none of it — status still 'free', no customer id,
+ * no sources — so resolveAccess would never look them up and they would sit
+ * behind the paywall having paid. The id comes from the SDK that created the
+ * customer, so accepting it does not mint a phantom customer the way a
+ * server-side reconcile of an RC-less user would.
+ *
+ * Appends rather than overwrites: revenueCatCustomerId is the webhook's to
+ * set, and a device should never be able to redirect it.
+ */
+export async function linkRevenueCatAppUserId(
+  userId: string,
+  appUserId: string,
+): Promise<void> {
+  const trimmed = appUserId.trim();
+  if (!trimmed) return;
+  await UserModel.updateOne(
+    { _id: userId },
+    { $addToSet: { "entitlement.revenueCatAppUserIds": trimmed } },
+  );
 }
 
 /** True when RevenueCat has ever been involved with this user. */

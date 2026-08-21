@@ -6,15 +6,26 @@
 //   confirmed inactive        → 403 ENTITLEMENT_REQUIRED  (paywall)
 //   verification unavailable  → 503 ACCESS_VERIFICATION_UNAVAILABLE (retry,
 //                               unless cached access is still within bounds)
-// Enforcement is active only when the RevenueCat server key is configured —
-// that key is the rollout flag for the whole access system.
+//
+// THIS GATE FAILS CLOSED. It used to call next() unconditionally whenever the
+// RevenueCat server key was absent, treating that key as a rollout flag — and
+// it is the ONLY entitlement check in the app (no route or service does its
+// own). So an empty or mistyped REVENUECAT_SECRET_API_KEY — a rotation, a
+// truncated secret store, a redeploy — silently made every premium route free
+// to everyone, with nothing in the logs and a preflight that still reported
+// RevenueCat "PASS". The key is now required in production (config/env.ts), and
+// if it is somehow missing anyway, users with cached access keep working while
+// everyone else is refused.
 
 import type { NextFunction, Request, Response } from "express";
 import { ERROR_CODES } from "@pepta/shared";
 import { AppError } from "../lib/errors";
+import { logger } from "../lib/logger";
 import { UserModel } from "../models/user.model";
 import { decisionFromPersistedState } from "../services/access-decision.service";
 import { isRevenueCatConfigured } from "./../services/revenuecat.client";
+
+let warnedUnconfigured = false;
 
 export async function requireActiveAccess(
   req: Request,
@@ -22,9 +33,12 @@ export async function requireActiveAccess(
   next: NextFunction,
 ): Promise<void> {
   try {
-    if (!isRevenueCatConfigured()) {
-      next();
-      return;
+    if (!isRevenueCatConfigured() && !warnedUnconfigured) {
+      // Loud once per process: this is a misconfiguration, not a mode.
+      warnedUnconfigured = true;
+      logger.error(
+        "[access] REVENUECAT_SECRET_API_KEY is not configured — entitlement is being enforced from persisted state only",
+      );
     }
 
     const userId = req.user?.id;

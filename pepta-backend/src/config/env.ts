@@ -55,6 +55,7 @@ const envSchema = z
     WEEKLY_RETENTION_CRON: z.string().min(1).default('0 8 * * 1'),
     MEDICATION_LEVEL_CRON: z.string().min(1).default('0 3 * * *'),
     PEP_PUSH_CRON: z.string().min(1).default('*/15 * * * *'),
+    MEDIA_CLEANUP_CRON: z.string().min(1).default('*/15 * * * *'),
   })
   .superRefine((value, context) => {
     if (value.NODE_ENV !== 'production') {
@@ -69,6 +70,11 @@ const envSchema = z
       'OPENAI_API_KEY',
       'TOGETHER_API_KEY',
       'REVENUECAT_WEBHOOK_SECRET',
+      // The server key is what lets the backend VERIFY entitlement against
+      // RevenueCat. requireActiveAccess is the only entitlement check in the
+      // app, so booting production without this key used to mean every
+      // premium route was free. Fail at boot rather than silently.
+      'REVENUECAT_SECRET_API_KEY',
     ] as const;
 
     // Complimentary-access hardening (audit H2): once the RevenueCat server
@@ -201,5 +207,6 @@ export const env = {
     weeklyRetentionCron: parsed.data.WEEKLY_RETENTION_CRON,
     medicationLevelCron: parsed.data.MEDICATION_LEVEL_CRON,
     pepPushCron: parsed.data.PEP_PUSH_CRON,
+    mediaCleanupCron: parsed.data.MEDIA_CLEANUP_CRON,
   },
 } as const;

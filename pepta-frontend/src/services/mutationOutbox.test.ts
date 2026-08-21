@@ -6,7 +6,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
   const storage = new Map<string, string>();
-  return { storage, createProteinLog: vi.fn(), createDoseLog: vi.fn() };
+  return {
+    storage,
+    createProteinLog: vi.fn(),
+    createDoseLog: vi.fn(),
+    createWaterLog: vi.fn(),
+  };
 });
 
 vi.mock("@react-native-async-storage/async-storage", () => ({
@@ -25,7 +30,7 @@ vi.mock("./api", () => ({
     createMeasurement: vi.fn(),
     createActivityLog: vi.fn(),
     createMealLog: vi.fn(),
-    createWaterLog: vi.fn(),
+    createWaterLog: mocks.createWaterLog,
     createFiberLog: vi.fn(),
   },
 }));
@@ -34,6 +39,8 @@ import { ApiError, ResponseParseError } from "./apiError";
 import {
   isRetryable,
   makeIdempotencyKey,
+  MAX_REPLAY_ATTEMPTS,
+  isDeadEntry,
   outboxCount,
   outboxKey,
   parseOutbox,
@@ -41,6 +48,7 @@ import {
   saveLogDurably,
 } from "./mutationOutbox";
 
+const NOW = "2026-08-21T12:00:00.000Z";
 const offline = () => new TypeError("Network request failed");
 const serverDown = () => new ApiError(503, "SERVICE_UNAVAILABLE", "down");
 const rejected = () => new ApiError(422, "VALIDATION", "bad payload");
@@ -184,5 +192,163 @@ describe("robustness", () => {
   it("keys are unique across rapid generation", () => {
     const keys = new Set(Array.from({ length: 500 }, () => makeIdempotencyKey()));
     expect(keys.size).toBe(500);
+  });
+});
+
+// The three links that turned one malformed payload into total data loss:
+// a validation throw misread as "offline", a FIFO that breaks on retryable,
+// and no cap on how long one entry may hold the queue.
+describe("a payload this build cannot send never blocks the queue", () => {
+  function zodLikeError() {
+    // Shaped like a real ZodError without importing zod into this test.
+    const error = new Error("Unrecognized key(s) in object: 'idempotencyKey'");
+    error.name = "ZodError";
+    (error as unknown as { issues: unknown[] }).issues = [
+      { code: "unrecognized_keys", keys: ["idempotencyKey"] },
+    ];
+    return error;
+  }
+
+  it("classifies a local validation throw as terminal, not as offline", () => {
+    // The old rule fell through to `return true` for anything that was not an
+    // ApiError — so a synchronous parse failure was queued as if the network
+    // had blipped, and retried forever.
+    expect(isRetryable(zodLikeError())).toBe(false);
+  });
+
+  it("still treats a genuine network failure as retryable", () => {
+    expect(isRetryable(new TypeError("Network request failed"))).toBe(true);
+  });
+
+  it("throws to the caller instead of queueing an unsendable payload", async () => {
+    mocks.createProteinLog.mockRejectedValueOnce(zodLikeError());
+
+    await expect(
+      saveLogDurably("user-1", "protein", { grams: 30, datetime: NOW }),
+    ).rejects.toThrow(/Unrecognized key/);
+
+    // Nothing queued — the entry that used to sit at the head forever.
+    expect(await outboxCount("user-1")).toBe(0);
+  });
+});
+
+describe("no single entry can hold the queue forever", () => {
+  it("drops an entry that has exhausted its attempts and drains the rest", async () => {
+    const stuck = {
+      key: "poison",
+      kind: "weight" as const,
+      payload: { value: 182, unit: "lb", datetime: NOW },
+      enqueuedAt: NOW,
+      attempts: MAX_REPLAY_ATTEMPTS,
+    };
+    const behind = {
+      key: "good",
+      kind: "protein" as const,
+      payload: { grams: 30, datetime: NOW },
+      enqueuedAt: NOW,
+      attempts: 0,
+    };
+    mocks.storage.set(outboxKey("user-1"), JSON.stringify([stuck, behind]));
+    mocks.createProteinLog.mockResolvedValueOnce({});
+
+    const result = await replayOutbox("user-1");
+
+    // The log stranded behind the poison entry finally syncs.
+    expect(result.dropped).toBe(1);
+    expect(result.sent).toBe(1);
+    expect(await outboxCount("user-1")).toBe(0);
+  });
+
+  it("drops an entry too old to be worth sending", async () => {
+    const ancient = {
+      key: "ancient",
+      kind: "water" as const,
+      payload: { amountOz: 8, datetime: NOW },
+      // Unambiguously past the age bound, whatever the wall clock says.
+      enqueuedAt: "2020-01-01T00:00:00.000Z",
+      attempts: 0,
+    };
+    mocks.storage.set(outboxKey("user-1"), JSON.stringify([ancient]));
+
+    const result = await replayOutbox("user-1");
+
+    expect(result.dropped).toBe(1);
+    expect(await outboxCount("user-1")).toBe(0);
+  });
+
+  it("leaves a healthy entry alone", async () => {
+    const fresh = {
+      key: "fresh",
+      kind: "protein" as const,
+      payload: { grams: 30, datetime: NOW },
+      enqueuedAt: NOW,
+      attempts: 1,
+    };
+    expect(isDeadEntry(fresh, Date.parse(NOW))).toBe(false);
+  });
+
+  it("recovers a previously stuck weight entry now that the payload validates", async () => {
+    // Exactly what a device upgrading from the broken build is holding.
+    const stuckWeight = {
+      key: "weight-stuck",
+      kind: "weight" as const,
+      payload: { value: 182, unit: "lb", datetime: NOW, idempotencyKey: "weight-stuck" },
+      enqueuedAt: NOW,
+      attempts: 3,
+    };
+    mocks.storage.set(outboxKey("user-1"), JSON.stringify([stuckWeight]));
+
+    const result = await replayOutbox("user-1");
+
+    // Not dropped — SENT. The user's weigh-in is recovered, not discarded.
+    expect(result.sent).toBe(1);
+    expect(result.dropped).toBe(0);
+  });
+});
+
+// replayOutbox used to read the queue ONCE and then write back slices of that
+// stale in-memory copy. A log enqueued while a replay was in flight — the app
+// is online again, the user keeps logging — was erased by the next write-back.
+describe("a log enqueued mid-replay is not erased", () => {
+  it("survives a replay that started before it was queued", async () => {
+    const queued = {
+      key: "already-queued",
+      kind: "protein" as const,
+      payload: { grams: 30, datetime: NOW, idempotencyKey: "already-queued" },
+      enqueuedAt: NOW,
+      attempts: 0,
+    };
+    mocks.storage.set(outboxKey("user-1"), JSON.stringify([queued]));
+
+    // Hold the in-flight send open so we can enqueue underneath it, and wait
+    // until the replay has actually reached that send before doing so.
+    let releaseSend: () => void = () => undefined;
+    let sendStarted: () => void = () => undefined;
+    const started = new Promise<void>((resolve) => { sendStarted = () => resolve(); });
+    mocks.createProteinLog.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          releaseSend = () => resolve();
+          sendStarted();
+        }),
+    );
+
+    const replay = replayOutbox("user-1");
+    await started;
+
+    // The user logs water while the replay is mid-flight. It fails offline, so
+    // it lands in the queue — and stays offline, so the replay cannot simply
+    // send it and make the erasure invisible.
+    mocks.createWaterLog.mockRejectedValue(offline());
+    await saveLogDurably("user-1", "water", { amountOz: 8, datetime: NOW });
+
+    releaseSend();
+    await replay;
+
+    // The water log must still be queued. The old code wrote back a slice of
+    // the copy it read BEFORE the water log existed, erasing it — never sent,
+    // never stored, silently gone.
+    const remaining = parseOutbox(mocks.storage.get(outboxKey("user-1")) ?? null);
+    expect(remaining.map((e) => e.kind)).toEqual(["water"]);
   });
 });

@@ -92,22 +92,43 @@ export function PepChatProvider({ children }: { children: ReactNode }) {
     setPendingQuestion(null);
   };
 
-  const sendConsentedChat = async (question: string) => {
-    const userMessage: PepChatMessage = { role: 'user', text: question };
-    const nextMessages: PepChatMessage[] = [...chatMessages, userMessage].slice(-16);
-    setChatMessages(nextMessages);
+  /** Sends a transcript exactly as given — it is already what Pep should see. */
+  const sendChat = async (messages: PepChatMessage[]) => {
+    setChatMessages(messages);
     setChatInput('');
     setChatPending(true);
     setChatError(null);
     try {
-      const response = await api.coachChat(nextMessages);
+      const response = await api.coachChat(messages);
       const pepMessage: PepChatMessage = { role: 'pep', text: response.reply };
-      setChatMessages([...nextMessages, pepMessage].slice(-16));
+      setChatMessages([...messages, pepMessage].slice(-16));
     } catch {
       setChatError("Pep couldn't answer right now. Try again in a moment.");
     } finally {
       setChatPending(false);
     }
+  };
+
+  const sendConsentedChat = async (question: string) => {
+    const userMessage: PepChatMessage = { role: 'user', text: question };
+    await sendChat([...chatMessages, userMessage].slice(-16));
+  };
+
+  /**
+   * Retry after a failed answer.
+   *
+   * The question is ALREADY in the transcript — it is added before the request
+   * goes out, and a failure leaves it there. Re-sending it through the normal
+   * path appended it a second time, so the user saw their own question twice
+   * (three times after a second retry) and the model was asked to answer a
+   * conversation that repeated itself.
+   */
+  const retryChatReply = () => {
+    if (chatPending) return;
+    const last = chatMessages[chatMessages.length - 1];
+    if (last?.role !== 'user') return;
+    Haptics.selectionAsync().catch(() => undefined);
+    void sendChat(chatMessages);
   };
 
   const requestChatReply = async (rawQuestion: string) => {
@@ -221,7 +242,12 @@ export function PepChatProvider({ children }: { children: ReactNode }) {
                     {chatError}
                   </AppText>
                   {chatMessages.length > 0 ? (
-                    <Pressable onPress={() => requestChatReply(chatMessages[chatMessages.length - 1]?.text ?? '')} style={{ alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Pressable
+                      onPress={retryChatReply}
+                      accessibilityRole="button"
+                      accessibilityLabel="Retry"
+                      style={{ alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6 }}
+                    >
                       <Icon name="refresh" size={14} color={theme.colors.danger} />
                       <AppText variant="caption" color="danger" style={{ fontWeight: '700' }}>
                         Retry

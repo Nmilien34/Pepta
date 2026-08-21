@@ -275,21 +275,22 @@ const avatarContentTypeSchema = z.enum([
 export const avatarUploadIntentRequestSchema = z
   .object({
     contentType: avatarContentTypeSchema,
-    sizeBytes: z.number().int().positive().optional(),
+    sizeBytes: z.number().int().positive(),
   })
   .strict();
 
 export const avatarUploadIntentResponseSchema = z
   .object({
-    key: z.string().min(1),
+    mediaId: idSchema,
     uploadUrl: z.string().url(),
+    fields: z.record(z.string()),
     expiresAt: isoDateTimeSchema,
   })
   .strict();
 
 export const avatarConfirmRequestSchema = z
   .object({
-    key: z.string().min(1),
+    mediaId: idSchema,
   })
   .strict();
 
@@ -303,7 +304,6 @@ export const avatarViewUrlResponseSchema = z
 export const userAccountPatchSchema = z
   .object({
     displayName: z.string().trim().min(1).max(120).optional(),
-    avatarUrl: z.string().url().optional(),
   })
   .strict()
   .refine((patch) => Object.keys(patch).length > 0, {
@@ -500,6 +500,15 @@ export const weightLogInputSchema = z
     value: z.number().positive(),
     unit: weightUnitSchema,
     datetime: isoDateTimeSchema,
+    // Weight was the ONE log kind of nine built without an idempotency key,
+    // while the durable outbox stamps one onto every payload it sends — so
+    // this strict schema rejected every weight log the app ever tried to
+    // save, synchronously, before the request left the device.
+    //
+    // Safe for shipped clients: the field is optional on the way in, and the
+    // server only stores and echoes it when the caller sent one, so a build
+    // that predates this never sees it come back.
+    idempotencyKey: z.string().trim().min(1).optional(),
     notes: z.string().trim().max(500).optional(),
   })
   .strict();
@@ -547,7 +556,7 @@ export const mealLogInputSchema = z
     fiber: z.number().nonnegative().optional(),
     source: mealLogSourceSchema,
     datetime: isoDateTimeSchema,
-    photoS3Key: z.string().trim().min(1).optional(),
+    photoMediaId: idSchema.optional(),
     idempotencyKey: z.string().trim().min(1).optional(),
     notes: z.string().trim().max(500).optional(),
   })
@@ -1058,7 +1067,7 @@ export const mealProductScanMetadataSchema = z
 export const mealScanResponseSchema = z
   .object({
     scanId: idSchema,
-    photoS3Key: z.string().min(1).optional(),
+    photoMediaId: idSchema.optional(),
     analysis: mealScanAnalysisSchema,
     coachContent: mealScanCoachContentSchema.nullable(),
     note: z.string().trim().min(1).optional(),
@@ -1085,7 +1094,7 @@ export const progressPhotoInputSchema = z
       "image/heic",
       "image/webp",
     ]),
-    sizeBytes: z.number().int().positive().optional(),
+    sizeBytes: z.number().int().positive(),
     kind: progressPhotoKindSchema.default("body"),
     faceFullness: z.number().int().min(1).max(5).optional(),
   })
@@ -1094,7 +1103,7 @@ export const progressPhotoInputSchema = z
 export const progressPhotoSchema = progressPhotoInputSchema.extend({
   id: idSchema,
   userId: idSchema,
-  s3Key: z.string().min(1),
+  mediaId: idSchema,
   status: progressPhotoStatusSchema,
   viewUrl: z.string().url().optional(),
   createdAt: isoDateTimeSchema,
@@ -1105,6 +1114,7 @@ export const progressPhotoUploadIntentResponseSchema = z
   .object({
     photo: progressPhotoSchema,
     uploadUrl: z.string().url(),
+    fields: z.record(z.string()),
     expiresAt: isoDateTimeSchema,
   })
   .strict();
@@ -1112,7 +1122,6 @@ export const progressPhotoUploadIntentResponseSchema = z
 export const progressPhotoConfirmInputSchema = z
   .object({
     photoId: idSchema,
-    sizeBytes: z.number().int().positive().optional(),
   })
   .strict();
 
@@ -1184,6 +1193,12 @@ export const trackResponseSchema = z
     // field drops it rather than failing. Optional with a default so a NEW
     // client still parses an OLD backend's response during the deploy gap.
     weightLogs: z.array(weightLogResponseSchema).default([]),
+    // Fibre was WRITE-ONLY: the Home stepper created rows the user could then
+    // never see or delete, because Track never carried them. Safe to add for
+    // the same reason weightLogs was — this schema is .strip(), so a client
+    // that predates the field drops it, and the default covers a new client
+    // talking to an old backend during the deploy gap.
+    fiberLogs: z.array(fiberLogResponseSchema).default([]),
     sectionErrors: z.record(z.string()).default({}),
   })
   // Response schema: tolerate unknown/extra server fields (strip, not strict) so
@@ -1225,6 +1240,14 @@ export const revenueCatWebhookSchema = z
         entitlement_id: z.string().min(1).nullish(),
         period_type: z.string().min(1).nullish(),
         expiration_at_ms: z.number().nullish(),
+        // Money and provenance. Declared so the receipt we keep for dispute
+        // defense can carry what was actually charged; RevenueCat sends these
+        // as null on events they do not apply to, hence .nullish() throughout.
+        price: z.number().nullish(),
+        price_in_purchased_currency: z.number().nullish(),
+        currency: z.string().min(1).nullish(),
+        store: z.string().min(1).nullish(),
+        environment: z.string().min(1).nullish(),
       })
       .passthrough(),
   })
@@ -1321,6 +1344,22 @@ function sourceLabelMatches(
   return kinds.size === 1 && kinds.has(label);
 }
 
+/**
+ * The client reporting the RevenueCat customer it is identified as.
+ *
+ * This is the evidence that lets the server reconcile a purchase whose webhook
+ * was lost: without it a first-time subscriber has no customer id, no sources
+ * and a 'free' status, so hasRevenueCatEvidence() is false and reconciliation
+ * never runs for them. The id comes from the device SDK, which is what created
+ * the customer — so trusting it does not re-open RevenueCat's create-on-read
+ * phantom-customer hazard the way a server-side guess would.
+ */
+export const revenueCatLinkInputSchema = z
+  .object({
+    appUserId: z.string().trim().min(1).max(200),
+  })
+  .strict();
+
 export const accessDecisionSchema = z
   .discriminatedUnion("state", [
     z
@@ -1394,6 +1433,57 @@ export const accessDecisionSchema = z
   });
 
 // ---------------------------------------------------------------------------
+// User media — opaque ownership records, never caller-selected S3 keys.
+//
+// The app uploads through a short-lived policy, then confirms only the media
+// id. Product inputs can carry that id, but storage keys stay backend-only.
+// ---------------------------------------------------------------------------
+
+export const mediaIntentSchema = z.enum([
+  "avatar",
+  "progress_photo",
+  "favourite_photo",
+  "meal_photo",
+]);
+
+export const mediaContentTypeSchema = z.enum([
+  "image/jpeg",
+  "image/png",
+  "image/heic",
+  "image/webp",
+]);
+
+export const mediaUploadIntentInputSchema = z
+  .object({
+    intent: mediaIntentSchema,
+    contentType: mediaContentTypeSchema,
+    sizeBytes: z.number().int().positive(),
+  })
+  .strict();
+
+export const mediaUploadIntentResponseSchema = z
+  .object({
+    mediaId: idSchema,
+    uploadUrl: z.string().url(),
+    fields: z.record(z.string()),
+    expiresAt: isoDateTimeSchema,
+  })
+  .strict();
+
+export const mediaConfirmInputSchema = z
+  .object({ mediaId: idSchema })
+  .strict();
+
+export const mediaReadyResponseSchema = z
+  .object({
+    mediaId: idSchema,
+    status: z.literal("ready"),
+  })
+  .strict();
+
+export const mediaDiscardInputSchema = mediaConfirmInputSchema;
+
+// ---------------------------------------------------------------------------
 // Favourites — the foods and drinks the user saved, with the portion.
 //
 // SERVER-BACKED so they follow the account rather than the handset: a
@@ -1428,12 +1518,8 @@ export const favouriteInputSchema = z
      * before you tap Log.
      */
     source: z.enum(["item", "recipe"]).default("item"),
-    /**
-     * A photo the user took of their own item. Stored as an S3 key; the list
-     * response carries a short-lived view URL rather than the key, so the
-     * client never has to sign anything.
-     */
-    photoS3Key: z.string().trim().min(1).max(300).optional(),
+    /** An owned, verified media record. Raw storage keys never cross here. */
+    photoMediaId: idSchema.optional(),
   })
   .strict();
 
@@ -1498,6 +1584,7 @@ export const recipeInputSchema = z
   .object({
     name: z.string().trim().min(1).max(120),
     ingredients: z.array(recipeIngredientSchema).min(1).max(40),
+    photoMediaId: idSchema.optional(),
   })
   .strict();
 
@@ -1505,6 +1592,7 @@ export const recipeResponseSchema = recipeInputSchema.extend({
   id: idSchema,
   /** True for the seeded ones, which belong to nobody and cannot be edited. */
   isStarter: z.boolean(),
+  photoUrl: z.string().url().nullable().default(null),
   createdAt: isoDateTimeSchema,
   updatedAt: isoDateTimeSchema,
 });
@@ -1554,36 +1642,9 @@ export const recipeComposeResponseSchema = z
 export type RecipeComposeInput = z.infer<typeof recipeComposeInputSchema>;
 export type RecipeComposeResponse = z.infer<typeof recipeComposeResponseSchema>;
 
-/** Asking for somewhere to put a favourite's photo. */
-export const favouritePhotoIntentInputSchema = z
-  .object({
-    contentType: z.enum(["image/jpeg", "image/png", "image/webp"]),
-  })
-  .strict();
-
-/**
- * Throwing away a photo that was uploaded but never attached to anything —
- * the user picked a second one, or closed the sheet without saving. Without
- * it those bytes sit in the bucket forever with nothing referencing them.
- */
-export const favouritePhotoDiscardInputSchema = z
-  .object({ photoS3Key: z.string().trim().min(1).max(300) })
-  .strict();
-
-export const favouritePhotoIntentResponseSchema = z
-  .object({
-    uploadUrl: z.string().min(1),
-    photoS3Key: z.string().min(1),
-    expiresAt: isoDateTimeSchema,
-  })
-  .strict();
-
-export type FavouritePhotoIntentInput = z.infer<typeof favouritePhotoIntentInputSchema>;
-export type FavouritePhotoDiscardInput = z.infer<typeof favouritePhotoDiscardInputSchema>;
 export type UiPreferences = z.infer<typeof uiPreferencesSchema>;
 export type UiPreferencesInput = z.input<typeof uiPreferencesSchema>;
 export type UiPreferencesResponse = z.infer<typeof uiPreferencesResponseSchema>;
 export type LevelRangeKey = z.infer<typeof levelRangeKeySchema>;
 export type LevelRangeQuery = z.input<typeof levelRangeQuerySchema>;
 export type MedicationLevelsResponse = z.infer<typeof medicationLevelsResponseSchema>;
-export type FavouritePhotoIntentResponse = z.infer<typeof favouritePhotoIntentResponseSchema>;

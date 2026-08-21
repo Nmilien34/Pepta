@@ -91,7 +91,9 @@ export function AccessGate() {
         // stale/webhook-lagged backend answer. Bouncing that user onto a
         // paywall asks them to pay twice (the welcomeIn rating bug,
         // 2026-08-05). Bounded — an expired grace falls through to the gate.
-        if (hasPurchaseGrace()) return shell;
+        // Scoped to the signed-in user: a window opened by whoever used this
+        // device before is not this user's grace.
+        if (hasPurchaseGrace(auth.user?.id)) return shell;
         return <PaywallScreen onComplete={() => access.resolve()} />;
       }
       return <OnboardingNavigator />;

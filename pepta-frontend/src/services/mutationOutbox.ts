@@ -23,6 +23,17 @@
 // stored blob parses defensively — corrupt state reads as an empty queue.
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import type {
+  ActivityLogInput,
+  DoseLogInput,
+  FiberLogInput,
+  MealLogInput,
+  MeasurementInput,
+  ProteinLogInput,
+  SideEffectLogInput,
+  WaterLogInput,
+  WeightLogInput,
+} from "@pepta/shared";
 import { api } from "./api";
 import { ApiError, ResponseParseError } from "./apiError";
 
@@ -81,34 +92,126 @@ export function parseOutbox(raw: string | null): OutboxEntry[] {
 }
 
 /**
+ * True when the request never left the device because WE built it wrong.
+ *
+ * This is not a network condition and waiting will never fix it. A zod
+ * ValidationError from an api-layer `.parse()` throws synchronously, before
+ * fetch — which is exactly how a malformed weight payload got classified as
+ * "offline", queued at the head of the FIFO, and blocked every log behind it
+ * forever. A programmer error must fail loudly, not retry forever.
+ */
+export function isLocalValidationError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const name = (error as { name?: unknown }).name;
+  // zod's ZodError, and anything that reports itself the same way.
+  return (
+    name === "ZodError" ||
+    Array.isArray((error as { issues?: unknown }).issues)
+  );
+}
+
+/**
  * A failure is retryable when trying again later could succeed: we're offline
- * (no HTTP status ever arrived) or the server itself failed. A 4xx is final.
+ * (no HTTP status ever arrived) or the server itself failed. A 4xx is final,
+ * and so is a payload this build cannot even serialize.
  */
 export function isRetryable(error: unknown): boolean {
   // The server ACCEPTED the write and we merely failed to read its reply.
   // Nothing to retry — the record exists. Checked first because this is the
   // one failure that is not a failure.
   if (error instanceof ResponseParseError) return false;
+  // Never sent, and never will be. Terminal regardless of connectivity.
+  if (isLocalValidationError(error)) return false;
   if (error instanceof ApiError) return error.status >= 500;
   // No ApiError means the request never got a response: network, timeout, DNS.
   return true;
 }
 
-type LogCall = (payload: Record<string, unknown>) => Promise<unknown>;
+/**
+ * Belt and braces behind the classification above: no single entry may hold
+ * the queue forever, whatever new failure mode we have not thought of. An
+ * entry that has exhausted its attempts, or has simply sat too long to be
+ * worth sending, is dropped with a loud log rather than blocking the rest.
+ */
+export const MAX_REPLAY_ATTEMPTS = 8;
+export const MAX_ENTRY_AGE_MS = 14 * 24 * 60 * 60 * 1000;
 
-// Payloads are validated by the api layer's zod input schemas at send time —
-// the outbox stores exactly what the caller tried to send, plus the key.
-const CALLS: Record<OutboxKind, LogCall> = {
-  dose: (p) => api.createDoseLog(p as never),
-  weight: (p) => api.createWeightLog(p as never),
-  sideEffect: (p) => api.createSideEffectLog(p as never),
-  measurement: (p) => api.createMeasurement(p as never),
-  activity: (p) => api.createActivityLog(p as never),
-  meal: (p) => api.createMealLog(p as never),
-  protein: (p) => api.createProteinLog(p as never),
-  water: (p) => api.createWaterLog(p as never),
-  fiber: (p) => api.createFiberLog(p as never),
+export function isDeadEntry(entry: OutboxEntry, now: number = Date.now()): boolean {
+  if (entry.attempts >= MAX_REPLAY_ATTEMPTS) return true;
+  const enqueued = Date.parse(entry.enqueuedAt);
+  return Number.isFinite(enqueued) && now - enqueued > MAX_ENTRY_AGE_MS;
+}
+
+/**
+ * Each entry takes the payload its api method takes, WITH the idempotency key
+ * the outbox stamps on — so the types have to admit that key exists.
+ *
+ * This deliberately no longer uses `as never`. That cast is what let a weight
+ * payload carrying an idempotencyKey compile against a schema that had no such
+ * field: TypeScript knew and was told to be quiet, and the mismatch only
+ * surfaced at runtime, on a user's device, as silently lost data. If a kind
+ * here stops type-checking, that is the compiler reporting a real schema
+ * disagreement — fix the schema, do not re-add the cast.
+ */
+type WithIdempotencyKey<T> = T & { idempotencyKey: string };
+
+interface OutboxCalls {
+  dose(payload: WithIdempotencyKey<DoseLogInput>): Promise<unknown>;
+  weight(payload: WithIdempotencyKey<WeightLogInput>): Promise<unknown>;
+  sideEffect(payload: WithIdempotencyKey<SideEffectLogInput>): Promise<unknown>;
+  measurement(payload: WithIdempotencyKey<MeasurementInput>): Promise<unknown>;
+  activity(payload: WithIdempotencyKey<ActivityLogInput>): Promise<unknown>;
+  meal(payload: WithIdempotencyKey<MealLogInput>): Promise<unknown>;
+  protein(payload: WithIdempotencyKey<ProteinLogInput>): Promise<unknown>;
+  water(payload: WithIdempotencyKey<WaterLogInput>): Promise<unknown>;
+  fiber(payload: WithIdempotencyKey<FiberLogInput>): Promise<unknown>;
+}
+
+const TYPED_CALLS: OutboxCalls = {
+  dose: (p) => api.createDoseLog(p),
+  weight: (p) => api.createWeightLog(p),
+  sideEffect: (p) => api.createSideEffectLog(p),
+  measurement: (p) => api.createMeasurement(p),
+  activity: (p) => api.createActivityLog(p),
+  meal: (p) => api.createMealLog(p),
+  protein: (p) => api.createProteinLog(p),
+  water: (p) => api.createWaterLog(p),
+  fiber: (p) => api.createFiberLog(p),
 };
+
+// The stored payload is an opaque record (it round-trips through JSON), so the
+// dispatch boundary needs one widening — but the TYPED_CALLS table above is
+// what the compiler actually checks each method's payload against.
+const CALLS: Record<OutboxKind, (payload: Record<string, unknown>) => Promise<unknown>> =
+  TYPED_CALLS as unknown as Record<
+    OutboxKind,
+    (payload: Record<string, unknown>) => Promise<unknown>
+  >;
+
+/**
+ * Every read-modify-write of a user's queue runs through here, one at a time.
+ *
+ * Without it, replayOutbox read the queue ONCE and then wrote back slices of
+ * that stale copy — so a log enqueued while a replay was in flight (the app
+ * came back online and the user kept logging) was silently erased by the next
+ * write-back. Both saveLogDurably and replayOutbox mutate the same key, and
+ * every await between a read and its write is an interleave point.
+ */
+const queueLocks = new Map<string, Promise<unknown>>();
+
+function withQueueLock<T>(userId: string, work: () => Promise<T>): Promise<T> {
+  const previous = queueLocks.get(userId) ?? Promise.resolve();
+  const next = previous.then(work, work);
+  // Keep the chain alive but never let a rejection poison the next waiter.
+  queueLocks.set(
+    userId,
+    next.then(
+      () => undefined,
+      () => undefined,
+    ),
+  );
+  return next;
+}
 
 async function readEntries(userId: string): Promise<OutboxEntry[]> {
   try {
@@ -125,6 +228,32 @@ async function writeEntries(userId: string, entries: OutboxEntry[]): Promise<voi
   } catch {
     // Storage failure degrades to the old behavior (lost on quit) — never throws.
   }
+}
+
+/**
+ * Removes one entry BY KEY against a fresh read of the queue, returning what
+ * is left. Never writes back a slice of a copy read earlier — that is what
+ * erased concurrently-enqueued logs.
+ */
+async function dropEntry(userId: string, key: string): Promise<OutboxEntry[]> {
+  return withQueueLock(userId, async () => {
+    const current = await readEntries(userId);
+    const next = current.filter((entry) => entry.key !== key);
+    await writeEntries(userId, next);
+    return next;
+  });
+}
+
+/** Records another failed attempt on one entry, leaving the rest untouched. */
+async function bumpAttempts(userId: string, key: string): Promise<OutboxEntry[]> {
+  return withQueueLock(userId, async () => {
+    const current = await readEntries(userId);
+    const next = current.map((entry) =>
+      entry.key === key ? { ...entry, attempts: entry.attempts + 1 } : entry,
+    );
+    await writeEntries(userId, next);
+    return next;
+  });
 }
 
 export async function outboxCount(userId: string): Promise<number> {
@@ -153,15 +282,17 @@ export async function saveLogDurably(
     // confusion. Report it as what it is.
     if (error instanceof ResponseParseError) return "saved";
     if (!isRetryable(error)) throw error;
-    const entries = await readEntries(userId);
-    entries.push({
-      key,
-      kind,
-      payload: body,
-      enqueuedAt: new Date().toISOString(),
-      attempts: 1,
+    await withQueueLock(userId, async () => {
+      const entries = await readEntries(userId);
+      entries.push({
+        key,
+        kind,
+        payload: body,
+        enqueuedAt: new Date().toISOString(),
+        attempts: 1,
+      });
+      await writeEntries(userId, entries);
     });
-    await writeEntries(userId, entries);
     return "queued";
   }
 }
@@ -184,24 +315,48 @@ export async function replayOutbox(userId: string): Promise<ReplayResult> {
     let dropped = 0;
     while (entries.length > 0) {
       const entry = entries[0]!;
+
+      // RECOVERY FOR ALREADY-POISONED QUEUES. A device that shipped with the
+      // old build may be holding a weight entry that could never send, with
+      // real logs stranded behind it. Now that weight payloads validate, that
+      // entry simply succeeds on this pass. Anything still undeliverable —
+      // too many attempts, or too old to be worth sending — is dropped here
+      // so the queue behind it drains either way.
+      if (isDeadEntry(entry)) {
+        console.warn(
+          "[outbox] dropping dead entry",
+          entry.kind,
+          entry.key,
+          `attempts=${entry.attempts}`,
+          `enqueuedAt=${entry.enqueuedAt}`,
+        );
+        dropped += 1;
+        entries = await dropEntry(userId, entry.key);
+        continue;
+      }
+
       try {
         await CALLS[entry.kind](entry.payload);
         sent += 1;
-        entries = entries.slice(1);
-        await writeEntries(userId, entries);
+        entries = await dropEntry(userId, entry.key);
       } catch (error) {
         if (isRetryable(error)) {
           // Still unhealthy — keep everything, in order, for next time.
-          entries = [{ ...entry, attempts: entry.attempts + 1 }, ...entries.slice(1)];
-          await writeEntries(userId, entries);
+          entries = await bumpAttempts(userId, entry.key);
           break;
         }
         // Final rejection: this entry can never succeed. Dropping it is the
         // only move that doesn't wedge the queue behind it forever.
-        console.warn("[outbox] dropping unacceptable entry", entry.kind, entry.key);
+        console.warn(
+          "[outbox] dropping unacceptable entry",
+          entry.kind,
+          entry.key,
+          isLocalValidationError(error)
+            ? "(payload this build cannot serialize)"
+            : "(server refused it)",
+        );
         dropped += 1;
-        entries = entries.slice(1);
-        await writeEntries(userId, entries);
+        entries = await dropEntry(userId, entry.key);
       }
     }
     return { sent, dropped, remaining: entries.length };

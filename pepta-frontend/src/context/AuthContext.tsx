@@ -4,12 +4,15 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { AppleAuth, AuthResponse, User } from "@pepta/shared";
 import { api } from "../services/api";
+import { clearPurchaseGrace } from "../services/purchaseGrace";
+import { clearSnapshot } from "../services/peptaSnapshotStore";
 import { appsFlyer } from "../services/appsflyer";
 import { revenueCat } from "../services/revenueCat";
 import {
@@ -91,6 +94,21 @@ async function identifyRevenueCatUser(user: {
     .catch((error) => {
       warnInDev("[RevenueCat] Could not identify user.", error);
     });
+
+  // Tell the server which RevenueCat customer this device is. That is the
+  // evidence the backend needs to reconcile a purchase whose webhook was lost
+  // — without it a first-time subscriber has no customer id, no sources and a
+  // 'free' status, so nothing ever looks their real state up.
+  //
+  // Deliberately NOT a silent catch: this failing is why a paying user could
+  // stay behind the paywall, so it is logged rather than swallowed. It must
+  // not block sign-in, hence the catch at all.
+  const appUserId = revenueCat.currentAppUserId();
+  if (appUserId) {
+    await api.linkRevenueCatAppUserId(appUserId).catch((error: unknown) => {
+      console.warn("[access] Could not link the RevenueCat customer id.", error);
+    });
+  }
 }
 
 async function logCompleteRegistrationIfNeeded(
@@ -114,6 +132,11 @@ async function logCompleteRegistrationIfNeeded(
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [auth, setAuth] = useState<AuthResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  // Who is signed in RIGHT NOW, readable from callbacks that must not close
+  // over a stale render. logout() needs the id to purge that user's snapshot,
+  // and doing it inside a setAuth updater would run twice under StrictMode.
+  const authRef = useRef<AuthResponse | null>(null);
+  authRef.current = auth;
 
   // Hydrate the saved session on launch (App.tsx shows a blank splash while
   // isLoading). A stale/corrupt blob parses to null → starts at sign-in.
@@ -218,6 +241,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void revenueCat.reset().catch((error) => {
       warnInDev("[RevenueCat] Could not log out.", error);
     });
+    // The post-purchase window belongs to the account that bought, not to the
+    // device. Leaving it behind handed the next account the premium shell.
+    clearPurchaseGrace();
+    // The offline snapshot holds this user's medications, doses, weights, side
+    // effects and schedules in plaintext AsyncStorage. It is keyed per user so
+    // the next account cannot READ it, but leaving it on a shared, resold or
+    // lost device is a data-at-rest problem regardless of who is signed in.
+    // Signing out is the moment to drop it.
+    const signedOutUserId = authRef.current?.user?.id;
+    if (signedOutUserId) {
+      void clearSnapshot(signedOutUserId).catch((error) => {
+        console.warn("[auth] Could not clear the offline snapshot.", error);
+      });
+    }
     setAuth(null);
     api.setAuthToken(null);
     persistAuth(null);

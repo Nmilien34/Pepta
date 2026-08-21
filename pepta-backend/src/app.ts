@@ -48,6 +48,7 @@ import { createLegalRouter } from "./routes/legal.routes";
 import { createMealLogsRouter } from "./routes/meal-logs.routes";
 import mealScansRoutes from "./routes/meal-scans.routes";
 import medicationLevelRoutes from "./routes/medication-level.routes";
+import mediaRoutes from "./routes/media.routes";
 import meRoutes from "./routes/me.routes";
 import onboardingRoutes from "./routes/onboarding.routes";
 import referralRoutes from "./routes/referral.routes";
@@ -156,8 +157,23 @@ export function createApp(options: CreateAppOptions = {}): Express {
   const premium = [requireAuth, requireActiveAccess] as const;
   app.use("/onboarding", onboardingRoutes);
   app.use("/referrals", referralRoutes);
-  app.use("/home", ...premium, homeRoutes);
+  // /home can reach a language model (insight prose), so it needs a limiter
+  // like the other AI-reaching routes — the /insights limiter below never saw
+  // this traffic. The ceiling is generous because Home is the app's landing
+  // screen and refetches on focus, pull, and after every log.
+  app.use(
+    "/home",
+    ...premium,
+    createInMemoryRateLimiter({
+      windowMs: 60 * 1000,
+      maxRequests: 60,
+      message: "Too many home requests",
+      keyBy: "userOrIp",
+    }),
+    homeRoutes,
+  );
   app.use("/track", ...premium, trackRoutes);
+  app.use("/media", ...premium, mediaRoutes);
   app.use("/favourites", ...premium, favouritesRoutes);
   app.use("/recipes", ...premium, recipesRoutes);
   app.use("/progress", ...premium, progressRoutes);
@@ -176,17 +192,11 @@ export function createApp(options: CreateAppOptions = {}): Express {
   );
   app.use("/weekly-retention", ...premium, weeklyRetentionRoutes);
   app.use("/diagnostics", ...premium, diagnosticsRoutes);
-  app.use(
-    "/meal-scans",
-    ...premium,
-    createInMemoryRateLimiter({
-      windowMs: 60 * 1000,
-      maxRequests: 20,
-      message: "Too many meal intelligence requests",
-      keyBy: "userOrIp",
-    }),
-    mealScansRoutes,
-  );
+  // Rate limits live INSIDE this router: the camera/voice calls and the
+  // typeahead food search need separate budgets, and a single mount-level
+  // limiter necessarily pools them (one counter for the whole mount), so
+  // searching a few foods could 429 the next meal photo.
+  app.use("/meal-scans", ...premium, mealScansRoutes);
   app.use("/compounds", ...premium, createCompoundsRouter());
   app.use("/cycles", ...premium, createCyclesRouter());
   app.use("/schedules", ...premium, createSchedulesRouter());

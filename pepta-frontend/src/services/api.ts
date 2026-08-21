@@ -2,8 +2,6 @@ import {
   apiErrorResponseSchema,
   appleAuthSchema,
   avatarConfirmRequestSchema,
-  avatarUploadIntentRequestSchema,
-  avatarUploadIntentResponseSchema,
   avatarViewUrlResponseSchema,
   authResponseSchema,
   googleAuthSchema,
@@ -40,6 +38,11 @@ import {
   mealTranscriptResponseSchema,
   mealTranscriptionInputSchema,
   mealVoiceInputSchema,
+  mediaConfirmInputSchema,
+  mediaDiscardInputSchema,
+  mediaReadyResponseSchema,
+  mediaUploadIntentInputSchema,
+  mediaUploadIntentResponseSchema,
   measurementInputSchema,
   measurementResponseSchema,
   notificationPreferencesPatchSchema,
@@ -73,8 +76,6 @@ import {
   type ActivityLogResponse,
   type AppleAuth,
   type AvatarConfirmRequest,
-  type AvatarUploadIntentRequest,
-  type AvatarUploadIntentResponse,
   type AvatarViewUrlResponse,
   type AuthResponse,
   type CompoundInput,
@@ -93,14 +94,11 @@ import {
   type HomeResponse,
   type DiscoverySource,
   type UserProfileSettingsPatch,
-  favouritePhotoIntentResponseSchema,
   medicationLevelsResponseSchema,
   uiPreferencesResponseSchema,
   favouriteResponseSchema,
   favouritesResponseSchema,
   type FavouriteInput,
-  type FavouritePhotoIntentInput,
-  type FavouritePhotoIntentResponse,
   type LevelRangeKey,
   type MedicationLevelsResponse,
   type UiPreferencesInput,
@@ -127,6 +125,12 @@ import {
   type MealTranscriptResponse,
   type MealTranscriptionInput,
   type MealVoiceInput,
+  type MediaConfirmInput,
+  type MediaContentType,
+  type MediaIntent,
+  type MediaReadyResponse,
+  type MediaUploadIntentInput,
+  type MediaUploadIntentResponse,
   type MeasurementInput,
   type MeasurementResponse,
   type NotificationPreferencesPatch,
@@ -228,6 +232,9 @@ export const LOG_PATHS = {
   activity: "/activity-logs",
   sideEffect: "/side-effect-logs",
   measurement: "/measurements",
+  // Fibre was missing here, so a row the Home stepper created could never be
+  // deleted — the backend has served /fiber-logs all along.
+  fiber: "/fiber-logs",
 } as const;
 
 export type DeletableLogKind = keyof typeof LOG_PATHS;
@@ -522,19 +529,6 @@ class PeptaApi {
     return this.fetchNoContent("/me/account", { method: "DELETE" });
   }
 
-  public createAvatarUploadIntent(
-    body: AvatarUploadIntentRequest,
-  ): Promise<AvatarUploadIntentResponse> {
-    return this.request(
-      "/me/avatar/upload-intent",
-      avatarUploadIntentResponseSchema,
-      {
-        method: "POST",
-        body: JSON.stringify(avatarUploadIntentRequestSchema.parse(body)),
-      },
-    );
-  }
-
   public confirmAvatarUpload(body: AvatarConfirmRequest): Promise<User> {
     return this.request("/me/avatar", userResponseSchema, {
       method: "POST",
@@ -665,22 +659,59 @@ class PeptaApi {
     });
   }
 
-  /** Step 1 of the favourite-photo upload: somewhere to PUT the bytes. */
-  public createFavouritePhotoIntent(
-    input: FavouritePhotoIntentInput,
-  ): Promise<FavouritePhotoIntentResponse> {
-    return this.request("/favourites/photo-intent", favouritePhotoIntentResponseSchema, {
+  public createMediaUploadIntent(
+    input: MediaUploadIntentInput,
+  ): Promise<MediaUploadIntentResponse> {
+    return this.request("/media/upload-intent", mediaUploadIntentResponseSchema, {
       method: "POST",
-      body: JSON.stringify(input),
+      body: JSON.stringify(mediaUploadIntentInputSchema.parse(input)),
     });
   }
 
-  /** Throws away a photo that was uploaded and then never attached. */
-  public discardFavouritePhoto(photoS3Key: string): Promise<unknown> {
-    return this.request("/favourites/photo-discard", z.unknown(), {
+  public confirmMedia(input: MediaConfirmInput): Promise<MediaReadyResponse> {
+    return this.request("/media/confirm", mediaReadyResponseSchema, {
       method: "POST",
-      body: JSON.stringify({ photoS3Key }),
+      body: JSON.stringify(mediaConfirmInputSchema.parse(input)),
     });
+  }
+
+  public discardMedia(mediaId: string): Promise<unknown> {
+    return this.request("/media/discard", z.unknown(), {
+      method: "POST",
+      body: JSON.stringify(mediaDiscardInputSchema.parse({ mediaId })),
+    });
+  }
+
+  public async uploadMediaPhoto(input: {
+    intent: MediaIntent;
+    uri: string;
+    contentType: MediaContentType;
+  }): Promise<MediaReadyResponse> {
+    const local = await fetch(input.uri);
+    const blob = await local.blob();
+    const intent = await this.createMediaUploadIntent({
+      intent: input.intent,
+      contentType: input.contentType,
+      sizeBytes: blob.size,
+    });
+    await this.uploadBlobToPostPolicy(intent.uploadUrl, intent.fields, blob);
+    return this.confirmMedia({ mediaId: intent.mediaId });
+  }
+
+  private async uploadBlobToPostPolicy(
+    uploadUrl: string,
+    fields: Record<string, string>,
+    blob: Blob,
+  ): Promise<void> {
+    const form = new FormData();
+    for (const [key, value] of Object.entries(fields)) {
+      form.append(key, value);
+    }
+    form.append("file", blob, "upload");
+    const uploaded = await fetch(uploadUrl, { method: "POST", body: form });
+    if (!uploaded.ok) {
+      throw new Error(`Photo upload failed: ${uploaded.status}`);
+    }
   }
 
   /**
@@ -718,6 +749,13 @@ class PeptaApi {
 
   public getRecipes(): Promise<RecipesResponse> {
     return this.request("/recipes", recipesResponseSchema);
+  }
+
+  public getRecipe(id: string): Promise<RecipeResponse> {
+    return this.request(
+      `/recipes/${encodeURIComponent(id)}`,
+      recipeResponseSchema,
+    );
   }
 
   /** Saving a starter as yours comes through here too — it is a copy. */
@@ -855,6 +893,21 @@ class PeptaApi {
     });
   }
 
+  /**
+   * POST /me/access/link → AccessDecision.
+   *
+   * Tells the server which RevenueCat customer this device is identified as.
+   * Without it, a first-time subscriber whose purchase webhook was lost has no
+   * RevenueCat evidence on the server at all, so nothing ever reconciles their
+   * real state and they sit behind the paywall having paid.
+   */
+  public linkRevenueCatAppUserId(appUserId: string): Promise<AccessDecision> {
+    return this.request("/me/access/link", accessDecisionSchema, {
+      method: "POST",
+      body: JSON.stringify({ appUserId }),
+    });
+  }
+
   // POST /referrals/claim → creator/referral attribution only. Never affects
   // subscription status or paywall eligibility. Backend validates the code;
   // 404 = unknown/expired, 409 = account already claimed a different code.
@@ -945,8 +998,8 @@ class PeptaApi {
     });
   }
 
-  // Progress-photo upload is a 3-step presigned-S3 flow:
-  // 1) intent → presigned uploadUrl, 2) PUT bytes to S3, 3) confirm.
+  // Progress-photo upload is a 3-step verified flow:
+  // 1) intent with measured bytes, 2) policy-bound POST, 3) opaque confirmation.
   public createPhotoUploadIntent(
     body: ProgressPhotoInput,
   ): Promise<ProgressPhotoUploadIntentResponse> {
@@ -960,29 +1013,29 @@ class PeptaApi {
     );
   }
 
-  // Raw binary PUT straight to the presigned S3 URL (no auth header / no JSON envelope).
-  public async uploadToPresignedUrl(
-    uploadUrl: string,
-    uri: string,
-    contentType: string,
-  ): Promise<void> {
-    const file = await fetch(uri);
-    const blob = await file.blob();
-    const res = await fetch(uploadUrl, {
-      method: "PUT",
-      headers: { "Content-Type": contentType },
-      body: blob,
-    });
-    if (!res.ok) {
-      throw new Error(`Photo upload failed: ${res.status}`);
-    }
-  }
-
   public confirmPhoto(body: ProgressPhotoConfirmInput): Promise<ProgressPhoto> {
     return this.request("/progress-photos/confirm", progressPhotoSchema, {
       method: "POST",
       body: JSON.stringify(progressPhotoConfirmInputSchema.parse(body)),
     });
+  }
+
+  public async uploadProgressPhoto(
+    input: Omit<ProgressPhotoInput, "sizeBytes"> & { uri: string },
+  ): Promise<ProgressPhoto> {
+    const local = await fetch(input.uri);
+    const blob = await local.blob();
+    const intent = await this.createPhotoUploadIntent({
+      captureDate: input.captureDate,
+      contentType: input.contentType,
+      sizeBytes: blob.size,
+      kind: input.kind,
+      ...(input.faceFullness === undefined
+        ? {}
+        : { faceFullness: input.faceFullness }),
+    });
+    await this.uploadBlobToPostPolicy(intent.uploadUrl, intent.fields, blob);
+    return this.confirmPhoto({ photoId: intent.photo.id });
   }
 }
 

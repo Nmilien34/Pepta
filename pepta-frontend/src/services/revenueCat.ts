@@ -358,10 +358,16 @@ export function createRevenueCatClient(options: RevenueCatClientOptions) {
 
   subscribeToAppsFlyerIdAvailability();
 
+  /** The RevenueCat customer this device is currently identified as. */
+  function currentAppUserId(): string | null {
+    return currentUserId;
+  }
+
   return {
     isAvailable,
     configure,
     identify,
+    currentAppUserId,
     getPaywallPackages,
     purchasePlan,
     restore,

@@ -28,6 +28,7 @@ export const ACTIVITY_ICON: Record<ActivityKind, { name: string; bg: string; fg:
   weight: { name: 'scale', bg: '#F2F3F5', fg: '#52525B' },
   protein: { name: 'food-drumstick', bg: '#FFEDE0', fg: '#D2691E' },
   water: { name: 'water', bg: '#E3F2FF', fg: '#2A8FD8' },
+  fiber: { name: 'leaf', bg: '#E8F8EE', fg: '#1E8E40' },
   meal: { name: 'nutrition', bg: '#E8F8EE', fg: '#1E8E40' },
   sideEffect: { name: 'alert-circle-outline', bg: '#FFF4E5', fg: '#B87514' },
   activity: { name: 'pulse', bg: '#FFE9EC', fg: '#C2415A' },

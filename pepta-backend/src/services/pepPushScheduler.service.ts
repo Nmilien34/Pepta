@@ -1,6 +1,7 @@
 import cron, { type ScheduledTask } from "node-cron";
 import { env } from "../config/env";
 import { logger } from "../lib/logger";
+import { hourInTz, isValidTimeZone } from "../lib/timezone";
 import {
   PepPushDeliveryModel,
   PushTokenModel,
@@ -76,6 +77,23 @@ export interface PepPushMaintenanceResult {
   skipped: number;
   duplicates: number;
   noCandidate: number;
+  /** Held back because it was the middle of the night where the user is. */
+  quietHours: number;
+}
+
+/** Nothing audible before this hour, or after it, in the user's own zone. */
+const QUIET_HOURS_START = 21;
+const QUIET_HOURS_END = 8;
+
+function isQuietHourFor(context: unknown, now: Date): boolean {
+  const timeZone = (context as PepPushContext | null)?.timezone;
+  if (!timeZone || !isValidTimeZone(timeZone)) {
+    // No usable zone means no way to know it is a reasonable hour for them.
+    // Hold rather than risk a 4am notification.
+    return true;
+  }
+  const hour = hourInTz(now, timeZone);
+  return hour >= QUIET_HOURS_START || hour < QUIET_HOURS_END;
 }
 
 function documentObject(document: unknown): Record<string, unknown> {
@@ -148,11 +166,19 @@ async function defaultCreateNotification(input: {
     });
     return null;
   }
-  const notification = await createPepPushNotification({
-    context,
-    candidate,
-    aiPushCopyConsent: input.aiPushCopyConsent,
-  });
+
+  // Selection is deterministic, so we already know here whether this candidate
+  // could ever be sent. Writing its copy first meant paying the model for
+  // notifications the caller was about to discard — on a 15-minute sweep, for
+  // every consenting user, that is almost all of them.
+  const sendable = candidate.pushEligible && candidate.importance === "high";
+  const notification = sendable
+    ? await createPepPushNotification({
+        context,
+        candidate,
+        aiPushCopyConsent: input.aiPushCopyConsent,
+      })
+    : { ...candidate.fallback, candidate, source: "deterministic" as const };
   await refreshPepMemoryFromContext(input.userId, context, input.now, {
     aiPushCopyConsent: input.aiPushCopyConsent,
     candidate,
@@ -217,6 +243,7 @@ export async function runPepPushMaintenance(
     skipped: 0,
     duplicates: 0,
     noCandidate: 0,
+    quietHours: 0,
   };
 
   const users = await deps.loadEligibleUsers();
@@ -241,6 +268,18 @@ export async function runPepPushMaintenance(
       const { candidate } = notification;
       if (!candidate.pushEligible || candidate.importance !== "high") {
         result.skipped += 1;
+        continue;
+      }
+
+      // QUIET HOURS. The sweep runs every 15 minutes around the clock and had
+      // no notion of what time it was where the user is, so an audible
+      // "protein checkpoint" could land at 12:15am — minutes after their day
+      // rolled over, before they could possibly have logged anything — or a
+      // dose reminder at 4am for an 8am dose. Nudges are never urgent enough
+      // to wake someone; one held back is picked up by the next sweep inside
+      // waking hours, and its windowKey stops it repeating once it lands.
+      if (isQuietHourFor(context, now)) {
+        result.quietHours += 1;
         continue;
       }
 

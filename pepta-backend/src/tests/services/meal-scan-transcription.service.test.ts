@@ -64,6 +64,9 @@ describe("meal scan transcription service", () => {
     expect(mocks.openAI).toHaveBeenCalledWith({
       apiKey: "test-openai-key",
       timeout: expect.any(Number),
+      // No retries: the app aborts at 15s, and a retry that lands after that
+      // is billed for a result nobody receives.
+      maxRetries: 0,
     });
     expect(mocks.toFile).toHaveBeenCalledWith(
       Buffer.from("fake m4a bytes"),
