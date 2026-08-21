@@ -33,6 +33,11 @@ export function serializeDraft(step: string, answers: Record<string, unknown>): 
  */
 const LEGACY_STEP_MAP: Record<string, string> = {
   auth: 'reveal',
+  // 'needs' was cut 2026-08-21. This entry is not optional politeness: the
+  // navigator only restores a draft whose step still EXISTS, so without it
+  // anyone parked on that screen when the build lands loses every answer and
+  // restarts the quiz from welcome. Resume on the turn that followed it.
+  needs: 'notifications',
 };
 
 export function migrateLegacyStep(step: string): string {
@@ -54,6 +59,42 @@ const OFFER_TAIL = new Set(['trialOffer', 'trialCarousel', 'paywall']);
 
 export function rewindResumeStep(step: string): string {
   return OFFER_TAIL.has(step) ? 'reveal' : step;
+}
+
+/**
+ * Answers that GATE later steps. A draft resuming past one of these with the
+ * answer missing walks a flow with a hole in it — so rewind to the gate and
+ * ask it again.
+ *
+ * This exists because REORDERING the step list can move a gate behind a step
+ * someone is already parked on. The 2026-08-21 reorder did exactly that:
+ * meetPep and nameCompanion moved from positions 3–4 to 6–7, past
+ * journeyStage. A draft saved at either would have resumed with journeyStage
+ * never asked, and `shouldSkipStep` short-circuits on `ctx.journeyStage &&`
+ * — so an undefined answer reads as "actively dosing" and hands a
+ * not-on-a-GLP-1 user the entire nine-step dosing block.
+ *
+ * Re-asking one question beats mis-gating nine steps, so the rewind is
+ * unconditional on distance. Keep this list to genuine gates: it can send a
+ * far-along draft back to an early screen, which is the right trade only when
+ * the missing answer actually breaks the flow.
+ */
+const GATE_STEPS: ReadonlyArray<{ step: string; answer: string }> = [
+  { step: 'journeyStage', answer: 'journeyStage' },
+];
+
+export function rewindToUnansweredGate(
+  step: string,
+  answers: Record<string, unknown> | null | undefined,
+  order: readonly string[],
+): string {
+  const at = order.indexOf(step);
+  if (at < 0) return step;
+  for (const gate of GATE_STEPS) {
+    const gateAt = order.indexOf(gate.step);
+    if (gateAt >= 0 && at > gateAt && answers?.[gate.answer] == null) return gate.step;
+  }
+  return step;
 }
 
 export function parseDraft(raw: string | null | undefined): StoredDraft | null {

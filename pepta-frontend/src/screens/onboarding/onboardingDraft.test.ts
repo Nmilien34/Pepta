@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { parseDraft, rewindResumeStep, serializeDraft } from './onboardingDraft';
+import { parseDraft, rewindResumeStep, rewindToUnansweredGate, serializeDraft } from './onboardingDraft';
+import { ONBOARDING_STEPS } from './onboardingFlow';
 
 describe('onboarding draft', () => {
   it('round-trips step + answers', () => {
@@ -32,5 +33,45 @@ describe('rewindResumeStep', () => {
     expect(rewindResumeStep('medication')).toBe('medication');
     expect(rewindResumeStep('reveal')).toBe('reveal');
     expect(rewindResumeStep('goalPace')).toBe('goalPace');
+  });
+});
+
+describe('rewindToUnansweredGate', () => {
+  const at = (step: string) => ONBOARDING_STEPS.indexOf(step as never);
+
+  it('catches the draft the 2026-08-21 reorder stranded', () => {
+    // meetPep and nameCompanion moved from positions 3–4 to 6–7, past
+    // journeyStage. Someone parked on either when the build shipped would
+    // otherwise resume with the medication-block gate never asked.
+    expect(rewindToUnansweredGate('meetPep', {}, ONBOARDING_STEPS)).toBe('journeyStage');
+    expect(rewindToUnansweredGate('nameCompanion', {}, ONBOARDING_STEPS)).toBe('journeyStage');
+  });
+
+  it('is why it matters: an undefined gate reads as "actively dosing"', () => {
+    // shouldSkipStep short-circuits on `ctx.journeyStage &&`, so a missing
+    // answer hands a not-on-a-GLP-1 user the whole dosing block. This test
+    // documents the consequence the rewind exists to prevent.
+    expect(at('journeyStage')).toBeLessThan(at('meetPep'));
+    expect(at('journeyStage')).toBeLessThan(at('medication'));
+  });
+
+  it('leaves a draft alone once the gate is answered', () => {
+    expect(
+      rewindToUnansweredGate('nameCompanion', { journeyStage: 'active' }, ONBOARDING_STEPS),
+    ).toBe('nameCompanion');
+    expect(
+      rewindToUnansweredGate('goalPace', { journeyStage: 'none' }, ONBOARDING_STEPS),
+    ).toBe('goalPace');
+  });
+
+  it('never rewinds a step that sits at or before the gate', () => {
+    expect(rewindToUnansweredGate('journeyStage', {}, ONBOARDING_STEPS)).toBe('journeyStage');
+    expect(rewindToUnansweredGate('notAlone', {}, ONBOARDING_STEPS)).toBe('notAlone');
+    expect(rewindToUnansweredGate('welcome', {}, ONBOARDING_STEPS)).toBe('welcome');
+  });
+
+  it('passes through a step it does not recognise, and a missing answers bag', () => {
+    expect(rewindToUnansweredGate('nonsense', {}, ONBOARDING_STEPS)).toBe('nonsense');
+    expect(rewindToUnansweredGate('nameCompanion', null, ONBOARDING_STEPS)).toBe('journeyStage');
   });
 });

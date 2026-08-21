@@ -241,14 +241,14 @@ export function echoFor(step: OnboardingStep, a: EchoAnswers, now: Date = new Da
       return `${journeyEcho(a.journeyStage)} Now, honestly —`;
     case 'symptomWeek':
       return sideEffectNamesEcho(a.sideEffects);
-    case 'needs':
-      // "I'll watch for those" belongs to whichever screen directly follows
-      // the side-effects turn. When the symptom-week beat runs it has already
-      // acknowledged the picks by name, so this must not say it twice.
-      if (symptomForWeekBeat(a.sideEffects)) return 'Last thing.';
-      return (a.sideEffects?.length ?? 0) > 0 ? 'Noted — I’ll watch for those.' : 'Clean slate so far.';
     case 'notifications':
-      return 'You’ve given me everything I need.';
+      // INHERITED FROM THE CUT `needs` TURN (2026-08-21). "I'll watch for
+      // those" belongs to whichever screen directly follows the side-effects
+      // turn, and that is now this one. When the symptom-week beat runs it has
+      // already acknowledged the picks by name, so this must not say it twice
+      // — the same rule the old turn carried, applied one screen later.
+      if (symptomForWeekBeat(a.sideEffects)) return 'You’ve given me everything I need.';
+      return (a.sideEffects?.length ?? 0) > 0 ? 'Noted — I’ll watch for those.' : 'Clean slate so far.';
     default:
       return undefined;
   }

@@ -40,10 +40,21 @@
 // each only ever produced a one-line conversational echo — a question's worth
 // of friction for a sentence. `momentum` also opened "Last one. Be honest."
 // while six screens still followed it.
-// KEPT, deliberately: `needs`. It looks like the same case on paper (also
-// absent from the payload) but it is not — `buildCraftingSteps` leads the
-// crafting checklist with the user's own picks, so the answer visibly comes
-// back. It moved late instead, next to that payoff.
+//
+// ALSO DROPPED (2026-08-21): `needs`, the "what would help most" multi-select,
+// which had been kept on the argument that buildCraftingSteps led the crafting
+// checklist with the user's own words. Two of the three reasons its own header
+// gave for existing were never wired: the paywall renders as
+// `<PaywallScreen onComplete={goNext} />` and never received the picks, and
+// nothing ever POSTed them or logged an event, so the promised "product-
+// priority signal in aggregate" did not exist. What remained was three lines
+// in a 3.7-second animation, bought with a MANDATORY screen (the CTA was
+// disabled until you picked) two turns before the paywall — and for an active
+// weekly injector who picked `schedule`, one of those lines duplicated the
+// shot-day row the checklist already appended.
+// The checklist rows are now DERIVED from answers we already hold — see
+// buildCraftingSteps in OnboardingNavigator. Wire it back only if the paywall
+// really will lead with the picks; that was the trade, and it was not taken.
 import type { SideEffectType } from '@pepta/shared';
 import { symptomForWeekBeat } from './symptomWeek';
 
@@ -52,10 +63,17 @@ export const ONBOARDING_STEPS = [
   // The gift, given before anything is asked. Was the welcome screen's payload
   // until the carousel took screen 1 — see NotAloneScreen.
   'notAlone',
-  'meetPep',
-  // Optional, never a gate — the default stays 'Pep'. Sits here so the
-  // introduction is still on screen; asking later would feel bolted on.
-  'nameCompanion',
+  // ASK ABOUT THEM BEFORE INTRODUCING THE MASCOT (moved 2026-08-21, Nick).
+  // Pep used to be screens 3–4, immediately after "you're not the only one
+  // doing this" — a cartoon shown to someone the app had not yet said one
+  // useful thing to. journeyStage is self-identifying and biggestWorry is the
+  // question people actually want asked, so they earn the screen that
+  // reassurance alone does not.
+  //
+  // NOTE THE PAIR: biggestWorry → fearAnswered stay ADJACENT. The straight
+  // 3-4 ↔ 5-6 swap would have put meetPep + nameCompanion between the fear and
+  // its answer, which is the one thing in this block worth protecting — see
+  // finding (1) below for why fearAnswered was dragged up here at all.
   'journeyStage',
   'biggestWorry',
   'fearAnswered',
@@ -66,6 +84,22 @@ export const ONBOARDING_STEPS = [
   // Never skipped; "Somewhere else" is the out. Pure insertion — draft key
   // stays pepta.onboarding.v2.
   'discoverySource',
+  // Pep now arrives AFTER the app has named the user's fear and answered it,
+  // so the introduction lands as "the thing that just helped you" rather than
+  // as a mascot handed to a stranger. Better entrance than the old slot,
+  // independent of the bounce argument.
+  //
+  // AND IT LOAD-BEARS: this beat is what keeps the dosing run at 7. The first
+  // draft of this reorder put the pair BEFORE discoverySource, which left
+  // nameCompanion adjacent to it and made the run to the leanMass beat 8 asks
+  // long — a reorder meant to cut early friction that quietly added some. The
+  // run-length test caught it. Do not move meetPep past nameCompanion.
+  'meetPep',
+  // Optional, never a gate — the default stays 'Pep'. Sits here so the
+  // introduction is still on screen; asking later would feel bolted on.
+  // Nothing before this reads companionName (first use is the leanMass beat),
+  // so moving the pair down from steps 3–4 costs no downstream copy.
+  'nameCompanion',
   'medication',
   'route',
   'currentDose',
@@ -97,11 +131,6 @@ export const ONBOARDING_STEPS = [
   // Conviction beat. Collect the worry, then draw it. Skipped for "none yet"
   // and for picks that do not follow a post-dose arc — see symptomForWeekBeat.
   'symptomWeek',
-  // Kept, and moved to sit two steps before `crafting`: this answer is what the
-  // crafting checklist leads with, ticking off the user's own words. Asked at
-  // step 5 that payoff was twenty screens away and read as a throwaway; here
-  // the loop closes almost immediately.
-  'needs',
   'notifications',
   'crafting',
   // The standalone `auth` turn was MERGED INTO `reveal` (2026-07-29): the
