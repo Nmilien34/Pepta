@@ -25,6 +25,8 @@ import { buildHomeView, recentDayLetters, type GoalView, type HomeWeightPulseVie
 import { globalDoseNoun, LEVEL_SUPPRESSION_COPY } from './levelSuppression';
 import { buildActivity, buildTodaysLog, type ActivitySummary, type LogChip, type LogKind } from './homeExtras';
 import { HomeShortcuts, type Shortcut } from './HomeShortcuts';
+import { StreakSheet } from '../../components/StreakSheet';
+import { activeDays, bestStreak, habitStreaks, localToday, recentDays } from './streaks';
 import { SHORTCUT_PHOTOS } from './nutrientPhotos';
 import { buildGettingStarted, buildPlanSummary, type GettingStarted, type LogAction, type PlanSummary } from './planView';
 import { resolveTeachCard, type PepTeachCard, type ResolvedTeachCard } from './pepTeach';
@@ -63,6 +65,30 @@ export function HomeScreen() {
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
   const { home, track, homeLoading, homeError, homeRefreshing, homeRange, refreshHome, refreshTrack, schedules, cycles, refreshScheduling, bumpProtein, bumpWater, bumpFiber, pendingLogs, lastSyncedAt, saveLog, deleteLog } = usePeptaData();
   const { openQuickLog, openMeal } = useLogSheets();
+  const [streakOpen, setStreakOpen] = useState(false);
+
+  // Detail for the streak sheet. The HEADLINE stays the server's number (see
+  // StreakSheet) — this only fills in what /home does not send.
+  const streakDetail = useMemo(() => {
+    const today = localToday();
+    const habits = [
+      { key: 'water', label: 'Water', logs: track?.waterLogs },
+      { key: 'protein', label: 'Protein', logs: track?.proteinLogs },
+      { key: 'fiber', label: 'Fibre', logs: track?.fiberLogs },
+      { key: 'meals', label: 'Meals', logs: track?.mealLogs },
+      { key: 'dose', label: 'Shots', logs: track?.doseLogs },
+      { key: 'activity', label: 'Activity', logs: track?.activityLogs },
+      { key: 'weight', label: 'Weight', logs: track?.weightLogs },
+    ];
+    const all = activeDays(...habits.map((habit) => habit.logs));
+    return {
+      today,
+      loggedToday: all.has(today),
+      best: bestStreak(all),
+      days: recentDays(all, today, 28),
+      habits: habitStreaks(habits, today),
+    };
+  }, [track]);
   /**
    * Today's resistance log id. A ref because the handler is declared above the
    * early returns — where hooks must live — and `activity` is built below
@@ -359,12 +385,29 @@ export function HomeScreen() {
                   reserved to mean "this is the value", and the streak count is
                   a value. Orange-on-orange said the number was decoration. */}
               {view.streakDays > 0 ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                // The count was decoration with nowhere to go. A streak you
+                // cannot inspect is one you cannot trust: "1" says nothing
+                // about which habit is carrying it, or whether today counts.
+                <Pressable
+                  onPress={() => {
+                    Haptics.selectionAsync().catch(() => undefined);
+                    setStreakOpen(true);
+                  }}
+                  hitSlop={10}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Streak, ${view.streakDays} days. View details`}
+                  style={({ pressed }) => ({
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 3,
+                    opacity: pressed ? 0.6 : 1,
+                  })}
+                >
                   <Icon name="fire" size={18} color={theme.colors.streak} />
                   <AppText style={{ fontWeight: '800', fontSize: 15 }}>
                     {view.streakDays}
                   </AppText>
-                </View>
+                </Pressable>
               ) : null}
               <View style={{ width: 34, height: 34, borderRadius: theme.radii.pill, backgroundColor: theme.colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
                 <Icon name="sparkles" size={18} color={theme.colors.primary} />
@@ -630,6 +673,18 @@ export function HomeScreen() {
           ) : null}
         </ScrollView>
       </SafeAreaView>
+
+      <StreakSheet
+        visible={streakOpen}
+        onClose={() => setStreakOpen(false)}
+        // The SERVER's count, not a second opinion — the sheet explains this
+        // number, so recomputing it here could only ever contradict it.
+        streakDays={view.streakDays}
+        loggedToday={streakDetail.loggedToday}
+        bestStreak={streakDetail.best}
+        days={streakDetail.days}
+        habits={streakDetail.habits}
+      />
     </View>
   );
 }

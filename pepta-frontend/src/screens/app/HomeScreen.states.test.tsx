@@ -120,6 +120,12 @@ vi.mock("../../components", () => {
 vi.mock("../../components/LivingMascot", () => ({
   LivingMascot: () => React.createElement("LivingMascot"),
 }));
+// The streak sheet is a BottomSheet, which pulls Modal / KeyboardAvoidingView
+// / useWindowDimensions / Keyboard into a mock that deliberately covers only
+// what Home itself renders. These tests never open the sheet, so stub it
+// rather than teaching the mock four more RN internals — StreakSheet has its
+// own render test.
+vi.mock("../../components/StreakSheet", () => ({ StreakSheet: () => null }));
 vi.mock("../../components/Icon", () => ({ Icon: () => null }));
 vi.mock("../../theme", () => ({
   useTheme: () => ({

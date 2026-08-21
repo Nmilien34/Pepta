@@ -131,9 +131,23 @@ describe('the streak counter is bare, per .streak', () => {
   it('sets the row at gap 3 with an 18px flame', () => {
     // gap:3 from the class; the flame's 18px from the frame's inline override.
     // It shipped at gap 5 with a 14px glyph, sized to fit the pill it was in.
-    expect(flat(header)).toContain(
-      "flexDirection: 'row', alignItems: 'center', gap: 3 }}> <Icon name=\"fire\" size={18}",
-    );
+    // Asserted as METRICS, not as an element shape: the row is a Pressable
+    // now (the flame opens the streak sheet), and the frame's numbers are the
+    // thing this test defends — not whether it is a View.
+    const streakRow = flat(header).slice(flat(header).indexOf('view.streakDays > 0'));
+    expect(streakRow).toContain("gap: 3,");
+    expect(streakRow).toContain('<Icon name="fire" size={18} color={theme.colors.streak} />');
+  });
+
+  it('makes the flame open the streak sheet', () => {
+    // The count was a dead number. It is the only place the streak appears, so
+    // "1" had to carry the whole story on its own — including which habit is
+    // keeping it alive, which it cannot.
+    const streakRow = flat(header).slice(flat(header).indexOf('view.streakDays > 0'));
+    expect(streakRow).toContain('setStreakOpen(true)');
+    expect(streakRow).toContain('accessibilityRole="button"');
+    // Named for a screen reader, since a bare flame and digit says nothing.
+    expect(streakRow).toContain('accessibilityLabel={`Streak, ${view.streakDays} days');
   });
 
   it('renders the COUNT in ink at 800/15, not in the flame’s orange', () => {
