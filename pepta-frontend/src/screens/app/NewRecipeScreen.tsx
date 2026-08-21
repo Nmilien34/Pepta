@@ -56,7 +56,7 @@ export function NewRecipeScreen() {
           >
             <Icon name="chevron-back" size={25} color={theme.colors.textSecondary} stroke={2.4} />
           </Pressable>
-          <AppText variant="screenTitle">New recipe</AppText>
+          <AppText variant="screenTitle" style={{ fontSize: 24 }}>New recipe</AppText>
         </View>
 
         <ScrollView
@@ -93,17 +93,20 @@ export function NewRecipeScreen() {
                   opacity: pressed ? 0.68 : 1,
                 })}
               >
+                {/* Food-side warm peach with a protein glyph, not the app's
+                    purple: these three tiles are the frame's food cue, and it
+                    is the only colour on the screen. */}
                 <View
                   style={{
                     width: 44,
                     height: 44,
                     borderRadius: 14,
-                    backgroundColor: theme.colors.surfaceAlt,
+                    backgroundColor: theme.colors.foodTint,
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
                 >
-                  <Icon name={r.icon} size={19} color={theme.colors.primary} stroke={2.2} />
+                  <Icon name={r.icon} size={20} color={theme.colors.protein} stroke={2.2} />
                 </View>
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <AppText variant="cardTitle" style={{ fontSize: 14 }}>

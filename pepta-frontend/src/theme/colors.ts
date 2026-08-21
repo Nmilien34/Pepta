@@ -44,6 +44,14 @@ interface SemanticColors {
   textTertiary: string;
   fillPrimary: string;
   fillSecondary: string;
+  // The frame's food tint — the warm peach behind every "log a meal" action
+  // (Home's meal CTA, Recipes' and Favourites' Log pills, New recipe's route
+  // tiles). It is its own value, NOT protein at 13%: the frame warms it toward
+  // cream so the food side of the app reads distinct from a tinted chip.
+  // Semantic rather than an accent because a literal #FFF1E6 block glares on
+  // the dark ground — it shipped hardcoded in three screens and was about to
+  // become a fourth.
+  foodTint: string;
   shadow: string;
   onPrimary: string;
 }
@@ -65,6 +73,7 @@ const lightColors: SemanticColors = {
   // Subtle tinted fills for inset rows / steppers, keyed off the gray scale.
   fillPrimary: "rgba(14,14,18,0.06)",
   fillSecondary: "rgba(14,14,18,0.04)",
+  foodTint: "#FFF1E6",
   // Soft shadow color (large blur, low opacity).
   shadow: "rgba(40,32,24,0.10)",
   // Color on top of the primary gradient / colored buttons.
@@ -81,6 +90,9 @@ const darkColors: SemanticColors = {
   textTertiary: "#6B6B76",
   fillPrimary: "rgba(255,255,255,0.08)",
   fillSecondary: "rgba(255,255,255,0.04)",
+  // Protein's own hue at low alpha: the same warm signal, carried by the
+  // accent instead of a cream fill that would burn a hole in the dark screen.
+  foodTint: "rgba(255,138,61,0.16)",
   shadow: "rgba(0,0,0,0.4)",
   onPrimary: "#FFFFFF",
 };

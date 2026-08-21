@@ -57,7 +57,10 @@ export function RecipesScreen() {
           >
             <Icon name="chevron-back" size={25} color={theme.colors.textSecondary} stroke={2.4} />
           </Pressable>
-          <AppText variant="screenTitle">Recipes</AppText>
+          <AppText variant="screenTitle" style={{ fontSize: 24 }}>Recipes</AppText>
+          {/* The frame's header pill, not a bare link: `.pill` on a var(--alt)
+              fill with a var(--ts) label and a 13px plus — the same treatment
+              Edit wears on Favourites. */}
           <Pressable
             onPress={() => {
               Haptics.selectionAsync().catch(() => undefined);
@@ -66,9 +69,20 @@ export function RecipesScreen() {
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             accessibilityRole="button"
             accessibilityLabel="New recipe"
-            style={({ pressed }) => ({ marginLeft: 'auto', opacity: pressed ? 0.6 : 1 })}
+            style={({ pressed }) => ({
+              marginLeft: 'auto',
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 5,
+              paddingVertical: 6,
+              paddingHorizontal: 12,
+              borderRadius: theme.radii.pill,
+              backgroundColor: theme.colors.surfaceAlt,
+              opacity: pressed ? 0.68 : 1,
+            })}
           >
-            <AppText variant="caption" style={{ fontWeight: '800', fontSize: 13, color: theme.colors.primary }}>
+            <Icon name="add" size={13} color={theme.colors.textSecondary} stroke={2.2} />
+            <AppText variant="caption" color="textSecondary" style={{ fontSize: 11.5, fontWeight: '700' }}>
               New
             </AppText>
           </Pressable>
@@ -121,14 +135,14 @@ export function RecipesScreen() {
                           accessibilityRole="button"
                           accessibilityLabel={`Log ${recipe.name}`}
                           style={({ pressed }) => ({
-                            paddingVertical: 6,
+                            paddingVertical: 7,
                             paddingHorizontal: 13,
                             borderRadius: theme.radii.pill,
-                            backgroundColor: theme.colors.surfaceAlt,
+                            backgroundColor: theme.colors.foodTint,
                             opacity: pressed ? 0.68 : 1,
                           })}
                         >
-                          <AppText variant="caption" style={{ fontWeight: '800', fontSize: 11.5 }}>
+                          <AppText variant="caption" style={{ fontWeight: '800', fontSize: 11.5, color: theme.colors.protein }}>
                             Log
                           </AppText>
                         </Pressable>

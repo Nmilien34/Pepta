@@ -1083,9 +1083,6 @@ function WaterCard({
 // The halo behind the "now" dot and the card's corner glow. Derived from the
 // one accent so they cannot drift apart.
 const WEIGHT_GLOW = 'rgba(124,92,252,0.08)';
-// The frame's Log-a-meal tint (#FFF1E6). Its own value, not protein@13%: the
-// frame picked a warmer peach than the chip formula gives.
-const MEAL_CTA_BG = '#FFF1E6';
 // The frame's Log-weight label. Its own grey, not a theme token: the button
 // sits on --alt and the text is deliberately quieter than textSecondary.
 const LOGCTA_TEXT = '#5E636E';
@@ -1216,7 +1213,7 @@ function MealsCard({ stat, onLog }: { stat: RingStat; onLog(): void }) {
           // Grey on grey made the one action on this card disappear into it.
           height: 38,
           borderRadius: theme.radii.pill,
-          backgroundColor: MEAL_CTA_BG,
+          backgroundColor: theme.colors.foodTint,
           opacity: pressed ? 0.7 : 1,
         })}
       >

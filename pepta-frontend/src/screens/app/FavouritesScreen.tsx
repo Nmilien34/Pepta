@@ -50,7 +50,6 @@ import {
 export type FavouritesParams = { kind?: FavouriteKind };
 
 /** Warm peach behind food, pale blue behind drinks — the frame's tints. */
-const FOOD_TINT = '#FFF1E6';
 const DRINK_TINT = '#E8F4FF';
 
 export function FavouritesScreen() {
@@ -85,7 +84,7 @@ export function FavouritesScreen() {
     [tab, track, favourites],
   );
   const suggestions = startingSuggestions(favourites, tab, seededSuggestions);
-  const tint = tab === 'food' ? FOOD_TINT : DRINK_TINT;
+  const tint = tab === 'food' ? theme.colors.foodTint : DRINK_TINT;
   const accent = tab === 'food' ? theme.colors.protein : theme.colors.water;
 
   const logFavourite = (fav: Favourite) => {

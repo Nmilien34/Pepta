@@ -15,6 +15,7 @@ import { useNavigation, useRoute, type NavigationProp, type RouteProp } from '@r
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { AppText, Card, ProgressBar } from '../../components';
+import { CardIcon } from '../../components/CardIcon';
 import { Icon } from '../../components/Icon';
 import { usePeptaData } from '../../context/PeptaDataContext';
 import { useLogSheets } from '../../context/LogSheetsContext';
@@ -151,8 +152,14 @@ export function NutrientWaysScreen() {
           {head ? (
             <Card style={{ marginTop: 12 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
-                  <Icon name={kind === 'fiber' ? 'leaf' : 'food-drumstick'} size={17} color={tint} stroke={2.3} />
+                {/* `.ch` in the frame: gap 8, and the glyph wears the `.ic`
+                    chip tinted with this nutrient's own accent. Both the
+                    Protein and Fiber frames write it
+                    `<div class="ch"><svg class="tin ic" style="color:var(--protein|--fiber)">`
+                    — the chip is in the CLASS, which is how the app-wide chip
+                    pass missed this one header. */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <CardIcon name={kind === 'fiber' ? 'leaf' : 'food-drumstick'} color={tint} />
                   <AppText variant="cardTitle" style={{ fontSize: 15 }}>Today</AppText>
                 </View>
                 <View style={{ backgroundColor: theme.colors.surfaceAlt, paddingVertical: 4, paddingHorizontal: 10, borderRadius: theme.radii.pill }}>
