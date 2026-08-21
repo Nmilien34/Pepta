@@ -176,9 +176,11 @@ export function HomeScreen() {
   const activity = buildActivity(track, home.profile, new Date(), selectedRange, home.rangeTotals);
   resistanceLogRef.current = activity.resistanceLogId;
   const todaysLog = buildTodaysLog(track, home, new Date(), selectedRange);
-  // Three of the four designed tiles have somewhere to go. Recipes does not —
-  // its screen is designed but unbuilt — so it is left out rather than shipped
-  // as a tile that does nothing.
+  // All four designed tiles, two rows of two. Recipes was held back while its
+  // screen was designed-but-unbuilt — a tile that goes nowhere is worse than a
+  // missing one — and that stopped being true when RecipesScreen shipped. It is
+  // routed at MainTabs and already reached from Account and NutrientWays, so
+  // Home was the only surface still pretending it did not exist.
   const shortcuts: Shortcut[] = [
     { key: 'meals', label: 'Meals', photo: SHORTCUT_PHOTOS.meals, onPress: openMeal },
     {
@@ -192,6 +194,12 @@ export function HomeScreen() {
       label: 'Hydration',
       photo: SHORTCUT_PHOTOS.hydration,
       onPress: () => navigation.navigate('Water'),
+    },
+    {
+      key: 'recipes',
+      label: 'Recipes',
+      photo: SHORTCUT_PHOTOS.recipes,
+      onPress: () => navigation.navigate('Recipes'),
     },
   ];
 
