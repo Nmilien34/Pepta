@@ -1066,10 +1066,8 @@ function WaterCard({
   );
 }
 
-// Purple washes for the weight surfaces. Derived from the one accent so the
-// tile, the glow and the pressable edge cannot drift apart.
-const WEIGHT_WASH = 'rgba(124,92,252,0.10)';
-const WEIGHT_EDGE = 'rgba(124,92,252,0.18)';
+// The halo behind the "now" dot and the card's corner glow. Derived from the
+// one accent so they cannot drift apart.
 const WEIGHT_GLOW = 'rgba(124,92,252,0.08)';
 const ACTIVITY_WASH = 'rgba(255,107,90,0.10)';
 
@@ -1095,43 +1093,64 @@ function MilestoneTrackView({ goal }: { goal: GoalView }) {
   }
 
   return (
-    <View style={{ marginTop: 16 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-        {/* Where they are now. Filled, because it is the only real number here. */}
-        <View
-          style={{
-            width: 11,
-            height: 11,
-            borderRadius: 6,
-            backgroundColor: theme.colors.weight,
-          }}
-        />
-        {track.markers.map((mark, i) => (
-          <React.Fragment key={mark}>
-            <View style={{ flex: 1, height: 2, backgroundColor: theme.colors.border }} />
-            <View
-              style={{
-                width: 7,
-                height: 7,
-                borderRadius: 4,
-                // Only the next marker is tinted — the rest are still abstract.
-                backgroundColor: i === 0 ? WEIGHT_EDGE : theme.colors.border,
-              }}
-            />
-          </React.Fragment>
+    <View style={{ marginTop: 14 }}>
+      {/* EVENLY-SPACED COLUMNS, EACH CARRYING ITS OWN LABEL — no connecting
+          rail. The rail was the tell that this was still a progress bar
+          underneath. The frame draws marks on a route, and a route is read by
+          its NUMBERS: without 195 / 190 / 185 under the dots a milestone track
+          cannot say what the milestones are, which is the only reason it beats
+          a percentage. */}
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+        {[
+          { key: 'now', label: 'now', kind: 'now' as const },
+          ...track.markers.map((mark) => ({ key: String(mark), label: String(mark), kind: 'mark' as const })),
+          { key: 'goal', label: String(track.goal), kind: 'goal' as const },
+        ].map((col) => (
+          <View key={col.key} style={{ flex: 1, alignItems: 'center', gap: 5 }}>
+            {col.kind === 'goal' ? (
+              <Icon name="flag" size={13} color={theme.colors.textTertiary} stroke={2.2} />
+            ) : (
+              <View
+                style={
+                  col.kind === 'now'
+                    ? {
+                        width: 11,
+                        height: 11,
+                        borderRadius: 999,
+                        backgroundColor: theme.colors.weight,
+                        // The halo is what makes "now" read as a POSITION and
+                        // not merely a darker dot, at a size where 11 against 9
+                        // is invisible.
+                        borderWidth: 4,
+                        borderColor: WEIGHT_GLOW,
+                      }
+                    : { width: 9, height: 9, borderRadius: 999, backgroundColor: theme.colors.border }
+                }
+              />
+            )}
+            <AppText
+              variant="caption"
+              style={
+                col.kind === 'now'
+                  ? { fontSize: 9, fontWeight: '700', color: theme.colors.textPrimary }
+                  : { fontSize: 9, color: theme.colors.textTertiary }
+              }
+            >
+              {col.label}
+            </AppText>
+          </View>
         ))}
-        <View style={{ flex: 1, height: 2, backgroundColor: theme.colors.border }} />
-        <Icon name="flag" size={14} color={theme.colors.textTertiary} stroke={2.2} />
       </View>
 
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 7 }}>
-        <AppText variant="caption" color="textTertiary" style={{ fontSize: 10 }}>
-          {track.next != null ? `Next marker ${track.next} ${unit}` : `Goal ${track.goal} ${unit}`}
+      {/* One sentence, not two numbers pushed to opposite ends: the distance
+          belongs to the marker it is a distance TO. */}
+      <AppText variant="caption" color="textTertiary" style={{ fontSize: 10.5, marginTop: 10 }}>
+        {track.next != null ? 'Next marker ' : 'Goal '}
+        <AppText variant="caption" style={{ fontSize: 10.5, fontWeight: '700', color: theme.colors.textPrimary }}>
+          {track.next ?? track.goal} {unit}
         </AppText>
-        <AppText variant="caption" style={{ fontSize: 10, color: theme.colors.weight, fontWeight: '800' }}>
-          {goal.trackLabel}
-        </AppText>
-      </View>
+        {` — ${track.toNext} ${unit} away.`}
+      </AppText>
     </View>
   );
 }
@@ -1214,70 +1233,70 @@ function HomeWeightPulseCard({
           backgroundColor: WEIGHT_GLOW,
         }}
       />
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-        <View
-          style={{
-            width: 42,
-            height: 42,
-            borderRadius: 18,
-            backgroundColor: WEIGHT_WASH,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Icon name="scale" size={20} color={theme.colors.weight} stroke={2.4} />
-        </View>
-        <View style={{ flex: 1 }}>
-          <AppText variant="caption" color="textTertiary" style={{ fontWeight: '800', fontSize: 10, textTransform: 'uppercase' }}>
-            Scale check
-          </AppText>
-          <AppText variant="cardTitle" style={{ fontSize: 16, marginTop: 2 }}>
-            {pulse.title}
-          </AppText>
-          <AppText variant="caption" color="textSecondary" style={{ marginTop: 4, lineHeight: 17 }}>
-            {pulse.detail}
+      {/* TITLE ROW: the card is named for what it holds, and the distance sits
+          in a quiet pill beside it. The old version led with an eyebrow, a
+          question and a line of encouragement, which pushed the reading — the
+          only thing actually being reported — into a corner. */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Icon name="scale" size={17} color={theme.colors.weight} stroke={2.4} />
+          <AppText variant="cardTitle" style={{ fontSize: 15 }}>
+            Weight
           </AppText>
         </View>
-        <View style={{ alignItems: 'flex-end' }}>
-          {/* A dash, not a blank: the frame shows "— lb" so the card keeps its
-              shape and reads as waiting rather than broken. */}
-          <AppText variant="statMedium" style={{ color: theme.colors.weight }}>
-            {hasWeight ? pulse.latestLabel : '—'}
-          </AppText>
-          <AppText variant="caption" color="textTertiary" style={{ fontSize: 10 }}>
-            {hasWeight ? 'latest' : 'no weigh-in yet'}
-          </AppText>
-        </View>
+        {goal ? (
+          <View
+            style={{
+              paddingVertical: 5,
+              paddingHorizontal: 11,
+              borderRadius: theme.radii.pill,
+              backgroundColor: theme.colors.surfaceAlt,
+            }}
+          >
+            <AppText variant="caption" color="textSecondary" style={{ fontSize: 11.5 }}>
+              {goal.trackLabel}
+            </AppText>
+          </View>
+        ) : null}
       </View>
-      {goal ? <MilestoneTrackView goal={goal} /> : null}
-      <View style={{ marginTop: 14, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-        <Pressable
-          onPress={() => {
-            Haptics.selectionAsync().catch(() => undefined);
-            onLog();
-          }}
-          style={({ pressed }) => ({
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 7,
-            paddingVertical: 9,
-            paddingHorizontal: 13,
-            borderRadius: theme.radii.pill,
-            backgroundColor: WEIGHT_WASH,
-            borderWidth: 1,
-            borderColor: WEIGHT_EDGE,
-            opacity: pressed ? 0.72 : 1,
-          })}
-        >
-          <Icon name="add" size={15} color={theme.colors.weight} stroke={2.6} />
-          <AppText variant="caption" style={{ color: theme.colors.weight, fontWeight: '800' }}>
-            {pulse.actionLabel}
-          </AppText>
-        </Pressable>
-        <AppText variant="caption" color="textTertiary" style={{ flex: 1, lineHeight: 16 }}>
-          No pressure. One quick check-in keeps your trend honest.
+
+      {/* The reading, then when it was taken. A dash rather than a blank: the
+          card keeps its shape and reads as waiting, not broken. */}
+      <View style={{ marginTop: 12 }}>
+        <AppText variant="statMedium" style={{ color: theme.colors.weight }}>
+          {hasWeight ? pulse.latestLabel : '—'}
+        </AppText>
+        <AppText variant="caption" color="textTertiary" style={{ marginTop: 6, fontSize: 11 }}>
+          {hasWeight && goal ? `Last check ${goal.dateLabel}` : 'No weigh-in yet'}
         </AppText>
       </View>
+      {goal ? <MilestoneTrackView goal={goal} /> : null}
+      {/* FULL WIDTH, and quiet. The frame gives this the neutral surface rather
+          than the weight tint: it is the routine action on a status card, not
+          the card's point. The reassurance line that sat beside it has gone
+          with the question it was reassuring about. */}
+      <Pressable
+        onPress={() => {
+          Haptics.selectionAsync().catch(() => undefined);
+          onLog();
+        }}
+        style={({ pressed }) => ({
+          marginTop: 14,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 7,
+          paddingVertical: 12,
+          borderRadius: theme.radii.pill,
+          backgroundColor: theme.colors.surfaceAlt,
+          opacity: pressed ? 0.72 : 1,
+        })}
+      >
+        <Icon name="add" size={15} color={theme.colors.textSecondary} stroke={2.6} />
+        <AppText variant="caption" color="textSecondary" style={{ fontWeight: '700' }}>
+          {pulse.actionLabel}
+        </AppText>
+      </Pressable>
     </Card>
   );
 }
