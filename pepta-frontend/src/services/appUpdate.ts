@@ -20,6 +20,22 @@ const SOFT_PROMPT_SHOWN_AT_KEY = "pepta:updatePrompt.softShownAt.v1";
 // not a version — the no-version-literals rule still holds.
 const FALLBACK_STORE_URL = "https://apps.apple.com/app/id6784368155";
 
+/**
+ * The App Store review composer, for a button the USER pressed.
+ *
+ * NOT StoreReview.requestReview(). That call is for unprompted moments: iOS
+ * caps it at three per user per 365 days and silently drops the rest, so it
+ * can resolve without ever showing a sheet — which behind a button labelled
+ * "Leave a rating" reads as a dead control. Apple's guidance is to keep the
+ * system prompt off any call to action for exactly that reason. This link
+ * always opens the composer, and costs none of the three.
+ *
+ * The rationed system prompt lives in services/reviewPrompt.ts and fires on an
+ * earned milestone. The two must not be confused: see the note in
+ * onboardingFlow.ts about never spending the ask inside onboarding.
+ */
+export const WRITE_REVIEW_URL = `${FALLBACK_STORE_URL}?action=write-review`;
+
 export type UpdateMode = "soft" | "hard";
 
 export interface UpdateConfig {

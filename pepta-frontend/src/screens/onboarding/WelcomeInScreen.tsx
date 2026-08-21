@@ -1,13 +1,22 @@
 // Onboarding — Welcome in (post-purchase, pre-app). Light returns after the
-// wall. The review ask lives HERE, after the user has paid and been welcomed —
-// never before the paywall (and never with invented social proof). "Leave a
-// rating" opens the system review sheet; "Not now" is quiet and always works.
+// wall. The review invitation lives HERE, after the user has paid and been
+// welcomed — never before the paywall, and never with invented social proof.
+// "Not now" is quiet and always works.
+//
+// THIS BUTTON OPENS THE APP STORE COMPOSER, NOT THE SYSTEM SHEET (2026-08-21).
+// It used to call StoreReview.requestReview() directly, which was wrong twice
+// over. iOS caps that prompt at three per user per 365 days and silently drops
+// the rest, so the handler could resolve having shown nothing at all and then
+// drop the user into the app — a button that does nothing. And because it
+// bypassed services/reviewPrompt.ts it spent one of those three off the books,
+// leaving the earned streak_3 ask to fire believing it was the first. The
+// deep link always opens the composer and costs none of the three.
 
 import React, { useState } from 'react';
 import { Pressable, StatusBar, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import * as StoreReview from 'expo-store-review';
 import { ConvoButton, Mascot, Typewriter, convo } from '../../components';
+import { WRITE_REVIEW_URL, openAppStore } from '../../services/appUpdate';
 import { typography } from '../../theme/typography';
 
 export interface WelcomeInScreenProps {
@@ -19,13 +28,9 @@ export function WelcomeInScreen({ onEnterApp }: WelcomeInScreenProps) {
   const [contextDone, setContextDone] = useState(false);
 
   const handleRate = async () => {
-    try {
-      if (await StoreReview.isAvailableAsync()) {
-        await StoreReview.requestReview();
-      }
-    } catch {
-      // The review sheet is best-effort; never block entry on it.
-    }
+    // openAppStore swallows its own failures — nowhere left to go is not a
+    // reason to strand someone on the last screen of onboarding.
+    await openAppStore(WRITE_REVIEW_URL);
     onEnterApp();
   };
 
@@ -63,7 +68,9 @@ export function WelcomeInScreen({ onEnterApp }: WelcomeInScreenProps) {
           </View>
         </View>
         <View style={styles.footer}>
-          <ConvoButton label="Leave a rating" onPress={handleRate} />
+          {/* Names the destination: this leaves the app for the App Store,
+              where "Leave a rating" implied a sheet that appears in place. */}
+          <ConvoButton label="Rate on the App Store" onPress={handleRate} />
           <Pressable accessibilityRole="button" accessibilityLabel="Not now" onPress={onEnterApp} style={styles.quiet}>
             <Text style={styles.quietText}>Not now</Text>
           </Pressable>
