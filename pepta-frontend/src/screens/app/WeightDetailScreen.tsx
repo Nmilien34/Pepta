@@ -27,7 +27,11 @@ export function WeightDetailScreen() {
 
   useEffect(() => {
     if (!home) void refreshHome();
-    if (!progress) void refreshProgress();
+    // EVERYTHING, not the server's 30-day default. This screen exists to show
+    // weight history and its RangePicker (7d…All) only cuts what is already
+    // downloaded — it does not refetch. Asking for the default meant picking
+    // "All" still showed one month, and the months before that looked deleted.
+    if (!progress) void refreshProgress(Infinity);
   }, [home, progress, refreshHome, refreshProgress]);
 
   const loading = (homeLoading || progressLoading) && !home && !progress;

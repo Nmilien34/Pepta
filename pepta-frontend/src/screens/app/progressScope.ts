@@ -92,3 +92,34 @@ export function withinScope(
   if (cutoff == null) return rows;
   return rows.filter((row) => new Date(row.datetime).getTime() >= cutoff);
 }
+
+/**
+ * How many days of history the SERVER must be asked for, for a given scope.
+ *
+ * This exists because the two windows are not the same thing and were being
+ * confused. `weightSeries` cuts an already-downloaded payload for DISPLAY; the
+ * server applies its own default of 30 days when asked for no window at all.
+ * ProgressScreen mounted with scope 'start' — "Since you started" — and called
+ * refreshProgress() with no argument, so the screen claimed to show everything
+ * while holding one month.
+ *
+ * For anyone whose account is older than 30 days that silently deletes their
+ * history: the onboarding weigh-in falls outside the window, so the earliest
+ * weight the screen can see is whatever they logged recently. "Since <today>",
+ * a difference of 0 lb against a start that is really the current weight, 0%
+ * to goal, and a chart with a single point.
+ *
+ * Infinity means "everything"; the API turns that into a year-2000 floor.
+ */
+export function scopeWindowDays(scope: ProgressScopeKey): number {
+  switch (scope) {
+    case 'start':
+      return Infinity;
+    case '30d':
+      return 30;
+    case '90d':
+      return 90;
+    case 'year':
+      return 365;
+  }
+}

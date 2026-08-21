@@ -45,10 +45,10 @@ import {
 } from './progressNumbers';
 import {
   scopePillLabel,
+  scopeWindowDays,
   type ProgressScopeKey,
 } from './progressScope';
 import {
-  RANGE_DAYS,
   formatShortDate,
   mergeWeightsWithLatest,
   sortWeights,
@@ -92,15 +92,26 @@ export function ProgressScreen() {
   const [photoOpen, setPhotoOpen] = useState(false);
 
   useEffect(() => {
-    if (!progress) void refreshProgress();
+    // THE WINDOW MUST MATCH THE SCOPE, INCLUDING ON FIRST LOAD. Calling this
+    // with no argument lets the SERVER pick, and its default is 30 days —
+    // while the pill says "Since you started". For an account older than a
+    // month that hides the onboarding weigh-in, which makes the chart look
+    // stuck, the difference read 0 against today's own weight, and the goal
+    // ring sit at 0%. Only the scope BUTTONS ever passed a window; mount
+    // never did.
+    if (!progress) void refreshProgress(scopeWindowDays(scope));
     if (!home) void refreshHome();
     // Nutrition for the eating and numbers cards. /progress has none, and this
     // screen used never to need /track at all.
     if (!track) void refreshTrack();
-  }, [progress, home, track, refreshProgress, refreshHome, refreshTrack]);
+  }, [progress, home, track, scope, refreshProgress, refreshHome, refreshTrack]);
 
   const refreshAll = () =>
-    Promise.all([refreshProgress(), refreshHome(), refreshTrack()]).then(() => undefined);
+    // Pull-to-refresh keeps the scope the user is looking at, rather than
+    // inheriting whatever window was last requested.
+    Promise.all([refreshProgress(scopeWindowDays(scope)), refreshHome(), refreshTrack()]).then(
+      () => undefined,
+    );
 
   if (!progress && progressError) {
     return (
@@ -192,7 +203,7 @@ export function ProgressScreen() {
     // Still re-queries: the buttons this replaces used to filter an already
     // downloaded 30-day payload, so anything wider showed a month at best and
     // older logs looked deleted. The client-side cut stays as the display cut.
-    void refreshProgress(RANGE_DAYS[SCOPE_RANGE[next]]);
+    void refreshProgress(scopeWindowDays(next));
   };
 
   return (

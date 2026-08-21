@@ -133,6 +133,13 @@ export function createCrudService<
       const documents = await config.model
         .find({
           userId,
+          // Soft-deleted logs are not history, they are corrections. This was
+          // the only query in this file that did not say so — create's
+          // idempotency lookup and softDelete both do — so a deleted weigh-in
+          // kept being served by /progress and /track, and nothing on the
+          // client filtered it either. Deleting a mistyped weight is the only
+          // way to correct the chart, and it did not change the chart.
+          deletedAt: null,
           datetime: {
             $gte: window.from,
             $lte: window.to,
