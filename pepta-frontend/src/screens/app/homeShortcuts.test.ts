@@ -50,6 +50,20 @@ describe('the Home shortcut grid', () => {
     }
   });
 
+  it('sends Meals to a SCREEN, not back to the log sheet', () => {
+    // Every other tile is a door. Meals opened the logging sheet — the same
+    // thing the "Log a meal" CTA directly above the grid does — so a quarter
+    // of the grid duplicated the button beside it, and there was no way into
+    // the meals surface from Home at all.
+    const meals = shortcutsBlock.slice(
+      shortcutsBlock.indexOf("key: 'meals'"),
+      shortcutsBlock.indexOf("key: 'fiber'"),
+    );
+
+    expect(meals).toContain("navigation.navigate('NutrientWays', { kind: 'protein' })");
+    expect(meals).not.toContain('onPress: openMeal');
+  });
+
   it('fills whole rows — HomeShortcuts lays out two per row', () => {
     // An odd count leaves a half-width gap on the last row by design. Four is
     // the designed set and divides cleanly; this fails loudly if a fifth tile

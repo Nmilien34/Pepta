@@ -209,7 +209,18 @@ export function HomeScreen() {
   // routed at MainTabs and already reached from Account and NutrientWays, so
   // Home was the only surface still pretending it did not exist.
   const shortcuts: Shortcut[] = [
-    { key: 'meals', label: 'Meals', photo: SHORTCUT_PHOTOS.meals, onPress: openMeal },
+    {
+      key: 'meals',
+      // A DOOR, like its three siblings — not a second Log-a-meal button.
+      // This opened the logging sheet, which the big CTA directly above the
+      // grid already does, so the tile spent its place in the grid
+      // duplicating the control next to it. Protein's "ways to hit it" is
+      // where meals actually live; the protein card's own "See examples"
+      // already goes there.
+      label: 'Meals',
+      photo: SHORTCUT_PHOTOS.meals,
+      onPress: () => navigation.navigate('NutrientWays', { kind: 'protein' }),
+    },
     {
       key: 'fiber',
       label: 'Fiber',

@@ -451,13 +451,34 @@ describe("Home · the doors to the nutrient screens", () => {
     }
   });
 
-  it("still logs a meal from the Meals tile — there is no Meals screen", () => {
+  it("opens the meals surface from the Meals tile", () => {
+    // REVERSED DELIBERATELY. This test used to assert the opposite, on the
+    // reasoning "there is no Meals screen". That premise was wrong rather than
+    // out of date: the meals surface exists, it is just called Protein —
+    // "Protein · ways to hit it" is the screen of meal ideas, and the protein
+    // card's own "See examples" has always gone there.
+    //
+    // Meanwhile the tile opened the logging sheet, which the "Log a meal" CTA
+    // directly above the grid already does. So a quarter of a grid of DOORS
+    // duplicated the button beside it, and Home had no way into the meals
+    // surface at all.
     const tree = render(doseDay());
     act(() => {
       doorFor(tree, "Meals")!.props.onPress();
     });
-    expect(mocks.openMeal).toHaveBeenCalledTimes(1);
-    expect(mocks.navigate).not.toHaveBeenCalled();
+    expect(mocks.navigate).toHaveBeenCalledWith("NutrientWays", { kind: "protein" });
+    expect(mocks.openMeal).not.toHaveBeenCalled();
+  });
+
+  it("still logs a meal from the Meals CARD, which is the logging control", () => {
+    // The tile moved; the card's button did not. Losing this would trade one
+    // missing route for a missing action.
+    const tree = render(doseDay());
+    mocks.openMeal.mockClear();
+    act(() => {
+      doorFor(tree, "Log a meal")?.props.onPress();
+    });
+    expect(mocks.openMeal).toHaveBeenCalled();
   });
 });
 
