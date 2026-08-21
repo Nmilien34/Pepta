@@ -13,28 +13,28 @@ import {
 describe("purchaseGrace", () => {
   it("opens on a confirmed purchase and admits within the bound", () => {
     const now = 1_000_000;
-    markPurchaseSuccess(now);
-    expect(hasPurchaseGrace(now)).toBe(true);
-    expect(hasPurchaseGrace(now + PURCHASE_GRACE_MS - 1)).toBe(true);
+    markPurchaseSuccess("user-1", now);
+    expect(hasPurchaseGrace("user-1", now)).toBe(true);
+    expect(hasPurchaseGrace("user-1", now + PURCHASE_GRACE_MS - 1)).toBe(true);
     clearPurchaseGrace();
   });
 
   it("expires at the bound — a webhook that never lands closes the gate again", () => {
     const now = 2_000_000;
-    markPurchaseSuccess(now);
-    expect(hasPurchaseGrace(now + PURCHASE_GRACE_MS)).toBe(false);
+    markPurchaseSuccess("user-1", now);
+    expect(hasPurchaseGrace("user-1", now + PURCHASE_GRACE_MS)).toBe(false);
     clearPurchaseGrace();
   });
 
   it("clears when the backend catches up with a real active decision", () => {
     const now = 3_000_000;
-    markPurchaseSuccess(now);
+    markPurchaseSuccess("user-1", now);
     clearPurchaseGrace();
-    expect(hasPurchaseGrace(now)).toBe(false);
+    expect(hasPurchaseGrace("user-1", now)).toBe(false);
   });
 
   it("is closed by default — never grants without a confirmed purchase", () => {
     clearPurchaseGrace();
-    expect(hasPurchaseGrace()).toBe(false);
+    expect(hasPurchaseGrace("user-1")).toBe(false);
   });
 });

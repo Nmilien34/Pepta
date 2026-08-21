@@ -253,7 +253,10 @@ describe('RevenueCat webhook service', () => {
     expect(vi.mocked(reconcileUserEntitlement)).toHaveBeenCalledWith(user);
   });
 
-  it('treats duplicate processed-event inserts as already handled without mutating the user', async () => {
+  it('survives a concurrent delivery losing the receipt race', async () => {
+    // The receipt is written LAST now, so both deliveries do the (idempotent)
+    // entitlement work and one of them loses the unique-index race. That is
+    // not an error: they applied the same state.
     const userId = new Types.ObjectId().toString();
     const user = userDocument({ id: userId });
     mocks.processedFindOne.mockResolvedValue(null);
@@ -264,6 +267,168 @@ describe('RevenueCat webhook service', () => {
       received: true,
     });
 
+    expect(user.save).toHaveBeenCalled();
+  });
+});
+
+// The webhook is the only writer of paid entitlement, so what it does with
+// input it does not understand, and with its own failures, is money-critical.
+describe('the webhook refuses to act on what it does not understand', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.processedFindOne.mockResolvedValue(null);
+    mocks.processedCreate.mockResolvedValue(undefined);
+  });
+
+  it('leaves an active subscriber untouched on a TEST event from the dashboard', async () => {
+    // The "Send test webhook" button in RevenueCat's dashboard sends this.
+    // It used to fall through statusForEvent's chain to 'free'.
+    const userId = new Types.ObjectId().toString();
+    const user = userDocument({
+      id: userId,
+      status: 'active',
+      expiresAt: new Date('2027-01-01T00:00:00.000Z'),
+    });
+    mocks.userFindById.mockResolvedValue(user);
+
+    await expect(
+      applyRevenueCatWebhook(event({ id: 'evt_test', type: 'TEST', appUserId: userId })),
+    ).resolves.toEqual({ received: true });
+
+    expect(user.entitlement.status).toBe('active');
+    expect(user.entitlement.expiresAt).toEqual(new Date('2027-01-01T00:00:00.000Z'));
     expect(user.save).not.toHaveBeenCalled();
+    expect(mocks.warn).toHaveBeenCalled();
+  });
+
+  it.each([
+    'SUBSCRIPTION_PAUSED',
+    'SUBSCRIPTION_EXTENDED',
+    'TEMPORARY_ENTITLEMENT_GRANT',
+    'INVOICE_ISSUANCE',
+    'SOME_TYPE_REVENUECAT_ADDS_NEXT_YEAR',
+  ])('leaves an active subscriber untouched on %s', async (type) => {
+    const userId = new Types.ObjectId().toString();
+    const user = userDocument({ id: userId, status: 'active' });
+    mocks.userFindById.mockResolvedValue(user);
+
+    await applyRevenueCatWebhook(event({ id: `evt_${type}`, type, appUserId: userId }));
+
+    expect(user.entitlement.status).toBe('active');
+    expect(user.save).not.toHaveBeenCalled();
+  });
+
+  it('still records a receipt for an unhandled event, so the arrival is traceable', async () => {
+    const userId = new Types.ObjectId().toString();
+    mocks.userFindById.mockResolvedValue(userDocument({ id: userId, status: 'active' }));
+
+    await applyRevenueCatWebhook(event({ id: 'evt_untyped', type: 'TEST', appUserId: userId }));
+
+    expect(mocks.processedCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ eventId: 'evt_untyped', eventType: 'TEST' }),
+    );
+  });
+
+  it('still applies the event types it DOES understand', async () => {
+    const userId = new Types.ObjectId().toString();
+    const user = userDocument({ id: userId, status: 'free' });
+    mocks.userFindById.mockResolvedValue(user);
+
+    await applyRevenueCatWebhook(event({ id: 'evt_renew', type: 'RENEWAL', appUserId: userId }));
+
+    expect(user.entitlement.status).toBe('active');
+    expect(user.save).toHaveBeenCalled();
+  });
+});
+
+describe('a purchase survives a failure mid-handler', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.processedCreate.mockResolvedValue(undefined);
+  });
+
+  it('leaves no receipt when the entitlement write throws, so the retry applies it', async () => {
+    const userId = new Types.ObjectId().toString();
+    const failing = userDocument({ id: userId, status: 'free' });
+    failing.save.mockRejectedValueOnce(new Error('write conflict'));
+    mocks.processedFindOne.mockResolvedValue(null);
+    mocks.userFindById.mockResolvedValue(failing);
+
+    // First delivery dies. RevenueCat sees a 5xx and will retry.
+    await expect(
+      applyRevenueCatWebhook(event({ id: 'evt_first_purchase', type: 'INITIAL_PURCHASE', appUserId: userId })),
+    ).rejects.toThrow('write conflict');
+
+    // The critical part: nothing was written that would make the retry look
+    // like a duplicate.
+    expect(mocks.processedCreate).not.toHaveBeenCalled();
+
+    // The retry succeeds and the user ends up entitled.
+    const retried = userDocument({ id: userId, status: 'free' });
+    mocks.userFindById.mockResolvedValue(retried);
+
+    await expect(
+      applyRevenueCatWebhook(event({ id: 'evt_first_purchase', type: 'INITIAL_PURCHASE', appUserId: userId })),
+    ).resolves.toEqual({ received: true });
+
+    expect(retried.entitlement.status).toBe('active');
+    expect(retried.save).toHaveBeenCalled();
+    expect(mocks.processedCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ eventId: 'evt_first_purchase' }),
+    );
+  });
+
+  it('processes a genuine duplicate exactly once', async () => {
+    const userId = new Types.ObjectId().toString();
+    const user = userDocument({ id: userId, status: 'free' });
+    mocks.processedFindOne.mockResolvedValue(null);
+    mocks.userFindById.mockResolvedValue(user);
+
+    await applyRevenueCatWebhook(event({ id: 'evt_once', type: 'INITIAL_PURCHASE', appUserId: userId }));
+    expect(user.save).toHaveBeenCalledTimes(1);
+
+    // Redelivery: the receipt now exists, so it short-circuits.
+    mocks.processedFindOne.mockResolvedValue({ eventId: 'evt_once' });
+    const second = userDocument({ id: userId, status: 'active' });
+    mocks.userFindById.mockResolvedValue(second);
+
+    await applyRevenueCatWebhook(event({ id: 'evt_once', type: 'INITIAL_PURCHASE', appUserId: userId }));
+
+    expect(second.save).not.toHaveBeenCalled();
+    expect(mocks.processedCreate).toHaveBeenCalledTimes(1);
+  });
+
+  it('records the money on the receipt so a charge can be traced', async () => {
+    const userId = new Types.ObjectId().toString();
+    mocks.processedFindOne.mockResolvedValue(null);
+    mocks.userFindById.mockResolvedValue(userDocument({ id: userId }));
+
+    await applyRevenueCatWebhook({
+      event: {
+        id: 'evt_paid',
+        type: 'INITIAL_PURCHASE',
+        app_user_id: userId,
+        entitlement_id: 'pepta_plus',
+        expiration_at_ms: Date.parse('2027-01-01T00:00:00.000Z'),
+        product_id: 'pepta_plus_annual',
+        transaction_id: '2000000900000001',
+        price_in_purchased_currency: 79.99,
+        currency: 'USD',
+        store: 'APP_STORE',
+        environment: 'PRODUCTION',
+        period_type: 'NORMAL',
+      },
+    } as never);
+
+    expect(mocks.processedCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'INITIAL_PURCHASE',
+        productId: 'pepta_plus_annual',
+        transactionId: '2000000900000001',
+        price: 79.99,
+        currency: 'USD',
+        userId: expect.anything(),
+      }),
+    );
   });
 });

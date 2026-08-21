@@ -890,6 +890,21 @@ class PeptaApi {
     });
   }
 
+  /**
+   * POST /me/access/link → AccessDecision.
+   *
+   * Tells the server which RevenueCat customer this device is identified as.
+   * Without it, a first-time subscriber whose purchase webhook was lost has no
+   * RevenueCat evidence on the server at all, so nothing ever reconciles their
+   * real state and they sit behind the paywall having paid.
+   */
+  public linkRevenueCatAppUserId(appUserId: string): Promise<AccessDecision> {
+    return this.request("/me/access/link", accessDecisionSchema, {
+      method: "POST",
+      body: JSON.stringify({ appUserId }),
+    });
+  }
+
   // POST /referrals/claim → creator/referral attribution only. Never affects
   // subscription status or paywall eligibility. Backend validates the code;
   // 404 = unknown/expired, 409 = account already claimed a different code.

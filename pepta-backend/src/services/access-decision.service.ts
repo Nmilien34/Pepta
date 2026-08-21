@@ -279,6 +279,32 @@ export async function resolveAccess(userId: string): Promise<AccessDecision> {
   return decisionFromPersistedState(user.entitlement, now);
 }
 
+/**
+ * Records the RevenueCat customer the DEVICE is identified as.
+ *
+ * This is what makes a lost purchase recoverable. reconciliation is gated on
+ * hasRevenueCatEvidence(), and a first-time subscriber whose INITIAL_PURCHASE
+ * webhook never landed has none of it — status still 'free', no customer id,
+ * no sources — so resolveAccess would never look them up and they would sit
+ * behind the paywall having paid. The id comes from the SDK that created the
+ * customer, so accepting it does not mint a phantom customer the way a
+ * server-side reconcile of an RC-less user would.
+ *
+ * Appends rather than overwrites: revenueCatCustomerId is the webhook's to
+ * set, and a device should never be able to redirect it.
+ */
+export async function linkRevenueCatAppUserId(
+  userId: string,
+  appUserId: string,
+): Promise<void> {
+  const trimmed = appUserId.trim();
+  if (!trimmed) return;
+  await UserModel.updateOne(
+    { _id: userId },
+    { $addToSet: { "entitlement.revenueCatAppUserIds": trimmed } },
+  );
+}
+
 /** True when RevenueCat has ever been involved with this user. */
 export function hasRevenueCatEvidence(entitlement: UserEntitlementDocument): boolean {
   return Boolean(

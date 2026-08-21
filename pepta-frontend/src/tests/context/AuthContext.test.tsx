@@ -11,6 +11,7 @@ import { mockAuthResponse, makeAuthResponse } from "../../mocks/auth";
 // a controllable mock (the methods AuthContext calls).
 const { mockApi, mockAppsFlyer, mockRevenueCat } = vi.hoisted(() => ({
   mockApi: {
+    linkRevenueCatAppUserId: vi.fn(async () => ({ state: "active" })),
     signInWithGoogle: vi.fn(),
     signInWithApple: vi.fn(),
     signInWithDemo: vi.fn(),
@@ -23,6 +24,7 @@ const { mockApi, mockAppsFlyer, mockRevenueCat } = vi.hoisted(() => ({
   },
   mockRevenueCat: {
     configure: vi.fn(),
+    currentAppUserId: vi.fn(() => "u1"),
     identify: vi.fn(),
     reset: vi.fn(),
   },

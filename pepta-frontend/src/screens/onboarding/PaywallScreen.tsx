@@ -65,12 +65,6 @@ type Plan = RevenueCatPlan;
 const RISE_EASING = Easing.bezier(0.2, 0.7, 0.2, 1);
 const RISE_STEP_MS = 110;
 const LEGAL_FOOTER_LABEL = "Terms & Privacy";
-const PREMIUM_ENTITLEMENT_STATUSES = new Set([
-  "trialing",
-  "active",
-  "active_canceled",
-  "past_due",
-]);
 
 function openLegalUrl(url: string) {
   Linking.openURL(url).catch(() => undefined);
@@ -210,41 +204,41 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
     return () => subscription.remove();
   }, []);
 
-  const refreshEntitlement = async (optimisticActive: boolean) => {
+  /**
+   * Reconcile with the server after the store says the purchase succeeded.
+   *
+   * NO FABRICATED ENTITLEMENT. This used to pin a hand-built `active`
+   * entitlement — complete with a made-up revenueCatCustomerId — into the
+   * persisted user whenever the backend disagreed, and nothing ever unpinned
+   * it. A user whose purchase webhook was lost saw "Pepta Plus · Active" on
+   * the Account screen forever while every premium route returned 403.
+   *
+   * The gap between StoreKit confirming and the webhook landing is covered by
+   * the BOUNDED purchase grace opened in completeSetup, not by lying in
+   * durable state. And the link call below is what lets the server recover on
+   * its own if that webhook never arrives.
+   */
+  const refreshEntitlement = async () => {
     if (!auth.user) return;
 
-    const optimisticEntitlement = {
-      ...auth.user.entitlement,
-      status: "active" as const,
-      willRenew: true,
-      revenueCatCustomerId: auth.user.id,
-      revenueCatEntitlement: "pro",
-    };
-
-    if (optimisticActive) {
-      auth.updateCachedUser({
-        ...auth.user,
-        entitlement: optimisticEntitlement,
+    // Report which RevenueCat customer this device is. Logged, not swallowed:
+    // this failing is precisely how a paying user stays behind the paywall.
+    const appUserId = revenueCat.currentAppUserId();
+    if (appUserId) {
+      await api.linkRevenueCatAppUserId(appUserId).catch((error: unknown) => {
+        console.warn("[paywall] Could not link the RevenueCat customer id.", error);
       });
     }
 
     try {
-      const refreshedUser = await api.getCurrentUser();
-      const backendHasPremium = PREMIUM_ENTITLEMENT_STATUSES.has(
-        refreshedUser.entitlement.status,
-      );
-      auth.updateCachedUser(
-        optimisticActive && !backendHasPremium
-          ? { ...refreshedUser, entitlement: optimisticEntitlement }
-          : refreshedUser,
-      );
-    } catch {
-      // The webhook can trail the SDK result by a moment; the optimistic state
-      // keeps the UI unlocked while the backend catches up.
+      auth.updateCachedUser(await api.getCurrentUser());
+    } catch (error) {
+      console.warn("[paywall] Could not refresh entitlement after purchase.", error);
     }
   };
 
-  const completeSetup = async (optimisticActive: boolean) => {
+  const completeSetup = async () => {
+    if (!auth.user) return;
     // Success path (purchase or restore): whatever happens to the app state
     // after this, it is not a dismissal.
     purchasedRef.current = true;
@@ -252,8 +246,8 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
     // webhook-fed decision will trail it. Open the grace window BEFORE any
     // navigation so AccessGate can never bounce this user back onto a
     // paywall while the backend catches up.
-    markPurchaseSuccess();
-    await refreshEntitlement(optimisticActive);
+    markPurchaseSuccess(auth.user.id);
+    await refreshEntitlement();
     await onComplete();
   };
 
@@ -281,7 +275,7 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
         );
         return;
       }
-      await completeSetup(true);
+      await completeSetup();
     } catch (error) {
       // Keep cancellation App Review-safe: no custom retention overlay here.
       if (isRevenueCatPurchaseCancelled(error)) return;
@@ -305,7 +299,7 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
         setMessage("No active Pepta Pro purchase was found for this Apple ID.");
         return;
       }
-      await completeSetup(true);
+      await completeSetup();
     } catch {
       setFailed(true);
       setMessage(

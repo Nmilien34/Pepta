@@ -8,6 +8,8 @@ import { clearPurchaseGrace, hasPurchaseGrace } from "../../services/purchaseGra
 
 const mocks = vi.hoisted(() => ({
   getCurrentUser: vi.fn(),
+  linkRevenueCatAppUserId: vi.fn(async () => ({ state: "active" })),
+  currentAppUserId: vi.fn(() => "u1"),
   getPaywallPackages: vi.fn(),
   isPurchaseCancelled: vi.fn(() => false),
   logPaywallShown: vi.fn(),
@@ -224,6 +226,7 @@ vi.mock("../../context/AuthContext", () => ({
 vi.mock("../../services/api", () => ({
   api: {
     getCurrentUser: mocks.getCurrentUser,
+    linkRevenueCatAppUserId: mocks.linkRevenueCatAppUserId,
   },
 }));
 
@@ -233,6 +236,7 @@ vi.mock("../../services/revenueCat", () => ({
   revenueCat: {
     getPaywallPackages: mocks.getPaywallPackages,
     purchasePlan: mocks.purchasePlan,
+    currentAppUserId: mocks.currentAppUserId,
     restore: mocks.restore,
   },
 }));
@@ -422,7 +426,7 @@ describe("PaywallScreen legal links", () => {
     expect(allText(tree!.root)).toContain("Purchase is still syncing");
   });
 
-  it("keeps optimistic pro access if the backend refresh is still waiting on the RevenueCat webhook", async () => {
+  it("does NOT fabricate an active entitlement while the backend still says free", async () => {
     mocks.purchasePlan.mockResolvedValueOnce({
       customerInfo: {},
       entitlementActive: true,
@@ -445,22 +449,17 @@ describe("PaywallScreen legal links", () => {
 
     expect(mocks.purchasePlan).toHaveBeenCalledWith("u1", "yearly");
     expect(mocks.onComplete).toHaveBeenCalledTimes(1);
-    expect(mocks.updateCachedUser).toHaveBeenCalledWith(
-      expect.objectContaining({
-        entitlement: expect.objectContaining({
-          status: "active",
-          revenueCatCustomerId: "u1",
-          revenueCatEntitlement: "pro",
-        }),
-      }),
-    );
-    expect(
-      mocks.updateCachedUser.mock.calls.at(-1)?.[0].entitlement.status,
-    ).toBe("active");
+    // The cached user comes from the SERVER now. The screen used to pin a
+    // hand-built 'active' entitlement (with a fabricated revenueCatCustomerId)
+    // whenever the backend disagreed, and nothing unpinned it — so a user
+    // whose webhook was lost saw "Plus · Active" forever while every premium
+    // route 403'd. The gap is covered by the bounded grace below instead.
+    const lastCached = mocks.updateCachedUser.mock.calls.at(-1)?.[0];
+    expect(lastCached?.entitlement?.revenueCatEntitlement).not.toBe("pro");
     // The SDK-confirmed purchase must open the access-gate grace window —
     // without it, AccessGate's stale/webhook-lagged 'inactive' bounces the
     // just-paid user back onto a paywall after welcomeIn (the rating bug).
-    expect(hasPurchaseGrace()).toBe(true);
+    expect(hasPurchaseGrace("u1")).toBe(true);
     clearPurchaseGrace();
   });
 

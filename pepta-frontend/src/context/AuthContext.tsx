@@ -10,6 +10,7 @@ import React, {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { AppleAuth, AuthResponse, User } from "@pepta/shared";
 import { api } from "../services/api";
+import { clearPurchaseGrace } from "../services/purchaseGrace";
 import { appsFlyer } from "../services/appsflyer";
 import { revenueCat } from "../services/revenueCat";
 import {
@@ -91,6 +92,21 @@ async function identifyRevenueCatUser(user: {
     .catch((error) => {
       warnInDev("[RevenueCat] Could not identify user.", error);
     });
+
+  // Tell the server which RevenueCat customer this device is. That is the
+  // evidence the backend needs to reconcile a purchase whose webhook was lost
+  // — without it a first-time subscriber has no customer id, no sources and a
+  // 'free' status, so nothing ever looks their real state up.
+  //
+  // Deliberately NOT a silent catch: this failing is why a paying user could
+  // stay behind the paywall, so it is logged rather than swallowed. It must
+  // not block sign-in, hence the catch at all.
+  const appUserId = revenueCat.currentAppUserId();
+  if (appUserId) {
+    await api.linkRevenueCatAppUserId(appUserId).catch((error: unknown) => {
+      console.warn("[access] Could not link the RevenueCat customer id.", error);
+    });
+  }
 }
 
 async function logCompleteRegistrationIfNeeded(
@@ -218,6 +234,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void revenueCat.reset().catch((error) => {
       warnInDev("[RevenueCat] Could not log out.", error);
     });
+    // The post-purchase window belongs to the account that bought, not to the
+    // device. Leaving it behind handed the next account the premium shell.
+    clearPurchaseGrace();
     setAuth(null);
     api.setAuthToken(null);
     persistAuth(null);

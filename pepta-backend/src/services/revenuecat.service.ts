@@ -20,34 +20,37 @@ interface DuplicateKeyError extends Error {
 
 type RevenueCatEvent = RevenueCatWebhook['event'];
 
-function statusForEvent(type: string): SubscriptionStatus {
+/**
+ * The ONLY event types allowed to change a user's entitlement.
+ *
+ * This is a whitelist because the previous shape — a chain of ifs ending in
+ * `return 'free'` — turned every event RevenueCat invents, or that we simply
+ * never handled, into a DOWNGRADE. SUBSCRIPTION_PAUSED, SUBSCRIPTION_EXTENDED,
+ * TEMPORARY_ENTITLEMENT_GRANT, INVOICE_ISSUANCE and the dashboard's own TEST
+ * event all landed as "this user is now free". The shared schema does not
+ * constrain `type` (z.string()), so there was nothing upstream to stop them
+ * either.
+ *
+ * Adding a type here is a deliberate act. Anything absent is acknowledged and
+ * logged, and changes nothing — an unrecognized event is news we do not
+ * understand, not evidence that access ended.
+ */
+const ENTITLEMENT_EVENT_STATUS: Record<string, SubscriptionStatus> = {
   // NON_RENEWING_PURCHASE covers RevenueCat promotional grants (store
   // PROMOTIONAL) and one-off purchases — both mean access is active now.
-  if (
-    ['INITIAL_PURCHASE', 'RENEWAL', 'UNCANCELLATION', 'PRODUCT_CHANGE', 'NON_RENEWING_PURCHASE'].includes(
-      type,
-    )
-  ) {
-    return 'active';
-  }
+  INITIAL_PURCHASE: 'active',
+  RENEWAL: 'active',
+  UNCANCELLATION: 'active',
+  PRODUCT_CHANGE: 'active',
+  NON_RENEWING_PURCHASE: 'active',
+  CANCELLATION: 'active_canceled',
+  EXPIRATION: 'canceled',
+  BILLING_ISSUE: 'past_due',
+  REFUND: 'refunded',
+};
 
-  if (type === 'CANCELLATION') {
-    return 'active_canceled';
-  }
-
-  if (type === 'EXPIRATION') {
-    return 'canceled';
-  }
-
-  if (type === 'BILLING_ISSUE') {
-    return 'past_due';
-  }
-
-  if (type === 'REFUND') {
-    return 'refunded';
-  }
-
-  return 'free';
+function statusForEvent(type: string): SubscriptionStatus | null {
+  return ENTITLEMENT_EVENT_STATUS[type] ?? null;
 }
 
 function isDuplicateKey(error: unknown): error is DuplicateKeyError {
@@ -162,26 +165,64 @@ async function findRevenueCatUser(candidates: string[]): Promise<UserDocument | 
   });
 }
 
-async function reserveProcessedEvent(
+/**
+ * Writes the RECEIPT for an event we have finished processing.
+ *
+ * This used to be a RESERVATION taken before any work: the row was created,
+ * then the user lookup and entitlement write ran, and anything that threw in
+ * between left a row saying "handled" for a purchase that never was. The
+ * retry RevenueCat sent next was short-circuited by that row and returned 200
+ * — silently, because the only log lived on the duplicate branch the retry
+ * never reached. A first purchase could be charged and never applied.
+ *
+ * Now it commits LAST. A failure before this point writes nothing, so the
+ * retry does the work again; the effects are idempotent (the same event sets
+ * the same fields), so a genuine duplicate is harmless even in the narrow
+ * window where two deliveries race. The unique index on eventId settles that
+ * race, and a duplicate-key error here means the other delivery already
+ * finished — not an error.
+ */
+async function recordProcessedEvent(
+  event: RevenueCatEvent,
   eventId: string | undefined,
   appUserId: string,
-): Promise<boolean> {
+  user: UserDocument | null,
+): Promise<void> {
   if (!eventId) {
-    return false;
+    // No id and no transaction id: nothing stable to dedupe on. Recorded
+    // nowhere, so a redelivery would be re-applied — see the warn below.
+    return;
   }
+
+  const raw = event as Record<string, unknown>;
+  const str = (value: unknown): string | undefined =>
+    typeof value === 'string' && value.trim() ? value.trim() : undefined;
+  const numberOrNull = (value: unknown): number | null =>
+    typeof value === 'number' && Number.isFinite(value) ? value : null;
 
   try {
     await ProcessedWebhookEventModel.create({
       provider: 'revenuecat',
       eventId,
       appUserId,
+      userId: user?._id ?? null,
+      eventType: event.type,
+      ...(str(raw.product_id) ? { productId: str(raw.product_id) } : {}),
+      ...(str(raw.transaction_id) ? { transactionId: str(raw.transaction_id) } : {}),
+      price:
+        numberOrNull(raw.price_in_purchased_currency) ?? numberOrNull(raw.price),
+      ...(str(raw.currency) ? { currency: str(raw.currency) } : {}),
+      ...(str(raw.environment) ? { environment: str(raw.environment) } : {}),
+      ...(str(raw.store) ? { store: str(raw.store) } : {}),
+      ...(str(raw.period_type) ? { periodType: str(raw.period_type) } : {}),
       processedAt: new Date(),
     });
-    return false;
   } catch (error) {
     if (isDuplicateKey(error)) {
-      logger.info({ eventId, appUserId }, '[revenuecat] duplicate webhook ignored');
-      return true;
+      // A concurrent delivery of the same event finished first. Both applied
+      // the same state, so there is nothing to repair.
+      logger.info({ eventId, appUserId }, '[revenuecat] duplicate webhook receipt ignored');
+      return;
     }
     throw error;
   }
@@ -214,6 +255,8 @@ export async function applyRevenueCatWebhook(input: RevenueCatWebhook): Promise<
     });
   }
 
+  // Dedupe CHECKS first (a receipt means this event is already applied) but
+  // COMMITS last — see recordProcessedEvent.
   if (eventId) {
     const processed = await ProcessedWebhookEventModel.findOne({
       provider: 'revenuecat',
@@ -221,22 +264,32 @@ export async function applyRevenueCatWebhook(input: RevenueCatWebhook): Promise<
     });
 
     if (processed) {
+      logger.info(
+        { eventId, eventType: event.type },
+        '[revenuecat] event already applied; acknowledged',
+      );
       return { received: true };
     }
-  }
-
-  const alreadyProcessed = await reserveProcessedEvent(eventId, customerId);
-  if (alreadyProcessed) {
-    return { received: true };
+  } else {
+    // Nothing stable to dedupe on, so a redelivery WILL be applied again.
+    // Worth knowing about rather than silently re-running.
+    logger.warn(
+      { eventType: event.type, appUserId: customerId },
+      '[revenuecat] event has no id or transaction_id; cannot be deduplicated',
+    );
   }
 
   const user = await findRevenueCatUser(candidates);
 
   if (!user) {
+    // No account to apply this to — a retry would resolve the same way, so
+    // this is acknowledged rather than retried. The receipt is still written:
+    // it is the only evidence the money event reached us at all.
     logger.warn(
-      { candidateRevenueCatIds: candidates, eventId },
+      { candidateRevenueCatIds: candidates, eventId, eventType: event.type },
       '[revenuecat] unknown user; acknowledged without retry',
     );
+    await recordProcessedEvent(event, eventId, customerId, null);
     return { received: true };
   }
 
@@ -245,8 +298,23 @@ export async function applyRevenueCatWebhook(input: RevenueCatWebhook): Promise<
       ? new Date(event.expiration_at_ms)
       : null;
   const nextStatus = statusForEvent(event.type);
+
+  if (event.type !== 'TRANSFER' && nextStatus === null) {
+    // Acknowledged, recorded, and NOT acted on. RevenueCat keeps inventing
+    // event types and the schema does not constrain them; treating an
+    // unrecognized one as a downgrade is how a TEST event from the dashboard
+    // could flip a subscriber to 'free'.
+    logger.warn(
+      { eventType: event.type, eventId, userId: String(user._id) },
+      '[revenuecat] unhandled event type; acknowledged without changing entitlement',
+    );
+    await recordProcessedEvent(event, eventId, customerId, user);
+    return { received: true };
+  }
+
   const currentExpiresAt = user.entitlement.expiresAt;
   const isStaleDowngrade =
+    nextStatus !== null &&
     expiresAt !== null &&
     currentExpiresAt !== null &&
     expiresAt.getTime() < currentExpiresAt.getTime() &&
@@ -264,6 +332,9 @@ export async function applyRevenueCatWebhook(input: RevenueCatWebhook): Promise<
     // create-on-read hazard does not apply.
     user.entitlement.verificationState = 'stale';
     await user.save();
+    // Receipt AFTER the save — a throw above must leave nothing behind, so
+    // RevenueCat's retry does the work again.
+    await recordProcessedEvent(event, eventId, customerId, user);
     try {
       await reconcileUserEntitlement(user);
     } catch {
@@ -286,7 +357,7 @@ export async function applyRevenueCatWebhook(input: RevenueCatWebhook): Promise<
       typeof (event as { store?: unknown }).store === 'string' &&
       ((event as { store?: string }).store ?? '').toUpperCase() === 'PROMOTIONAL';
 
-    user.entitlement.status = nextStatus;
+    user.entitlement.status = nextStatus!;
     user.entitlement.expiresAt = expiresAt;
     // Promotional grants never renew; store lifecycles keep the old rule.
     user.entitlement.willRenew = isPromotionalEvent
@@ -299,6 +370,11 @@ export async function applyRevenueCatWebhook(input: RevenueCatWebhook): Promise<
     user.entitlement.verificationState = 'stale';
     await user.save();
   }
+
+  // The entitlement write has succeeded (or was deliberately skipped as a
+  // stale downgrade), so the event is now genuinely handled and earns its
+  // receipt. Reconciliation below is best-effort refinement, not the work.
+  await recordProcessedEvent(event, eventId, customerId, user);
 
   // Webhooks are signals, not the whole truth: when the server API key is
   // configured, derive access from the customer's COMPLETE current state so

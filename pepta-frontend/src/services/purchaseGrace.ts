@@ -11,33 +11,61 @@
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const STORAGE_KEY = "pepta.purchaseGraceUntil";
+// One key holding both facts — the window and whose it is. They must never be
+// readable apart, or a half-restored state could admit the wrong account.
+const STORAGE_KEY = "pepta.purchaseGrace";
 export const PURCHASE_GRACE_MS = 30 * 60 * 1000;
 
 let graceUntil = 0;
+// WHOSE purchase this is. The grace used to be device-global and to survive
+// sign-out, so the next account to sign in on a shared or handed-over device
+// got the full premium shell for the rest of the window — and a relaunch could
+// even resurrect a window that had been cleared.
+let graceUserId: string | null = null;
 
 // Best-effort rehydrate at module load; the in-memory value is the source of
 // truth for the synchronous render-time check and only ever grows from disk.
 AsyncStorage.getItem(STORAGE_KEY)
   .then((raw) => {
-    const stored = Number(raw);
-    if (Number.isFinite(stored)) graceUntil = Math.max(graceUntil, stored);
+    if (!raw) return;
+    const parsed = JSON.parse(raw) as { until?: unknown; userId?: unknown };
+    const until = Number(parsed?.until);
+    const owner = typeof parsed?.userId === "string" ? parsed.userId : null;
+    if (Number.isFinite(until) && owner && until > graceUntil) {
+      graceUntil = until;
+      graceUserId = owner;
+    }
   })
   .catch(() => undefined);
 
 /** Call ONLY on an SDK-confirmed purchase or restore success. */
-export function markPurchaseSuccess(now: number = Date.now()): void {
+export function markPurchaseSuccess(
+  userId: string,
+  now: number = Date.now(),
+): void {
   graceUntil = now + PURCHASE_GRACE_MS;
-  AsyncStorage.setItem(STORAGE_KEY, String(graceUntil)).catch(() => undefined);
+  graceUserId = userId;
+  AsyncStorage.setItem(
+    STORAGE_KEY,
+    JSON.stringify({ until: graceUntil, userId }),
+  ).catch(() => undefined);
 }
 
-/** Synchronous, render-safe: is a confirmed purchase still outrunning the webhook? */
-export function hasPurchaseGrace(now: number = Date.now()): boolean {
+/**
+ * Synchronous, render-safe: is THIS user's confirmed purchase still outrunning
+ * the webhook? A window belonging to someone else is not grace, it is a leak.
+ */
+export function hasPurchaseGrace(
+  userId: string | null | undefined,
+  now: number = Date.now(),
+): boolean {
+  if (!userId || graceUserId !== userId) return false;
   return now < graceUntil;
 }
 
 /** The backend caught up (a real 'active' decision landed) — tidy up. */
 export function clearPurchaseGrace(): void {
   graceUntil = 0;
+  graceUserId = null;
   AsyncStorage.removeItem(STORAGE_KEY).catch(() => undefined);
 }

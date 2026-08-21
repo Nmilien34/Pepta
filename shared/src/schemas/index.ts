@@ -1225,6 +1225,14 @@ export const revenueCatWebhookSchema = z
         entitlement_id: z.string().min(1).nullish(),
         period_type: z.string().min(1).nullish(),
         expiration_at_ms: z.number().nullish(),
+        // Money and provenance. Declared so the receipt we keep for dispute
+        // defense can carry what was actually charged; RevenueCat sends these
+        // as null on events they do not apply to, hence .nullish() throughout.
+        price: z.number().nullish(),
+        price_in_purchased_currency: z.number().nullish(),
+        currency: z.string().min(1).nullish(),
+        store: z.string().min(1).nullish(),
+        environment: z.string().min(1).nullish(),
       })
       .passthrough(),
   })
@@ -1320,6 +1328,22 @@ function sourceLabelMatches(
   if (label === "mixed") return kinds.has("promotional") && kinds.has("app_store");
   return kinds.size === 1 && kinds.has(label);
 }
+
+/**
+ * The client reporting the RevenueCat customer it is identified as.
+ *
+ * This is the evidence that lets the server reconcile a purchase whose webhook
+ * was lost: without it a first-time subscriber has no customer id, no sources
+ * and a 'free' status, so hasRevenueCatEvidence() is false and reconciliation
+ * never runs for them. The id comes from the device SDK, which is what created
+ * the customer — so trusting it does not re-open RevenueCat's create-on-read
+ * phantom-customer hazard the way a server-side guess would.
+ */
+export const revenueCatLinkInputSchema = z
+  .object({
+    appUserId: z.string().trim().min(1).max(200),
+  })
+  .strict();
 
 export const accessDecisionSchema = z
   .discriminatedUnion("state", [

@@ -19,6 +19,7 @@ import type {
   referralClaimRequestSchema,
   referralClaimResponseSchema,
   pepChatRequestSchema,
+  revenueCatLinkInputSchema,
   pepChatResponseSchema,
   injectionDeviceTypeSchema,
   compoundResponseSchema,
@@ -139,6 +140,7 @@ export type CompoundInput = z.infer<typeof compoundInputSchema>;
 export type InjectionDeviceType = z.infer<typeof injectionDeviceTypeSchema>;
 export type PepChatMessage = z.infer<typeof pepChatMessageSchema>;
 export type PepChatRequest = z.infer<typeof pepChatRequestSchema>;
+export type RevenueCatLinkInput = z.infer<typeof revenueCatLinkInputSchema>;
 export type PepChatResponse = z.infer<typeof pepChatResponseSchema>;
 export type CompoundPatch = z.infer<typeof compoundPatchSchema>;
 export type CompoundResponse = z.infer<typeof compoundResponseSchema>;
