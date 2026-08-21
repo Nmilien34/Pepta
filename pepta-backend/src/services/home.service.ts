@@ -7,6 +7,8 @@ import {
   weightLogResponseSchema,
 } from '@pepta/shared';
 import { addUtcDays, startOfUtcDay } from '../lib/dates';
+import { withDeadline } from '../lib/deadline';
+import { logger } from '../lib/logger';
 import { parseHomeTimezone, resolveHomeWindow } from '../lib/homeRange';
 import { consecutiveActivityStreak } from '../lib/streak';
 import {
@@ -24,6 +26,10 @@ import { getInsights } from './insights.service';
 import { getMedicationLevels, getNextDoseCandidates } from './medication-level.service';
 import { getWeeklyRetention } from './muscle-retention.service';
 import { serializeWithSchema } from './serializers';
+
+// The app aborts its own requests at 15s. Insights get a slice of that well
+// inside the budget, leaving room for the rest of the payload.
+const HOME_INSIGHTS_DEADLINE_MS = 4_000;
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Section failed';
@@ -219,7 +225,21 @@ export async function getHome(
     getRangeTotals(userId, now, 'today', tz),
     getRangeAvailability(userId, now, tz),
     getLatestWeight(userId),
-    getInsights(userId, now, { allowAIProse: options.allowAIInsightProse === true }),
+    // Insights are the ONE part of /home that can reach a language model, and
+    // they are the least important thing on the screen. Promise.allSettled
+    // below guards their errors but not their latency, and the SDK's own
+    // timeout bounds a single attempt rather than the call — with retries a
+    // slow model outlasts the app's 15s request abort, so the user gets the
+    // Home error state instead of their rings, levels and next dose.
+    //
+    // Past the deadline the screen renders without insights; the generation
+    // keeps running and populates the cache for the next load.
+    withDeadline(
+      getInsights(userId, now, { allowAIProse: options.allowAIInsightProse === true }),
+      HOME_INSIGHTS_DEADLINE_MS,
+      [],
+      () => logger.warn({ userId }, '[home] insights exceeded their deadline; serving without them'),
+    ),
     getWeeklyRetention(userId, now),
     getStreak(userId, now),
     getNextDoseCandidates(userId, now),

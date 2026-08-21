@@ -51,6 +51,8 @@ export interface InsightDocument extends Document<Types.ObjectId> {
   cta?: string;
   deterministicSignal: Record<string, unknown>;
   generatedAt: Date;
+  /** True when headline/body came from the model rather than the fallback. */
+  aiCopy: boolean;
   copyVersion?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -353,6 +355,19 @@ const insightSchema = new Schema<InsightDocument>(
       required: true,
       default: () => new Date(),
       index: true,
+    },
+    // Whether headline/body were WRITTEN BY THE MODEL or are the deterministic
+    // fallback. Internal only — it never reaches the API response.
+    //
+    // Without it a cached row cannot say where its copy came from, and the
+    // background sweeps (which deliberately run with AI prose off) would fill
+    // the cache with fallback text that then satisfied the freshness check for
+    // a consented reader — so consented users saw boilerplate for the whole
+    // TTL and effectively never got the AI copy they opted into.
+    aiCopy: {
+      type: Boolean,
+      required: true,
+      default: false,
     },
     copyVersion: {
       type: String,
