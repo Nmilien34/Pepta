@@ -509,3 +509,67 @@ describe('trials are distinguishable from payments', () => {
     );
   });
 });
+
+// A TRANSFER moves a subscription between accounts. The winner's alias array
+// is a USER-LOOKUP KEY, so putting the loser's identifiers in it made the
+// winner reachable by the loser's events — one account's REFUND downgrading
+// another's paying subscription.
+describe('a transfer does not bind the two accounts together', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.processedFindOne.mockResolvedValue(null);
+    mocks.processedCreate.mockResolvedValue(undefined);
+  });
+
+  it('never stores the losing account id on the winning account', async () => {
+    const loser = new Types.ObjectId().toString();
+    const winner = new Types.ObjectId().toString();
+    const user = userDocument({ id: winner, status: 'active' });
+    mocks.userFindById.mockResolvedValue(user);
+
+    await applyRevenueCatWebhook(
+      event({
+        id: 'evt_transfer',
+        type: 'TRANSFER',
+        appUserId: winner,
+        transferredFrom: [loser],
+        transferredTo: [winner],
+      }),
+    );
+
+    expect(user.entitlement.revenueCatAppUserIds).not.toContain(loser);
+    expect(user.entitlement.revenueCatAppUserIds).toContain(winner);
+  });
+
+  it('a refund for the losing account cannot reach the winning account', async () => {
+    const loser = new Types.ObjectId().toString();
+    const winner = new Types.ObjectId().toString();
+
+    // The winner, as they stand AFTER the transfer above.
+    const winnerDoc = userDocument({
+      id: winner,
+      status: 'active',
+      revenueCatCustomerId: winner,
+      revenueCatAppUserIds: [winner],
+    });
+
+    // The loser's account is gone, so findById misses and the alias query is
+    // the only way a match could happen.
+    mocks.userFindById.mockResolvedValue(null);
+    mocks.userFindOne.mockResolvedValue(null);
+
+    await applyRevenueCatWebhook(
+      event({ id: 'evt_refund_loser', type: 'REFUND', appUserId: loser }),
+    );
+
+    expect(winnerDoc.entitlement.status).toBe('active');
+    expect(winnerDoc.save).not.toHaveBeenCalled();
+    // And the query that ran did not include the winner's id as a candidate.
+    expect(mocks.userFindOne).toHaveBeenCalledWith({
+      $or: [
+        { 'entitlement.revenueCatCustomerId': { $in: [loser] } },
+        { 'entitlement.revenueCatAppUserIds': { $in: [loser] } },
+      ],
+    });
+  });
+});

@@ -233,8 +233,39 @@ async function provision(
     const subscriber = await getSubscriber(appUserId);
     const existing = subscriber.entitlements?.[entitlementId];
     const existingExpiry = existing?.expires_date ? new Date(existing.expires_date) : null;
-    const alreadyGranted =
-      existingExpiry != null && existingExpiry.getTime() > Date.now();
+    const live = existingExpiry != null && existingExpiry.getTime() > Date.now();
+
+    // WHOSE entitlement is live matters. This check used to treat ANY live pro
+    // entitlement as "the grant already went out" — including a PAID
+    // subscription. An invited creator who already subscribes had their invite
+    // consumed and marked active while no promotional entitlement was ever
+    // issued, so when their paid period ended they had nothing.
+    const productId = existing?.product_identifier;
+    const backing = productId ? subscriber.subscriptions?.[productId] : undefined;
+    const existingIsPromotional =
+      (productId?.startsWith("rc_promo") ?? false) ||
+      backing?.store?.toLowerCase() === "promotional";
+
+    if (live && !existingIsPromotional) {
+      // They are paying. Granting free access on top would be thrown away, so
+      // the grant STACKS: it stays unconsumed and provisions when the paid
+      // period ends. The saga's own retry clock carries it there.
+      grant.nextAttemptAt = existingExpiry!;
+      grant.lastErrorCode = "PAID_SUBSCRIPTION_ACTIVE";
+      grant.leaseId = undefined;
+      grant.leaseExpiresAt = undefined;
+      await grant.save();
+      logger.info(
+        { userId: String(user._id), until: existingExpiry!.toISOString() },
+        "[complimentary] paid subscription active; grant deferred to its end",
+      );
+      // Their access right now is the paid one — reconcile so the projection
+      // reflects it, and return that rather than a paywall.
+      await reconcileUserEntitlement(user);
+      return decisionFromPersistedState(user.entitlement);
+    }
+
+    const alreadyGranted = live && existingIsPromotional;
 
     if (!alreadyGranted) {
       await grantPromotionalEntitlement(appUserId, entitlementId, grant.expiresAt!);

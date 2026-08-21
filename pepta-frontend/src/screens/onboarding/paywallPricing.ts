@@ -78,8 +78,11 @@ const FALLBACK_PRICING: PaywallPricingCopy = {
     per: "/mo",
   },
   footer: {
-    yearly: "$59.99/year. Cancel anytime · Terms & Privacy",
-    monthly: "$9.99/month. Cancel anytime · Terms & Privacy",
+    // The disclosure rides on the fallback too — this copy is on screen for
+    // the moment before the store answers, and it is still a subscription
+    // being offered.
+    yearly: "$59.99/year, auto-renews until cancelled. Cancel anytime · Terms & Privacy",
+    monthly: "$9.99/month, auto-renews until cancelled. Cancel anytime · Terms & Privacy",
   },
   // Pre-load fallback: no product yet, so never advertise a trial. (The
   // button is disabled until plans load; these labels are the disabled text.)
@@ -176,9 +179,15 @@ function planFooter(
   planNoun: 'month' | 'year',
   trialEligible: boolean,
 ): string {
+  // AUTO-RENEWAL IS DISCLOSED FOR EVERY SUBSCRIPTION, not only when a trial
+  // is on offer. App Store guideline 3.1.2 requires the auto-renewing nature
+  // to be stated wherever the subscription is sold, and the trial-only branch
+  // left every trial-INELIGIBLE user — anyone who already used the intro offer
+  // in this group, and anyone in a no-intro arm — reading "Cancel anytime"
+  // with no mention that it renews on its own.
   const trial = freeTrialOf(pkg);
   if (!trial || !trialEligible) {
-    return `${price}/${planNoun}. Cancel anytime · Terms & Privacy`;
+    return `${price}/${planNoun}, auto-renews until cancelled. Cancel anytime · Terms & Privacy`;
   }
   return `Then ${price}/${planNoun}, auto-renews. Cancel anytime · Terms & Privacy`;
 }

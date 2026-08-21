@@ -82,6 +82,10 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
   };
   const [completing, setCompleting] = useState(false);
   const [failed, setFailed] = useState(false);
+  // Offerings are a separate failure from a failed purchase: the store never
+  // told us what the plans are, so there is nothing to buy yet.
+  const [offeringsFailed, setOfferingsFailed] = useState(false);
+  const [offeringsAttempt, setOfferingsAttempt] = useState(0);
   const [message, setMessage] = useState<string | null>(null);
   const [paywallPackages, setPaywallPackages] =
     useState<PaywallPackages | null>(null);
@@ -116,6 +120,7 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
 
   useEffect(() => {
     let mounted = true;
+    setOfferingsFailed(false);
 
     if (!auth.user?.id) {
       setPaywallPackages(null);
@@ -178,13 +183,18 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
         console.error("[Paywall] getOfferings failed:", error);
         if (!mounted) return;
         setPaywallPackages(null);
+        // AND VISIBLE. This used to set neither `failed` nor a message, so the
+        // screen sat on "Loading App Store plans…" forever with a dead CTA:
+        // a user who wanted to pay could not, and — this being the app's only
+        // surface for an inactive account — could not leave either.
+        setOfferingsFailed(true);
         logShownOnce("unknown", false, "none");
       });
 
     return () => {
       mounted = false;
     };
-  }, [auth.user?.id]);
+  }, [auth.user?.id, offeringsAttempt]);
 
   // paywall_dismissed: the wall has no dismiss control, so the only "leave"
   // is backgrounding the app. 'background' only — the StoreKit purchase sheet
@@ -464,7 +474,34 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
                 "We couldn’t save your setup. Check your connection and try again."}
             </AppText>
           ) : null}
-          {!plansReady && !failed && !message ? (
+          {offeringsFailed ? (
+            <View style={{ marginBottom: theme.spacing.sm, gap: 8 }}>
+              <AppText variant="caption" color="danger" align="center">
+                We couldn’t reach the App Store to load your plans.
+              </AppText>
+              <Pressable
+                onPress={() => setOfferingsAttempt((attempt) => attempt + 1)}
+                accessibilityRole="button"
+                accessibilityLabel="Try loading plans again"
+              >
+                <AppText variant="caption" color="primary" align="center" style={{ fontWeight: "800" }}>
+                  Try again
+                </AppText>
+              </Pressable>
+              {/* The only honest way off this screen when there is nothing to
+                  buy. Without it a user who cannot load plans is stuck here. */}
+              <Pressable
+                onPress={() => auth.logout()}
+                accessibilityRole="button"
+                accessibilityLabel="Sign out"
+              >
+                <AppText variant="caption" color="textSecondary" align="center">
+                  Sign out
+                </AppText>
+              </Pressable>
+            </View>
+          ) : null}
+          {!plansReady && !failed && !message && !offeringsFailed ? (
             <AppText
               variant="caption"
               color="textSecondary"

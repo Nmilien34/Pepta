@@ -147,11 +147,20 @@ function revenueCatLookupCandidates(event: RevenueCatEvent): string[] {
   ]);
 }
 
+/**
+ * The ids we are willing to STORE on a user as their own.
+ *
+ * transferred_from is deliberately absent. Those ids belong to the account
+ * that LOST the subscription, and this array is a user-lookup key — storing
+ * them made the winner findable by the loser's identifiers, so a later event
+ * for the loser (a REFUND, an EXPIRATION) could land on the winner's
+ * entitlement and downgrade an unrelated paying account. The losing side's
+ * ids are the losing side's.
+ */
 function revenueCatIdsToAssociate(event: RevenueCatEvent): string[] {
   return uniqueNonEmptyStrings([
     event.app_user_id,
     event.original_app_user_id,
-    ...(event.transferred_from ?? []),
     ...(event.transferred_to ?? []),
     ...(event.aliases ?? []),
   ]);

@@ -359,7 +359,7 @@ describe("PaywallScreen legal links", () => {
     const text = allText(tree!.root);
     expect(text).toContain("$3.33");
     expect(text).toContain("$40.00/yr");
-    expect(text).toContain("$40.00/year. Cancel anytime");
+    expect(text).toContain("$40.00/year, auto-renews until cancelled. Cancel anytime");
   });
 
   it("keeps subscribe disabled until App Store packages are loaded", async () => {
