@@ -41,10 +41,27 @@ function transformForApi(_doc: unknown, ret: ApiRecord): ApiRecord {
   return serialized;
 }
 
-export function applyApiTransforms(schema: Schema): void {
+/**
+ * @param omit storage-only paths to drop from the API shape.
+ *
+ * Response schemas are STRICT: they reject unknown keys rather than ignoring
+ * them, so a persistence field that is not part of the contract does not get
+ * quietly dropped — it throws. `uiPreferencesUpdatedAt` on the user profile
+ * (declared `default: null`, so present on EVERY document) took /home's whole
+ * profile section down that way in production on 2026-08-21, returning
+ * `profile: null` with the raw zod error in sectionErrors.
+ *
+ * Declaring the omission on the MODEL is what makes it unforgettable — a new
+ * serialization call site inherits it, where a fix at the call site would not.
+ */
+export function applyApiTransforms(schema: Schema, omit: readonly string[] = []): void {
   const options = {
     virtuals: false,
-    transform: transformForApi,
+    transform(doc: unknown, ret: ApiRecord): ApiRecord {
+      const serialized = transformForApi(doc, ret);
+      for (const path of omit) delete serialized[path];
+      return serialized;
+    },
   };
 
   schema.set('toJSON', options);

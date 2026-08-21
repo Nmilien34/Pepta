@@ -239,7 +239,21 @@ const userProfileSchema = new Schema<UserProfileDocument>(
   },
 );
 
-applyApiTransforms(userProfileSchema);
+// STORAGE-ONLY FIELDS — never part of a profile RESPONSE.
+//
+// userProfileResponseSchema rejects unknown keys, and serializeWithSchema hands
+// it toObject() output directly. `uiPreferencesUpdatedAt` is declared with
+// `default: null`, so it exists on EVERY profile document — including users who
+// have never opened "What to show". The moment that field shipped, every
+// profile serialization threw and /home returned `profile: null` carrying the
+// raw zod error in sectionErrors: no targets, no companion name, no units, for
+// everyone (production, 2026-08-21).
+//
+// Stripped here rather than at the two call sites because a third one will be
+// added eventually, and this is the only place that cannot be forgotten. The
+// preferences keep their own endpoint (/me/ui-preferences), which reads them
+// straight off the document and is unaffected by a plain-object transform.
+applyApiTransforms(userProfileSchema, ["uiPreferences", "uiPreferencesUpdatedAt"]);
 
 export const UserProfileModel = mongoose.model<UserProfileDocument>(
   "UserProfile",
