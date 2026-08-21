@@ -17,7 +17,7 @@ say()  { printf '%s\n' "$*"; }
 ok()   { say "  ✓ $*"; }
 bad()  { say "  ✗ $*"; fail=1; }
 
-say "1/7 JS ↔ native module parity (autolinking vs Podfile.lock)"
+say "1/8 JS ↔ native module parity (autolinking vs Podfile.lock)"
 missing=$(npx expo-modules-autolinking resolve -p apple --json 2>/dev/null | python3 -c '
 import json, re, sys
 resolved = json.load(sys.stdin)
@@ -51,7 +51,7 @@ fi
 #
 # Resolution is done FROM THE PACKAGE THAT IMPORTS IT, not from the app — that
 # distinction is the whole bug, and checking it the easy way reproduces it.
-say "1b/7 native pod versions == resolved JS versions"
+say "1b/8 native pod versions == resolved JS versions"
 drift=$(python3 - <<'PY'
 import json, os, re, subprocess, sys
 
@@ -101,14 +101,14 @@ else
   ok "every locally-sourced pod matches the JS version Metro will bundle"
 fi
 
-say "2/7 Pods in sync with lockfile"
+say "2/8 Pods in sync with lockfile"
 if [ -f ios/Pods/Manifest.lock ] && diff -q ios/Podfile.lock ios/Pods/Manifest.lock >/dev/null 2>&1; then
   ok "ios/Pods matches Podfile.lock"
 else
   bad "ios/Pods out of sync with Podfile.lock (run: cd ios && pod install)"
 fi
 
-say "3/7 Production env baked into the bundle"
+say "3/8 Production env baked into the bundle"
 if [ ! -f .env ]; then
   bad ".env missing — EXPO_PUBLIC_* vars won't be inlined"
 else
@@ -123,20 +123,20 @@ else
     || bad "EXPO_PUBLIC_REVENUECAT_IOS_API_KEY missing or malformed"
 fi
 
-say "4/7 Typecheck"
+say "4/8 Typecheck"
 if npx tsc --noEmit >/dev/null 2>&1; then ok "tsc clean"; else bad "tsc failed (run: npm run typecheck)"; fi
 
-say "5/7 Lint (rules-of-hooks is the load-bearing part)"
+say "5/8 Lint (rules-of-hooks is the load-bearing part)"
 # A conditional hook is a guaranteed runtime crash, not a style problem —
 # builds 20-22 shipped one in HomeScreen that blanked the app on entry the
 # moment /home data arrived. eslint-plugin-react-hooks now guards the whole
 # tree, but a rule that never runs before an archive protects nobody.
 if npx eslint src >/dev/null 2>&1; then ok "eslint clean"; else bad "eslint failed (run: npx eslint src)"; fi
 
-say "6/7 Tests"
+say "6/8 Tests"
 if npm run -s test >/dev/null 2>&1; then ok "tests pass"; else bad "tests failed (run: npm test)"; fi
 
-say "7/7 OTA runtime version parity (Expo.plist vs Info.plist vs app.config)"
+say "7/8 OTA runtime version parity (Expo.plist vs Info.plist vs app.config)"
 # An OTA update only reaches binaries whose EXUpdatesRuntimeVersion equals the
 # published runtime (policy: the marketing version). If the plist lags a
 # version bump, every user on that build is stranded off the update channel —
@@ -153,6 +153,24 @@ if /usr/libexec/PlistBuddy -c 'Print :EXUpdatesEnabled' ios/Pepta/Supporting/Exp
   ok "EXUpdatesEnabled true"
 else
   bad "EXUpdatesEnabled is not true in Expo.plist — OTA client would ship dead"
+fi
+
+echo
+say "8/8 build number parity (Info.plist vs pbxproj vs app.config)"
+# THE ONE THAT ACTUALLY SHIPS IS Info.plist. CFBundleVersion there is a
+# LITERAL — it does not read $(CURRENT_PROJECT_VERSION) — so bumping the
+# pbxproj and app.config.js looks like a version bump, passes every other
+# check, and archives with the OLD number. Build 37 was archived as 36 exactly
+# this way; App Store Connect rejects the duplicate, but only after the upload.
+b_plist=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' ios/Pepta/Info.plist 2>/dev/null)
+b_proj=$(grep -o 'CURRENT_PROJECT_VERSION = [0-9]*;' ios/Pepta.xcodeproj/project.pbxproj | grep -o '[0-9]*' | sort -u)
+b_cfg=$(node -e 'process.stdout.write(require("./app.config.js").expo.ios.buildNumber)' 2>/dev/null)
+if [ "$(printf '%s' "$b_proj" | wc -l)" -gt 0 ]; then
+  bad "pbxproj has more than one CURRENT_PROJECT_VERSION value: $(echo $b_proj)"
+elif [ -n "$b_plist" ] && [ "$b_plist" = "$b_proj" ] && [ "$b_plist" = "$b_cfg" ]; then
+  ok "build number $b_plist agrees across all three"
+else
+  bad "build number drift — Info.plist '$b_plist' vs pbxproj '$b_proj' vs app.config '$b_cfg'"
 fi
 
 echo
