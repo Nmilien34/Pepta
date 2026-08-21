@@ -1309,7 +1309,15 @@ function ResultView({
         >
           Portion
         </AppText>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 14,
+            flexShrink: 1,
+            minWidth: 0,
+          }}
+        >
           <Pressable
             onPress={() => step(-1)}
             hitSlop={8}
@@ -1324,11 +1332,20 @@ function ResultView({
           >
             <Icon name="remove" size={16} color={theme.colors.textPrimary} />
           </Pressable>
+          {/* THE MULTIPLIER ONLY. This used to read `{portion} × {servingSize}`,
+              which repeated the serving description already printed in full
+              directly above ("… · detected"). For a voice-logged meal that
+              string is a whole sentence — "1 omelet (2 eggs, 1/2 cup
+              asparagus, 1/2 cup tomatoes)" — and with no max width it grew the
+              row until the + button was pushed off the screen edge and the
+              text wrapped over two centred lines. The stepper's job is the
+              count; the serving is stated above. */}
           <AppText
             variant="bodyStrong"
-            style={{ fontWeight: "700", minWidth: 64, textAlign: "center" }}
+            numberOfLines={1}
+            style={{ fontWeight: "700", minWidth: 44, textAlign: "center" }}
           >
-            {portion} × {a.servingSize}
+            {portion}×
           </AppText>
           <Pressable
             onPress={() => step(1)}
