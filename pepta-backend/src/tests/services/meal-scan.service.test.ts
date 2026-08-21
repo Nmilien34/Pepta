@@ -536,3 +536,77 @@ describe("meal scan service", () => {
     expect(result.coachContent).toEqual(coachContent);
   });
 });
+
+// The snapshot decides the "you'd be at Xg of Yg protein today" figure that
+// the AI note states as fact. Measured over UTC days it contradicted the
+// user's own Home screen for most of the evening.
+describe("the protein snapshot is measured in the user's day", () => {
+  beforeEach(() => {
+    // Self-contained: this block sits outside the suite above, so it sets up
+    // (and clears) everything it needs itself.
+    vi.clearAllMocks();
+    mocks.generateMealTextAnalysis.mockResolvedValue({
+      foodName: "Chicken and rice",
+      servingSize: "1 bowl",
+      protein: 42,
+      calories: 640,
+      carbs: 72,
+      fat: 18,
+      fiber: 7,
+      confidence: 0.76,
+    });
+    mocks.generateMealScanNote.mockResolvedValue("note");
+    mocks.mealScanFindOne.mockResolvedValue(null);
+    mocks.mealScanCreate.mockImplementation((payload: Record<string, unknown>) =>
+      Promise.resolve(document({
+        id: "scan-1",
+        ...payload,
+        createdAt: "2026-06-22T00:00:00.000Z",
+        updatedAt: "2026-06-22T00:00:00.000Z",
+      })),
+    );
+    mocks.mealFind.mockResolvedValue([]);
+    mocks.proteinFind.mockResolvedValue([]);
+    mocks.userProfileFindOne.mockResolvedValue({
+      dailyProteinTargetGrams: 120,
+      dailyCalorieTarget: 1800,
+      timezone: "America/Los_Angeles",
+    });
+  });
+
+  it("counts from local midnight, not UTC midnight", async () => {
+    // 6pm PDT on 20 Aug is 01:00 UTC on 21 Aug — already "tomorrow" in UTC.
+    const capturedAt = new Date("2026-08-21T01:00:00.000Z");
+    mocks.mealFind.mockResolvedValue([]);
+    mocks.proteinFind.mockResolvedValue([]);
+
+    await parseVoiceMeal("user-1", {
+      transcript: "chicken and rice",
+      recordedAt: capturedAt.toISOString(),
+    });
+
+    const dayFilter = mocks.mealFind.mock.calls[0]![0].datetime;
+    // Local midnight in Los Angeles = 07:00 UTC that morning, so breakfast
+    // and lunch are inside the window rather than left in "yesterday".
+    expect(dayFilter.$gte.toISOString()).toBe("2026-08-20T07:00:00.000Z");
+    expect(dayFilter.$lt.toISOString()).toBe("2026-08-21T07:00:00.000Z");
+  });
+
+  it("falls back to UTC days when the profile has no usable zone", async () => {
+    mocks.userProfileFindOne.mockResolvedValue({
+      dailyProteinTargetGrams: 120,
+      dailyCalorieTarget: 1800,
+      timezone: "Not/AZone",
+    });
+    mocks.mealFind.mockResolvedValue([]);
+    mocks.proteinFind.mockResolvedValue([]);
+
+    await parseVoiceMeal("user-1", {
+      transcript: "chicken and rice",
+      recordedAt: "2026-08-21T01:00:00.000Z",
+    });
+
+    const dayFilter = mocks.mealFind.mock.calls[0]![0].datetime;
+    expect(dayFilter.$gte.toISOString()).toBe("2026-08-21T00:00:00.000Z");
+  });
+});

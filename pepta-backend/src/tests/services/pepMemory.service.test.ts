@@ -6,6 +6,7 @@ import type {
 
 const mocks = vi.hoisted(() => ({
   pepMemoryFindOneAndUpdate: vi.fn(),
+  pepMemoryFindOne: vi.fn(),
 }));
 
 vi.mock("../../models", async (importOriginal) => {
@@ -13,6 +14,7 @@ vi.mock("../../models", async (importOriginal) => {
   return {
     ...actual,
     PepMemoryModel: {
+      findOne: mocks.pepMemoryFindOne,
       findOneAndUpdate: mocks.pepMemoryFindOneAndUpdate,
     },
   };
@@ -97,6 +99,11 @@ function candidate(
 describe("Pep memory service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // No stored summary by default, so the freshness check falls through to
+    // generating one.
+    mocks.pepMemoryFindOne.mockReturnValue({
+      select: () => ({ lean: () => Promise.resolve(null) }),
+    });
   });
 
   it("builds a durable companion snapshot from the latest Pep context", () => {
@@ -268,5 +275,89 @@ describe("Pep memory service", () => {
 
     expect(result).toEqual({ id: "side-1" });
     expect(refresh).toHaveBeenCalledWith(userId);
+  });
+});
+
+// The push scheduler sweeps every 15 minutes. Regenerating the summary on
+// every sweep meant ~96 paid model calls per consenting user per day to
+// restate a narrative that barely moves — and almost none of those sweeps
+// produce a notification anyone ever sees.
+describe("the AI summary is not rewritten on every sweep", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("reuses a summary that is still current", async () => {
+    const generateSummary = vi.fn(async () => "fresh text");
+    mocks.pepMemoryFindOne.mockReturnValue({
+      select: () => ({
+        lean: () =>
+          Promise.resolve({
+            aiSummary: {
+              text: "stored text",
+              generatedAt: new Date(now.getTime() - 60 * 60 * 1000),
+              copyVersion: "pep-memory-summary-v1",
+            },
+          }),
+      }),
+    });
+
+    const snapshot = await refreshPepMemory(userId, now, {
+      aiPushCopyConsent: true,
+      loadContext: async () => context(),
+      generateSummary,
+    });
+
+    expect(generateSummary).not.toHaveBeenCalled();
+    expect(snapshot.aiSummary?.text).toBe("stored text");
+  });
+
+  it("rewrites one that has aged out", async () => {
+    const generateSummary = vi.fn(async () => "fresh text");
+    mocks.pepMemoryFindOne.mockReturnValue({
+      select: () => ({
+        lean: () =>
+          Promise.resolve({
+            aiSummary: {
+              text: "stale text",
+              generatedAt: new Date(now.getTime() - 12 * 60 * 60 * 1000),
+              copyVersion: "pep-memory-summary-v1",
+            },
+          }),
+      }),
+    });
+
+    const snapshot = await refreshPepMemory(userId, now, {
+      aiPushCopyConsent: true,
+      loadContext: async () => context(),
+      generateSummary,
+    });
+
+    expect(generateSummary).toHaveBeenCalledTimes(1);
+    expect(snapshot.aiSummary?.text).toBe("fresh text");
+  });
+
+  it("rewrites one written by an older prompt version", async () => {
+    const generateSummary = vi.fn(async () => "fresh text");
+    mocks.pepMemoryFindOne.mockReturnValue({
+      select: () => ({
+        lean: () =>
+          Promise.resolve({
+            aiSummary: {
+              text: "old version",
+              generatedAt: new Date(now.getTime() - 60 * 1000),
+              copyVersion: "pep-memory-summary-v0",
+            },
+          }),
+      }),
+    });
+
+    await refreshPepMemory(userId, now, {
+      aiPushCopyConsent: true,
+      loadContext: async () => context(),
+      generateSummary,
+    });
+
+    expect(generateSummary).toHaveBeenCalledTimes(1);
   });
 });

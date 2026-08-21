@@ -10,6 +10,7 @@ import {
   detectStall,
   type DetectorSeverity,
 } from '../lib/insight-detectors';
+import { parseModelJson } from '../lib/parseModelJson';
 import { daysSinceDose, cycleDayFromShotDay } from '../lib/week';
 import { logger } from '../lib/logger';
 import {
@@ -124,20 +125,19 @@ function isInsightCopy(value: unknown): value is InsightCopy {
 }
 
 function parseInsightCopy(outputText: string): InsightCopy | null {
-  try {
-    const parsed = JSON.parse(outputText) as unknown;
+  // Fence-tolerant, like the product parser. A fenced reply used to fail here
+  // and degrade silently to the canned fallback, so the user saw boilerplate
+  // and nothing said why.
+  const parsed = parseModelJson<unknown>(outputText);
 
-    if (!isInsightCopy(parsed)) {
-      return null;
-    }
-
-    return {
-      headline: parsed.headline.trim(),
-      body: parsed.body.trim(),
-    };
-  } catch {
+  if (!isInsightCopy(parsed)) {
     return null;
   }
+
+  return {
+    headline: parsed.headline.trim(),
+    body: parsed.body.trim(),
+  };
 }
 
 function getOpenAIClient(): OpenAI | null {

@@ -148,11 +148,19 @@ async function defaultCreateNotification(input: {
     });
     return null;
   }
-  const notification = await createPepPushNotification({
-    context,
-    candidate,
-    aiPushCopyConsent: input.aiPushCopyConsent,
-  });
+
+  // Selection is deterministic, so we already know here whether this candidate
+  // could ever be sent. Writing its copy first meant paying the model for
+  // notifications the caller was about to discard — on a 15-minute sweep, for
+  // every consenting user, that is almost all of them.
+  const sendable = candidate.pushEligible && candidate.importance === "high";
+  const notification = sendable
+    ? await createPepPushNotification({
+        context,
+        candidate,
+        aiPushCopyConsent: input.aiPushCopyConsent,
+      })
+    : { ...candidate.fallback, candidate, source: "deterministic" as const };
   await refreshPepMemoryFromContext(input.userId, context, input.now, {
     aiPushCopyConsent: input.aiPushCopyConsent,
     candidate,

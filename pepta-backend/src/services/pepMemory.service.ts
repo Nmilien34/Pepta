@@ -243,7 +243,18 @@ export function buildPepMemorySnapshot(input: {
   };
 }
 
+/**
+ * How long a stored AI summary is considered current.
+ *
+ * The scheduler sweeps every 15 minutes, so without this the summary was
+ * regenerated ~96 times a day per consenting user — a paid model call each
+ * time — to restate a rolling narrative that barely moves between sweeps, and
+ * almost none of which ever became a notification anyone saw.
+ */
+const AI_SUMMARY_MAX_AGE_MS = 6 * 60 * 60 * 1000;
+
 async function maybeGenerateAISummary(input: {
+  userId: string;
   context: PepPushContext;
   candidate: PepPushCandidate | null;
   aiPushCopyConsent: boolean;
@@ -251,6 +262,25 @@ async function maybeGenerateAISummary(input: {
   generateSummary?: GeneratePepMemorySummary;
 }): Promise<PepMemorySnapshot["aiSummary"]> {
   if (!input.aiPushCopyConsent) return null;
+
+  // Reuse a summary that is still current rather than paying to rewrite it.
+  // Returning the stored one (rather than null) matters: the upsert only
+  // preserves what it is given or leaves the field untouched, and this keeps
+  // the snapshot honest about what Pep actually knows.
+  const existing = await PepMemoryModel.findOne({ userId: input.userId })
+    .select({ aiSummary: 1 })
+    .lean();
+  const stored = (existing as { aiSummary?: PepMemorySnapshot["aiSummary"] } | null)
+    ?.aiSummary;
+  if (
+    stored?.text &&
+    stored.copyVersion === PEP_MEMORY_SUMMARY_VERSION &&
+    stored.generatedAt &&
+    input.now.getTime() - new Date(stored.generatedAt).getTime() < AI_SUMMARY_MAX_AGE_MS
+  ) {
+    return stored;
+  }
+
   const generateSummary = input.generateSummary ?? defaultGenerateSummary;
 
   try {
@@ -320,6 +350,7 @@ export async function refreshPepMemoryFromContext(
       ? selectPepPushCandidate(context, now)
       : options.candidate;
   const aiSummary = await maybeGenerateAISummary({
+    userId,
     context,
     candidate,
     aiPushCopyConsent: options.aiPushCopyConsent === true,

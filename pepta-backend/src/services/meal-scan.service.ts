@@ -10,7 +10,9 @@ import {
   type MealVoiceInput,
 } from "@pepta/shared";
 import { isValidObjectId } from "mongoose";
-import { addUtcDays, startOfUtcDay, startOfUtcWeek } from "../lib/dates";
+import { startOfUtcWeek } from "../lib/dates";
+import { parseHomeTimezone, resolveHomeWindow } from "../lib/homeRange";
+import { addDaysDateOnly, dateOnlyInTz, dayOfWeekOf, zonedTimeToUtc } from "../lib/timezone";
 import { AppError, NotFoundError } from "../lib/errors";
 import { logger } from "../lib/logger";
 import {
@@ -76,6 +78,14 @@ function storageFailed(): AppError {
 
 function roundOne(value: number): number {
   return Math.round(value * 10) / 10;
+}
+
+/** Monday 00:00 of the local week containing `at`. */
+function startOfLocalWeek(at: Date, timeZone: string): Date {
+  const today = dateOnlyInTz(at, timeZone);
+  const weekday = dayOfWeekOf(today); // 0 = Sunday
+  const daysSinceMonday = weekday === 0 ? 6 : weekday - 1;
+  return zonedTimeToUtc(addDaysDateOnly(today, -daysSinceMonday), "00:00", timeZone);
 }
 
 function isDuplicateIdempotencyError(
@@ -198,9 +208,21 @@ async function computeProteinSnapshot(input: {
     });
   }
 
-  const todayStart = startOfUtcDay(input.capturedAt);
-  const tomorrowStart = addUtcDays(todayStart, 1);
-  const weekStart = startOfUtcWeek(input.capturedAt);
+  // THE USER'S DAY, NOT THE SERVER'S. These windows decide the "you'd be at
+  // Xg of Yg protein today" figure that the AI note then states as fact. On
+  // UTC boundaries a user in Los Angeles scanning dinner at 6pm was already
+  // into the next UTC day, so the snapshot counted only what they had logged
+  // since 5pm local and the note contradicted their own Home screen.
+  const timeZone = parseHomeTimezone(profile.timezone);
+  const { start: todayStart, end: tomorrowStart } = resolveHomeWindow(
+    "today",
+    input.capturedAt,
+    timeZone,
+  );
+  // Week-to-date, Monday-anchored, in the same zone.
+  const weekStart = timeZone
+    ? startOfLocalWeek(input.capturedAt, timeZone)
+    : startOfUtcWeek(input.capturedAt);
   const elapsedWeekDays =
     Math.floor(
       (todayStart.getTime() - weekStart.getTime()) / (24 * 60 * 60 * 1000),
