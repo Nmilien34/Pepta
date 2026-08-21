@@ -4,6 +4,7 @@
 // one waiting for the first log. Splitting them would let the two drift.
 
 import React, { useState } from 'react';
+import { CardIcon } from './CardIcon';
 import { Animated, Pressable, View, type LayoutChangeEvent } from 'react-native';
 import Svg, { Circle, Line, Path } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
@@ -38,7 +39,7 @@ export function SideEffectsCard({ trend, type, onPickType, onLog }: SideEffectsC
   return (
     <Card>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <Icon name="alert-circle-outline" size={18} color={theme.colors.warning} />
+        <CardIcon name="alert-circle-outline" color={theme.colors.primary} />
         <AppText variant="cardTitle" style={{ fontSize: 15 }}>
           Side effects
         </AppText>

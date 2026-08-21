@@ -23,6 +23,7 @@ import {
   ScreenHeader,
   SectionErrorBanner,
   WeightChart,
+  CardIcon,
 } from '../../components';
 
 import { ProgressScopeMenu } from '../../components/ProgressScopeMenu';
@@ -223,7 +224,7 @@ export function ProgressScreen() {
               <Card>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <Icon name="scale" size={18} color={theme.colors.weight} />
+                    <CardIcon name="scale" color={theme.colors.weight} />
                     <AppText variant="cardTitle" style={{ fontSize: 15 }}>
                       Weight ({s.weight.unit})
                     </AppText>
@@ -339,7 +340,7 @@ export function ProgressScreen() {
             <View style={{ flex: 1, gap: 12 }}>
               <Card>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
-                  <Icon name="heart-pulse" size={16} color={theme.colors.primary} />
+                  <CardIcon name="heart-pulse" color={theme.colors.primary} />
                   <AppText variant="cardTitle" style={{ fontSize: 15 }}>
                     BMI
                   </AppText>
@@ -360,7 +361,7 @@ export function ProgressScreen() {
               </Card>
               <Card>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
-                  <Icon name="arrow-down-right" size={16} color={theme.colors.fiber} />
+                  <CardIcon name="arrow-down-right" color={theme.colors.fiber} />
                   <AppText variant="cardTitle" style={{ fontSize: 15 }}>
                     Difference
                   </AppText>
@@ -397,7 +398,7 @@ export function ProgressScreen() {
             <Reveal delay={220} style={{ marginTop: 12 }}>
               <Card>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Icon name="shield-check" size={18} color={theme.colors.textTertiary} />
+                  <CardIcon name="shield-check" color={theme.colors.fiber} />
                   <AppText variant="cardTitle" style={{ fontSize: 15, flex: 1 }}>
                     Muscle protection
                   </AppText>
@@ -476,7 +477,7 @@ export function ProgressScreen() {
               <Card>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <Icon name="shield-check" size={18} color={theme.colors.fiber} />
+                    <CardIcon name="shield-check" color={theme.colors.fiber} />
                     <AppText variant="cardTitle" style={{ fontSize: 15 }}>
                       Muscle protection
                     </AppText>
@@ -539,7 +540,7 @@ export function ProgressScreen() {
             <Reveal delay={200} style={{ marginTop: 12 }}>
               <Card>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Icon name="nutrition" size={18} color={theme.colors.protein} />
+                  <CardIcon name="nutrition" color={theme.colors.fiber} />
                   <AppText variant="cardTitle" style={{ fontSize: 15 }}>
                     What you’re eating
                   </AppText>
@@ -614,7 +615,7 @@ export function ProgressScreen() {
               <Card>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <Icon name="flag" size={18} color={theme.colors.weight} />
+                    <CardIcon name="flag" color={theme.colors.weight} />
                     <AppText variant="cardTitle" style={{ fontSize: 15 }}>
                       Timeline
                     </AppText>
@@ -671,7 +672,7 @@ export function ProgressScreen() {
             <Reveal delay={340} style={{ marginTop: 12 }}>
               <Card>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Icon name="chart-line" size={18} color={theme.colors.primary} />
+                  <CardIcon name="chart-line" color={theme.colors.textSecondary} />
                   <AppText variant="cardTitle" style={{ fontSize: 15 }}>
                     What your numbers say
                   </AppText>
@@ -712,7 +713,7 @@ export function ProgressScreen() {
             <Card>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Icon name="camera" size={18} color={theme.colors.textSecondary} />
+                  <CardIcon name="camera" color={theme.colors.textSecondary} />
                   <AppText variant="cardTitle" style={{ fontSize: 15 }}>
                     Progress photos
                   </AppText>

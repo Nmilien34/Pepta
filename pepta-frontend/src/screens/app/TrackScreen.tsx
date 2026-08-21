@@ -9,7 +9,7 @@ import * as Haptics from 'expo-haptics';
 import { useNavigation, type NavigationProp } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../theme';
-import { ActivityFeedCard, AddCompoundSheet, AppText, BodyMap, Button, Card, Mascot, ProgressRing, Reveal, MedicationLevelCard, ScreenHeader, SectionErrorBanner, ShotDetailSheet } from '../../components';
+import { ActivityFeedCard, AddCompoundSheet, AppText, BodyMap, Button, Card, Mascot, ProgressRing, Reveal, MedicationLevelCard, ScreenHeader, SectionErrorBanner, ShotDetailSheet, CardIcon } from '../../components';
 import { WeekStrip } from '../../components/WeekStrip';
 import { ScheduleSheet } from '../../components/ScheduleSheet';
 import { usePeptaData } from '../../context/PeptaDataContext';
@@ -332,7 +332,7 @@ export function TrackScreen() {
             <Card>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Icon name="current-location" size={18} color={theme.colors.primary} />
+                  <CardIcon name="current-location" color={theme.colors.primary} />
                   <AppText variant="cardTitle" style={{ fontSize: 15 }}>
                     Injection sites
                   </AppText>
@@ -405,7 +405,7 @@ export function TrackScreen() {
           <Reveal delay={420} style={{ marginTop: 12 }}>
             <Card>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Icon name="alert-circle-outline" size={18} color={theme.colors.warning} />
+                <CardIcon name="alert-circle-outline" color={theme.colors.primary} />
                 <AppText variant="cardTitle" style={{ fontSize: 15 }}>
                   Side effects
                 </AppText>

@@ -7,6 +7,7 @@
 // and the tests below press it.
 
 import React from 'react';
+import { CardIcon } from './CardIcon';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { AppText } from './AppText';
@@ -60,7 +61,7 @@ export function MedicationLevelCard({
     <>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Icon name="chart-line" size={18} color={theme.colors.primary} />
+          <CardIcon name="chart-line" color={theme.colors.primary} />
           <AppText variant="cardTitle" style={{ fontSize: 15 }}>
             Medication level
           </AppText>

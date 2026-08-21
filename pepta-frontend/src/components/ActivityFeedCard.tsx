@@ -9,6 +9,7 @@
 // a cap, and renders whatever it is handed.
 
 import React from 'react';
+import { CardIcon } from './CardIcon';
 import { Pressable, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { AppText } from './AppText';
@@ -68,7 +69,7 @@ export function ActivityFeedCard({
         }}
       >
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 }}>
-          <Icon name="history" size={18} color={theme.colors.textSecondary} />
+          <CardIcon name="history" color={theme.colors.textSecondary} />
           <AppText variant="cardTitle" style={{ fontSize: 15 }} numberOfLines={1}>
             Your log
           </AppText>

@@ -1349,7 +1349,7 @@ function ActivityCard({
   return (
     <Card>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <Icon name="run" size={18} color={theme.colors.activity} />
+        <CardIcon name="run" color={theme.colors.activity} />
         <AppText variant="cardTitle" style={{ fontSize: 16 }}>
           Activity
         </AppText>

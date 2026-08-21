@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { AppText, Button, Card, ProgressBar, SectionErrorBanner, WeightChart } from '../../components';
+import { AppText, Button, Card, ProgressBar, SectionErrorBanner, WeightChart, CardIcon } from '../../components';
 import { Icon } from '../../components/Icon';
 import { useLogSheets } from '../../context/LogSheetsContext';
 import { usePeptaData } from '../../context/PeptaDataContext';
@@ -67,7 +67,7 @@ export function WeightDetailScreen() {
               <Card style={{ marginTop: theme.spacing.lg }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <Icon name="scale" size={18} color={theme.colors.weight} />
+                    <CardIcon name="scale" color={theme.colors.weight} />
                     <AppText variant="cardTitle" style={{ fontSize: 15 }}>
                       Weight ({s?.weight.unit ?? profile?.weightUnit ?? 'lb'})
                     </AppText>
@@ -92,7 +92,7 @@ export function WeightDetailScreen() {
                 <Card style={{ marginTop: 12 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                      <Icon name="flag" size={18} color={theme.colors.weight} />
+                      <CardIcon name="flag" color={theme.colors.weight} />
                       <AppText variant="cardTitle" style={{ fontSize: 16 }}>
                         Timeline
                       </AppText>
