@@ -24,7 +24,7 @@ export const weightLogService = createCrudService({
   model: WeightLogModel,
   responseSchema: weightLogResponseSchema,
   name: 'Weight log',
-  hasIdempotencyKey: false,
+  hasIdempotencyKey: true,
 });
 
 export const doseLogService = createCrudService({

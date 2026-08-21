@@ -29,9 +29,8 @@ interface LogDocumentBase extends Document<Types.ObjectId> {
 }
 
 export interface WeightLogDocument
-  extends
-    Omit<WeightLogInput, "datetime">,
-    Omit<LogDocumentBase, "idempotencyKey"> {}
+  extends Omit<WeightLogInput, "datetime">,
+    LogDocumentBase {}
 
 export interface DoseLogDocument
   extends Omit<DoseLogInput, "compoundId" | "datetime">, LogDocumentBase {
@@ -98,6 +97,10 @@ const weightLogSchema = new Schema<WeightLogDocument>(
     userId: logBaseFields.userId,
     datetime: logBaseFields.datetime,
     deletedAt: logBaseFields.deletedAt,
+    // Weight now carries an idempotency key like the other eight kinds, so a
+    // replayed POST whose response was lost returns the existing row instead
+    // of recording the weigh-in twice.
+    idempotencyKey: logBaseFields.idempotencyKey,
     notes: logBaseFields.notes,
     value: {
       type: Number,
@@ -365,7 +368,7 @@ const measurementSchema = new Schema<MeasurementDocument>(
 );
 
 const logSchemas = [
-  { schema: weightLogSchema, hasIdempotencyKey: false },
+  { schema: weightLogSchema, hasIdempotencyKey: true },
   { schema: doseLogSchema, hasIdempotencyKey: true },
   { schema: mealLogSchema, hasIdempotencyKey: true },
   { schema: waterLogSchema, hasIdempotencyKey: true },

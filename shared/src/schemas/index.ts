@@ -500,6 +500,15 @@ export const weightLogInputSchema = z
     value: z.number().positive(),
     unit: weightUnitSchema,
     datetime: isoDateTimeSchema,
+    // Weight was the ONE log kind of nine built without an idempotency key,
+    // while the durable outbox stamps one onto every payload it sends — so
+    // this strict schema rejected every weight log the app ever tried to
+    // save, synchronously, before the request left the device.
+    //
+    // Safe for shipped clients: the field is optional on the way in, and the
+    // server only stores and echoes it when the caller sent one, so a build
+    // that predates this never sees it come back.
+    idempotencyKey: z.string().trim().min(1).optional(),
     notes: z.string().trim().max(500).optional(),
   })
   .strict();
