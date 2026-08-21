@@ -321,7 +321,9 @@ export function NewItemSheet({ visible, initialKind, onCancel, onSave }: NewItem
               {photoUri ? (
                 <Image source={{ uri: photoUri }} resizeMode="cover" style={{ width: '100%', height: '100%' }} />
               ) : (
-                <AppText variant="caption" color="textTertiary" style={{ fontSize: 20 }}>+</AppText>
+                <AppText variant="caption" color="textTertiary" style={{ fontSize: 20, lineHeight: 24 }}>
+                  +
+                </AppText>
               )}
             </Pressable>
             <View style={{ flex: 1, minWidth: 0 }}>

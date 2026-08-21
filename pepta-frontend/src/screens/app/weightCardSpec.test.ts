@@ -25,6 +25,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const source = readFileSync(join(__dirname, 'HomeScreen.tsx'), 'utf8');
+const read = (rel: string) => readFileSync(join(__dirname, rel), 'utf8');
 
 /** Just the weight card + its track, so assertions cannot match another card. */
 const card = (() => {
@@ -76,7 +77,15 @@ describe('the weight card matches the frame', () => {
     // and the header chip. Note it is not a blanket rule for the metric:
     // Progress's "Weight (lbs)", "To goal" and "Timeline" ARE --weight. The
     // accent follows the screen, not the number.
-    expect(card).toContain('fontSize: 26, letterSpacing: -0.6, color: theme.colors.primary');
+    expect(card).toContain('fontSize: 26, lineHeight: 32, letterSpacing: -0.6, color: theme.colors.primary');
+    // Worth stating plainly: --primary and --weight are BOTH #7C5CFC today, so
+    // this change is semantic, not visual. It matters because the two tokens
+    // are free to diverge, and when they do this card must follow the frame.
+    const colors = read('../../theme/colors.ts');
+    expect(colors).toContain('primary: "#7C5CFC"');
+    expect(colors).toContain('weight: "#7C5CFC"');
+    // Scoped to the READING. The milestone dots below legitimately use
+    // theme.colors.weight, so a card-wide ban is wrong.
     expect(card).not.toContain('letterSpacing: -0.6, color: theme.colors.weight');
     // latestLabel survives as the null-check; what must not come back is the
     // combined string being RENDERED at one size.

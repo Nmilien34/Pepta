@@ -276,6 +276,11 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
     (kind: DeletableLogKind, id: string) => Promise<boolean>
   >(async () => false);
   const refreshTrackRef = useRef<() => Promise<void>>(async () => undefined);
+  // Set by every plus, cleared once Track has been pulled fresh. saveLog does
+  // NOT refresh Track, so between a plus and the next Track load, trackRef is
+  // missing the row that plus created — and minus reads trackRef to decide
+  // what to delete. See undoBump.
+  const trackMissesABump = useRef(false);
   const sessionEpoch = useRef(0);
   const [boundUserId, setBoundUserId] = useState<string | null>(userId);
   if (boundUserId !== userId) {
@@ -374,7 +379,31 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
       }
       if (!current) return;
 
-      const target = pickLogToUndo(rowsOf(current), amount, amountOf);
+      // A plus since the last Track load means trackRef cannot contain the row
+      // this minus is meant to undo. Picking from it would either find nothing
+      // (a dead button) or find an OLDER log with the same amount and delete
+      // that instead — destroying real data on a control the user reasonably
+      // reads as an undo. Pull once, then decide.
+      if (trackMissesABump.current) {
+        await refreshTrackRef.current();
+        if (epoch !== sessionEpoch.current) return;
+        trackMissesABump.current = false;
+        current = trackRef.current;
+        if (!current) return;
+      }
+
+      let target = pickLogToUndo(rowsOf(current), amount, amountOf);
+      if (!target) {
+        // Nothing matched a copy that may still be stale for other reasons (a
+        // log added on another device, or a plus from a previous session that
+        // queued offline). One refresh before concluding there is nothing to
+        // undo; a genuine no-match still no-ops, which is correct.
+        await refreshTrackRef.current();
+        if (epoch !== sessionEpoch.current) return;
+        current = trackRef.current;
+        if (!current) return;
+        target = pickLogToUndo(rowsOf(current), amount, amountOf);
+      }
       if (!target) return;
 
       applyDelta(-amount);
@@ -420,6 +449,8 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
       }
       if (grams === 0) return;
       const epoch = sessionEpoch.current;
+      // Track no longer reflects reality; the next minus must refresh first.
+      trackMissesABump.current = true;
       applyDelta(grams);
       // Durable: offline/5xx queues the log (optimistic total stays — the log
       // WILL land); only a final server rejection reverts the total.
@@ -460,6 +491,8 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
       }
       if (oz === 0) return;
       const epoch = sessionEpoch.current;
+      // Track no longer reflects reality; the next minus must refresh first.
+      trackMissesABump.current = true;
       applyDelta(oz);
       saveLogRef
         .current("water", { amountOz: oz, datetime: new Date().toISOString() })
@@ -501,6 +534,8 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
       }
       if (grams === 0) return;
       const epoch = sessionEpoch.current;
+      // Track no longer reflects reality; the next minus must refresh first.
+      trackMissesABump.current = true;
       applyDelta(grams);
       saveLogRef
         .current("fiber", { grams, datetime: new Date().toISOString() })
@@ -521,6 +556,11 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
       const data = await api.getTrack();
       if (epoch !== sessionEpoch.current) return;
       setTrack(data);
+      // trackRef is otherwise assigned during RENDER, so anything that awaits
+      // this refresh and then reads trackRef gets the PREVIOUS value — the
+      // refresh looks like it did nothing. undoBump depends on reading the
+      // rows it just pulled, so the ref is written here at the source.
+      trackRef.current = data;
       hasTrack.current = true;
     } catch (error) {
       if (epoch !== sessionEpoch.current) return;

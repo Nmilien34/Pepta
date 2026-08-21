@@ -205,7 +205,11 @@ export function ItemDetailScreen() {
                   justifyContent: 'center',
                 }}
               >
-                <AppText variant="cardTitle" style={{ fontSize: 38, color: theme.colors.textTertiary }}>
+                {/* 38pt in cardTitle's 24pt line box crops the letter. */}
+                <AppText
+                  variant="cardTitle"
+                  style={{ fontSize: 38, lineHeight: 44, color: theme.colors.textTertiary }}
+                >
                   {item.name.trim().charAt(0).toUpperCase()}
                 </AppText>
               </View>

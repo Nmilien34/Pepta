@@ -1345,7 +1345,16 @@ function HomeWeightPulseCard({
             accent) against `.unit` (15px/700, secondary). Rendering
             "199.5 lb" as one string made the unit shout as loudly as the
             reading, which is the one thing on this card that matters. */}
-        <AppText variant="cardTitle" style={{ fontSize: 26, letterSpacing: -0.6, color: theme.colors.primary }}>
+        {/* lineHeight IS LOAD-BEARING HERE. `cardTitle` is fontSize 18 /
+            lineHeight 24; overriding the size to 26 leaves the 24pt line box
+            behind, and a 26pt glyph clips against the top of it. The frame's
+            `.big` is `line-height:1`, which CSS resolves generously and RN
+            does not — RN centres the glyph in exactly that box and crops the
+            overflow. 32 gives the ascender room without loosening the stack. */}
+        <AppText
+          variant="cardTitle"
+          style={{ fontSize: 26, lineHeight: 32, letterSpacing: -0.6, color: theme.colors.primary }}
+        >
           {hasWeight && goal ? String(goal.value) : '—'}
           <AppText variant="cardTitle" style={{ fontSize: 15, color: theme.colors.textSecondary }}>
             {hasWeight && goal ? ` ${goal.unit}` : ''}

@@ -71,6 +71,15 @@ const trackFixture = () => ({
   sectionErrors: {},
 });
 
+/** undoBump may await a Track refresh, and trackRef is assigned during render,
+ *  so the fix needs a macrotask + a render to be observable — counting
+ *  microtasks is not enough. */
+const settle = async () => {
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+};
+
 type Handle = ReturnType<typeof usePeptaData>;
 let handle!: Handle;
 function Probe() {
@@ -169,5 +178,75 @@ describe('bumpWater(-n)', () => {
     });
 
     expect(mocks.createWaterLog).not.toHaveBeenCalled();
+  });
+});
+
+describe('plus then minus — the log you just added is the one that comes off', () => {
+  // THE BUG THE USER HIT. saveLog does not refresh Track, so trackRef still
+  // predates the plus. Minus then reads that stale copy:
+  //
+  //   - nothing matches      -> pickLogToUndo returns null, undoBump returns,
+  //                             and the tap does NOTHING. The number does not
+  //                             move and no request is made.
+  //   - an OLDER log matches -> it deletes THAT one. +5g then -5g silently
+  //                             destroys a 5g log from this morning.
+  //
+  // The second is the dangerous one: it is not a dead button, it is real data
+  // loss on a control the user reasonably believes is an undo.
+
+  it('removes the just-added log, not an older one with the same amount', async () => {
+    // Track knows only about this morning's 8oz. The user logs another 8oz,
+    // then immediately takes it back.
+    mocks.getTrack.mockResolvedValue({
+      ...trackFixture(),
+      waterLogs: [{ id: 'w-this-morning', amountOz: 8, datetime: todayAt(9), deletedAt: null }],
+    });
+    await mount();
+
+    await act(async () => {
+      handle.bumpWater(8);
+      await Promise.resolve();
+    });
+
+    // The server now has the new row; a refresh would show it.
+    mocks.getTrack.mockResolvedValue({
+      ...trackFixture(),
+      waterLogs: [
+        { id: 'w-this-morning', amountOz: 8, datetime: todayAt(9), deletedAt: null },
+        { id: 'w-just-added', amountOz: 8, datetime: todayAt(14), deletedAt: null },
+      ],
+    });
+
+    await act(async () => {
+      handle.bumpWater(-8);
+    });
+    await settle();
+
+    expect(mocks.deleteLog).toHaveBeenCalledWith('water', 'w-just-added');
+    expect(mocks.deleteLog).not.toHaveBeenCalledWith('water', 'w-this-morning');
+  });
+
+  it('still undoes the plus when Track held no matching log at all', async () => {
+    // The silent-no-op case: nothing in the stale copy matches, so minus did
+    // nothing whatsoever and the button read as broken.
+    mocks.getTrack.mockResolvedValue({ ...trackFixture(), waterLogs: [] });
+    await mount();
+
+    await act(async () => {
+      handle.bumpWater(8);
+      await Promise.resolve();
+    });
+
+    mocks.getTrack.mockResolvedValue({
+      ...trackFixture(),
+      waterLogs: [{ id: 'w-fresh', amountOz: 8, datetime: todayAt(14), deletedAt: null }],
+    });
+
+    await act(async () => {
+      handle.bumpWater(-8);
+    });
+    await settle();
+
+    expect(mocks.deleteLog).toHaveBeenCalledWith('water', 'w-fresh');
   });
 });
