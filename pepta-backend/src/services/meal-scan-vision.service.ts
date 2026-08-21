@@ -6,7 +6,14 @@ import { clampNutrition } from '../lib/nutritionBounds';
 
 export const MEAL_SCAN_VISION_ENGINE_VERSION = 'meal-scan-vision-v1';
 const MEAL_SCAN_VISION_MODEL = 'gpt-4o-mini';
-const MEAL_SCAN_VISION_TIMEOUT_MS = 15_000;
+// THE APP ABORTS AT 15s. This call used to be given that entire budget on its
+// own, and the SDK retries twice by default — so a slow model could occupy
+// ~45s server-side while the user had long since seen "Couldn't analyze that
+// photo". The scan often SUCCEEDED after they gave up, and every tap of Try
+// again paid for another full attempt. Sized to leave room for the upload,
+// the snapshot queries and the note.
+const MEAL_SCAN_VISION_TIMEOUT_MS = 9_000;
+const MEAL_SCAN_VISION_MAX_RETRIES = 0;
 const MEAL_SCAN_VISION_MAX_TOKENS = 450;
 
 const MEAL_SCAN_VISION_SYSTEM_PROMPT = `
@@ -104,6 +111,7 @@ export async function generateMealScanVision(
   const openai = new OpenAI({
     apiKey: env.openai.apiKey,
     timeout: MEAL_SCAN_VISION_TIMEOUT_MS,
+    maxRetries: MEAL_SCAN_VISION_MAX_RETRIES,
   });
 
   try {

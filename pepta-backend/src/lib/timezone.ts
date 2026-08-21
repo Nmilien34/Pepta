@@ -70,6 +70,14 @@ export function dateOnlyInTz(at: Date, timeZone: string): string {
   return `${get("year")}-${get("month")}-${get("day")}`;
 }
 
+/** Hour of day (0-23) the instant falls on in the zone. */
+export function hourInTz(at: Date, timeZone: string): number {
+  const parts = partsFormatter(timeZone).formatToParts(at);
+  const hour = parts.find((part) => part.type === "hour")?.value ?? "0";
+  // hourCycle h23 keeps midnight as 0 rather than 24.
+  return Number.parseInt(hour, 10) % 24;
+}
+
 /** Day-of-week (0 = Sunday) for a date-only string — timezone-free math. */
 export function dayOfWeekOf(dateOnly: string): number {
   const [y, m, d] = dateOnly.split("-").map(Number);

@@ -3,6 +3,7 @@ import type { HomeResponse, TrackResponse } from "@pepta/shared";
 import { env } from "../config/env";
 import { logger } from "../lib/logger";
 import { doseNoun } from "../lib/dose-noun";
+import { dateOnlyInTz, isValidTimeZone } from "../lib/timezone";
 import { UserProfileModel } from "../models";
 import { getHome } from "./home.service";
 import { buildPepSideEffectTip } from "./pepSideEffectTips.service";
@@ -141,14 +142,26 @@ async function defaultGenerateCopy({
   return response.output_text ?? null;
 }
 
-function dateOnly(value: Date): string {
+/**
+ * The calendar day a daily nudge belongs to, IN THE USER'S ZONE.
+ *
+ * windowKey is what stops a nudge repeating within its day, and the totals it
+ * judges are measured over the user's local day. On a UTC key the two
+ * disagreed: a US-Eastern user's window rolled over at 8pm local, so an
+ * evening protein nudge could fire again on what the server considered a new
+ * day while the user was still in the same one.
+ */
+function dateOnly(value: Date, timeZone?: string): string {
+  if (timeZone && isValidTimeZone(timeZone)) {
+    return dateOnlyInTz(value, timeZone);
+  }
   return value.toISOString().slice(0, 10);
 }
 
-function windowDate(value: string | Date): string {
+function windowDate(value: string | Date, timeZone?: string): string {
   const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) return dateOnly(new Date());
-  return dateOnly(date);
+  if (Number.isNaN(date.getTime())) return dateOnly(new Date(), timeZone);
+  return dateOnly(date, timeZone);
 }
 
 function asDateMs(value: string | Date | undefined): number {
@@ -157,8 +170,8 @@ function asDateMs(value: string | Date | undefined): number {
   return date.getTime();
 }
 
-function isToday(iso: string, now: Date): boolean {
-  return windowDate(iso) === dateOnly(now);
+function isToday(iso: string, now: Date, timeZone?: string): boolean {
+  return windowDate(iso, timeZone) === dateOnly(now, timeZone);
 }
 
 function hoursBetween(later: Date, earlier: string | Date): number {
@@ -213,7 +226,7 @@ function selectSideEffectCandidate(
     priorityId,
     importance: tip.clinicianPrompt || importantSupport ? "high" : "normal",
     pushEligible: tip.clinicianPrompt || importantSupport,
-    windowKey: `${priorityId}:${windowDate(latest.when)}`,
+    windowKey: `${priorityId}:${windowDate(latest.when, context.timezone)}`,
     fallback: {
       title: tip.clinicianPrompt
         ? "Pep: symptom safety check"
@@ -344,7 +357,7 @@ export function selectPepPushCandidate(
       priorityId: "dose_due",
       importance: "high",
       pushEligible: true,
-      windowKey: `dose_due:${windowDate(context.nextDose.nextDoseAt)}`,
+      windowKey: `dose_due:${windowDate(context.nextDose.nextDoseAt, context.timezone)}`,
       fallback: {
         title: `Pep: ${doseNoun(context.nextDose.route)} time`,
         body: `I have ${context.nextDose.compoundName} on the board. Log it when it's done and I'll keep the cycle lined up.`,
@@ -361,7 +374,7 @@ export function selectPepPushCandidate(
         priorityId: "post_dose_checkin",
         importance: "high",
         pushEligible: true,
-        windowKey: `post_dose_checkin:${windowDate(lastDose.when)}`,
+        windowKey: `post_dose_checkin:${windowDate(lastDose.when, context.timezone)}`,
         fallback: {
           title: `Pep: post-${doseNoun(lastDose.route)} check-in`,
           body: "Quick check for me: appetite, side effects, water, and protein while this dose settles in.",
@@ -383,7 +396,7 @@ export function selectPepPushCandidate(
       priorityId: "protein_anchor",
       importance: "high",
       pushEligible: true,
-      windowKey: `protein_anchor:${dateOnly(now)}`,
+      windowKey: `protein_anchor:${dateOnly(now, context.timezone)}`,
       fallback: {
         title: "Pep: protein checkpoint",
         body: `You're ${Math.round(proteinGap)}g from today's protein target. Put protein first on the next meal.`,
@@ -402,7 +415,7 @@ export function selectPepPushCandidate(
       priorityId: "hydration_check",
       importance: "normal",
       pushEligible: false,
-      windowKey: `hydration_check:${dateOnly(now)}`,
+      windowKey: `hydration_check:${dateOnly(now, context.timezone)}`,
       fallback: {
         title: "Pep: water + fiber check",
         body: "Water and fiber check. Small, boring, useful. My favorite category.",
@@ -411,12 +424,15 @@ export function selectPepPushCandidate(
     };
   }
 
-  if (!lastDose && !context.recentMeals.some((meal) => isToday(meal.when, now))) {
+  if (
+    !lastDose &&
+    !context.recentMeals.some((meal) => isToday(meal.when, now, context.timezone))
+  ) {
     return {
       priorityId: "trend_review",
       importance: "normal",
       pushEligible: false,
-      windowKey: `trend_review:${dateOnly(now)}`,
+      windowKey: `trend_review:${dateOnly(now, context.timezone)}`,
       fallback: {
         title: "Pep: quick setup",
         body: "A dose, meal, water, or weight log gives me enough signal to stay useful with you.",

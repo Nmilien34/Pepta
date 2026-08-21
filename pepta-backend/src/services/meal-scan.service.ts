@@ -11,6 +11,7 @@ import {
 } from "@pepta/shared";
 import { isValidObjectId } from "mongoose";
 import { startOfUtcWeek } from "../lib/dates";
+import { withDeadline } from "../lib/deadline";
 import { parseHomeTimezone, resolveHomeWindow } from "../lib/homeRange";
 import { addDaysDateOnly, dateOnlyInTz, dayOfWeekOf, zonedTimeToUtc } from "../lib/timezone";
 import { AppError, NotFoundError } from "../lib/errors";
@@ -49,6 +50,9 @@ import {
 } from "./product-scan-vision.service";
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+// The note is optional garnish with a deterministic fallback; it must not
+// push the scan past the app's own request abort.
+const MEAL_SCAN_NOTE_DEADLINE_MS = 3_000;
 const MEAL_SCAN_COACH_COPY_VERSION = "meal-scan-coach-v1";
 const MIN_PROTEIN_AFFIRMATION_GRAMS = 25;
 
@@ -281,20 +285,22 @@ async function resolveTrackerNote(input: {
   snapshot: MealScanProteinSnapshot;
   biggestWorry?: string;
 }): Promise<string> {
-  try {
-    const generated = await generateMealScanNote(
-      input.analysis,
-      input.snapshot,
-      {
-        biggestWorry: input.biggestWorry,
-      },
-    );
+  // The note is the garnish on the scan, and a deterministic version of it
+  // already exists — so it gets a hard deadline. Without one it could spend
+  // its own timeout (times the SDK's retries) on top of the vision call and
+  // push the whole scan past the app's 15s abort, losing the user a result
+  // the server had already computed.
+  const generated = await withDeadline(
+    generateMealScanNote(input.analysis, input.snapshot, {
+      biggestWorry: input.biggestWorry,
+    }),
+    MEAL_SCAN_NOTE_DEADLINE_MS,
+    null,
+    () => logger.warn("[meal-scan] note generation exceeded its deadline"),
+  );
 
-    if (generated) {
-      return generated;
-    }
-  } catch (error) {
-    logger.warn({ error }, "[meal-scan] note generation failed");
+  if (generated) {
+    return generated;
   }
 
   return fallbackNote(input.analysis, input.snapshot);
