@@ -95,7 +95,17 @@ export function doseCtaState({
   // deletedAt is the only delete this app performs. Counting a deleted dose
   // would leave someone who logged one shot and removed it stuck with a card
   // that neither beats nor offers the button.
-  const live = (doseLogs ?? []).filter((dose) => dose.deletedAt == null);
+  // NULL IS "NOT LOADED", NOT "NONE". Track hydrates after the first paint, so
+  // treating null as an empty list made every returning user's button beat on
+  // each cold launch until it arrived — and the frame is explicit that the
+  // heartbeat teaches the FIRST dose and "a returning user's Home never
+  // twitches". Same guard the schedules === null case already has, a few lines
+  // down; this was its missing twin.
+  if (doseLogs === null) {
+    return { show: true, pulse: false, reason: 'schedule-unknown' };
+  }
+
+  const live = doseLogs.filter((dose) => dose.deletedAt == null);
 
   if (live.length === 0) {
     return { show: true, pulse: true, reason: 'first-dose' };

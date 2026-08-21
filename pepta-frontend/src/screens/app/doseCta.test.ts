@@ -291,14 +291,26 @@ describe('it only hides on positive knowledge', () => {
     expect(state.reason).toBe('schedule-unknown');
   });
 
-  it('handles a null dose list as a brand-new user', () => {
+  it('treats a null dose list as NOT LOADED, not as a brand-new user', () => {
+    // Changed 2026-08-21. This asserted 'first-dose', which meant every
+    // returning user's Log-a-shot button beat on every cold launch for as long
+    // as Track took to hydrate — and the frame is explicit that the heartbeat
+    // teaches the FIRST dose only, because "a returning user's Home never
+    // twitches".
+    //
+    // The trade is asymmetric: the old way twitched at everyone with doses,
+    // every launch; the new way starts a genuinely new user's beat a moment
+    // later, once doseLogs resolves to [] and first-dose fires properly.
     const state = doseCtaState({
       schedules: null,
       cycles: null,
       doseLogs: null,
       today: day('2026-08-25'),
     });
-    expect(state.reason).toBe('first-dose');
+    expect(state.reason).toBe('schedule-unknown');
+    expect(state.pulse).toBe(false);
+    // Still offered — not knowing must never take the action away.
+    expect(state.show).toBe(true);
   });
 });
 

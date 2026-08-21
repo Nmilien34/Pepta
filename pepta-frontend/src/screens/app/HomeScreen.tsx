@@ -427,7 +427,7 @@ export function HomeScreen() {
               <Card>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 }}>
-                    <Icon name="needle" size={18} color={theme.colors.primary} />
+                    <CardIcon name="needle" color={theme.colors.primary} />
                     <AppText variant="cardTitle" style={{ fontSize: 15 }} numberOfLines={1}>
                       Medication Level
                     </AppText>
@@ -484,7 +484,7 @@ export function HomeScreen() {
               <Card>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 }}>
-                    <Icon name="needle" size={18} color={theme.colors.primary} />
+                    <CardIcon name="needle" color={theme.colors.primary} />
                     <AppText variant="cardTitle" style={{ fontSize: 15 }} numberOfLines={1}>
                       Medication Level
                     </AppText>
@@ -784,9 +784,7 @@ function DoseCtaSection({
         accessibilityLabel={label}
         style={({ pressed }) => ({
           flexDirection: 'row',
-          alignItems: 'center',
           justifyContent: 'center',
-          gap: 5,
           marginTop: 12,
           paddingTop: 9,
           borderTopWidth: 0.5,
@@ -794,10 +792,26 @@ function DoseCtaSection({
           opacity: pressed ? 0.6 : 1,
         })}
       >
-        <Icon name="chevron-down" size={13} color={theme.colors.primary} />
-        <AppText variant="caption" style={{ fontSize: 10.5, fontWeight: '700', color: theme.colors.primary }}>
-          {label}
-        </AppText>
+        {/* The SAME quiet pill as Close, not bare purple text. Collapsed, this
+            is a way back to an action the user has already dismissed — the
+            frame keeps it in --alt/--ts so it reads as a handle rather than
+            competing with the level reading directly above it. */}
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 5,
+            paddingVertical: 3,
+            paddingHorizontal: 12,
+            borderRadius: theme.radii.pill,
+            backgroundColor: theme.colors.surfaceAlt,
+          }}
+        >
+          <Icon name="chevron-down" size={13} color={theme.colors.textSecondary} />
+          <AppText variant="caption" color="textSecondary" style={{ fontSize: 10.5, fontWeight: '700' }}>
+            {label}
+          </AppText>
+        </View>
       </Pressable>
     );
   }
