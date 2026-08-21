@@ -1313,7 +1313,11 @@ function HomeWeightPulseCard({
               box), radius 11, on the icon's OWN colour at 13% —
               color-mix(in srgb, currentColor 13%, transparent). A bare glyph
               left the title row visibly lighter than every other card header. */}
-<CardIcon name="scale" color={theme.colors.weight} stroke={2.4} />
+          {/* PRIMARY, not --weight. All three Home frames write
+              `color:var(--primary)` on this chip and on the reading below,
+              while Progress keeps its weight cards on --weight. Home's weight
+              card is the medication story's companion, not a Progress card. */}
+          <CardIcon name="scale" color={theme.colors.primary} stroke={2.4} />
           <AppText variant="cardTitle" style={{ fontSize: 15.5 }}>
             Weight
           </AppText>
@@ -1341,7 +1345,7 @@ function HomeWeightPulseCard({
             accent) against `.unit` (15px/700, secondary). Rendering
             "199.5 lb" as one string made the unit shout as loudly as the
             reading, which is the one thing on this card that matters. */}
-        <AppText variant="cardTitle" style={{ fontSize: 26, letterSpacing: -0.6, color: theme.colors.weight }}>
+        <AppText variant="cardTitle" style={{ fontSize: 26, letterSpacing: -0.6, color: theme.colors.primary }}>
           {hasWeight && goal ? String(goal.value) : '—'}
           <AppText variant="cardTitle" style={{ fontSize: 15, color: theme.colors.textSecondary }}>
             {hasWeight && goal ? ` ${goal.unit}` : ''}

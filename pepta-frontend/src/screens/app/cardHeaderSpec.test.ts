@@ -23,6 +23,12 @@ const SRC = join(__dirname, '..', '..');
 
 const read = (rel: string) => readFileSync(join(SRC, rel), 'utf8');
 
+// ONE SUBTLETY, settled against the frames rather than guessed: Home's Weight
+// card is tinted `--primary`, while Progress's "Weight (lbs)", "To goal" and
+// "Timeline" are tinted `--weight`. This file used to pin Home's as --weight,
+// which contradicted all three Home frames. It is not a blanket rule either
+// way — check the frame for the SCREEN, not just the metric.
+
 /** Headers the hub chips, and the accent it tints each with. */
 const CHIPPED: Array<[file: string, icon: string, token: string]> = [
   ['components/ActivityFeedCard.tsx', 'history', 'textSecondary'],
@@ -33,7 +39,7 @@ const CHIPPED: Array<[file: string, icon: string, token: string]> = [
   ['screens/app/HomeScreen.tsx', 'leaf', 'fiber'],
   ['screens/app/HomeScreen.tsx', 'water', 'water'],
   ['screens/app/HomeScreen.tsx', 'restaurant', 'protein'],
-  ['screens/app/HomeScreen.tsx', 'scale', 'weight'],
+  ['screens/app/HomeScreen.tsx', 'scale', 'primary'],
   ['screens/app/ProgressScreen.tsx', 'heart-pulse', 'primary'],
   ['screens/app/ProgressScreen.tsx', 'shield-check', 'fiber'],
   ['screens/app/ProgressScreen.tsx', 'nutrition', 'fiber'],

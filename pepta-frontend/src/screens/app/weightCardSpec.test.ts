@@ -68,6 +68,16 @@ describe('the weight card matches the frame', () => {
     // size made "lb" shout as loudly as the number.
     expect(card).toContain('fontSize: 26');
     expect(card).toContain('fontSize: 15, color: theme.colors.textSecondary');
+  });
+
+  it('sets the reading in --primary, the accent all three Home frames give it', () => {
+    // This was --weight pink and NOTHING pinned it, which is exactly how it
+    // drifted. The frames write `color:var(--primary)` on both this reading
+    // and the header chip. Note it is not a blanket rule for the metric:
+    // Progress's "Weight (lbs)", "To goal" and "Timeline" ARE --weight. The
+    // accent follows the screen, not the number.
+    expect(card).toContain('fontSize: 26, letterSpacing: -0.6, color: theme.colors.primary');
+    expect(card).not.toContain('letterSpacing: -0.6, color: theme.colors.weight');
     // latestLabel survives as the null-check; what must not come back is the
     // combined string being RENDERED at one size.
     expect(card).not.toContain('{hasWeight ? pulse.latestLabel');
