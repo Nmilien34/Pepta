@@ -1069,6 +1069,11 @@ function WaterCard({
 // The halo behind the "now" dot and the card's corner glow. Derived from the
 // one accent so they cannot drift apart.
 const WEIGHT_GLOW = 'rgba(124,92,252,0.08)';
+// The `.ic` chip: the icon's own colour at 13%, per the frame.
+const WEIGHT_CHIP = 'rgba(124,92,252,0.13)';
+// The frame's Log-weight label. Its own grey, not a theme token: the button
+// sits on --alt and the text is deliberately quieter than textSecondary.
+const LOGCTA_TEXT = '#5E636E';
 const ACTIVITY_WASH = 'rgba(255,107,90,0.10)';
 
 /**
@@ -1239,8 +1244,22 @@ function HomeWeightPulseCard({
           only thing actually being reported — into a corner. */}
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Icon name="scale" size={17} color={theme.colors.weight} stroke={2.4} />
-          <AppText variant="cardTitle" style={{ fontSize: 15 }}>
+          {/* The frame's `.ic` chip: an 18px glyph in 8.5px of padding (a 35pt
+              box), radius 11, on the icon's OWN colour at 13% —
+              color-mix(in srgb, currentColor 13%, transparent). A bare glyph
+              left the title row visibly lighter than every other card header. */}
+          <View
+            style={{
+              padding: 8.5,
+              borderRadius: 11,
+              backgroundColor: WEIGHT_CHIP,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Icon name="scale" size={18} color={theme.colors.weight} stroke={2.4} />
+          </View>
+          <AppText variant="cardTitle" style={{ fontSize: 15.5 }}>
             Weight
           </AppText>
         </View>
@@ -1263,10 +1282,17 @@ function HomeWeightPulseCard({
       {/* The reading, then when it was taken. A dash rather than a blank: the
           card keeps its shape and reads as waiting, not broken. */}
       <View style={{ marginTop: 12 }}>
-        <AppText variant="statMedium" style={{ color: theme.colors.weight }}>
-          {hasWeight ? pulse.latestLabel : '—'}
+        {/* NUMBER AND UNIT ARE DIFFERENT SIZES — the frame's `.big` (26px/800,
+            accent) against `.unit` (15px/700, secondary). Rendering
+            "199.5 lb" as one string made the unit shout as loudly as the
+            reading, which is the one thing on this card that matters. */}
+        <AppText variant="cardTitle" style={{ fontSize: 26, letterSpacing: -0.6, color: theme.colors.weight }}>
+          {hasWeight && goal ? String(goal.value) : '—'}
+          <AppText variant="cardTitle" style={{ fontSize: 15, color: theme.colors.textSecondary }}>
+            {hasWeight && goal ? ` ${goal.unit}` : ''}
+          </AppText>
         </AppText>
-        <AppText variant="caption" color="textTertiary" style={{ marginTop: 6, fontSize: 11 }}>
+        <AppText variant="caption" color="textSecondary" style={{ marginTop: 6, fontSize: 12.5 }}>
           {hasWeight && goal ? `Last check ${goal.dateLabel}` : 'No weigh-in yet'}
         </AppText>
       </View>
@@ -1286,14 +1312,14 @@ function HomeWeightPulseCard({
           alignItems: 'center',
           justifyContent: 'center',
           gap: 7,
-          paddingVertical: 12,
+          height: 44,
           borderRadius: theme.radii.pill,
           backgroundColor: theme.colors.surfaceAlt,
           opacity: pressed ? 0.72 : 1,
         })}
       >
-        <Icon name="add" size={15} color={theme.colors.textSecondary} stroke={2.6} />
-        <AppText variant="caption" color="textSecondary" style={{ fontWeight: '700' }}>
+        <Icon name="add" size={15} color={LOGCTA_TEXT} stroke={2.6} />
+        <AppText variant="caption" style={{ color: LOGCTA_TEXT, fontWeight: '800', fontSize: 14 }}>
           {pulse.actionLabel}
         </AppText>
       </Pressable>

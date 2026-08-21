@@ -52,6 +52,30 @@ describe('the weight card matches the frame', () => {
   it('drops the encouragement line the frame never had', () => {
     expect(card).not.toContain('No pressure');
   });
+
+  it('gives the icon the frame\'s .ic chip, not a bare glyph', () => {
+    // .ch svg.ic { padding:8.5px; border-radius:11px;
+    //              background: color-mix(in srgb, currentColor 13%, transparent) }
+    // A bare glyph left this title row visibly lighter than every other card.
+    expect(card).toContain('padding: 8.5');
+    expect(card).toContain('borderRadius: 11');
+    expect(card).toContain('WEIGHT_CHIP');
+  });
+
+  it('sizes the unit below the reading, not equal to it', () => {
+    // .big is 26px/800 accent; .unit is 15px/700 secondary. One string at one
+    // size made "lb" shout as loudly as the number.
+    expect(card).toContain('fontSize: 26');
+    expect(card).toContain('fontSize: 15, color: theme.colors.textSecondary');
+    // latestLabel survives as the null-check; what must not come back is the
+    // combined string being RENDERED at one size.
+    expect(card).not.toContain('{hasWeight ? pulse.latestLabel');
+  });
+
+  it('uses the frame\'s button metrics', () => {
+    expect(card).toContain('height: 44');
+    expect(card).toContain('LOGCTA_TEXT');
+  });
 });
 
 describe('the milestone track matches the frame', () => {
