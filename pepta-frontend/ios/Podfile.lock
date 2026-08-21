@@ -2461,7 +2461,7 @@ DEPENDENCIES:
   - RNReanimated (from `../../node_modules/react-native-reanimated`)
   - RNScreens (from `../../node_modules/react-native-screens`)
   - RNSVG (from `../../node_modules/react-native-svg`)
-  - RNWorklets (from `../node_modules/react-native-worklets`)
+  - RNWorklets (from `../../node_modules/react-native-worklets`)
   - Yoga (from `../../node_modules/react-native/ReactCommon/yoga`)
 
 SPEC REPOS:
@@ -2692,7 +2692,7 @@ EXTERNAL SOURCES:
   RNSVG:
     :path: "../../node_modules/react-native-svg"
   RNWorklets:
-    :path: "../node_modules/react-native-worklets"
+    :path: "../../node_modules/react-native-worklets"
   Yoga:
     :path: "../../node_modules/react-native/ReactCommon/yoga"
 
@@ -2811,10 +2811,10 @@ SPEC CHECKSUMS:
   RNGestureHandler: c3831b3b1b5014c6afab7fff7e4171394a3419ab
   RNGoogleSignin: 4590097b5c265e55e01bf2e824e0f5f5f66d2dfd
   RNPurchases: 3138a73091d78c9ddaa86a405488cd9b5f8404e7
-  RNReanimated: bb5f60b2bfe29a986bdde3534c11bae51d74821f
+  RNReanimated: bf51e66775b0e530ad55f4c935be93ec62d06780
   RNScreens: 33bbd1d0f86ed957557620dc94054b71db0a94ee
   RNSVG: ac3047fdd9c0ebac9d0b731a352bddf216af6242
-  RNWorklets: af0b0e53c3e1e2264a18b50e5625ed80fd38250f
+  RNWorklets: 6b5df411fbf69d3ee19013030f2db4c04180472f
   Yoga: 65431d43277b661ebc7289c6c5d82f64ce42cfe0
   ZXingObjC: 8898711ab495761b2dbbdec76d90164a6d7e14c5
 

@@ -38,6 +38,69 @@ else
   ok "every autolinked Expo module has its pod in Podfile.lock"
 fi
 
+# THE GAP THAT SHIPPED BUILD 35 BROKEN (2026-08-21).
+#
+# A pod being PRESENT is not the same as it being the SAME VERSION as the JS
+# Metro bundles. Build 35 carried react-native-worklets 0.8.3 in the bundle —
+# reanimated resolves it from the repo root — while RNWorklets compiled from a
+# nested 0.5.1. Mismatched TurboModule ABI: NativeWorklets threw "Exception in
+# HostFunction" the instant it initialised, expo-updates' ErrorRecovery had no
+# cached update to fall back to, and the app aborted 0.7s into launch. Every
+# other gate passed: the pod existed, Pods matched Podfile.lock, tsc and lint
+# were clean, and 1689 tests passed because tests mock native modules.
+#
+# Resolution is done FROM THE PACKAGE THAT IMPORTS IT, not from the app — that
+# distinction is the whole bug, and checking it the easy way reproduces it.
+say "1b/7 native pod versions == resolved JS versions"
+drift=$(python3 - <<'PY'
+import json, os, re, subprocess, sys
+
+lock = open("ios/Podfile.lock").read()
+# "  - RNWorklets (0.5.1):"  → {pod: version}
+locked = dict(re.findall(r"^  - ([A-Za-z0-9_+-]+) \(([0-9][^)]*)\):", lock, re.M))
+# "  - RNWorklets (from <backtick>../../node_modules/react-native-worklets<backtick>)"
+# The backticks are written as \x60: this python lives inside a $( ) command
+# substitution, and a literal backtick there is a nested substitution to bash.
+sources = dict(re.findall(r"^  - ([A-Za-z0-9_+-]+) \(from \x60([^\x60]+)\x60\)", lock, re.M))
+
+drift = []
+for pod, path in sources.items():
+    if "node_modules/" not in path:
+        continue
+    pkg_dir = os.path.normpath(os.path.join("ios", path))
+    pkg_json = os.path.join(pkg_dir, "package.json")
+    if not os.path.exists(pkg_json):
+        continue
+    try:
+        pkg = json.load(open(pkg_json))
+    except Exception:
+        continue
+    name, native = pkg.get("name"), locked.get(pod)
+    if not name or not native:
+        continue
+    # What Node/Metro ACTUALLY resolves for this package name, from the app.
+    try:
+        resolved_path = subprocess.check_output(
+            ["node", "-e",
+             "process.stdout.write(require.resolve(process.argv[1]+'/package.json',"
+             "{paths:[process.cwd()]}))", name],
+            stderr=subprocess.DEVNULL, text=True,
+        ).strip()
+        js = json.load(open(resolved_path)).get("version")
+    except Exception:
+        continue
+    if js and js != native:
+        drift.append(f"{name}: pod {native} (from {path}) != bundled JS {js} (at {resolved_path})")
+print("\n".join(drift))
+PY
+)
+if [ -n "$drift" ]; then
+  bad "native/JS version drift — the binary and the bundle disagree (run: npm dedupe && cd ios && pod install):"
+  say "$drift"
+else
+  ok "every locally-sourced pod matches the JS version Metro will bundle"
+fi
+
 say "2/7 Pods in sync with lockfile"
 if [ -f ios/Pods/Manifest.lock ] && diff -q ios/Podfile.lock ios/Pods/Manifest.lock >/dev/null 2>&1; then
   ok "ios/Pods matches Podfile.lock"
