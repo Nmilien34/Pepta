@@ -368,18 +368,20 @@ export function buildActivityFeed({
   const ordered = [...byDay.entries()].sort(([left], [right]) => (left < right ? 1 : -1));
   const selected = ordered.slice(0, maxDays);
 
-  // THE DOSE IS THIS APP'S ANCHOR, so it is never allowed to fall off the end.
-  // A weekly injector who logs water daily fills the window with habit logs
-  // and pushes their last shot out of it entirely — rows of water and no
-  // dose, where the doses-only card this replaced
-  // would have shown their last eight. When the window contains no dose, the
-  // most recent dose day is appended (it is older, so it stays last).
-  const hasDose = (day: [string, ActivityEntry[]]) =>
-    day[1].some((entry) => entry.kind === 'dose');
-  if (!selected.some(hasDose)) {
-    const mostRecentDoseDay = ordered.find(hasDose);
-    if (mostRecentDoseDay) selected.push(mostRecentDoseDay);
-  }
+  // NO DOSE RESCUE. This used to append the most recent dose day whenever the
+  // window held none, on the reasoning that "the dose is this app's anchor"
+  // and a weekly injector logging water daily would never see a shot here.
+  //
+  // That was written when this card replaced a doses-only "Dose history" five
+  // cards down. It is no longer true of the screen: slot 1 on Track — the card
+  // DIRECTLY ABOVE this one — is the medication card, with the level ring, the
+  // next dose and the week strip. The shot is the most prominent thing on the
+  // screen before this card is reached.
+  //
+  // So the rescue bought nothing and cost the one thing the card is for: at
+  // two days it silently made three, which is exactly the length complaint it
+  // was supposed to be exempt from. Everything older is one tap away in
+  // See all.
 
   return selected
     .map(([date, dayEntries]) => ({

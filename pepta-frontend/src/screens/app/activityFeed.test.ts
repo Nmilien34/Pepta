@@ -132,9 +132,18 @@ describe('grouping and order', () => {
     expect(feed[0]!.label).toBe('Today');
   });
 
-  it('still rescues the last dose when neither day holds one', () => {
-    // The anchor rule matters MORE at two days than at three: a weekly
-    // injector logging water daily would otherwise never see a shot on Track.
+  it('shows TWO days even when neither holds a dose', () => {
+    // REVERSED DELIBERATELY, an hour after the opposite was asserted here.
+    // The feed used to append the most recent dose day whenever the window
+    // held none — "the dose is this app's anchor". That rule dates from when
+    // this card replaced a doses-only "Dose history" five cards down.
+    //
+    // It is no longer true of the screen. Slot 1 on Track, the card directly
+    // above this one, is the medication card: level ring, next dose, week
+    // strip. The shot is the most prominent thing on the screen before this
+    // card is reached, so the rescue protected nothing and quietly turned two
+    // days into three — the exact length problem the two-day cap exists to
+    // fix, in the exact case a habit-logger hits every day.
     const waterLogs = [
       { id: 'a', amountOz: 8, datetime: at(13, 9), deletedAt: null },
       { id: 'b', amountOz: 8, datetime: at(12, 9), deletedAt: null },
@@ -148,9 +157,8 @@ describe('grouping and order', () => {
       track: track({ waterLogs, doseLogs } as never),
     });
 
-    // Two days plus the rescued dose day, which stays last because it is older.
-    expect(feed).toHaveLength(3);
-    expect(feed[2]!.entries.some((entry) => entry.kind === 'dose')).toBe(true);
+    expect(feed).toHaveLength(2);
+    expect(feed.some((day) => day.entries.some((entry) => entry.kind === 'dose'))).toBe(false);
   });
 
   it('groups on the LOCAL day — a late-evening log is not filed under tomorrow', () => {
@@ -187,10 +195,18 @@ describe('route awareness', () => {
   });
 });
 
-describe('the dose never falls off the end', () => {
-  it('keeps the last dose visible for a weekly injector who logs daily habits', () => {
-    // Regression: three days of water filled the window and the shot from five
-    // days ago vanished — worse than the doses-only card this replaced.
+describe('the window is the window — an old dose does not reopen it', () => {
+  it('does NOT drag a five-day-old shot into a two-day card', () => {
+    // This asserted the opposite until the card was cut to two days. The rule
+    // it defended ("the dose is this app's anchor") was written when this card
+    // replaced a doses-only "Dose history" five cards down, so losing the shot
+    // here meant losing it entirely.
+    //
+    // That stopped being true: slot 1 on Track is the medication card — level
+    // ring, next dose, week strip — directly above this one. The shot is the
+    // most prominent thing on the screen. Meanwhile the rescue turned every
+    // habit-logger's two-day card into three, which is the whole reason the
+    // cap was tightened. See all still holds everything.
     const feed = buildActivityFeed({
       home: home(),
       now: NOW,
@@ -199,10 +215,9 @@ describe('the dose never falls off the end', () => {
         waterLogs: [11, 12, 13].map((d) => ({ id: `w${d}`, amountOz: 64, datetime: at(d, 9), deletedAt: null })),
       }),
     });
-    const kinds = feed.flatMap((day) => day.entries.map((entry) => entry.kind));
-    expect(kinds).toContain('dose');
-    // Appended, not promoted: recency order is preserved.
-    expect(feed[feed.length - 1]!.entries.some((e) => e.kind === 'dose')).toBe(true);
+
+    expect(feed).toHaveLength(2);
+    expect(feed.flatMap((day) => day.entries.map((entry) => entry.kind))).not.toContain('dose');
   });
 
   it('does not append a duplicate when a dose is already in the window', () => {
