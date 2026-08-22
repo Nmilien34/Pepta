@@ -120,3 +120,36 @@ describe('recipe copy never promises what the recipe path refuses to do', () => 
     expect(source).toContain('const intent: SheetIntent = keepAsRecipe ? "recipe" : "meal"');
   });
 });
+
+describe('the search view is a tall anchored sheet', () => {
+  // Two bugs meet on this view.
+  //
+  // Keyboard avoidance is OFF for search, and that is deliberate: with it on,
+  // the sheet lifted by the keyboard's full height and pushed the back button
+  // under the status area. MealLogSheet.test.tsx pins that.
+  //
+  // But it also had NO height, so it was content-sized at bottom:0 — and a
+  // ~340pt keyboard covered the whole sheet. A dimmed screen, a keyboard, and
+  // nothing else. That is the state reached from New recipe -> Search foods.
+  //
+  // The height is what reconciles them: a tall anchored sheet keeps the
+  // autofocused input near its top, clear of the keyboard, with the results
+  // scrolling underneath. Nothing moves, so nothing is pushed off the top.
+  // Fixing either half alone just swaps one defect for the other.
+
+  it('gives search a fixed height, not a content-sized sheet', () => {
+    expect(stripComments(source)).toContain(
+      'height={view === "chooser" || view === "search" ? "84%" : undefined}',
+    );
+  });
+
+  it('keeps avoidance off for search — the back button must stay put', () => {
+    expect(stripComments(source)).toContain('avoidKeyboard={view !== "search"}');
+  });
+
+  it('still autofocuses the search input — the reason the height matters', () => {
+    // If the autoFocus goes, re-read the coupling above rather than assuming
+    // the constraint went with it.
+    expect(source).toContain('autoFocus');
+  });
+});

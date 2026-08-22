@@ -601,6 +601,19 @@ export function MealLogSheet({
 
   return (
     <>
+      {/* SEARCH GETS A FIXED HEIGHT, like the chooser.
+          Two bugs meet on this view, and the height is what settles them. Its
+          input autoFocuses, so the keyboard is always up.
+            - With keyboard avoidance ON, the sheet lifted by the keyboard's
+              full height and pushed the back button under the status area.
+              That is why it is off here, and there is a test for it.
+            - With it OFF and NO height, the sheet is content-sized at
+              bottom:0, so a ~340pt keyboard covered the entire thing — a
+              dimmed screen, a keyboard, and no sheet at all. Reached from
+              New recipe -> Search foods.
+          A tall anchored sheet has neither problem: the input sits near its
+          top, well clear of the keyboard, and the results scroll underneath.
+          Nothing moves, so nothing can be pushed off the top. */}
       <BottomSheet
         visible={
           visible &&
@@ -623,7 +636,7 @@ export function MealLogSheet({
             onDismissed?.();
           }
         }}
-        height={view === "chooser" ? "84%" : undefined}
+        height={view === "chooser" || view === "search" ? "84%" : undefined}
         avoidKeyboard={view !== "search"}
         scrollable
       >
