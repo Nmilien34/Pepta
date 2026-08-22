@@ -1187,10 +1187,16 @@ function WaterCard({
           </AppText>
         </View>
         <View style={{ alignItems: 'center', marginVertical: 6 }}>
+          {/* NO TOTAL LINE. This rendered `/ 100 oz` with nothing before the
+              slash — a denominator on its own, which reads as a number that
+              failed to load. It was never right: the numerator has been
+              missing since the card was written.
+              The frame's water card is header, glass, stepper — and the glass
+              holds the only number, because its FILL already says how far
+              through the target you are. Its three sibling cards print
+              "0 / 30 g" and the like precisely because they have no vessel to
+              show it with. */}
           <WaterCup value={stat.current} target={stat.target} color={theme.colors.water} size={120} />
-          <AppText variant="caption" color="textTertiary" style={{ fontSize: 11, marginTop: 2 }}>
-            {stat.target ? `/ ${stat.target} oz` : ''}
-          </AppText>
         </View>
       </Pressable>
       <Stepper label="8 oz" color={theme.colors.water} onMinus={onMinus} onPlus={onPlus} />

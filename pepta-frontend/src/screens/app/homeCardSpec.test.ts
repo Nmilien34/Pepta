@@ -237,3 +237,35 @@ describe('the resistance row leads with its glyph', () => {
     );
   });
 });
+
+describe('the water card has no orphaned denominator', () => {
+  // It printed "/ 100 oz" with nothing before the slash — a fraction missing
+  // its numerator, which on a screen full of "0 / 30 g" siblings reads as a
+  // number that failed to load. It had been that way since the card was
+  // written; nothing ever rendered the current value there.
+  //
+  // The frame's water card is header, glass, stepper. The glass carries the
+  // only number, because its FILL already shows how far through the target
+  // you are — the siblings print their totals precisely because they have no
+  // vessel to show it with.
+  const water = (() => {
+    const start = home.indexOf('function WaterCard');
+    expect(start).toBeGreaterThan(-1);
+    return home.slice(start, home.indexOf('\nfunction ', start + 10));
+  })();
+
+  it('prints no bare "/ target" line under the glass', () => {
+    expect(water).not.toContain('` / ${stat.target} oz`');
+    expect(water).not.toMatch(/\/ \$\{stat\.target\}/);
+  });
+
+  it('still hands the glass both the value and the target', () => {
+    // The target did not stop mattering — it sets the fill level. Losing it
+    // here would leave a glass that never fills.
+    expect(water).toContain('<WaterCup value={stat.current} target={stat.target}');
+  });
+
+  it('keeps the stepper, which is the only other control on the card', () => {
+    expect(water).toContain('<Stepper label="8 oz"');
+  });
+});
