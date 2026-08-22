@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RecipeInput, RecipeResponse } from '@pepta/shared';
 import { api } from '../../services/api';
+import { useLogSheets } from '../../context/LogSheetsContext';
 
 export function useRecipes(): {
   recipes: RecipeResponse[];
@@ -20,6 +21,12 @@ export function useRecipes(): {
   const [starters, setStarters] = useState<RecipeResponse[]>([]);
   const [hydrated, setHydrated] = useState(false);
   const alive = useRef(true);
+  // Recipes are created inside the meal sheet, which is mounted ABOVE the
+  // navigator — so this screen never loses focus while it is open and no focus
+  // effect fires when it closes. Without this the list kept showing the state
+  // from before the save, and the new recipe only appeared after navigating
+  // away and back, which reads as "it did not save".
+  const { recipesRevision } = useLogSheets();
   const mineRef = useRef<RecipeResponse[]>([]);
 
   const setMine = useCallback((next: RecipeResponse[]) => {
@@ -45,7 +52,7 @@ export function useRecipes(): {
     return () => {
       alive.current = false;
     };
-  }, [setMine]);
+  }, [setMine, recipesRevision]);
 
   const saveAsMine = useCallback(
     (input: RecipeInput) => {

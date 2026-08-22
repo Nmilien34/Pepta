@@ -32,6 +32,8 @@ export interface RecipeReviewViewProps {
   onRemove(index: number): void;
   confidence: number;
   saving: boolean;
+  /** The last save was rejected — say so instead of closing as if it worked. */
+  failed?: boolean;
   onSave(): void;
 }
 
@@ -44,6 +46,7 @@ export function RecipeReviewView({
   confidence,
   saving,
   onSave,
+  failed = false,
 }: RecipeReviewViewProps) {
   const totals = recipeTotals(ingredients);
 
@@ -145,9 +148,32 @@ export function RecipeReviewView({
         ) : null}
       </View>
 
+      {/* A REJECTED SAVE SAYS SO. The sheet used to swallow the failure and
+          close exactly as it does on success, so the only difference a user
+          could see was a recipe missing from a list that does not refresh —
+          i.e. none at all. The sheet stays open so the tap can be retried
+          without re-describing the food. */}
+      {failed ? (
+        <View
+          style={{
+            marginTop: 12,
+            backgroundColor: theme.colors.surfaceAlt,
+            borderRadius: theme.radii.card,
+            padding: 12,
+          }}
+        >
+          <AppText variant="caption" style={{ color: theme.colors.danger, fontWeight: '700' }}>
+            That didn’t save
+          </AppText>
+          <AppText variant="caption" color="textSecondary" style={{ marginTop: 3, lineHeight: 16 }}>
+            Your recipe is still here — tap Save recipe to try again.
+          </AppText>
+        </View>
+      ) : null}
+
       <View style={{ marginTop: 14 }}>
         <Button
-          label={saving ? 'Saving…' : 'Save recipe'}
+          label={saving ? 'Saving…' : failed ? 'Try again' : 'Save recipe'}
           disabled={saving || ingredients.length === 0 || name.trim().length === 0}
           onPress={onSave}
         />

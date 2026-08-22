@@ -105,6 +105,8 @@ export interface MealLogSheetProps {
    * result is the only part that differs.
    */
   keepAsRecipe?: boolean;
+  /** Fired after a recipe is actually persisted, so lists can reload. */
+  onRecipeSaved?: () => void;
 }
 
 export function MealLogSheet({
@@ -115,6 +117,7 @@ export function MealLogSheet({
   seed,
   start = null,
   keepAsRecipe = false,
+  onRecipeSaved,
 }: MealLogSheetProps) {
   const theme = useTheme();
   const { addMeal, refreshHome, refreshTrack, saveLog } = usePeptaData();
@@ -145,6 +148,8 @@ export function MealLogSheet({
     photoMediaId?: string;
   } | null>(null);
   const [savingRecipe, setSavingRecipe] = useState(false);
+  /** A failed recipe write, shown on the review screen rather than swallowed. */
+  const [recipeError, setRecipeError] = useState(false);
   const saidRef = useRef<string>("");
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraMode, setCameraMode] = useState<CameraMode>("meal");
@@ -506,6 +511,7 @@ export function MealLogSheet({
 
   const saveProposedRecipe = () => {
     if (!proposal || savingRecipe) return;
+    setRecipeError(false);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
       () => undefined,
     );
@@ -518,11 +524,27 @@ export function MealLogSheet({
           ? { photoMediaId: proposal.photoMediaId }
           : {}),
       })
-      .catch(() => undefined)
-      .finally(() => {
-        setSavingRecipe(false);
+      .then(() => {
+        // TELL SOMEONE. The Recipes list loads once when its screen mounts,
+        // and the screen does not lose focus while this sheet is over it —
+        // New recipe pops itself before opening this. So without a signal the
+        // recipe the user just saved was absent from the list they were
+        // returned to, and only appeared after leaving the screen and coming
+        // back, which reads as "it didn't save".
+        onRecipeSaved?.();
         onClose();
-      });
+      })
+      // AND DO NOT PRETEND ON FAILURE. This was `.catch(() => undefined)` with
+      // onClose in a `.finally`, so a rejected write closed the sheet exactly
+      // like a successful one. Paired with the missing refresh above, a user
+      // whose save failed saw precisely what a user whose save worked saw.
+      .catch(() => {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(
+          () => undefined,
+        );
+        setRecipeError(true);
+      })
+      .finally(() => setSavingRecipe(false));
   };
 
   const back = () => {
@@ -773,6 +795,7 @@ export function MealLogSheet({
             }
             confidence={proposal.confidence}
             saving={savingRecipe}
+            failed={recipeError}
             onSave={saveProposedRecipe}
           />
         ) : null}

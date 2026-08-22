@@ -803,6 +803,44 @@ describe("MealLogSheet · keeping the result as a recipe", () => {
     });
   });
 
+  it("announces the save, so lists that loaded earlier can reload", async () => {
+    // The Recipes list loads once when its screen mounts, and that screen does
+    // not lose focus while this sheet is over it — New recipe pops itself
+    // first. So no focus effect fires on close, and without this signal the
+    // recipe the user just saved was missing from the list they were returned
+    // to. It appeared only after leaving the screen and coming back, which
+    // reads as "it did not save".
+    const onRecipeSaved = vi.fn();
+    const tree = await commit({ keepAsRecipe: true, onRecipeSaved });
+
+    await act(async () => {
+      tree.root.findByProps({ label: "Save recipe" }).props.onPress();
+    });
+
+    expect(onRecipeSaved).toHaveBeenCalledTimes(1);
+  });
+
+  it("does NOT announce, or close, when the write is rejected", async () => {
+    // This was `.catch(() => undefined)` with onClose in a `.finally`, so a
+    // failed write closed the sheet exactly like a successful one. Combined
+    // with the missing refresh, a user whose save failed saw precisely what a
+    // user whose save worked saw: nothing.
+    apiMock.createRecipe.mockReset().mockRejectedValue(new Error("offline"));
+    const onRecipeSaved = vi.fn();
+    const onClose = vi.fn();
+    const tree = await commit({ keepAsRecipe: true, onRecipeSaved, onClose });
+
+    await act(async () => {
+      tree.root.findByProps({ label: "Save recipe" }).props.onPress();
+    });
+
+    expect(onRecipeSaved).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+    // And it says so, keeping the composed recipe for a retry.
+    expect(texts(tree)).toContain("That didn’t save");
+    expect(tree.root.findByProps({ label: "Try again" })).toBeTruthy();
+  });
+
   it("drops a row the model invented, and the total follows", async () => {
     const tree = await commit({ keepAsRecipe: true });
     expect(texts(tree)).toContain("29 g protein"); // 5 + 24

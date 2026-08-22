@@ -30,6 +30,8 @@ interface LogSheetsValue {
     seed?: MealSeed | null,
     opts?: { keepAsRecipe?: boolean; start?: "scan" | "voice" | "search" },
   ): void;
+  /** Increments each time a recipe is persisted — a cue for lists to reload. */
+  recipesRevision: number;
 }
 
 interface LogToastMessage {
@@ -66,6 +68,17 @@ export function LogSheetsProvider({ children }: { children: ReactNode }) {
   const pendingStart = useRef<"scan" | "voice" | "search" | null>(null);
   const [mealStart, setMealStart] = useState<"scan" | "voice" | "search" | null>(null);
   const [keepAsRecipe, setKeepAsRecipe] = useState(false);
+  /**
+   * Bumped whenever a recipe is actually persisted.
+   *
+   * The sheet lives here, above the navigator, so a screen it opens over never
+   * loses focus while it is up — New recipe pops itself first. That means no
+   * focus effect fires when it closes, and the Recipes list (which loads once
+   * on mount) still showed the state from before the save. The recipe only
+   * appeared after leaving the screen and coming back, which reads as "it did
+   * not save".
+   */
+  const [recipesRevision, setRecipesRevision] = useState(0);
   const [mealSeed, setMealSeed] = useState<MealSeed | null>(null);
 
   useEffect(
@@ -156,8 +169,8 @@ export function LogSheetsProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<LogSheetsValue>(
-    () => ({ openQuickLog, openMeal }),
-    [openQuickLog, openMeal],
+    () => ({ openQuickLog, openMeal, recipesRevision }),
+    [openQuickLog, openMeal, recipesRevision],
   );
 
   return (
@@ -184,6 +197,7 @@ export function LogSheetsProvider({ children }: { children: ReactNode }) {
         keepAsRecipe={keepAsRecipe}
         start={mealStart}
         visible={mealOpen}
+        onRecipeSaved={() => setRecipesRevision((n) => n + 1)}
         onClose={handleMealClose}
         onBack={mealReturnsToQuickLog ? handleMealBack : undefined}
         onDismissed={handleMealDismissed}
