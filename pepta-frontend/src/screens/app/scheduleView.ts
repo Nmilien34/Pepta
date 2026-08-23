@@ -93,6 +93,32 @@ export function patternOf(cycle: CycleResponse | null): CyclePattern | null {
  * kept drawing a check and a green dot on a day whose dose the user had
  * removed. Doing it inside means a fourth caller cannot get it wrong.
  */
+/**
+ * Newest non-deleted dose day per compound — the cadence anchor.
+ *
+ * The BACKEND projects the next dose from the latest logged dose, falling back
+ * to the schedule's stored anchor only when nothing was ever logged
+ * (projectNextDoseAt). plannedDays anchored on schedule.nextDoseAt alone —
+ * written at creation, never advanced by logging — so the first time someone
+ * logged a day late, their real cadence walked away from the stored anchor and
+ * every stale anchor day thereafter read as a red "missed", forever, for a
+ * perfectly adherent user. Same anchor rule as the backend, so the strip, the
+ * month calendar and the countdown all agree by construction.
+ */
+export function latestDoseDayByCompound(doseLogs: DoseLogResponse[]): Map<string, string> {
+  const latest = new Map<string, number>();
+  for (const log of doseLogs) {
+    if (log.deletedAt != null) continue;
+    const at = new Date(log.datetime).getTime();
+    if (Number.isNaN(at)) continue;
+    const seen = latest.get(log.compoundId);
+    if (seen == null || at > seen) latest.set(log.compoundId, at);
+  }
+  const days = new Map<string, string>();
+  for (const [compoundId, at] of latest) days.set(compoundId, localDateOnly(new Date(at)));
+  return days;
+}
+
 export function loggedDays(doseLogs: DoseLogResponse[]): Set<string> {
   const days = new Set<string>();
   for (const log of doseLogs) {
@@ -113,6 +139,8 @@ export function plannedDays(
   schedules: ScheduleResponse[] | null,
   from: string,
   to: string,
+  /** From latestDoseDayByCompound — omitted, cadences use the stored anchor. */
+  latestByCompound?: ReadonlyMap<string, string>,
 ): Set<string> {
   const days = new Set<string>();
   if (!schedules) return days;
@@ -147,8 +175,12 @@ export function plannedDays(
         : schedule.frequency === 'biweekly'
           ? 14
           : schedule.intervalDays;
-    if (!interval || !schedule.nextDoseAt) continue;
-    const anchor = localDateOnly(new Date(schedule.nextDoseAt));
+    // The user's real rhythm wins; the stored anchor is for a schedule no dose
+    // has ever been logged against. daysOfWeek schedules never reach here —
+    // named days are a promise, not a drift.
+    const loggedAnchor = latestByCompound?.get(schedule.compoundId) ?? null;
+    if (!interval || (!loggedAnchor && !schedule.nextDoseAt)) continue;
+    const anchor = loggedAnchor ?? localDateOnly(new Date(schedule.nextDoseAt!));
     // First on-or-after `from` that is ≡ anchor (mod interval).
     const offset = dayDiff(anchor, from);
     const first = addDays(from, ((-offset % interval) + interval) % interval);
@@ -200,7 +232,7 @@ export function weekStrip(
   const monday = addDays(todayOnly, dow === 0 ? -6 : 1 - dow);
   const sunday = addDays(monday, 6);
   const logged = loggedDays(doseLogs);
-  const planned = plannedDays(schedules, monday, sunday);
+  const planned = plannedDays(schedules, monday, sunday, latestDoseDayByCompound(doseLogs));
   if (nextDoseAt) {
     const nextDay = localDateOnly(new Date(nextDoseAt));
     if (nextDay >= monday && nextDay <= sunday) planned.add(nextDay);

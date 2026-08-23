@@ -177,6 +177,75 @@ describe('weekStrip', () => {
   });
 });
 
+describe('the cadence anchor follows real doses, not the stored schedule', () => {
+  // The drift this pins: for cadence schedules (weekly with no daysOfWeek,
+  // biweekly, custom) plannedDays anchored on schedule.nextDoseAt — written at
+  // creation and never advanced by logging. The BACKEND anchors the countdown
+  // on the latest logged dose. So the first time someone logs a day late,
+  // their real cadence walks away from the stored anchor, and every stale
+  // anchor day thereafter passed unlogged — a phantom red "missed" X, every
+  // week, for a perfectly adherent user. The nextDoseAt merge in weekStrip
+  // ringed the TRUE next day but never removed the phantom.
+  //
+  // Fixture: schedule anchored Friday Jun 19; the user has settled into
+  // Saturdays (last dose Sat Jun 20). Today is Wed Jun 24.
+
+  const cadence = schedule({ nextDoseAt: '2026-06-19T12:00:00.000Z' });
+
+  it('plans the user’s actual rhythm once a dose exists', () => {
+    const strip = weekStrip(TODAY, [cadence], [dose('2026-06-20T12:00:00.000Z')], null);
+
+    // Sat 27 is due (last dose Sat 20 + 7). Fri 26 — the stored anchor's
+    // projection — is nothing at all.
+    expect(strip[4]!).toMatchObject({ date: '2026-06-26', mark: 'none' });
+    expect(strip.filter((d) => d.mark === 'due').map((d) => d.date)).toEqual(['2026-06-27']);
+  });
+
+  it('paints no phantom missed on the stale anchor day', () => {
+    // Fri Jun 26 was the stored anchor's projection. With the real dose
+    // anchoring the cadence, Friday is not planned, so a Friday that passes
+    // unlogged cannot read as missed.
+    const monday = new Date('2026-06-29T12:00:00.000Z');
+    const strip = weekStrip(monday, [cadence], [dose('2026-06-20T12:00:00.000Z')], null);
+
+    expect(strip.find((d) => d.date === '2026-06-26')).toBeUndefined(); // prev week
+    // This week: Sat Jul 4 due (Jun 20 + 14), no missed anywhere.
+    expect(strip.some((d) => d.mark === 'missed')).toBe(false);
+    expect(strip.filter((d) => d.mark === 'due').map((d) => d.date)).toEqual(['2026-07-04']);
+  });
+
+  it('falls back to the stored anchor when nothing has been logged', () => {
+    // A brand-new schedule must still show its plan — the fallback is the
+    // same rule the backend applies (scheduleAnchor only when no dose exists).
+    const strip = weekStrip(TODAY, [cadence], [], null);
+
+    expect(strip.filter((d) => d.mark === 'due').map((d) => d.date)).toEqual(['2026-06-26']);
+  });
+
+  it('a deleted dose does not anchor', () => {
+    const gone = { ...dose('2026-06-20T12:00:00.000Z'), deletedAt: '2026-06-21T00:00:00.000Z' };
+    const strip = weekStrip(TODAY, [cadence], [gone], null);
+
+    expect(strip.filter((d) => d.mark === 'due').map((d) => d.date)).toEqual(['2026-06-26']);
+  });
+
+  it('anchors per compound — another medication’s dose moves nothing', () => {
+    const other = { ...dose('2026-06-20T12:00:00.000Z'), compoundId: 'c2' };
+    const strip = weekStrip(TODAY, [cadence], [other], null);
+
+    expect(strip.filter((d) => d.mark === 'due').map((d) => d.date)).toEqual(['2026-06-26']);
+  });
+
+  it('leaves daysOfWeek schedules alone — named days are a promise, not a drift', () => {
+    // Saturday-by-name stays Saturday no matter when the user actually logs;
+    // only cadence schedules follow the latest dose.
+    const named = schedule({ daysOfWeek: [6] });
+    const strip = weekStrip(TODAY, [named], [dose('2026-06-22T12:00:00.000Z')], null);
+
+    expect(strip.filter((d) => d.mark === 'due').map((d) => d.date)).toEqual(['2026-06-27']);
+  });
+});
+
 describe('cyclePillFor', () => {
   const pattern = { startDate: '2026-06-01', weeksOn: 8, weeksOff: 2, repeats: true };
 

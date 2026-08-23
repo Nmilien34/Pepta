@@ -21,6 +21,7 @@ import {
   activeCycleOf,
   isLastDoseOfCycle,
   loggedDays,
+  latestDoseDayByCompound,
   markForDay,
   type DayMark,
   patternOf,
@@ -116,6 +117,12 @@ export function ScheduleSheet({ visible, onClose, onEditCycle, onDismissed }: Sc
   const cycle = useMemo(() => activeCycleOf(cycles), [cycles]);
   const pattern = useMemo(() => patternOf(cycle), [cycle]);
   const logged = useMemo(() => loggedDays(track?.doseLogs ?? []), [track?.doseLogs]);
+  // Same cadence anchor as the strip and the backend countdown: the user's
+  // latest real dose, stored anchor only when nothing was ever logged.
+  const latestByCompound = useMemo(
+    () => latestDoseDayByCompound(track?.doseLogs ?? []),
+    [track?.doseLogs],
+  );
 
   const grid = useMemo<GridCell[]>(() => {
     const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
@@ -127,7 +134,7 @@ export function ScheduleSheet({ visible, onClose, onEditCycle, onDismissed }: Sc
     const start = `${first.getUTCFullYear()}-${pad2(first.getUTCMonth() + 1)}-${pad2(first.getUTCDate())}`;
     const last = new Date(Date.UTC(year, month - 1, 1 - lead + cellCount - 1));
     const end = `${last.getUTCFullYear()}-${pad2(last.getUTCMonth() + 1)}-${pad2(last.getUTCDate())}`;
-    const planned = plannedDays(schedules, start, end);
+    const planned = plannedDays(schedules, start, end, latestByCompound);
 
     return Array.from({ length: cellCount }, (_, i) => {
       const date = new Date(Date.UTC(year, month - 1, 1 - lead + i));
@@ -146,7 +153,7 @@ export function ScheduleSheet({ visible, onClose, onEditCycle, onDismissed }: Sc
         restEnd: status?.phaseEnd === dateOnly,
       };
     });
-  }, [year, month, schedules, pattern, logged, today]);
+  }, [year, month, schedules, pattern, logged, latestByCompound, today]);
 
   const goMonth = (delta: number) => {
     Haptics.selectionAsync().catch(() => undefined);
