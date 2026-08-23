@@ -129,6 +129,57 @@ async function logCompleteRegistrationIfNeeded(
   }
 }
 
+/**
+ * Analytics and billing identification are BEST EFFORT. They must never decide
+ * whether somebody is signed in.
+ *
+ * They used to. `finalizeAuth` set the token, wrote the session to storage,
+ * and then awaited AppsFlyer init, the registration event and the RevenueCat
+ * identify BEFORE calling setAuth. Anything that rejected or simply never
+ * settled in that stretch left the user authenticated on disk and signed OUT
+ * in memory — the sign-in screen showing "We couldn't sign you in", while the
+ * next cold launch restored the session and let them straight in. That is a
+ * confusing failure on the single highest-stakes screen in the app, and the
+ * only thing standing between it and every new user was three third-party
+ * helpers each remembering to catch.
+ *
+ * The launch path had the same shape, and worse odds: it awaited two of the
+ * same SDKs before setAuth, so a rejection there dropped somebody with a
+ * perfectly good stored session back to sign-in.
+ *
+ * This runs the same work in the same order, but nothing it does can prevent
+ * the caller from continuing: failures are logged, and a stall is capped so a
+ * hung SDK cannot hold the session hostage either.
+ */
+const SIGN_IN_SIDE_EFFECT_BUDGET_MS = 8_000;
+
+async function runSignInSideEffects(work: () => Promise<void>): Promise<void> {
+  let release: (() => void) | undefined;
+  const budget = new Promise<void>((resolve) => {
+    const timer = setTimeout(() => {
+      console.warn(
+        "[auth] Sign-in side effects exceeded their budget; continuing without them.",
+      );
+      resolve();
+    }, SIGN_IN_SIDE_EFFECT_BUDGET_MS);
+    release = () => {
+      clearTimeout(timer);
+      resolve();
+    };
+  });
+
+  await Promise.race([
+    work()
+      // Deliberately not silent: a swallowed failure here is missing funnel
+      // data or an unidentified RevenueCat customer, both of which matter.
+      .catch((error: unknown) => {
+        console.warn("[auth] A sign-in side effect failed.", error);
+      })
+      .finally(() => release?.()),
+    budget,
+  ]);
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [auth, setAuth] = useState<AuthResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -147,8 +198,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .then(async (stored) => {
         if (active && stored) {
           api.setAuthToken(stored.token);
-          await initializeAppsFlyerForUser(stored.user.id);
-          await identifyRevenueCatUser(stored.user);
+          // A stored session is proof enough. Neither SDK gets to send an
+          // already-signed-in user back to the sign-in screen.
+          await runSignInSideEffects(async () => {
+            await initializeAppsFlyerForUser(stored.user.id);
+            await identifyRevenueCatUser(stored.user);
+          });
           if (active) setAuth(stored);
           return;
         }
@@ -169,9 +224,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const finalizeAuth = useCallback(async (response: AuthResponse, method: AuthMethod): Promise<User> => {
     api.setAuthToken(response.token);
     persistAuth(response);
-    await initializeAppsFlyerForUser(response.user.id);
-    await logCompleteRegistrationIfNeeded(response, method);
-    await identifyRevenueCatUser(response.user);
+    // Same work, same order — but it can no longer decide whether the sign-in
+    // happened. The server has authenticated this person; setAuth follows.
+    await runSignInSideEffects(async () => {
+      await initializeAppsFlyerForUser(response.user.id);
+      await logCompleteRegistrationIfNeeded(response, method);
+      await identifyRevenueCatUser(response.user);
+    });
     setAuth(response);
     return response.user;
   }, []);
