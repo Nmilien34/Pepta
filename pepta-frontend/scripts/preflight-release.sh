@@ -17,7 +17,7 @@ say()  { printf '%s\n' "$*"; }
 ok()   { say "  ✓ $*"; }
 bad()  { say "  ✗ $*"; fail=1; }
 
-say "1/8 JS ↔ native module parity (autolinking vs Podfile.lock)"
+say "1/9 JS ↔ native module parity (autolinking vs Podfile.lock)"
 missing=$(npx expo-modules-autolinking resolve -p apple --json 2>/dev/null | python3 -c '
 import json, re, sys
 resolved = json.load(sys.stdin)
@@ -51,7 +51,7 @@ fi
 #
 # Resolution is done FROM THE PACKAGE THAT IMPORTS IT, not from the app — that
 # distinction is the whole bug, and checking it the easy way reproduces it.
-say "1b/8 native pod versions == resolved JS versions"
+say "1b/9 native pod versions == resolved JS versions"
 drift=$(python3 - <<'PY'
 import json, os, re, subprocess, sys
 
@@ -110,14 +110,14 @@ else
   ok "every locally-sourced pod matches the JS version Metro will bundle"
 fi
 
-say "2/8 Pods in sync with lockfile"
+say "2/9 Pods in sync with lockfile"
 if [ -f ios/Pods/Manifest.lock ] && diff -q ios/Podfile.lock ios/Pods/Manifest.lock >/dev/null 2>&1; then
   ok "ios/Pods matches Podfile.lock"
 else
   bad "ios/Pods out of sync with Podfile.lock (run: cd ios && pod install)"
 fi
 
-say "3/8 Production env baked into the bundle"
+say "3/9 Production env baked into the bundle"
 if [ ! -f .env ]; then
   bad ".env missing — EXPO_PUBLIC_* vars won't be inlined"
 else
@@ -132,20 +132,20 @@ else
     || bad "EXPO_PUBLIC_REVENUECAT_IOS_API_KEY missing or malformed"
 fi
 
-say "4/8 Typecheck"
+say "4/9 Typecheck"
 if npx tsc --noEmit >/dev/null 2>&1; then ok "tsc clean"; else bad "tsc failed (run: npm run typecheck)"; fi
 
-say "5/8 Lint (rules-of-hooks is the load-bearing part)"
+say "5/9 Lint (rules-of-hooks is the load-bearing part)"
 # A conditional hook is a guaranteed runtime crash, not a style problem —
 # builds 20-22 shipped one in HomeScreen that blanked the app on entry the
 # moment /home data arrived. eslint-plugin-react-hooks now guards the whole
 # tree, but a rule that never runs before an archive protects nobody.
 if npx eslint src >/dev/null 2>&1; then ok "eslint clean"; else bad "eslint failed (run: npx eslint src)"; fi
 
-say "6/8 Tests"
+say "6/9 Tests"
 if npm run -s test >/dev/null 2>&1; then ok "tests pass"; else bad "tests failed (run: npm test)"; fi
 
-say "7/8 OTA runtime version parity (Expo.plist vs Info.plist vs app.config)"
+say "7/9 OTA runtime version parity (Expo.plist vs Info.plist vs app.config)"
 # An OTA update only reaches binaries whose EXUpdatesRuntimeVersion equals the
 # published runtime (policy: the marketing version). If the plist lags a
 # version bump, every user on that build is stranded off the update channel —
@@ -165,7 +165,7 @@ else
 fi
 
 echo
-say "8/8 build number parity (Info.plist vs pbxproj vs app.config)"
+say "8/9 build number parity (Info.plist vs pbxproj vs app.config)"
 # THE ONE THAT ACTUALLY SHIPS IS Info.plist. CFBundleVersion there is a
 # LITERAL — it does not read $(CURRENT_PROJECT_VERSION) — so bumping the
 # pbxproj and app.config.js looks like a version bump, passes every other
@@ -180,6 +180,52 @@ elif [ -n "$b_plist" ] && [ "$b_plist" = "$b_proj" ] && [ "$b_plist" = "$b_cfg" 
   ok "build number $b_plist agrees across all three"
 else
   bad "build number drift — Info.plist '$b_plist' vs pbxproj '$b_proj' vs app.config '$b_cfg'"
+fi
+
+echo
+say "9/9 entitlement purpose strings (Apple rejects at upload, not at build)"
+# THE CHECK THIS EXISTS FOR: 1.0.9 build 40 archived cleanly, passed all
+# eight checks, and was REJECTED BY THE UPLOAD — HealthKit was entitled with
+# only NSHealthShareUsageDescription. We request read-only (write: []), so
+# the update string looked unnecessary; Apple's scanner does not care what we
+# CALL, only what the linked library REFERENCES, and react-native-health
+# includes HealthKit write APIs. Their error says it outright: "While your
+# app might not use these APIs, a purpose string is still required."
+#
+# Table-driven so the next entitlement adds a row, not a lesson.
+missing=$(python3 - <<'PYEOF'
+import plistlib, re
+
+ent = plistlib.load(open("ios/Pepta/Pepta.entitlements", "rb"))
+info = open("ios/Pepta/Info.plist").read()
+
+# entitlement key -> purpose strings Apple demands when it is present
+REQUIRED = {
+    "com.apple.developer.healthkit": [
+        "NSHealthShareUsageDescription",
+        "NSHealthUpdateUsageDescription",
+    ],
+}
+
+missing = []
+for key, strings in REQUIRED.items():
+    if not ent.get(key):
+        continue
+    for name in strings:
+        if f"<key>{name}</key>" not in info:
+            missing.append(f"{key} is entitled but {name} is absent from Info.plist")
+        else:
+            body = re.search(rf"<key>{name}</key>\s*<string>([^<]*)</string>", info)
+            if not body or len(body.group(1).strip()) < 20:
+                missing.append(f"{name} is present but too short to satisfy review")
+print("\n".join(missing))
+PYEOF
+)
+if [ -n "$missing" ]; then
+  bad "an entitlement is missing its purpose string — the upload WILL be rejected:"
+  say "$missing"
+else
+  ok "every entitlement carries the purpose strings Apple requires"
 fi
 
 echo
