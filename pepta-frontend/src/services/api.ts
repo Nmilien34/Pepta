@@ -998,6 +998,22 @@ class PeptaApi {
     });
   }
 
+  /**
+   * PATCH the Apple Health daily row in place. Activity-only server-side:
+   * the endpoint exists because Health's step count grows all day, and a
+   * create per sync would pile duplicate rows the way the resistance
+   * pile-up did.
+   */
+  public patchActivityLog(
+    id: string,
+    patch: Partial<ActivityLogInput>,
+  ): Promise<ActivityLogResponse> {
+    return this.request(`/activity-logs/${id}`, activityLogResponseSchema, {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    });
+  }
+
   // Progress-photo upload is a 3-step verified flow:
   // 1) intent with measured bytes, 2) policy-bound POST, 3) opaque confirmation.
   public createPhotoUploadIntent(

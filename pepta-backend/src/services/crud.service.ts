@@ -151,6 +151,31 @@ export function createCrudService<
       return Promise.all(documents.map(serialize));
     },
 
+    /**
+     * Patch one live row. The filter refuses deleted rows — a PATCH that
+     * resurrects a soft-deleted log would undo a correction silently.
+     * Added for Apple Health sync, whose daily row grows all day and must be
+     * updated in place rather than re-created (a create per sync is the
+     * resistance pile-up again).
+     */
+    async update(
+      userId: string,
+      id: string,
+      patch: Partial<TCreate>,
+    ): Promise<TResponse> {
+      const document = await config.model.findOneAndUpdate(
+        { _id: id, userId, deletedAt: null },
+        { $set: patch as Record<string, unknown> },
+        { new: true, runValidators: true },
+      );
+
+      if (!document) {
+        throw new NotFoundError(`${config.name} not found`);
+      }
+
+      return serialize(document);
+    },
+
     async softDelete(userId: string, id: string): Promise<TResponse> {
       const document = await config.model.findOneAndUpdate(
         { _id: id, userId },

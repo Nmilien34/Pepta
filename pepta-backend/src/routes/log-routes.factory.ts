@@ -11,11 +11,14 @@ interface LogRouteService<TCreate, TResponse> {
   create(userId: string, body: TCreate): Promise<TResponse>;
   list(userId: string, query?: z.infer<typeof logListQuerySchema>): Promise<TResponse[]>;
   softDelete(userId: string, id: string): Promise<TResponse>;
+  update?(userId: string, id: string, patch: Partial<TCreate>): Promise<TResponse>;
 }
 
 export function createLogRouter<TSchema extends z.ZodTypeAny, TResponse>(
   bodySchema: TSchema,
   service: LogRouteService<z.infer<TSchema>, TResponse>,
+  /** Opt-in per kind: PATCH exists only where a patch schema is provided. */
+  patchSchema?: z.ZodTypeAny,
 ): Router {
   const router = createRouter();
 
@@ -42,6 +45,17 @@ export function createLogRouter<TSchema extends z.ZodTypeAny, TResponse>(
       sendData(res, await service.create(req.user!.id, req.body), 201);
     }),
   );
+
+  if (patchSchema && service.update) {
+    const update = service.update.bind(service);
+    router.patch(
+      '/:id',
+      validateBody(patchSchema),
+      asyncHandler(async (req, res) => {
+        sendData(res, await update(req.user!.id, req.params.id as string, req.body));
+      }),
+    );
+  }
 
   router.delete(
     '/:id',

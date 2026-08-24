@@ -61,4 +61,43 @@ describe("createCrudService list window", () => {
 
     expect((capturedQuery as { deletedAt: unknown }).deletedAt).toBeNull();
   });
+
+  it("update patches one LIVE row and refuses deleted ones", async () => {
+    // Added for Apple Health: its one daily row grows all day and must be
+    // updated in place — a create per sync is the resistance pile-up again.
+    // The deletedAt filter is the safety half: a PATCH that can reach a
+    // soft-deleted row would silently resurrect a correction.
+    let captured: { filter?: unknown; update?: unknown } = {};
+    const findOneAndUpdate = vi.fn((filter: unknown, update: unknown) => {
+      captured = { filter, update };
+      return Promise.resolve({ toObject: () => ({ id: "a1", steps: 7100 }) });
+    });
+    const service = createCrudService({
+      model: { findOneAndUpdate } as never,
+      responseSchema: z.object({}).passthrough(),
+      name: "Test log",
+    });
+
+    await service.update("507f1f77bcf86cd799439011", "a1", { steps: 7100 } as never);
+
+    expect(captured.filter).toMatchObject({ _id: "a1", deletedAt: null });
+    // $set ONLY — a whole-document replace would erase fields the patch
+    // does not mention.
+    expect(captured.update).toEqual({ $set: { steps: 7100 } });
+  });
+
+  it("update throws NotFound rather than upserting", async () => {
+    // An upsert here would let a patch against a deleted or foreign id mint
+    // a brand-new log out of thin air.
+    const findOneAndUpdate = vi.fn(() => Promise.resolve(null));
+    const service = createCrudService({
+      model: { findOneAndUpdate } as never,
+      responseSchema: z.object({}).passthrough(),
+      name: "Test log",
+    });
+
+    await expect(service.update("507f1f77bcf86cd799439011", "gone", {} as never)).rejects.toThrow(
+      "Test log not found",
+    );
+  });
 });

@@ -221,7 +221,18 @@ export function createApp(options: CreateAppOptions = {}): Express {
   app.use(
     "/activity-logs",
     ...premium,
-    createLogRouter(activityLogInputSchema, trackedActivityLogService),
+    createLogRouter(
+      activityLogInputSchema,
+      trackedActivityLogService,
+      // PATCH is opt-in and activity-only for now: Apple Health updates its
+      // one daily row in place as the numbers grow. .partial() suppresses the
+      // resistanceTraining default (verified), so a steps-only patch cannot
+      // clobber the strength flag; idempotencyKey is create-only.
+      activityLogInputSchema.omit({ idempotencyKey: true }).partial().refine(
+        (patch) => Object.keys(patch).length > 0,
+        { message: "At least one field is required" },
+      ),
+    ),
   );
   app.use(
     "/side-effect-logs",
