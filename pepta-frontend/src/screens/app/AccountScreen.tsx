@@ -39,6 +39,7 @@ import {
 } from "./accountView";
 import { LIBRARY_ENTRIES } from "../../data/peptideLibrary";
 import { ReminderSettingsScreen } from "./ReminderSettingsScreen";
+import { isHealthSyncEnabled, setHealthSyncEnabled } from "../../services/healthSync";
 import { PaywallScreen } from "../onboarding/PaywallScreen";
 import {
   buildPeptaReportExportPayload,
@@ -84,6 +85,16 @@ export function AccountScreen() {
     (home?.activeCompounds ?? []).some((c) => c.route !== "oral");
   const [settingsSheet, setSettingsSheet] = useState<SettingsSheet>(null);
   const [remindersOpen, setRemindersOpen] = useState(false);
+  const [healthSyncOn, setHealthSyncOn] = useState(false);
+  useEffect(() => {
+    let active = true;
+    void isHealthSyncEnabled().then((on) => {
+      if (active) setHealthSyncOn(on);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
   const [paywallOpen, setPaywallOpen] = useState(false);
   const [profilePatch, setProfilePatch] = useState<UserProfileSettingsPatch>(
     {},
@@ -311,7 +322,34 @@ export function AccountScreen() {
       chevron: true,
     },
   ];
+  const toggleHealthSync = async () => {
+    const next = !healthSyncOn;
+    if (!next) {
+      await setHealthSyncEnabled(false);
+      setHealthSyncOn(false);
+      return;
+    }
+    // Enabling prompts for HealthKit access; the OS sheet is the consent.
+    // A denial leaves the toggle off rather than half-on.
+    const granted = await setHealthSyncEnabled(true);
+    setHealthSyncOn(granted);
+    if (!granted) {
+      Alert.alert(
+        "Apple Health access needed",
+        "Allow Steps and Workouts for Pepta in the Health app, then try again.",
+      );
+    }
+  };
+
   const preferences: Row[] = [
+    {
+      icon: "heart-pulse",
+      label: "Sync Apple Health",
+      // The row states the CONTRACT, not just on/off: read-only, and what for.
+      value: healthSyncOn ? "On" : "Off",
+      onPress: () => void toggleHealthSync(),
+      chevron: false,
+    },
     {
       icon: "resize",
       label: "Units",

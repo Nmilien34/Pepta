@@ -39,6 +39,7 @@ import type {
   WeightLogResponse,
 } from "@pepta/shared";
 import { api, type DeletableLogKind } from "../services/api";
+import { maybeSyncHealth } from "../services/healthSync";
 import { pickLogToUndo, type UndoableLog } from "../utils/undoBump";
 import { useAuth } from "./AuthContext";
 import { readSnapshot, writeSnapshot } from "../services/peptaSnapshotStore";
@@ -880,15 +881,35 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
     }
   }, [userId]);
 
+  // Apple Health, on the same triggers as the outbox: sign-in and
+  // background→active. The service gates itself (enabled? throttled? ios?)
+  // and NEVER throws — a HealthKit hiccup must not reach a screen. Rows it
+  // holds are the freshest the app has via trackRef; a landed write refetches
+  // truth the same way every other writer does.
+  const syncHealth = useCallback(() => {
+    void maybeSyncHealth({
+      getRows: () => trackRef.current?.activityLogs ?? [],
+      onWrote: () => {
+        const { refreshHome: rh, refreshTrack: rt } = refreshersRef.current;
+        void rh();
+        void rt();
+      },
+    });
+  }, []);
+
   useEffect(() => {
     if (!userId) return undefined;
     void refreshOutboxCount();
     void runReplay();
+    syncHealth();
     const subscription = AppState.addEventListener("change", (state) => {
-      if (state === "active") void runReplay();
+      if (state === "active") {
+        void runReplay();
+        syncHealth();
+      }
     });
     return () => subscription.remove();
-  }, [userId, refreshOutboxCount, runReplay]);
+  }, [userId, refreshOutboxCount, runReplay, syncHealth]);
 
   // FOREGROUND DRAIN. The two triggers above are sign-in and
   // background→active, so a log that queued while the user was sitting in the

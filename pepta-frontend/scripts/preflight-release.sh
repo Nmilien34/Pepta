@@ -90,6 +90,15 @@ for pod, path in sources.items():
     except Exception:
         continue
     if js and js != native:
+        # SAME DIRECTORY = SAME PACKAGE = CANNOT DRIFT. The check exists for
+        # the worklets crash, where the pod was built from one directory and
+        # Metro bundled another. When both point at the SAME package dir, a
+        # version mismatch is the library's own podspec lying about itself
+        # (react-native-health 1.19.0 hardcodes s.version = '1.7.0') — noisy,
+        # but the binary and bundle are one codebase. Compare dirs, not names,
+        # so this never becomes a per-package allowlist.
+        if os.path.realpath(pkg_dir) == os.path.realpath(os.path.dirname(resolved_path)):
+            continue
         drift.append(f"{name}: pod {native} (from {path}) != bundled JS {js} (at {resolved_path})")
 print("\n".join(drift))
 PY

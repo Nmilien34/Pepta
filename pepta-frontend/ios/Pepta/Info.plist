@@ -47,6 +47,8 @@
 	</array>
 	<key>CFBundleVersion</key>
 	<string>39</string>
+	<key>NSHealthShareUsageDescription</key>
+	<string>Pepta reads your steps and workouts from Apple Health so activity fills in automatically.</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>LSMinimumSystemVersion</key>
