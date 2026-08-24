@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   data: { home: null as unknown, track: null as unknown },
   openQuickLog: vi.fn(),
   addActivityLog: vi.fn(),
+  alert: vi.fn(),
   saveLog: vi.fn(async () => "saved" as const),
   deleteLog: vi.fn(async () => true),
   openMeal: vi.fn(),
@@ -43,6 +44,7 @@ vi.mock("react-native", () => {
     );
   return {
     ActivityIndicator: "ActivityIndicator",
+    Alert: { alert: (...args: unknown[]) => mocks.alert(...args) },
     Animated: {
       Value,
       View: "Animated.View",
@@ -485,6 +487,33 @@ describe("Home · the doors to the nutrient screens", () => {
       doorFor(tree, "Log a meal")?.props.onPress();
     });
     expect(mocks.openMeal).toHaveBeenCalled();
+  });
+});
+
+describe("a mistyped weigh-in has a way out", () => {
+  it("Remove confirms, then deletes the latest weigh-in", async () => {
+    // The idea being pinned: a wrong entry was simply STUCK — no control on
+    // the card, and the only deletes lived on Track. Remove asks first
+    // (destructive, one tap from the card) and then goes through deleteLog,
+    // whose fan-out marks track AND progress and refetches, so the chart and
+    // the rings back-track together.
+    const tree = render(doseDay());
+
+    act(() => {
+      tree.root.findByProps({ accessibilityLabel: "Remove last weigh-in" }).props.onPress();
+    });
+
+    // Confirmation, not immediate deletion — this destroys a record.
+    expect(mocks.deleteLog).not.toHaveBeenCalled();
+    const [, , buttons] = mocks.alert.mock.calls.at(-1)! as [string, string, Array<{ style?: string; onPress?: () => void }>];
+    const destructive = buttons.find((b) => b.style === "destructive")!;
+
+    act(() => {
+      destructive.onPress!();
+    });
+
+    // The fixture's real (non-temp) id — the temp-id case hides the control.
+    expect(mocks.deleteLog).toHaveBeenCalledWith("weight", "6a3dceaa778d3c45f699fee8");
   });
 });
 

@@ -175,3 +175,34 @@ describe('a goal date in the past is not a projection', () => {
     expect(summary(empty, profileWith('2026-08-24'), NOW).estimatedGoalDate).toBe('2026-08-24');
   });
 });
+
+describe('a deleted weigh-in is invisible everywhere, immediately', () => {
+  // deleteLog marks rows optimistically and lets the refetch bring truth. The
+  // mark is only worth anything if consumers FILTER it — these three did not,
+  // so between the tap and the refetch the chart, the summary and the Home
+  // merge all kept drawing the row the user had just removed.
+  const w = (id: string, value: number, day: number, deletedAt: string | null = null) =>
+    ({ id, value, unit: 'lb', datetime: `2026-08-${String(day).padStart(2, '0')}T12:00:00.000Z`, deletedAt }) as WeightLogResponse;
+  const NOW = new Date('2026-08-24T15:00:00.000Z');
+
+  it('weightSeries drops marked rows', () => {
+    const series = weightSeries([w('a', 200, 20), w('b', 190, 22, '2026-08-24T14:00:00.000Z')], 'All', NOW);
+
+    expect(series.map((p) => p.value)).toEqual([200]);
+  });
+
+  it('weightSummary neither starts nor ends on a marked row', () => {
+    const s = weightSummary([w('a', 200, 20, '2026-08-24T14:00:00.000Z'), w('b', 190, 22)], null);
+
+    expect(s.start).toBe(190);
+    expect(s.current).toBe(190);
+  });
+
+  it('mergeWeightsWithLatest does not resurrect a deleted latest', () => {
+    // home.latestWeight can still hold the row for a beat after the delete;
+    // merging it back in would undo the removal on the chart.
+    const merged = mergeWeightsWithLatest([w('a', 200, 20)], w('b', 180, 24, '2026-08-24T14:00:00.000Z'));
+
+    expect(merged.map((row) => row.id)).toEqual(['a']);
+  });
+});

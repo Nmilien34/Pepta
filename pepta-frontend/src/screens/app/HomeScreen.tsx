@@ -7,7 +7,7 @@
 // setup progress, latest weight, and the first insight.
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Switch, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, Switch, View } from 'react-native';
 import { Icon } from "../../components/Icon";
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -102,6 +102,32 @@ export function HomeScreen() {
    * is no edit — so "off" has to mean the record goes, not that a second log
    * says the opposite.
    */
+  // Remove the latest weigh-in from the Home card. deleteLog fans out — the
+  // row is marked in track AND progress, /progress is refetched — so the
+  // chart, the ring and the difference back-track with it. Null (hides the
+  // control) while the id is optimistic.
+  const latestWeightRow = home?.latestWeight ?? null;
+  const removeLatestWeight =
+    latestWeightRow && !String(latestWeightRow.id).startsWith('temp-')
+      ? () => {
+          Alert.alert(
+            'Remove this weigh-in?',
+            `${latestWeightRow.value} ${latestWeightRow.unit} comes off your charts and progress.`,
+            [
+              { text: 'Keep it', style: 'cancel' },
+              {
+                text: 'Remove',
+                style: 'destructive',
+                onPress: () => {
+                  Haptics.selectionAsync().catch(() => undefined);
+                  void deleteLog('weight', latestWeightRow.id);
+                },
+              },
+            ],
+          );
+        }
+      : null;
+
   const setResistanceToday = (next: boolean) => {
     if (next) {
       // Already on (a row exists, real or optimistic): write nothing. The
@@ -669,7 +695,12 @@ export function HomeScreen() {
           </Reveal>
 
           <Reveal delay={250} style={{ marginTop: 12 }}>
-            <HomeWeightPulseCard pulse={view.weightPulse} goal={view.goal} onLog={() => openQuickLog('weight')} />
+            <HomeWeightPulseCard
+              pulse={view.weightPulse}
+              goal={view.goal}
+              onLog={() => openQuickLog('weight')}
+              onRemove={removeLatestWeight}
+            />
           </Reveal>
 
           {/* activity */}
@@ -1374,10 +1405,13 @@ function HomeWeightPulseCard({
   pulse,
   goal,
   onLog,
+  onRemove,
 }: {
   pulse: HomeWeightPulseView;
   goal: GoalView | null;
   onLog(): void;
+  /** Remove the latest weigh-in; absent while its id is still optimistic. */
+  onRemove: (() => void) | null;
 }) {
   const theme = useTheme();
   const hasWeight = pulse.latestLabel != null;
@@ -1452,9 +1486,30 @@ function HomeWeightPulseCard({
             {hasWeight && goal ? ` ${goal.unit}` : ''}
           </AppText>
         </AppText>
-        <AppText variant="caption" color="textSecondary" style={{ marginTop: 6, fontSize: 12.5 }}>
-          {hasWeight && goal ? `Last check ${goal.dateLabel}` : 'No weigh-in yet'}
-        </AppText>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 }}>
+          <AppText variant="caption" color="textSecondary" style={{ fontSize: 12.5 }}>
+            {hasWeight && goal ? `Last check ${goal.dateLabel}` : 'No weigh-in yet'}
+          </AppText>
+          {/* THE WAY OUT OF A MISTYPED WEIGH-IN. Without it, a wrong entry was
+              simply stuck on the card and every chart. Quiet tertiary text —
+              a correction, not an action the card promotes — and it CONFIRMS,
+              because this deletes a record. Hidden while the row's id is still
+              optimistic: deleting a temp id would 404 and roll back (the same
+              rule the resistance switch follows). */}
+          {hasWeight && onRemove ? (
+            <Pressable
+              onPress={onRemove}
+              hitSlop={{ top: 10, bottom: 10, left: 6, right: 10 }}
+              accessibilityRole="button"
+              accessibilityLabel="Remove last weigh-in"
+              style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
+            >
+              <AppText variant="caption" color="textTertiary" style={{ fontSize: 12, fontWeight: '700' }}>
+                Remove
+              </AppText>
+            </Pressable>
+          ) : null}
+        </View>
       </View>
       {goal ? <MilestoneTrackView goal={goal} /> : null}
       {/* FULL WIDTH, and quiet. The frame gives this the neutral surface rather

@@ -24,7 +24,14 @@ export interface WeightPoint {
 }
 
 export function sortWeights(weights: WeightLogResponse[]): WeightLogResponse[] {
-  return [...weights].sort((a, b) => new Date(a.datetime).getTime() - new Date(b.datetime).getTime());
+  // Deleted rows drop HERE, at the one gate every consumer passes through.
+  // deleteLog marks rows optimistically and lets the refetch bring truth; the
+  // mark is only worth anything if it is filtered, and until it was, the
+  // chart, the summary and the Home merge all kept drawing a weigh-in the
+  // user had just removed — for as long as the refetch took.
+  return weights
+    .filter((w) => w.deletedAt == null)
+    .sort((a, b) => new Date(a.datetime).getTime() - new Date(b.datetime).getTime());
 }
 
 export function weightSeries(weights: WeightLogResponse[], range: RangeKey, now: Date): WeightPoint[] {
@@ -39,7 +46,7 @@ export function mergeWeightsWithLatest(
   weights: WeightLogResponse[],
   latestWeight: WeightLogResponse | null | undefined,
 ): WeightLogResponse[] {
-  if (!latestWeight) return weights;
+  if (!latestWeight || latestWeight.deletedAt != null) return weights;
   const withoutSameRow = weights.filter((w) => w.id !== latestWeight.id);
   const newestProgress = sortWeights(withoutSameRow)[withoutSameRow.length - 1];
   const latestTime = new Date(latestWeight.datetime).getTime();
