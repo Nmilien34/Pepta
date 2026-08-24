@@ -231,13 +231,28 @@ export function formatShortDate(iso: string): string {
   return `${MONTHS_SHORT[d.getUTCMonth()] ?? ''} ${d.getUTCDate()}`;
 }
 
-export function summary(progress: ProgressResponse, profile: UserProfileResponse | null) {
+export function summary(
+  progress: ProgressResponse,
+  profile: UserProfileResponse | null,
+  now: Date = new Date(),
+) {
   const ws = weightSummary(progress.weights, profile);
+  // A GOAL DATE IN THE PAST IS NOT A PROJECTION. The server computed it from
+  // the journey start (fixed there), so a long-running profile carried
+  // "2025-11-09" into August 2026 — and formatShortDate hides the year, so
+  // the legend read "Projected · Nov 9" and looked current while the chart
+  // correctly refused to extend to it. The stored value heals on the next
+  // profile write; until then, presenting it would be a lie. Nulled HERE so
+  // the legend, the chart's axis and the timeline all inherit one decision.
+  const storedGoalDate = profile?.estimatedGoalDate ?? null;
+  const goalDateIsAhead =
+    storedGoalDate != null &&
+    new Date(`${storedGoalDate}T23:59:59.999Z`).getTime() >= now.getTime();
   return {
     weight: ws,
     bmi: bmiView(ws.current, ws.unit, profile),
     retention: latestRetention(progress.weeklyRetention),
     measurements: latestMeasurements(progress.measurements),
-    estimatedGoalDate: profile?.estimatedGoalDate ?? null,
+    estimatedGoalDate: goalDateIsAhead ? storedGoalDate : null,
   };
 }

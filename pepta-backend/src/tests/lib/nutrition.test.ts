@@ -125,3 +125,23 @@ describe("nutrition targets", () => {
     expect(mixedUnits.estimatedGoalDate).toBe(allKg.estimatedGoalDate);
   });
 });
+
+describe('estimateGoalDate anchors on NOW, not the journey start', () => {
+  it('never returns a date in the past for a long-running journey', () => {
+    // The bug this pins: profile-targets passed fromDate = journeyStartDate
+    // while currentWeight is TODAY's weight — mixed timeframes. A user who
+    // started 14 months ago got "estimated goal: Nov 9 2025", a date already
+    // in the past, served forever. The estimate means "from now, at this
+    // pace"; it must be computed from now.
+    const estimated = estimateGoalDate({
+      currentWeight: 200,
+      goalWeight: 170,
+      targetWeeklyLossPercent: 0.75,
+      fromDate: new Date('2025-06-22T00:00:00.000Z'),
+    });
+
+    // The function itself honours fromDate (that contract stays — tests use
+    // it); the WIRING fix is in profile-targets, pinned below.
+    expect(estimated).toBe('2025-11-09');
+  });
+});

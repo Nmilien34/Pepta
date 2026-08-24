@@ -260,8 +260,15 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
   const hasTrack = useRef(false);
   const hasProgress = useRef(false);
   // The server window Progress last asked for (days; Infinity = everything).
-  // Undefined until a range is chosen — the server's default window applies.
-  const progressWindowRef = useRef<number | undefined>(undefined);
+  //
+  // DEFAULTS TO EVERYTHING, never to "let the server decide". The server's
+  // default is 30 days, and this ref used to start undefined — so QuickLog's
+  // no-arg refreshProgress() after a weight save silently REPLACED a full
+  // history with a 30-day payload. Progress then mounted, saw data present,
+  // and never refetched: "Since you started" showed three days, and a 20 lb
+  // loss barely moved the chart. The scope pill narrows this deliberately;
+  // nothing narrows it by accident.
+  const progressWindowRef = useRef<number>(Infinity);
 
   // ── Account isolation (P0) ─────────────────────────────────────────────
   // This provider mounts ONCE, above AccessGate, and used to keep its state
@@ -312,7 +319,7 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
     setProgressError(null);
     setPendingLogs(0);
     setLastSyncedAt(null);
-    progressWindowRef.current = undefined;
+    progressWindowRef.current = Infinity;
     hasData.current = false;
     hasTrack.current = false;
     hasProgress.current = false;

@@ -4,10 +4,11 @@ import {
   bmiView,
   computeBmi,
   formatShortDate,
-  weightPulse,
   latestMeasurements,
   latestRetention,
   mergeWeightsWithLatest,
+  summary,
+  weightPulse,
   weightSeries,
   weightSummary,
 } from './progressView';
@@ -146,5 +147,31 @@ describe('latestMeasurements', () => {
 describe('formatShortDate', () => {
   it('formats month + day', () => {
     expect(formatShortDate('2026-06-21T08:00:00.000Z')).toBe('Jun 21');
+  });
+});
+
+describe('a goal date in the past is not a projection', () => {
+  // A real profile carried estimatedGoalDate 2025-11-09 (computed from the
+  // journey start — fixed server-side). formatShortDate hides the year, so
+  // the legend read "Projected · Nov 9" in August 2026 and looked current,
+  // while the chart correctly refused to extend its axis to a past date. The
+  // stored stale value only heals on the next profile write, so the client
+  // must not present it meanwhile: summary nulls it, and the legend, chart
+  // and timeline all inherit that from the one place.
+  const profileWith = (estimatedGoalDate: string | null) =>
+    ({ estimatedGoalDate }) as never;
+  const empty = { weights: [], measurements: [], progressPhotos: [], weeklyRetention: [], sectionErrors: {} } as never;
+  const NOW = new Date('2026-08-24T12:00:00.000Z');
+
+  it('nulls a past goal date', () => {
+    expect(summary(empty, profileWith('2025-11-09'), NOW).estimatedGoalDate).toBeNull();
+  });
+
+  it('keeps a future one', () => {
+    expect(summary(empty, profileWith('2026-11-09'), NOW).estimatedGoalDate).toBe('2026-11-09');
+  });
+
+  it("keeps TODAY's — arriving today is not stale", () => {
+    expect(summary(empty, profileWith('2026-08-24'), NOW).estimatedGoalDate).toBe('2026-08-24');
   });
 });

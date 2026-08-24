@@ -66,11 +66,16 @@ export function computeProfileTargets(
     profile.goalWeight,
     profile.goalWeightUnit,
   );
+  // FROM NOW, NOT FROM THE JOURNEY START. This passed journeyStartDate while
+  // currentWeight is today's weight — mixed timeframes — so anyone whose
+  // journey outlasted their remaining plan got a goal date in the PAST, stored
+  // on the profile and served forever ("Projected · Nov 9" in Aug 2026, the
+  // hidden year 2025). The estimate means "at this pace, from now".
   const estimatedGoalDate = estimateGoalDate({
     currentWeight: currentWeightLb,
     goalWeight: goalWeightLb,
     targetWeeklyLossPercent: nutritionTargets.targetWeeklyLossPercent,
-    fromDate: new Date(`${profile.journeyStartDate}T00:00:00.000Z`),
+    fromDate: now,
   });
   const lifestyleTargets = computeLifestyleTargets({
     currentWeightLb,

@@ -270,3 +270,22 @@ describe('addActivityLog', () => {
     expect(String(row.id).startsWith('temp-')).toBe(true);
   });
 });
+
+describe('refreshProgress with no window asks for EVERYTHING', () => {
+  it('never lets the server default decide', async () => {
+    // The clobber this pins: the window ref started `undefined`, meaning
+    // "server default" — which is 30 days. QuickLog refreshes progress with
+    // no argument after a weight save, so logging a weight from Home REPLACED
+    // a full-history payload with a 30-day one; Progress then mounted, saw
+    // data present, and never refetched. "Since you started" showed 3 days,
+    // and a 20 lb loss barely moved the chart.
+    await mount();
+
+    await act(async () => {
+      await handle.refreshProgress();
+    });
+
+    const lastCall = mocks.getProgress.mock.calls.at(-1)!;
+    expect(lastCall[0]).toBe(Infinity);
+  });
+});
