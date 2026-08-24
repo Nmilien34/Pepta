@@ -250,3 +250,23 @@ describe('plus then minus — the log you just added is the one that comes off',
     expect(mocks.deleteLog).toHaveBeenCalledWith('water', 'w-fresh');
   });
 });
+
+describe('addActivityLog', () => {
+  it('lands an optimistic row the resistance switch can see immediately', async () => {
+    // The switch is CONTROLLED by state derived from track.activityLogs.
+    // Before this existed, turning it on wrote to the server and changed
+    // nothing locally — the thumb snapped back while the log piled up.
+    await mount();
+
+    await act(async () => {
+      handle.addActivityLog({ resistanceTraining: true, datetime: todayAt(14) });
+    });
+
+    const row = handle.track!.activityLogs[0]!;
+    expect(row.resistanceTraining).toBe(true);
+    expect(row.deletedAt).toBeNull();
+    // Temp id, by design — HomeScreen refuses to DELETE a temp id and pulls
+    // truth instead, so the marker matters.
+    expect(String(row.id).startsWith('temp-')).toBe(true);
+  });
+});

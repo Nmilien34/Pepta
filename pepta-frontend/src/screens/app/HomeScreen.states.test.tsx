@@ -16,6 +16,9 @@ import TestRenderer, { act } from "react-test-renderer";
 const mocks = vi.hoisted(() => ({
   data: { home: null as unknown, track: null as unknown },
   openQuickLog: vi.fn(),
+  addActivityLog: vi.fn(),
+  saveLog: vi.fn(async () => "saved" as const),
+  deleteLog: vi.fn(async () => true),
   openMeal: vi.fn(),
   navigate: vi.fn(),
 }));
@@ -163,6 +166,9 @@ vi.mock("../../context/PeptaDataContext", () => ({
     bumpProtein: vi.fn(),
     bumpWater: vi.fn(),
     bumpFiber: vi.fn(),
+    addActivityLog: mocks.addActivityLog,
+    saveLog: mocks.saveLog,
+    deleteLog: mocks.deleteLog,
   }),
 }));
 vi.mock("../../context/LogSheetsContext", () => ({
@@ -480,6 +486,38 @@ describe("Home · the doors to the nutrient screens", () => {
     });
     expect(mocks.openMeal).toHaveBeenCalled();
   });
+});
+
+describe("the resistance switch actually turns on", () => {
+  it("flips optimistically — the local row lands BEFORE the server call", async () => {
+    // The switch is controlled by a value derived from track.activityLogs.
+    // Turning it on used to fire saveLog and update NOTHING locally — no
+    // optimistic add exists for activity logs, unlike doses and weights — so
+    // the controlled value stayed false and the thumb snapped straight back.
+    // It read as "the drag doesn't work". Worse, every snapped-back flip had
+    // already written a REAL log: wrestling the switch five times left five
+    // resistance logs on the server, invisible until the next refresh.
+    const tree = render(doseDay());
+    const toggle = tree.root.findByProps({ accessibilityLabel: "Resistance training today" });
+
+    act(() => {
+      toggle.props.onValueChange(true);
+    });
+
+    expect(mocks.addActivityLog).toHaveBeenCalledWith(
+      expect.objectContaining({ resistanceTraining: true }),
+    );
+    expect(mocks.saveLog).toHaveBeenCalledWith(
+      "activity",
+      expect.objectContaining({ resistanceTraining: true }),
+    );
+    // Optimistic FIRST — a snapped-back switch with a server write behind it
+    // is exactly the bug.
+    expect(mocks.addActivityLog.mock.invocationCallOrder[0]!).toBeLessThan(
+      mocks.saveLog.mock.invocationCallOrder[0]!,
+    );
+  });
+
 });
 
 describe("Home · no two controls answer to one label", () => {

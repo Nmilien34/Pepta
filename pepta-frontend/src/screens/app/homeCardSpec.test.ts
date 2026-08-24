@@ -269,3 +269,36 @@ describe('the water card has no orphaned denominator', () => {
     expect(water).toContain('<Stepper label="8 oz"');
   });
 });
+
+describe('the resistance switch cannot pile up duplicate logs', () => {
+  // The visible bug was a thumb that snapped back; the invisible one was that
+  // every snapped-back flip still wrote a real log. These pin the two guards
+  // that keep the fix from trading one for the other.
+  const handler = home.slice(
+    home.indexOf('const setResistanceToday'),
+    home.indexOf('// When "Log a shot"'),
+  );
+
+  it('refuses a second ON while a row already exists', () => {
+    expect(handler).toContain('if (resistanceLogRef.current != null) return;');
+    // And the guard sits BEFORE the optimistic add.
+    expect(handler.indexOf('resistanceLogRef.current != null')).toBeLessThan(
+      handler.indexOf('addActivityLog(input)'),
+    );
+  });
+
+  it('never DELETEs a temp id — it pulls truth instead', () => {
+    // Deleting the optimistic id would 404, roll back, and flip the switch
+    // back on in the user's hand.
+    expect(handler).toContain("if (id.startsWith('temp-'))");
+    expect(handler.indexOf("id.startsWith('temp-')")).toBeLessThan(
+      handler.indexOf("void deleteLog('activity', id)"),
+    );
+  });
+
+  it('adds the optimistic row before the server write', () => {
+    expect(handler.indexOf('addActivityLog(input)')).toBeLessThan(
+      handler.indexOf("saveLog('activity', input)"),
+    );
+  });
+});

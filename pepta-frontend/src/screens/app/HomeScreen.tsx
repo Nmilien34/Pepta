@@ -63,7 +63,7 @@ function formatSyncTime(iso: string): string {
 export function HomeScreen() {
   const theme = useTheme();
   const navigation = useNavigation<NavigationProp<Record<string, object | undefined>>>();
-  const { home, track, homeLoading, homeError, homeRefreshing, homeRange, refreshHome, refreshTrack, schedules, cycles, refreshScheduling, bumpProtein, bumpWater, bumpFiber, pendingLogs, lastSyncedAt, saveLog, deleteLog } = usePeptaData();
+  const { home, track, homeLoading, homeError, homeRefreshing, homeRange, refreshHome, refreshTrack, schedules, cycles, refreshScheduling, bumpProtein, bumpWater, bumpFiber, pendingLogs, lastSyncedAt, saveLog, deleteLog, addActivityLog } = usePeptaData();
   const { openQuickLog, openMeal } = useLogSheets();
   const [streakOpen, setStreakOpen] = useState(false);
 
@@ -104,11 +104,31 @@ export function HomeScreen() {
    */
   const setResistanceToday = (next: boolean) => {
     if (next) {
-      void saveLog('activity', { resistanceTraining: true, datetime: new Date().toISOString() });
+      // Already on (a row exists, real or optimistic): write nothing. The
+      // snapped-back era proved why — every flip of a switch that LOOKED dead
+      // still landed a real log, so wrestling it piled duplicates server-side.
+      if (resistanceLogRef.current != null) return;
+      const input = { resistanceTraining: true, datetime: new Date().toISOString() };
+      // OPTIMISTIC FIRST. The switch is controlled by state derived from
+      // track.activityLogs; saveLog alone changes nothing locally, which is
+      // exactly the bug — the thumb snapped back while the write succeeded.
+      addActivityLog(input);
+      void saveLog('activity', input).then((result) => {
+        // Replace the temp row with the real one so OFF has a real id.
+        if (result === 'saved') void refreshTrack();
+      });
       return;
     }
     const id = resistanceLogRef.current;
-    if (id) void deleteLog('activity', id);
+    if (!id) return;
+    if (id.startsWith('temp-')) {
+      // Off within the sub-second before the real id lands. The server row
+      // exists (or is queued) — deleting the temp id would 404 and roll the
+      // switch back on. Pull truth; the next tap deletes the real row.
+      void refreshTrack();
+      return;
+    }
+    void deleteLog('activity', id);
   };
   // When "Log a shot" is on the level card, and whether it beats. Dose LOGS,
   // not medicationLevels — the level list excludes unmodelled and oral

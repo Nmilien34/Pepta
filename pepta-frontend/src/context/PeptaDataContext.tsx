@@ -20,7 +20,9 @@ import type {
   CompoundResponse,
   CycleInput,
   CycleResponse,
+  ActivityLogInput,
   DoseLogInput,
+  ActivityLogResponse,
   DoseLogResponse,
   HomeRangeKey,
   HomeResponse,
@@ -120,6 +122,13 @@ interface PeptaDataContextValue {
   // Optimistic inserts for the QuickLog sheet (prepend a temp row; the next
   // refresh reconciles to server truth).
   addDoseLog(input: DoseLogInput): void;
+  /**
+   * Optimistic activity row. The Home resistance switch is CONTROLLED by a
+   * value derived from track.activityLogs; without this, turning it on wrote
+   * to the server and changed nothing locally, so the thumb snapped back —
+   * and every snapped-back flip had still written a real log.
+   */
+  addActivityLog(input: ActivityLogInput): void;
   addWeightLog(input: WeightLogInput): void;
   addMeasurement(input: MeasurementInput): void;
   addSideEffectLog(input: SideEffectLogInput): void;
@@ -621,6 +630,16 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
     },
     [refreshScheduling],
   );
+  const addActivityLog = useCallback((input: ActivityLogInput) => {
+    setTrack((t) =>
+      t
+        ? {
+            ...t,
+            activityLogs: [optimisticRow<ActivityLogResponse>(input), ...t.activityLogs],
+          }
+        : t,
+    );
+  }, []);
   const addDoseLog = useCallback((input: DoseLogInput) => {
     setTrack((t) =>
       t
@@ -945,6 +964,7 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
       refreshProgress,
       addCompound,
       addDoseLog,
+      addActivityLog,
       addWeightLog,
       addMeasurement,
       addSideEffectLog,
@@ -980,6 +1000,7 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
       refreshProgress,
       addCompound,
       addDoseLog,
+      addActivityLog,
       addWeightLog,
       addMeasurement,
       addSideEffectLog,
