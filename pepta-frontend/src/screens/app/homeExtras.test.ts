@@ -92,6 +92,29 @@ describe('buildTodaysLog', () => {
     expect(chips.find((c) => c.kind === 'shot')!.label).toBe('Tirzepatide');
     expect(chips.find((c) => c.kind === 'weight')!.label).toBe('184 lb');
   });
+  it('names each kind of activity for what it is', () => {
+    // Twelve "Workout" chips appeared after the resistance switch pile-up,
+    // because every activity row without steps was labelled "Workout" — a
+    // resistance MARKER included. The three kinds are distinct records:
+    // steps are steps, a workout is minutes of one, and the toggle writes a
+    // marker with neither. Flattening them made the ghosts unreadable — the
+    // user could not tell twelve toggle-echoes from twelve gym sessions.
+    const at = (h: number) => new Date(2026, 5, 23, h, 0).toISOString();
+    const t = track({
+      activityLogs: [
+        { id: 'a1', steps: 3200, resistanceTraining: false, datetime: at(8), deletedAt: null },
+        { id: 'a2', workoutMinutes: 45, resistanceTraining: false, datetime: at(9), deletedAt: null },
+        { id: 'a3', resistanceTraining: true, datetime: at(10), deletedAt: null },
+      ] as unknown as TrackResponse['activityLogs'],
+    });
+
+    const labels = buildTodaysLog(t, { activeCompounds: [], latestWeight: null } as unknown as HomeResponse, now)
+      .map((c) => c.label)
+      .reverse();
+
+    expect(labels).toEqual(['3,200 steps', 'Workout · 45 min', 'Resistance']);
+  });
+
   it('returns empty with no logs', () => {
     expect(buildTodaysLog(track(), { activeCompounds: [], latestWeight: null } as unknown as HomeResponse, now)).toEqual([]);
   });
@@ -126,12 +149,15 @@ describe('resistance today', () => {
     const view = withLogs([activityLog({ id: 'r1', resistanceTraining: true })]);
 
     expect(view.resistanceToday).toBe(true);
-    expect(view.resistanceLogId).toBe('r1');
+    // Plural now: the pile-up era wrote duplicate markers, and a single id
+    // left the switch stuck ON — OFF deleted one of twelve. The day's state
+    // carries every live marker so OFF can clear the day.
+    expect(view.resistanceLogIds).toEqual(['r1']);
   });
 
   it('is off without one', () => {
     expect(withLogs([activityLog({ steps: 4000 })]).resistanceToday).toBe(false);
-    expect(withLogs([]).resistanceLogId).toBeNull();
+    expect(withLogs([]).resistanceLogIds).toEqual([]);
   });
 
   it('ignores a deleted one', () => {

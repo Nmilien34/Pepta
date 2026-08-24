@@ -245,6 +245,10 @@ beforeEach(() => {
   mocks.openQuickLog.mockClear();
   mocks.openMeal.mockClear();
   mocks.navigate.mockClear();
+  mocks.addActivityLog.mockClear();
+  mocks.saveLog.mockClear();
+  mocks.deleteLog.mockClear();
+  mocks.alert.mockClear();
 });
 
 describe("Home · first run — the Get started checklist", () => {
@@ -487,6 +491,40 @@ describe("Home · the doors to the nutrient screens", () => {
       doorFor(tree, "Log a meal")?.props.onPress();
     });
     expect(mocks.openMeal).toHaveBeenCalled();
+  });
+});
+
+describe("switching resistance OFF clears the whole day", () => {
+  it("deletes every live marker, not the first of twelve", async () => {
+    // The pile-up era wrote a marker per snapped-back flip — twelve on one
+    // real account. With a single-id delete, OFF removed one and the switch
+    // flipped straight back on: eleven more taps to dig out. The toggle is a
+    // boolean over the DAY, so off clears the day — which also makes one
+    // flip the self-service cleanup for the old ghosts.
+    const today = new Date();
+    const marker = (id: string) => ({
+      id,
+      resistanceTraining: true,
+      datetime: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 9).toISOString(),
+      deletedAt: null,
+    });
+    mocks.data.home = doseDay();
+    mocks.data.track = {
+      ...EMPTY_TRACK,
+      activityLogs: [marker("g1"), marker("g2"), marker("g3")] as never,
+    };
+    let tree!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      tree = TestRenderer.create(<HomeScreen />);
+    });
+
+    act(() => {
+      tree.root
+        .findByProps({ accessibilityLabel: "Resistance training today" })
+        .props.onValueChange(false);
+    });
+
+    expect((mocks.deleteLog.mock.calls as unknown[][]).map((c) => c[1])).toEqual(["g1", "g2", "g3"]);
   });
 });
 

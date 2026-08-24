@@ -43,7 +43,7 @@ export interface ActivitySummary {
    */
   resistanceToday: boolean;
   /** The log carrying it, so turning the row off can remove it. */
-  resistanceLogId: string | null;
+  resistanceLogIds: string[];
 }
 
 export function buildActivity(
@@ -77,18 +77,28 @@ export function buildActivity(
   };
 }
 
-/** Today's resistance log, if there is one. Always today, never the range. */
+/**
+ * Today's resistance logs — ALL of them. Always today, never the range.
+ *
+ * Plural is the fix for a stuck switch: the pile-up era wrote duplicate
+ * marker rows (twelve on one real account), and with a single id the OFF tap
+ * deleted one and left the switch ON — eleven more flips to dig out. The
+ * toggle means "did I train today", a boolean over the DAY, so turning it off
+ * clears every marker the day holds.
+ */
 function resistanceState(
   track: TrackResponse | null,
   now: Date,
-): { resistanceToday: boolean; resistanceLogId: string | null } {
-  const today = (track?.activityLogs ?? []).find(
-    (log) =>
-      log.deletedAt == null &&
-      log.resistanceTraining === true &&
-      inLocalRange(log.datetime, now, 'today'),
-  );
-  return { resistanceToday: today != null, resistanceLogId: today?.id ?? null };
+): { resistanceToday: boolean; resistanceLogIds: string[] } {
+  const ids = (track?.activityLogs ?? [])
+    .filter(
+      (log) =>
+        log.deletedAt == null &&
+        log.resistanceTraining === true &&
+        inLocalRange(log.datetime, now, 'today'),
+    )
+    .map((log) => log.id);
+  return { resistanceToday: ids.length > 0, resistanceLogIds: ids };
 }
 
 export type LogKind = 'shot' | 'meal' | 'water' | 'protein' | 'weight' | 'sideEffect' | 'measurement' | 'activity';
@@ -117,7 +127,22 @@ export function buildTodaysLog(
     for (const m of track.mealLogs) if (m.deletedAt == null) add('meal', m.foodName, m.datetime);
     for (const w of track.waterLogs) if (w.deletedAt == null) add('water', `${w.amountOz} oz`, w.datetime);
     for (const p of track.proteinLogs) if (p.deletedAt == null) add('protein', `${p.grams} g`, p.datetime);
-    for (const a of track.activityLogs) if (a.deletedAt == null) add('activity', a.steps ? `${a.steps} steps` : 'Workout', a.datetime);
+    // Three kinds of activity, named apart. Everything without steps was
+    // "Workout" — including the resistance TOGGLE's marker rows, so a run of
+    // toggle-echoes was indistinguishable from a run of gym sessions.
+    for (const a of track.activityLogs)
+      if (a.deletedAt == null)
+        add(
+          'activity',
+          a.steps
+            ? `${a.steps.toLocaleString()} steps`
+            : a.workoutMinutes
+              ? `Workout · ${a.workoutMinutes} min`
+              : a.resistanceTraining
+                ? 'Resistance'
+                : 'Workout',
+          a.datetime,
+        );
     for (const s of track.sideEffectLogs) if (s.deletedAt == null) add('sideEffect', 'Side effect', s.datetime);
     for (const me of track.measurements) if (me.deletedAt == null) add('measurement', measurementLabel(me.type), me.datetime);
   }

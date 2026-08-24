@@ -279,21 +279,30 @@ describe('the resistance switch cannot pile up duplicate logs', () => {
     home.indexOf('// When "Log a shot"'),
   );
 
-  it('refuses a second ON while a row already exists', () => {
-    expect(handler).toContain('if (resistanceLogRef.current != null) return;');
+  it('refuses a second ON while any row already exists', () => {
+    expect(handler).toContain('if (resistanceLogRef.current.length > 0) return;');
     // And the guard sits BEFORE the optimistic add.
-    expect(handler.indexOf('resistanceLogRef.current != null')).toBeLessThan(
+    expect(handler.indexOf('resistanceLogRef.current.length > 0')).toBeLessThan(
       handler.indexOf('addActivityLog(input)'),
     );
   });
 
-  it('never DELETEs a temp id — it pulls truth instead', () => {
-    // Deleting the optimistic id would 404, roll back, and flip the switch
+  it('OFF clears every live marker for the day, never just one', () => {
+    // Plural is load-bearing: the pile-up era left duplicate markers, and
+    // deleting a single one flipped the switch straight back on — eleven
+    // flips from clean on a real account. One flip now clears the day, which
+    // is also the self-service cleanup for the old ghosts.
+    expect(handler).toContain('for (const id of real) void deleteLog(');
+  });
+
+  it('never DELETEs a temp id — it filters them and pulls truth instead', () => {
+    // Deleting an optimistic id would 404, roll back, and flip the switch
     // back on in the user's hand.
-    expect(handler).toContain("if (id.startsWith('temp-'))");
-    expect(handler.indexOf("id.startsWith('temp-')")).toBeLessThan(
+    expect(handler).toContain("ids.filter((id) => !id.startsWith('temp-'))");
+    expect(handler.indexOf('.filter((id) =>')).toBeLessThan(
       handler.indexOf("void deleteLog('activity', id)"),
     );
+    expect(handler).toContain('void refreshTrack();');
   });
 
   it('adds the optimistic row before the server write', () => {

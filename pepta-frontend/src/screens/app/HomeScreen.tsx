@@ -94,7 +94,7 @@ export function HomeScreen() {
    * early returns — where hooks must live — and `activity` is built below
    * them; the ref is read at tap time, by which point it is set.
    */
-  const resistanceLogRef = useRef<string | null>(null);
+  const resistanceLogRef = useRef<string[]>([]);
 
   /**
    * Turning the row on writes an activity log for today; turning it off
@@ -133,7 +133,7 @@ export function HomeScreen() {
       // Already on (a row exists, real or optimistic): write nothing. The
       // snapped-back era proved why — every flip of a switch that LOOKED dead
       // still landed a real log, so wrestling it piled duplicates server-side.
-      if (resistanceLogRef.current != null) return;
+      if (resistanceLogRef.current.length > 0) return;
       const input = { resistanceTraining: true, datetime: new Date().toISOString() };
       // OPTIMISTIC FIRST. The switch is controlled by state derived from
       // track.activityLogs; saveLog alone changes nothing locally, which is
@@ -145,16 +145,21 @@ export function HomeScreen() {
       });
       return;
     }
-    const id = resistanceLogRef.current;
-    if (!id) return;
-    if (id.startsWith('temp-')) {
-      // Off within the sub-second before the real id lands. The server row
-      // exists (or is queued) — deleting the temp id would 404 and roll the
-      // switch back on. Pull truth; the next tap deletes the real row.
+    // OFF clears the DAY, not one row. The pile-up era left duplicate marker
+    // rows (twelve on one real account); deleting a single one flipped the
+    // switch straight back on, eleven flips from clean. The toggle is a
+    // boolean over the day, so off means every live marker goes — which also
+    // makes one flip the self-service cleanup for old ghosts.
+    const ids = resistanceLogRef.current;
+    if (ids.length === 0) return;
+    const real = ids.filter((id) => !id.startsWith('temp-'));
+    for (const id of real) void deleteLog('activity', id);
+    if (real.length < ids.length) {
+      // Some rows are still optimistic. The server rows exist (or are
+      // queued) — deleting a temp id would 404 and roll the switch back on.
+      // Pull truth; the next tap clears the stragglers.
       void refreshTrack();
-      return;
     }
-    void deleteLog('activity', id);
   };
   // When "Log a shot" is on the level card, and whether it beats. Dose LOGS,
   // not medicationLevels — the level list excludes unmodelled and oral
@@ -247,7 +252,7 @@ export function HomeScreen() {
   const selectedRange = home.selectedRange ?? homeRange;
   const rangeAvailability = home.rangeAvailability ?? { today: true, week: false, month: false, year: false };
   const activity = buildActivity(track, home.profile, new Date(), selectedRange, home.rangeTotals);
-  resistanceLogRef.current = activity.resistanceLogId;
+  resistanceLogRef.current = activity.resistanceLogIds;
   const todaysLog = buildTodaysLog(track, home, new Date(), selectedRange);
   // All four designed tiles, two rows of two. Recipes was held back while its
   // screen was designed-but-unbuilt — a tile that goes nowhere is worse than a
