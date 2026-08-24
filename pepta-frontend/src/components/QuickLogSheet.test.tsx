@@ -75,7 +75,7 @@ vi.mock("../theme", () => ({
     shadows: { card: {} },
     spacing: { sm: 8 },
     sizes: {
-      button: { height: 56, borderRadius: 18, paddingHorizontal: 16 },
+      button: { height: 56, borderRadius: 14, borderWidth: 1.5, paddingHorizontal: 22 },
     },
     motion: {
       scale: { pressIn: 0.98, pressOut: 1 },

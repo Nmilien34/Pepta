@@ -129,7 +129,7 @@ vi.mock("../../theme", () => ({
     },
     radii: { pill: 999 },
     sizes: {
-      button: { height: 56 },
+      button: { height: 56, borderRadius: 14, borderWidth: 1.5, paddingHorizontal: 22 },
       hitSlop: 10,
     },
     spacing: {

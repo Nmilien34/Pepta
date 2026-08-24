@@ -149,6 +149,16 @@ describe("the other variants share the edge logic", () => {
     expect(skin.borderRadius).toBe(14);
   });
 
+  it("labels secondary in buttonFill, which PASSES on the tinted ground", () => {
+    // The regression this catches: the first cut of the restyle used `primary`
+    // (#7C5CFC) here, which is 3.75:1 on #EFEBFF — a fail, introduced by a
+    // change argued for on accessibility grounds. #6751E8 is 4.59:1.
+    const tree = render({ variant: "secondary" });
+    const label = tree.root.findAll((n) => n.props?.color != null)[0];
+
+    expect(label?.props.color).toBe("buttonFill");
+  });
+
   it("leaves ghost transparent, with no edge to draw", () => {
     const skin = skinOf(render({ variant: "ghost" }));
 

@@ -98,12 +98,13 @@ export function Button({
     };
   };
 
+  // SECONDARY'S LABEL IS buttonFill, NOT primary. The restyle put a purple
+  // label on a tinted fill, and #7C5CFC on #EFEBFF is 3.75:1 — a fail, and an
+  // accessibility regression introduced by a change whose whole argument was
+  // accessibility. The deeper #6751E8 is 4.59:1 and passes, and it is the same
+  // token the primary fill uses, so the pair still reads as one family.
   const labelColor =
-    variant === "primary"
-      ? "onPrimary"
-      : variant === "secondary"
-        ? "primary"
-        : "primary";
+    variant === "primary" ? "onPrimary" : variant === "secondary" ? "buttonFill" : "primary";
 
   const inner = (
     <>
