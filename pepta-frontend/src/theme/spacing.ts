@@ -42,7 +42,11 @@ export const sizes = {
   button: {
     height: 56,
     paddingHorizontal: 22,
-    borderRadius: radii.pill,
+    // NOT a pill. At radius 999 on a 56pt height both ends are perfect
+    // semicircles — the shape has no corners left, and corners are what make
+    // something read as built rather than as a lozenge. 14 keeps four.
+    borderRadius: 14,
+    borderWidth: 1.5,
   },
   stepperButton: {
     size: 36, // circular − / +

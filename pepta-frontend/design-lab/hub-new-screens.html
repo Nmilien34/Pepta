@@ -217,6 +217,22 @@
      is retired for good after it. A returning user's Home never twitches. */
   .logcta.still{animation:none}
   /* Week strip: a day you TOOK it gets a light fill; the dot is what is COMING. */
+
+.btn-now,.btn-a,.btn-b,.btn-sec,.btn-quiet{width:100%;height:56px;border:0;font-family:var(--f);
+  font-weight:800;font-size:16.5px;letter-spacing:-.1px;cursor:pointer;display:block}
+.btn-now{border-radius:999px;color:#fff;
+  background:linear-gradient(90deg,#6751E8,#8C63F4);
+  box-shadow:0 10px 18px -4px rgba(124,92,252,.24)}
+.btn-a{border-radius:14px;color:#fff;background:#7C5CFC;border:1.5px solid #6146D9}
+.btn-b{border-radius:14px;color:#fff;background:#6751E8;border:1.5px solid #5642C4}
+.btn-b.pressed{background:#5642C4;border-color:#4736A8}
+.btn-sec{border-radius:14px;background:#EFEBFF;color:var(--primary);border:1.5px solid #DCD3FF}
+.btn-quiet{border-radius:14px;background:var(--alt);color:var(--ts);border:1.5px solid var(--border);
+  font-weight:700;font-size:15px;height:48px}
+.rrow{display:flex;gap:8px;margin-top:2px}
+.rrow .btn-b{font-size:13px;height:46px}
+.bnote{font-size:11.5px;line-height:1.5;color:var(--ts);margin-top:9px}
+.card .sec{margin-bottom:8px}
 </style><style>
   .cv{position:relative;background:var(--bg);overflow:hidden;min-height:726px;display:flex;flex-direction:column}
   .cv .orb{position:absolute;border-radius:999px;background:rgba(124,92,252,.05);pointer-events:none}
@@ -2188,5 +2204,89 @@
   </div>
 
   <!-- ================= ACCOUNT ================= -->
+  
+<!-- ================= BUTTONS ================= -->
+<div class="cmp" style="margin-top:52px">
+<div class="fw" style="width:360px">
+<div class="fl">Primary button <span style="color:var(--primary)">(NEW)</span></div>
+<div class="card" style="width:360px;padding:22px">
+
+  <div class="sec">TODAY</div>
+  <button class="btn-now">Continue</button>
+  <div class="bnote">Gradient #6751E8&rarr;#8C63F4 &middot; pill 999 &middot; coloured glow 24%<br>
+  Three softening effects at once, no defined edge.</div>
+
+  <div class="sec" style="margin-top:22px">PROPOSED &middot; A</div>
+  <button class="btn-a">Continue</button>
+  <div class="bnote">Flat <b>#7C5CFC</b> &middot; edge <b>#6146D9</b> &middot; radius 14 &middot; no shadow<br>
+  Brand purple, unchanged. <span style="color:var(--danger)">White text 4.3:1 &mdash; under AA.</span></div>
+
+  <div class="sec" style="margin-top:22px">PROPOSED &middot; B</div>
+  <button class="btn-b">Continue</button>
+  <div class="bnote">Flat <b>#6751E8</b> &middot; edge <b>#5642C4</b> &middot; radius 14 &middot; no shadow<br>
+  Already in the palette (the gradient's own start).
+  <span style="color:var(--fiber)">White text 5.2:1 &mdash; passes AA.</span></div>
+
+</div>
+</div>
+
+<div class="fw" style="width:360px">
+<div class="fl">Radius &amp; states</div>
+<div class="card" style="width:360px;padding:22px">
+  <div class="sec">RADIUS, ON THE SAME FILL</div>
+  <div class="rrow">
+    <button class="btn-b" style="border-radius:10px">10</button>
+    <button class="btn-b" style="border-radius:14px">14</button>
+    <button class="btn-b" style="border-radius:18px">18</button>
+    <button class="btn-b" style="border-radius:999px">pill</button>
   </div>
+  <div class="bnote">14 keeps four readable corners &mdash; corners are what make a
+  shape look built. The pill has none left, which is why it reads as a lozenge.</div>
+
+  <div class="sec" style="margin-top:22px">STATES</div>
+  <button class="btn-b">Default</button>
+  <button class="btn-b pressed" style="margin-top:10px">Pressed &middot; darkens, no scale</button>
+  <button class="btn-b" style="margin-top:10px;opacity:.45" disabled>Disabled</button>
+  <div class="bnote">Press darkens the fill instead of springing the shape:
+  a flat button has an edge to hold still, and movement blurs it.</div>
+</div>
+</div>
+
+<div class="fw" style="width:360px">
+<div class="fl">Accents &amp; secondary</div>
+<div class="card" style="width:360px;padding:22px">
+  <div class="sec">SAME RULE, EVERY ACCENT</div>
+  <button class="btn-b" style="background:var(--protein);border-color:#E06A1F;margin-top:0">Log a meal</button>
+  <button class="btn-b" style="background:var(--water);border-color:#1F82D6;margin-top:10px">Log water</button>
+  <button class="btn-b" style="background:var(--fiber);border-color:#22A344;margin-top:10px">Log fibre</button>
+  <button class="btn-b" style="background:var(--weight);border-color:#C4429F;margin-top:10px">Log weight</button>
+  <div class="bnote">Fill = the accent, edge = the same accent one step darker.
+  One rule, so a new accent needs no new decision.</div>
+
+  <div class="sec" style="margin-top:22px">SECONDARY &amp; QUIET</div>
+  <button class="btn-sec" style="margin-top:0">Secondary</button>
+  <button class="btn-quiet" style="margin-top:10px">Not now</button>
+  <div class="bnote">The secondary borrows the same edge logic on a tinted fill,
+  so the pair reads as one family.</div>
+</div>
+</div>
+
+<div class="fw" style="width:360px">
+<div class="fl">In context</div>
+<div class="card" style="width:360px;padding:22px">
+  <div style="font-weight:800;font-size:19px;letter-spacing:-.3px">Start today</div>
+  <div class="lab" style="margin-top:5px;line-height:1.45">Your level, your vial math and
+  your protein &mdash; in one place.</div>
+  <div style="background:var(--alt);border-radius:14px;padding:12px;margin-top:14px">
+    <div style="font-weight:800;font-size:14px">Yearly &middot; $59.99</div>
+    <div class="lab" style="font-size:11.5px;margin-top:2px">One payment &mdash; done for the year</div>
+  </div>
+  <button class="btn-b" style="margin-top:14px">Continue</button>
+  <div class="bnote">The reason to look twice: with no glow, the button stops
+  competing with the price block and starts terminating the page.</div>
+</div>
+</div>
+</div>
+
+</div>
 </body></html>

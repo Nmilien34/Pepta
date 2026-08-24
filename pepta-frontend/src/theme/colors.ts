@@ -16,6 +16,25 @@ const accents = {
   // The hub uses it for meters and progress fills (at 90deg, and 135deg on
   // tiles), which is why a flat primary in its place reads as a disabled
   // control rather than a filled one.
+  /**
+   * PRIMARY BUTTON FILL, and its own edge.
+   *
+   * The button was a gradient (#6751E8→#8C63F4) in a full pill under a
+   * coloured glow — three softening effects at once and no defined boundary,
+   * so it read as a lozenge painted on the surface rather than an object cut
+   * into it. Flat fill + a one-step-darker edge is what gives a button its
+   * shape: the stroke reads as the object's own edge catching less light.
+   *
+   * The fill is `primaryGradientStart`, already in the palette — the gradient
+   * collapsed to its deeper end, not a new colour. It is also the accessible
+   * one: white on #6751E8 is 5.2:1 (passes AA), where white on the lighter
+   * #7C5CFC is 4.3:1 and fails for anything but large text.
+   */
+  buttonFill: "#6751E8",
+  buttonEdge: "#5642C4",
+  /** Pressed: the fill darkens. A flat button has an edge worth holding still. */
+  buttonFillPressed: "#5642C4",
+  buttonEdgePressed: "#4736A8",
   fillGradientStart: "#8B6CFF",
   fillGradientEnd: "#C77DFF",
   // Data-type colors

@@ -1,16 +1,31 @@
-// Button — primary / secondary / ghost. Primary fills with the brand gradient
-// (Master Prompt §3A primaryGrad). Press gives a subtle, calm scale-spring
-// (motion tokens). Pill radius, 56px height, bold label.
+// Button — primary / secondary / ghost.
+//
+// FLAT FILL WITH ITS OWN EDGE. This was a gradient (#6751E8→#8C63F4) in a full
+// pill under a coloured glow: three softening effects at once and no defined
+// boundary, so the shape read as a lozenge painted onto the surface rather
+// than an object cut into it. The gradient was the worst of the three — a ~5%
+// luminance shift across 56pt is too subtle to read as a deliberate gradient
+// and too present to read as one clean colour, which left the fill looking
+// unresolved.
+//
+// Now: one flat colour, a one-step-darker stroke (a real edge reads as the
+// object's own boundary catching less light), radius 14 so four corners
+// survive, and no shadow. The fill moved to `buttonFill` (#6751E8) — the old
+// gradient's own deeper end, so it is not a new colour — which also fixes
+// contrast: white on it is 5.2:1 and passes AA, where the lighter #7C5CFC was
+// 4.3:1 and failed for anything but large text.
+//
+// PRESS DARKENS INSTEAD OF SCALING. A spring-scale blurs the edge for the
+// length of the animation, which is precisely the thing this restyle exists
+// to give the button. Darkening the fill keeps the shape still.
 
-import React, { useRef } from "react";
+import React from "react";
 import {
   ActivityIndicator,
-  Animated,
   Pressable,
   View,
   type ViewStyle,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "../theme";
 import { AppText } from "./AppText";
 
@@ -41,49 +56,53 @@ export function Button({
   style,
 }: ButtonProps) {
   const theme = useTheme();
-  const scale = useRef(new Animated.Value(1)).current;
   const isDisabled = disabled || loading;
-
-  const pressIn = () =>
-    Animated.spring(scale, {
-      toValue: theme.motion.scale.pressIn,
-      useNativeDriver: true,
-      ...theme.motion.springs.press,
-    }).start();
-  const pressOut = () =>
-    Animated.spring(scale, {
-      toValue: theme.motion.scale.pressOut,
-      useNativeDriver: true,
-      ...theme.motion.springs.press,
-    }).start();
 
   const base: ViewStyle = {
     height: theme.sizes.button.height,
     borderRadius: theme.sizes.button.borderRadius,
+    borderWidth: theme.sizes.button.borderWidth,
     paddingHorizontal: theme.sizes.button.paddingHorizontal,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
     gap: theme.spacing.sm,
     width: fullWidth ? "100%" : undefined,
-    opacity: isDisabled ? 0.5 : 1,
+    opacity: isDisabled ? 0.45 : 1,
   };
-  const primaryShadow: ViewStyle | null =
-    variant === "primary" && !isDisabled
-      ? {
-          shadowColor: theme.colors.primary,
-          shadowOpacity: 0.24,
-          shadowRadius: 18,
-          shadowOffset: { width: 0, height: 10 },
-          elevation: 3,
-        }
-      : null;
+
+  /** Fill and edge per variant; pressed darkens both, never moves the shape. */
+  const skin = (pressed: boolean): ViewStyle => {
+    if (variant === "primary") {
+      return {
+        backgroundColor:
+          pressed && !isDisabled
+            ? theme.colors.buttonFillPressed
+            : theme.colors.buttonFill,
+        borderColor:
+          pressed && !isDisabled
+            ? theme.colors.buttonEdgePressed
+            : theme.colors.buttonEdge,
+      };
+    }
+    if (variant === "secondary") {
+      // The same edge logic on a tinted fill, so the pair reads as one family.
+      return {
+        backgroundColor: pressed && !isDisabled ? "#E4DDFF" : "#EFEBFF",
+        borderColor: "#DCD3FF",
+      };
+    }
+    return {
+      backgroundColor: pressed && !isDisabled ? theme.colors.surfaceAlt : "transparent",
+      borderColor: "transparent",
+    };
+  };
 
   const labelColor =
     variant === "primary"
       ? "onPrimary"
       : variant === "secondary"
-        ? "textPrimary"
+        ? "primary"
         : "primary";
 
   const inner = (
@@ -108,17 +127,9 @@ export function Button({
   );
 
   return (
-    <Animated.View
-      style={[
-        { transform: [{ scale }], width: fullWidth ? "100%" : undefined },
-        primaryShadow,
-        style,
-      ]}
-    >
+    <View style={[{ width: fullWidth ? "100%" : undefined }, style]}>
       <Pressable
         onPress={onPress}
-        onPressIn={pressIn}
-        onPressOut={pressOut}
         disabled={isDisabled}
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel}
@@ -127,53 +138,8 @@ export function Button({
           busy: Boolean(loading),
         }}
       >
-        {variant === "primary" ? (
-          <LinearGradient
-            colors={[
-              theme.colors.primaryGradientStart,
-              theme.colors.primaryGradientEnd,
-            ]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0.85 }}
-            style={[
-              base,
-              {
-                borderWidth: 1,
-                borderColor: "rgba(255,255,255,0.18)",
-                overflow: "hidden",
-              },
-            ]}
-          >
-            <LinearGradient
-              pointerEvents="none"
-              colors={["rgba(255,255,255,0.24)", "rgba(255,255,255,0)"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 0, y: 1 }}
-              style={{
-                position: "absolute",
-                top: 1,
-                left: 1,
-                right: 1,
-                height: Math.round(theme.sizes.button.height * 0.44),
-                borderTopLeftRadius: theme.sizes.button.borderRadius - 1,
-                borderTopRightRadius: theme.sizes.button.borderRadius - 1,
-              }}
-            />
-            {inner}
-          </LinearGradient>
-        ) : (
-          <View
-            style={[
-              base,
-              variant === "secondary"
-                ? { backgroundColor: theme.colors.surfaceAlt }
-                : { backgroundColor: "transparent" },
-            ]}
-          >
-            {inner}
-          </View>
-        )}
+        {({ pressed }) => <View style={[base, skin(pressed)]}>{inner}</View>}
       </Pressable>
-    </Animated.View>
+    </View>
   );
 }
