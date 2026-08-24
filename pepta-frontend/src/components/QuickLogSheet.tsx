@@ -292,7 +292,10 @@ export function QuickLogSheet({
   const refreshHomeTrack = () =>
     Promise.all([refreshHome(), refreshTrack()]).then(() => undefined);
   const refreshHomeProgress = () =>
-    Promise.all([refreshHome(), refreshProgress()]).then(() => undefined);
+    // Track included: the optimistic weight row lands in track.weightLogs too
+    // (Your log, the streak sheet), and its temp id must become real —
+    // deleting a temp id from the feed would 404 and roll back.
+    Promise.all([refreshHome(), refreshProgress(), refreshTrack()]).then(() => undefined);
 
   const onSave = () => {
     const ts = now();

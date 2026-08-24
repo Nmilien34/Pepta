@@ -76,6 +76,25 @@ describe("homeWithLatestWeight", () => {
     expect(next?.latestWeight?.unit).toBe("lb");
     expect(next?.latestWeight?.datetime).toBe("2026-06-23T12:00:00.000Z");
   });
+
+  it("does NOT let a backdated weigh-in clobber a newer latest", () => {
+    // "I forgot Tuesday's 195" entered after today's 180 must not turn the
+    // Home card into "195 now". mergeWeightsWithLatest guards ordering for
+    // Progress; this is the Home-side twin, and it had no guard at all.
+    const withToday = homeWithLatestWeight(baseHome, {
+      value: 180,
+      unit: "lb",
+      datetime: "2026-08-24T12:00:00.000Z",
+    });
+
+    const afterBackdate = homeWithLatestWeight(withToday, {
+      value: 195,
+      unit: "lb",
+      datetime: "2026-08-18T12:00:00.000Z",
+    });
+
+    expect(afterBackdate?.latestWeight?.value).toBe(180);
+  });
 });
 
 describe("trackWithAddedSideEffect", () => {

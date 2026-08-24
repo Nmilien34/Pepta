@@ -212,3 +212,56 @@ describe('deleteLog', () => {
     expect(stuck).toBe(true);
   });
 });
+
+describe('deleting a weight reaches Progress', () => {
+  it('marks progress.weights and refetches progress truth', async () => {
+    // deleteLog marked TRACK only and refreshed home+track — progress.weights
+    // kept the deleted row, so the weight chart, the To-goal ring and the
+    // Difference card all counted a weigh-in the user had just removed. The
+    // server now filters deletedAt out of list(), but nothing ever asked it
+    // again.
+    mocks.getProgress.mockResolvedValue({
+      weights: [
+        { id: 'w1', value: 195, unit: 'lb', datetime: '2026-08-20T12:00:00.000Z', deletedAt: null },
+      ],
+      measurements: [],
+      progressPhotos: [],
+      weeklyRetention: [],
+      sectionErrors: {},
+    });
+    await mount();
+    await act(async () => {
+      await handle.refreshProgress();
+    });
+    expect(handle.progress!.weights).toHaveLength(1);
+    const fetchesBefore = mocks.getProgress.mock.calls.length;
+
+    // Hold the server delete in flight, so the optimistic mark is observable
+    // before any refetch can replace state with server truth.
+    let settle!: (value: unknown) => void;
+    mocks.deleteLog.mockReturnValue(new Promise((resolve) => { settle = resolve; }));
+    let done!: Promise<boolean>;
+    await act(async () => {
+      done = handle.deleteLog('weight', 'w1');
+      await Promise.resolve();
+    });
+
+    // Marked immediately — the chart must not wait on the network to drop it.
+    expect(handle.progress!.weights[0]!.deletedAt).not.toBeNull();
+
+    // The server confirms; its truth no longer contains the row (list() now
+    // filters deletedAt server-side — the first version of this test had the
+    // mock keep serving the deleted row, which is exactly the stale world the
+    // refetch exists to correct).
+    mocks.getProgress.mockResolvedValue({
+      weights: [], measurements: [], progressPhotos: [], weeklyRetention: [], sectionErrors: {},
+    });
+    await act(async () => {
+      settle({});
+      await done;
+    });
+
+    expect(mocks.getProgress.mock.calls.length).toBeGreaterThan(fetchesBefore);
+    expect(handle.progress!.weights).toHaveLength(0);
+  });
+});

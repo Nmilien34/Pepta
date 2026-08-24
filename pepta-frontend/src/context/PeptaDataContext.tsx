@@ -170,6 +170,18 @@ export function homeWithLatestWeight(
     "id" in latestWeight
       ? latestWeight
       : optimisticRow<WeightLogResponse>(latestWeight);
+  // A BACKDATED weigh-in must not clobber a newer latest: "I forgot Tuesday's
+  // 195" entered after today's 180 would turn the Home card into "195 now".
+  // mergeWeightsWithLatest guards ordering on the Progress side; this is the
+  // Home twin.
+  const current = home.latestWeight;
+  if (current) {
+    const currentAt = new Date(current.datetime).getTime();
+    const rowAt = new Date(row.datetime).getTime();
+    if (Number.isFinite(currentAt) && Number.isFinite(rowAt) && rowAt < currentAt) {
+      return home;
+    }
+  }
   return {
     ...home,
     latestWeight: row,
@@ -245,12 +257,14 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
    */
   const trackRef = useRef<TrackResponse | null>(null);
   trackRef.current = track;
+  const progressRef = useRef<ProgressResponse | null>(null);
   const [trackLoading, setTrackLoading] = useState(false);
   const [trackRefreshing, setTrackRefreshing] = useState(false);
   const [trackError, setTrackError] = useState<string | null>(null);
   const [schedules, setSchedules] = useState<ScheduleResponse[] | null>(null);
   const [cycles, setCycles] = useState<CycleResponse[] | null>(null);
   const [progress, setProgress] = useState<ProgressResponse | null>(null);
+  progressRef.current = progress;
   const [progressLoading, setProgressLoading] = useState(false);
   const [progressRefreshing, setProgressRefreshing] = useState(false);
   const [progressError, setProgressError] = useState<string | null>(null);
@@ -678,6 +692,7 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
       // after the user has signed out has nothing left to roll back to.
       const epoch = sessionEpoch.current;
       const before = trackRef.current;
+      const progressBefore = progressRef.current;
       const mark = <T extends { id: string; deletedAt?: string | null }>(rows: T[]) =>
         rows.map((row) => (row.id === id ? { ...row, deletedAt: new Date().toISOString() } : row));
 
@@ -697,6 +712,15 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
             }
           : t,
       );
+      // Progress holds its own copies of weights and measurements — the chart,
+      // the To-goal ring and the Difference card read THOSE, and they kept a
+      // deleted weigh-in indefinitely: nothing marked it here and nothing
+      // refetched /progress after the delete.
+      setProgress((p) =>
+        p
+          ? { ...p, weights: mark(p.weights), measurements: mark(p.measurements) }
+          : p,
+      );
 
       try {
         await api.deleteLog(kind, id);
@@ -705,10 +729,15 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
         // row vanishing locally is only half of it.
         void refreshHome();
         void refreshTrack();
+        // Through the ref: refreshProgress is declared later in the file, and
+        // this is the same declaration-order pattern runReplay already uses.
+        if (kind === 'weight' || kind === 'measurement')
+          void refreshersRef.current.refreshProgress();
         return true;
       } catch {
         if (epoch !== sessionEpoch.current) return false;
         setTrack(before);
+        setProgress(progressBefore);
         return false;
       }
     },
@@ -728,6 +757,10 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
           }
         : p,
     );
+    // Track too: Your log and the streak sheet read track.weightLogs, and the
+    // post-save refresh covers home+progress — without this the weigh-in was
+    // missing from both until something unrelated refreshed Track.
+    setTrack((t) => (t ? { ...t, weightLogs: [row, ...t.weightLogs] } : t));
     setHome((h) => homeWithLatestWeight(h, row));
   }, []);
   const addMeasurement = useCallback((input: MeasurementInput) => {

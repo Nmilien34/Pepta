@@ -289,3 +289,21 @@ describe('refreshProgress with no window asks for EVERYTHING', () => {
     expect(lastCall[0]).toBe(Infinity);
   });
 });
+
+describe('addWeightLog reaches every surface that shows weight', () => {
+  it('lands in track.weightLogs too — Your log and the streak read it', async () => {
+    // The optimistic add covered progress.weights and home.latestWeight but
+    // skipped track.weightLogs, and the post-save refresh was home+progress —
+    // so a fresh weigh-in was missing from Track's Your log and the streak
+    // sheet's Weight row until something unrelated refreshed Track.
+    await mount();
+
+    await act(async () => {
+      handle.addWeightLog({ value: 180, unit: 'lb', datetime: todayAt(14) });
+    });
+
+    const row = handle.track!.weightLogs[0]!;
+    expect(row.value).toBe(180);
+    expect(row.deletedAt).toBeNull();
+  });
+});
