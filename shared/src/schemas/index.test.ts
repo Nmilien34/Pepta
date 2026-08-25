@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  discoverySourceInputSchema,
+  discoverySourceSchema,
   dismissedNudgesResponseSchema,
   nudgeKeySchema,
   avatarConfirmRequestSchema,
@@ -787,5 +789,27 @@ describe("dismissedNudgesResponseSchema", () => {
         dismissed: ["unidentified-medication:66b1f2c4e9a1b2c3d4e5f607:a1b2c3d4e5f6"],
       }).dismissed,
     ).toHaveLength(1);
+  });
+});
+
+// "Where did you find us?" — the acquisition channel list.
+//
+// Reddit was missing from launch until 2026-08-24. For a GLP-1 app it is
+// plausibly the largest organic source (r/Ozempic, r/GLP1), and with no row
+// for it every one of those users was answering "Somewhere else" — so the
+// attribution the roadmap was being steered by understated it to zero.
+describe("discoverySourceSchema", () => {
+  it("accepts reddit", () => {
+    expect(discoverySourceSchema.safeParse("reddit").success).toBe(true);
+  });
+
+  it("still rejects a channel we do not offer", () => {
+    expect(discoverySourceSchema.safeParse("myspace").success).toBe(false);
+  });
+
+  it("rejects unknown keys on the input body", () => {
+    expect(
+      discoverySourceInputSchema.safeParse({ source: "reddit", extra: 1 }).success,
+    ).toBe(false);
   });
 });

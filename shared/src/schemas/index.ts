@@ -58,12 +58,18 @@ export const medicationStatusSchema = z.enum(MEDICATION_STATUSES);
 // step 7). Deliberately NOT a profile/user field: those response schemas are
 // strict AND bundled into shipped builds, so a new response key would blank
 // old clients. It lives in its own collection behind its own endpoint.
+// KEEP IN SYNC with the Mongoose `enum` on discovery-source.model.ts. They are
+// two separate lists over the same values, and drift between them fails in the
+// worst way: the request validates here, then the write rejects at the schema
+// layer, so the answer is lost after the user has already been told "got it".
+// discovery-source.model.test.ts asserts the two are identical.
 export const discoverySourceSchema = z.enum([
   "app_store",
   "instagram",
   "facebook",
   "tiktok",
   "youtube",
+  "reddit",
   "friends",
   "other",
 ]);

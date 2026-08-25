@@ -25,8 +25,21 @@ const discoverySourceSchema = new Schema<DiscoverySourceDocument>(
       unique: true,
     },
     source: {
+      // KEEP IN SYNC with discoverySourceSchema in @pepta/shared. Drift lets a
+      // body validate and then fail to save, which loses the answer after the
+      // user has been shown the sent-bubble confirmation.
+      // discovery-source.model.test.ts asserts the two lists are identical.
       type: String,
-      enum: ["app_store", "instagram", "facebook", "tiktok", "youtube", "friends", "other"],
+      enum: [
+        "app_store",
+        "instagram",
+        "facebook",
+        "tiktok",
+        "youtube",
+        "reddit",
+        "friends",
+        "other",
+      ],
       required: true,
     },
   },
