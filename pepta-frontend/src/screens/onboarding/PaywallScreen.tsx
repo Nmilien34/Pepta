@@ -804,7 +804,15 @@ const styles = StyleSheet.create({
   reassureRow: {
     flexDirection: "row",
     justifyContent: "center",
-    gap: 16,
+    // WRAPS, because it cannot fit (2026-08-25). The three items measure
+    // roughly 430pt at 10.5pt type with their checkmarks and gaps, against a
+    // 393pt screen — so on one line the outer two were sliced off at both
+    // edges, "Cancel anytime" losing its tick and "Full access today" its
+    // last word. It went unnoticed because this row renders ONLY on the
+    // no-trial arm, which the trial-eligible test paths never reach.
+    flexWrap: "wrap",
+    columnGap: 14,
+    rowGap: 6,
     marginTop: 12,
   },
   reassureItem: { flexDirection: "row", alignItems: "center", gap: 4 },
