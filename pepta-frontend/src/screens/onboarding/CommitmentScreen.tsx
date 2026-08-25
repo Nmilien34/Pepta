@@ -94,7 +94,7 @@ export function CommitmentScreen({ progress, onBack, onSigned }: CommitmentScree
               what the user is promising, in their own voice. "Hold the ring"
               is the app talking, so it goes after "— me, today" and is styled
               as guidance, not as another clause of the promise. */}
-          <Text style={styles.cue}>Hold the ring below to seal it.</Text>
+          <Text style={styles.cue}>Hold the ring below to seal this commitment.</Text>
 
           <View style={styles.hold}>
             <HoldToCommit label="Hold if you’re in" onComplete={onSigned} />
