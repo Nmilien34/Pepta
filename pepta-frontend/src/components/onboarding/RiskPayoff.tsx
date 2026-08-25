@@ -169,6 +169,12 @@ const styles = StyleSheet.create({
   ringNum: {
     fontFamily: typography.fonts.heavy,
     fontSize: 31,
+    // EXPLICIT, OR THE DIGITS ARE GUILLOTINED (2026-08-25). With no lineHeight
+    // RN gives the text a line box from the font's own metrics, and this face
+    // at heavy weight has ascenders taller than that box — so the tops of the
+    // numerals were sliced clean off inside the ring. 38 is ~1.23x, enough for
+    // the ascender at every digit.
+    lineHeight: 38,
     letterSpacing: -1,
     color: convo.ink,
   },
@@ -183,7 +189,12 @@ const styles = StyleSheet.create({
   drivers: { marginTop: 22, gap: 11 },
   driver: { flexDirection: 'row', alignItems: 'center', gap: 11 },
   driverLabel: {
-    width: 112,
+    // 132, not 112. "Resistance training" is the longest label in RISK_DRIVERS
+    // and measures ~124pt at 12pt semiBold, so the old width truncated it to
+    // "Resistance traini…" at DEFAULT type — before Dynamic Type touched it.
+    // Fixed rather than content-sized because the bars share a left edge, and
+    // that alignment is the point of the row.
+    width: 132,
     fontFamily: typography.fonts.semiBold,
     fontSize: 12,
     color: convo.ink,
