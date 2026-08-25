@@ -450,9 +450,16 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
           delay={5 * RISE_STEP_MS}
           style={{
             paddingHorizontal: theme.spacing.xl,
-            // 18 between the terms strip and the CTA: the offer and the action
-            // are separate beats, and 12 (the plans->terms gap) reads as one.
-            paddingTop: 18,
+            // 18 -> 9 (2026-08-25). The pinned footer's height is subtracted
+            // from the ScrollView above it, and at 18 this block was tall
+            // enough to CLIP the yearly plan card — "$59.99/yr" was sliced
+            // mid-line, so the price the card exists to state was the one part
+            // you had to scroll for. The slack came from here and from the
+            // margins below, not from the card, because the cards are the
+            // content and this is the chrome around it. The offer and the
+            // action still read as separate beats at 9, since the noPay row
+            // carries its own margin under it.
+            paddingTop: 9,
             paddingBottom: theme.spacing.xs,
           }}
         >
@@ -534,7 +541,7 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
               variant="caption"
               color="textSecondary"
               align="center"
-              style={{ fontSize: 11, marginTop: theme.spacing.sm }}
+              style={{ fontSize: 11, marginTop: 5 }}
             >
               {pricing.cta[plan].subline}
             </AppText>
@@ -784,10 +791,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
-    marginBottom: 11,
+    marginBottom: 7,
   },
   noPayText: { fontFamily: typography.fonts.bold, fontSize: 12.5, color: "#1E8449" },
-  securedText: { fontSize: 10.5, opacity: 0.55, marginTop: 8 },
+  securedText: { fontSize: 10.5, opacity: 0.55, marginTop: 5 },
   reassureRow: {
     flexDirection: "row",
     justifyContent: "center",
