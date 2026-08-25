@@ -459,7 +459,13 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
             // content and this is the chrome around it. The offer and the
             // action still read as separate beats at 9, since the noPay row
             // carries its own margin under it.
-            paddingTop: 9,
+            //
+            // 9 -> 14 (same day). 9 cleared the clipping but overshot: the
+            // plan cards then sat flush against this block with no air at all,
+            // so their bottom border read as the top edge of the footer and
+            // the two zones fused into one. 14 buys the gap back and is still
+            // 4 under the original 18 that was doing the clipping.
+            paddingTop: 14,
             paddingBottom: theme.spacing.xs,
           }}
         >
