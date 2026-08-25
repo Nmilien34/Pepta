@@ -7,6 +7,7 @@
 // temporarily_unavailable + cachedAccess; without usable cache it returns
 // temporarily_unavailable with no cache — never inactive.
 
+import { DEMO_ACCOUNT } from "../config/demoAccount";
 import type { AccessDecision, AccessSource } from "@pepta/shared";
 import { logger } from "../lib/logger";
 import { NotFoundError } from "../lib/errors";
@@ -255,6 +256,32 @@ export async function resolveAccess(userId: string): Promise<AccessDecision> {
       );
       return { state: "temporarily_unavailable", retryAfterMs: UNAVAILABLE_RETRY_MS };
     }
+  }
+
+  // THE REVIEW ACCOUNT NEVER RECONCILES (2026-08-25).
+  //
+  // seedDemoUser grants it access by writing entitlement.status "active" with
+  // no RevenueCat linkage, and hasRevenueCatEvidence() below counts ANY status
+  // other than "free" as evidence. So the very first resolve — which the app
+  // fires on boot, right after sign-in — treated this account as
+  // RevenueCat-backed, reconciled it against a subscriber RevenueCat has never
+  // heard of, and PERSISTED the empty result as "canceled". Every premium
+  // route 403s from that moment, and because "canceled" is still not "free"
+  // each later resolve re-confirmed the wipe. Apple reviews the build with
+  // this account, so this was a rejection waiting to happen.
+  //
+  // Why an exemption and not the complimentary-grant path: an `active` grant
+  // deliberately returns null from resolveOwnedGrant and falls through to
+  // exactly this reconciliation — a real complimentary grant survives it only
+  // because provision() put a promotional entitlement in RevenueCat first.
+  // That needs a live API call at seed time, which would make seeding
+  // network-dependent and fail closed on a blip.
+  //
+  // Why this is not an escalation surface: the match is a compile-time email
+  // constant, not a database flag anything can write. Claiming it means
+  // controlling review@pepta.app, which is ours.
+  if (user.email === DEMO_ACCOUNT.email) {
+    return decisionFromPersistedState(user.entitlement, now);
   }
 
   // ONLY reconcile users RevenueCat already knows. The reconciler reads via
