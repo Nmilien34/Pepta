@@ -83,6 +83,19 @@ export function CommitmentScreen({ progress, onBack, onSigned }: CommitmentScree
             <Text style={styles.signature}>— me, today</Text>
           </View>
 
+          {/* THE INSTRUCTION CANNOT LIVE ONLY UNDER THE RING (2026-08-25).
+              HoldToCommit's own label sits BELOW the ring, which is exactly
+              where the thumb goes — so the one person who most needs to be
+              told how to sign covers the telling with their hand the moment
+              they reach for it. This sits at the end of the reading path,
+              before the control, where it is read rather than reached over.
+
+              Outside the pact deliberately: everything above the signature is
+              what the user is promising, in their own voice. "Hold the ring"
+              is the app talking, so it goes after "— me, today" and is styled
+              as guidance, not as another clause of the promise. */}
+          <Text style={styles.cue}>Hold the ring below to seal it.</Text>
+
           <View style={styles.hold}>
             <HoldToCommit label="Hold if you’re in" onComplete={onSigned} />
           </View>
@@ -128,6 +141,13 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     color: convo.faint,
     marginTop: 18,
+  },
+  cue: {
+    fontFamily: typography.fonts.semiBold,
+    fontSize: 13,
+    lineHeight: 19,
+    color: convo.soft,
+    marginTop: 26,
   },
   hold: { marginTop: 'auto', paddingBottom: 30, alignItems: 'center' },
 });
