@@ -134,10 +134,16 @@ export function TrialTimelineScreen({
         if (!mounted) return;
         // Same package-agnostic rule as TrialOfferScreen: announce the
         // PRESELECTED plan's trial so the dates match the wall they land on.
+        const yearlyTrial = packages?.trial.yearly.eligible ? freeTrialOf(packages.yearly) : null;
         const resolved =
-          (packages?.trial.yearly.eligible ? freeTrialOf(packages.yearly) : null) ??
-          (packages?.trial.monthly.eligible ? freeTrialOf(packages.monthly) : null);
-        setPerDay(dailyEquivalent(packages?.yearly));
+          yearlyTrial ?? (packages?.trial.monthly.eligible ? freeTrialOf(packages.monthly) : null);
+        // THE ANCHOR FOLLOWS THE PACKAGE THAT SUPPLIED THE DATES. freeTrialOf
+        // returns null for any package with no zero-price intro, and the
+        // experiment's treatment offering carries that intro on MONTHLY — so
+        // falling through is a mainline path, not an edge case. Pricing the
+        // YEAR under monthly dates puts a date and a billing period from two
+        // different plans in the same row, one screen before purchase.
+        setPerDay(yearlyTrial ? dailyEquivalent(packages?.yearly) : null);
         if (resolved) setTrial(resolved);
         else onSkipToWall();
       })

@@ -294,6 +294,13 @@ export function shouldSkipStep(step: OnboardingStep, ctx: FlowContext): boolean 
     // Note this cannot be fixed by adding the step to MEDICATION_BLOCK: the
     // half-life return below runs first and would preempt that check.
     if (ctx.journeyStage && ctx.journeyStage !== 'active') return true;
+    // AND NOT FOR ORALS (2026-08-25). The header used to assume orals always
+    // carry a short half-life and so skip on the check below — the catalog
+    // says otherwise: Rybelsus, Wegovy Pill and oral semaglutide are all
+    // 7 days. The NUMBER is right for them, but every noun on the screen is
+    // an injection ("one shot covers a week", axis "shot day"), so the beat
+    // goes rather than telling a daily-pill user about their weekly shot.
+    if (ctx.route === 'oral') return true;
     return (
       typeof ctx.halfLifeDays !== 'number' || ctx.halfLifeDays < FORGIVING_HALF_LIFE_DAYS
     );

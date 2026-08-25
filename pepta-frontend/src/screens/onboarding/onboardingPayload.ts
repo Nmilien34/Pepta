@@ -62,7 +62,7 @@ export interface OnboardingAnswers {
 /** The picker's escape hatch — a doorway, not a medication. Its catalog row
  *  carries a 7-day half-life that belongs to no drug. The data-health D3
  *  detector finds what this leaves behind and asks the user to name it. */
-function isEscapeHatchMedication(option: MedicationOption): boolean {
+export function isEscapeHatchMedication(option: MedicationOption): boolean {
   return (
     option.id === 'other' ||
     option.name.trim().toLowerCase() === 'something else'

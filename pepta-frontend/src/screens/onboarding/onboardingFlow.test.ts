@@ -284,6 +284,16 @@ describe('onboarding flow', () => {
 });
 
 describe('shouldSkipStep', () => {
+  // The catalog gives Rybelsus / Wegovy Pill / oral semaglutide a 7-day
+  // half-life, so the half-life gate passes and the screen renders its
+  // INJECTION copy — "one shot covers a week", axis label "shot day" — to
+  // someone taking a daily pill. The number is right; every noun is wrong.
+  it('never promises a weekly shot to someone taking a daily pill', () => {
+    const oral = { journeyStage: 'active', halfLifeDays: 7 } as const;
+    expect(shouldSkipStep('doseForgiveness', { ...oral, route: 'injection' })).toBe(false);
+    expect(shouldSkipStep('doseForgiveness', { ...oral, route: 'oral' })).toBe(true);
+  });
+
   // REGRESSION (2026-08-25). doseForgiveness was gated ONLY on half-life, and
   // it is not in MEDICATION_BLOCK — so a starting_soon user, who skips
   // currentDose, still got "A day late won't undo you". Consoling someone

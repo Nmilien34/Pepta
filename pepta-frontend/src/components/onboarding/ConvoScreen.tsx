@@ -383,6 +383,8 @@ export function ConvoScreen<T>({
 
   // Haptic grammar: a warm tap the moment they speak, the success thump when
   // the sent bubble lands.
+  const ackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const handlePick = (option: ConvoOption<T>) => {
     if (advanced.current) return;
     if (option.holds) {
@@ -400,8 +402,23 @@ export function ConvoScreen<T>({
     // The question steps back once answered; the answer glides in as a sent message.
     Animated.timing(questionDim, { toValue: 0.45, duration: 240, useNativeDriver: true }).start();
     Animated.spring(sentPop, { toValue: 1, friction: 6, tension: 120, useNativeDriver: true }).start();
-    setTimeout(() => onAnswer?.(option.value), ACKNOWLEDGE_MS);
+    ackTimer.current = setTimeout(() => onAnswer?.(option.value), ACKNOWLEDGE_MS);
   };
+
+  // THE ACKNOWLEDGE TIMER MUST DIE WITH THE SCREEN (2026-08-25). It used to be
+  // a bare setTimeout with nothing holding its id. `advanced` blocks a second
+  // CHIP tap, but Back is in the header, is never disabled, and StepFade keeps
+  // the outgoing screen mounted and interactive for stepFadeOutMs (475ms) —
+  // well inside the 1050ms acknowledge beat. So tapping Back right after a
+  // pick unmounted this instance and the orphaned timer still fired, calling
+  // the mount-time onAnswer: the answer the user was walking away from got
+  // committed and the flow jumped forward from the step they had just left.
+  useEffect(
+    () => () => {
+      if (ackTimer.current) clearTimeout(ackTimer.current);
+    },
+    [],
+  );
 
   // Sticky/multi chips speak softly: a tap per toggle, no sent beat.
   const handleStickyPress = (option: ConvoOption<T>) => {
@@ -419,7 +436,10 @@ export function ConvoScreen<T>({
       <Ground />
       <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
         <View style={styles.header}>
-          {onBack ? (
+          {/* Hidden once the turn is answered, not just inert: for the length
+              of the acknowledge beat the answer is already on its way, and a
+              chevron that silently does nothing reads as a dropped tap. */}
+          {onBack && !picked ? (
             <Pressable accessibilityRole="button" accessibilityLabel="Back" hitSlop={12} onPress={onBack}>
               <Icon name="chevron-back" size={22} color={convo.ink} />
             </Pressable>

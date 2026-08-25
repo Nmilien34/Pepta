@@ -210,6 +210,23 @@ describe('the folded price anchor', () => {
     expect(all).toContain('billed yearly');
   });
 
+  // The dates come from whichever package actually carries the free intro.
+  // freeTrialOf returns null for a package without one, and the experiment's
+  // treatment offering puts the intro on MONTHLY — so this is a mainline path,
+  // not an edge case. Pricing the year underneath monthly dates stacks a date
+  // and a billing period from two different plans in one row, before purchase.
+  it('does not price the YEAR under dates that came from the monthly trial', async () => {
+    mocks.packages = {
+      // Yearly is priced but carries no intro offer, so freeTrialOf skips it.
+      yearly: { product: { price: 59.99, priceString: '$59.99' } },
+      monthly: trialPkg(3),
+      trial: { yearly: { eligible: true }, monthly: { eligible: true } },
+    };
+    const all = deepText(await render());
+    expect(all).toContain('First charge');
+    expect(all).not.toContain('billed yearly');
+  });
+
   it('renders the timeline with NO anchor when the year will not price', async () => {
     withTrial(3);
     const all = deepText(await render());

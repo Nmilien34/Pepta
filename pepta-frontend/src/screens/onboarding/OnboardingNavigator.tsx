@@ -73,7 +73,7 @@ import { kgToLb, lbToKg, type BodyMeasure } from '../../utils/units';
 import { projectGoal } from '../../utils/goalProjection';
 import { previewTargets, proteinFloorG } from '../../utils/planPreview';
 import { buildRiskProfile } from '../../utils/riskProfile';
-import { buildOnboardingPayload } from './onboardingPayload';
+import { buildOnboardingPayload, isEscapeHatchMedication } from './onboardingPayload';
 import { api } from '../../services/api';
 import { writeCompanionName } from '../../services/companionNameStore';
 import { useAuth } from '../../context/AuthContext';
@@ -136,7 +136,18 @@ function ctxFromAnswers(a: FlowAnswers): FlowContext {
     sideEffects: a.sideEffects,
     // Only the number reaches the step machine — it decides whether the
     // forgiveness give has an honest version, nothing more.
-    halfLifeDays: a.medication?.halfLifeDays ?? null,
+    //
+    // NULLED FOR THE ESCAPE HATCH (2026-08-25). "Something else" carries a
+    // 7-day half-life in the catalog that belongs to no actual drug, and
+    // buildOnboardingPayload already refuses to persist it for exactly that
+    // reason ("a made-up number rendered as a real chart"). It was still
+    // reaching the flow, so the forgiveness beat rendered "~7 days" cited to
+    // "Something else prescribing information" — an invented pharmacological
+    // claim about a drug the app cannot identify.
+    halfLifeDays:
+      a.medication && !isEscapeHatchMedication(a.medication)
+        ? (a.medication.halfLifeDays ?? null)
+        : null,
     hasBody: a.body != null,
   };
 }
@@ -474,7 +485,9 @@ export function OnboardingNavigator() {
       const med = answers.medication;
       // shouldSkipStep guarantees both, but the screen states its own
       // requirement rather than trusting the router.
-      if (!med || typeof med.halfLifeDays !== 'number') return null;
+      if (!med || isEscapeHatchMedication(med) || typeof med.halfLifeDays !== 'number') {
+        return null;
+      }
       return (
         <DoseForgivenessScreen
           progress={progress}
@@ -610,7 +623,10 @@ export function OnboardingNavigator() {
           onGenderChange={(genderIdentity) => setAnswers((a) => ({ ...a, genderIdentity }))}
           birthday={answers.birthday ?? defaultBirthday()}
           onBirthdayChange={(birthday) => setAnswers((a) => ({ ...a, birthday }))}
-          onContinue={goNext}
+          // Same wheel-never-fired problem as heightWeight: without this the
+          // reveal scores risk with ageYears undefined while the payload
+          // posts age 30 from the same default.
+          onContinue={() => commit({ birthday: answers.birthday ?? defaultBirthday() })}
         />
       );
     case 'heightWeight':
@@ -621,7 +637,15 @@ export function OnboardingNavigator() {
           context={context}
           value={answers.body ?? DEFAULT_BODY}
           onChange={(body) => setAnswers((a) => ({ ...a, body }))}
-          onContinue={goNext}
+          // COMMIT WHAT IS ON SCREEN (2026-08-25). WheelPicker only fires
+          // onChange when the selected index CHANGES, and it mounts parked on
+          // the prefilled row — so a user who agrees with 5'6"/184 and taps
+          // Continue left `body` undefined. hasBody went false, muscleFloor
+          // (the payoff for these very numbers) silently vanished, and the
+          // startWeight/goalWeight echoes rendered blank, while crafting and
+          // the payload proceeded on DEFAULT_BODY regardless. Agreeing with a
+          // default is an answer, not the absence of one.
+          onContinue={() => commit({ body: answers.body ?? DEFAULT_BODY })}
         />
       );
     case 'muscleFloor': {
