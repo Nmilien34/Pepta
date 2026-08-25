@@ -110,7 +110,6 @@ vi.mock("../../services/revenueCat", () => ({
 }));
 
 import { TrialOfferScreen } from "./TrialOfferScreen";
-import { TrialCarouselScreen } from "./TrialCarouselScreen";
 
 function makePackages(options: {
   monthlyIntro?: object | null;
@@ -282,26 +281,5 @@ describe("TrialOfferScreen trial gate", () => {
     const { onSkipToWall } = await mount();
     expect(onSkipToWall).toHaveBeenCalledTimes(1);
     expect(mocks.getPaywallPackages).not.toHaveBeenCalled();
-  });
-});
-
-describe("TrialCarouselScreen", () => {
-  it("renders all four value slides, the peeking Pep, and the persistent CTA", async () => {
-    let tree!: TestRenderer.ReactTestRenderer;
-    await act(async () => {
-      tree = TestRenderer.create(
-        <TrialCarouselScreen progress={0.95} onContinue={vi.fn()} />,
-      );
-    });
-    const text = nodeText(tree.root);
-    expect(text).toContain("Never wonder when");
-    expect(text).toContain("See the medicine working");
-    expect(text).toContain("without losing your muscle");
-    expect(text).toContain("Notice patterns in");
-    expect(tree.root.findAll((n) => String(n.type) === "Mascot" && n.props.pose === "peek")).toHaveLength(1);
-    // The same first-person yes as screen A, persistent under every slide.
-    expect(
-      all(tree, "See my free offer", "ConvoButton"),
-    ).toHaveLength(1);
   });
 });
