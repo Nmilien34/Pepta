@@ -17,6 +17,7 @@ import {
   Animated,
   Easing,
   Platform,
+  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
@@ -257,7 +258,7 @@ export function TrialOfferScreen({
       <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
         <ConvoProgressHeader progress={progress} onBack={onBack} />
         {trialLabel ? (
-          <View style={styles.body}>
+          <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
             <Entrance delayMs={80}>
               <Text style={styles.eyebrow}>One last thing…</Text>
             </Entrance>
@@ -304,7 +305,7 @@ export function TrialOfferScreen({
                 <GlassButton label="See my free offer" onPress={onContinue} />
               </Entrance>
             </View>
-          </View>
+          </ScrollView>
         ) : null}
       </SafeAreaView>
     </View>
@@ -314,7 +315,10 @@ export function TrialOfferScreen({
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: convo.ground },
   safe: { flex: 1 },
-  body: { flex: 1, paddingHorizontal: 28, paddingTop: 26, paddingBottom: 30 },
+  // See CommitmentScreen: flex-basis 0 plus a `marginTop: 'auto'` footer puts
+  // the CTA below the viewport once the content grows. Here the 216pt halo is
+  // a HARD height that never shrinks, so this screen runs out of room first.
+  body: { flexGrow: 1, paddingHorizontal: 28, paddingTop: 26, paddingBottom: 30 },
   eyebrow: {
     fontFamily: typography.fonts.bold,
     fontSize: 13.5,

@@ -46,7 +46,7 @@ export function GoalWeightScreen({
       question="Where are we headed?"
       footer={<ConvoButton label="Continue" onPress={onContinue} />}
     >
-      <View style={{ flex: 1, justifyContent: 'center', gap: 30 }}>
+      <View style={{ flexGrow: 1, justifyContent: 'center', gap: 30 }}>
         <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'center', gap: 8 }}>
           <Text style={styles.hero}>{value}</Text>
           <Text style={styles.heroUnit}>{unit}</Text>

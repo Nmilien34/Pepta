@@ -54,7 +54,7 @@
 
 import React from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { ConvoProgressHeader } from '../../components';
 import { HoldToCommit } from '../../components/HoldToCommit';
 import { convo } from '../../components/onboarding/convoTokens';
@@ -71,7 +71,7 @@ export function CommitmentScreen({ progress, onBack, onSigned }: CommitmentScree
     <View style={styles.root}>
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
         <ConvoProgressHeader progress={progress} onBack={onBack} />
-        <View style={styles.body}>
+        <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
           <View style={styles.pact}>
             <Text style={styles.eyebrow}>A PROMISE TO MYSELF</Text>
             <Text style={styles.words}>
@@ -86,7 +86,7 @@ export function CommitmentScreen({ progress, onBack, onSigned }: CommitmentScree
           <View style={styles.hold}>
             <HoldToCommit label="Hold if you’re in" onComplete={onSigned} />
           </View>
-        </View>
+        </ScrollView>
       </SafeAreaView>
     </View>
   );
@@ -95,7 +95,11 @@ export function CommitmentScreen({ progress, onBack, onSigned }: CommitmentScree
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: convo.ground },
   safe: { flex: 1 },
-  body: { flex: 1, paddingHorizontal: 28 },
+  // flexGrow, not flex: the pact card + the hold ring exceed a small screen at
+  // large Dynamic Type, and with flex-basis 0 the ring's `marginTop: 'auto'`
+  // collapses and lays it out BELOW the viewport with nothing scrollable —
+  // the user cannot sign and cannot advance, one step from the paywall.
+  body: { flexGrow: 1, paddingHorizontal: 28 },
   pact: {
     marginTop: 14,
     backgroundColor: convo.surface,

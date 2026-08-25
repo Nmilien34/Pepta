@@ -87,7 +87,7 @@ export function AboutYouScreen({
         <ConvoButton label="Continue" onPress={onContinue} disabled={!genderIdentity} />
       }
     >
-      <View style={{ flex: 1, justifyContent: 'center' }}>
+      <View style={{ flexGrow: 1, justifyContent: 'center' }}>
         <DateWheel
           value={birthday}
           onChange={onBirthdayChange}

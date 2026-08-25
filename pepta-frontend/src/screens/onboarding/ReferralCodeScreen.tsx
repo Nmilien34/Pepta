@@ -132,7 +132,7 @@ export function ReferralCodeScreen({ progress, onBack, onDone }: ReferralCodeScr
         </View>
       }
     >
-      <View style={{ flex: 1, justifyContent: 'center' }}>
+      <View style={{ flexGrow: 1, justifyContent: 'center' }}>
         <View style={{ alignItems: 'center', marginBottom: 22 }}>
           <Mascot pose={applied ? 'wave' : 'idle'} size={124} />
         </View>

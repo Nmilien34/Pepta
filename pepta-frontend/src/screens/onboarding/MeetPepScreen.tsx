@@ -77,7 +77,7 @@ export function MeetPepScreen({ progress, onBack, onContinue }: MeetPepScreenPro
       onTyped={greet}
       footer={<ConvoButton label={waved ? 'Pep waves back!' : 'Wave back 👋'} onPress={wave} />}
     >
-      <View style={{ flex: 1, justifyContent: 'center', paddingTop: 18 }}>
+      <View style={{ flexGrow: 1, justifyContent: 'center', paddingTop: 18 }}>
         <Animated.View
           style={{
             alignSelf: 'flex-start',

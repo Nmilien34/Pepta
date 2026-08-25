@@ -31,7 +31,7 @@ export function LastShotScreen({ progress, onBack, context, oral, value, onChang
       sub="This is how I know what’s still in you."
       footer={<ConvoButton label="Continue" onPress={onContinue} />}
     >
-      <View style={{ flex: 1, justifyContent: 'center', marginTop: 10 }}>
+      <View style={{ flexGrow: 1, justifyContent: 'center', marginTop: 10 }}>
         <DateWheel value={value} onChange={onChange} minYear={minYear} maxYear={maxYear} maxToday />
       </View>
     </ConvoScreen>
