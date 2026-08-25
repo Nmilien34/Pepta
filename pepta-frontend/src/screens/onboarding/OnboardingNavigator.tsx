@@ -7,6 +7,7 @@
 // context BEFORE choosing the next step, so the very next turn is never chosen
 // from stale answers.
 
+import { ageInYears } from '../../utils/age';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Modal, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -823,8 +824,15 @@ export function OnboardingNavigator() {
             activityLevel: answers.activityLevel,
             // Age from the birthday they gave; the risk model treats a
             // missing one as unknown, never as young.
+            //
+            // Was `getFullYear() - birthday.year`, which is a year too old for
+            // anyone whose birthday has not come round yet — enough to push
+            // someone across an ageRisk boundary. ageInYears checks the month
+            // and day, and it is the same helper the aboutYou wheel shows, so
+            // the number the user was told cannot disagree with the number the
+            // reveal scored.
             ageYears: answers.birthday
-              ? new Date().getFullYear() - answers.birthday.year
+              ? (ageInYears(answers.birthday) ?? undefined)
               : undefined,
           })}
           authenticated={auth.isAuthenticated}

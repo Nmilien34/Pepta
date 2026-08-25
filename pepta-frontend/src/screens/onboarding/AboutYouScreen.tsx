@@ -22,8 +22,11 @@
 // no such gate because it always holds a valid date.
 
 import React, { useMemo } from 'react';
-import { View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { ConvoButton, ConvoScreen, DateWheel, type ConvoOption } from '../../components';
+import { convo } from '../../components/onboarding/convoTokens';
+import { typography } from '../../theme/typography';
+import { ageLabel } from '../../utils/age';
 import type { DateParts } from '../../utils/dateParts';
 
 /**
@@ -68,6 +71,8 @@ export function AboutYouScreen({
     return { minYear: current - 100, maxYear: current - 13 };
   }, []);
 
+  const age = ageLabel(birthday);
+
   return (
     <ConvoScreen<GenderIdentity>
       progress={progress}
@@ -87,6 +92,23 @@ export function AboutYouScreen({
         <ConvoButton label="Continue" onPress={onContinue} disabled={!genderIdentity} />
       }
     >
+      {/* THE WHEEL NEEDS ITS OWN NAME (2026-08-25). Merging the birthday screen
+          in cost it its question — "When were you born?" — and the combined
+          headline cannot carry both fields, so a first-time user met an
+          unlabelled date wheel and had to infer it from the sub-line, which is
+          already busy justifying the ask.
+
+          The right half is the part that earns its place: every other turn in
+          this flow answers back, so the derived age updates as the wheel turns
+          rather than sitting there as a static form label. It also makes a
+          mis-scrolled year self-evident — "126 years old" is impossible to
+          miss where a stray date is easy to skim past. */}
+      <View style={styles.eyebrow}>
+        <Text style={styles.eyebrowLabel}>DATE OF BIRTH</Text>
+        {age ? <Text style={styles.age}>{age}</Text> : null}
+      </View>
+      <View style={styles.rule} />
+
       <View style={{ flexGrow: 1, justifyContent: 'center' }}>
         <DateWheel
           value={birthday}
@@ -98,3 +120,28 @@ export function AboutYouScreen({
     </ConvoScreen>
   );
 }
+
+const styles = StyleSheet.create({
+  eyebrow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 20,
+  },
+  eyebrowLabel: {
+    fontFamily: typography.fonts.bold,
+    fontSize: 10,
+    letterSpacing: 1.1,
+    color: convo.faint,
+  },
+  age: {
+    fontFamily: typography.fonts.heavy,
+    fontSize: 11.5,
+    color: convo.primary,
+  },
+  rule: {
+    height: 1,
+    backgroundColor: convo.hairline,
+    marginTop: 5,
+  },
+});
