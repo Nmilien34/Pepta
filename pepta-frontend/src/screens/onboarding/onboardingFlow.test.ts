@@ -15,10 +15,19 @@ describe('onboarding flow', () => {
     expect(ONBOARDING_STEPS[1]).toBe('notAlone');
     expect(ONBOARDING_STEPS[ONBOARDING_STEPS.length - 1]).toBe('welcomeIn');
     expect(nextStep('welcome')).toBe('notAlone');
-    expect(nextStep('notAlone')).toBe('journeyStage');
+    // The pact answers notAlone — you are not the only one, so here is what
+    // I am in for — 35 screens from any price.
+    expect(nextStep('notAlone')).toBe('commitment');
+    expect(nextStep('commitment')).toBe('journeyStage');
     // The rating ask is post-purchase (WelcomeInScreen), never a quiz turn.
+    // The commitment pact sits between the payoff and the warm-up (2026-08-24):
+    // they see their plan, promise something to themselves, and only then meet
+    // an offer. It asks for nothing, so nothing skips it.
     expect(nextStep('reveal')).toBe('trialOffer'); // the warm-up sits between auth and the wall
-    expect(nextStep('trialCarousel')).toBe('paywall');
+    // The price anchor sits between the timeline and the wall (2026-08-24):
+    // the wall had no price framing of any kind before it.
+    expect(nextStep('trialTimeline')).toBe('priceAnchor');
+    expect(nextStep('priceAnchor')).toBe('paywall');
     // The referral code turn was removed — auth hands straight to the wall.
     
     expect(nextStep('paywall')).toBe('welcomeIn');
@@ -74,8 +83,14 @@ describe('onboarding flow', () => {
     // signed-out users and the plain Start-today CTA for signed-in ones. A
     // separate auth turn reappearing here means the merge regressed.
     expect(ONBOARDING_STEPS).not.toContain('auth');
+    // The commitment pact sits between the payoff and the warm-up (2026-08-24):
+    // they see their plan, promise something to themselves, and only then meet
+    // an offer. It asks for nothing, so nothing skips it.
     expect(nextStep('reveal')).toBe('trialOffer'); // the warm-up sits between auth and the wall
-    expect(nextStep('trialCarousel')).toBe('paywall');
+    // The price anchor sits between the timeline and the wall (2026-08-24):
+    // the wall had no price framing of any kind before it.
+    expect(nextStep('trialTimeline')).toBe('priceAnchor');
+    expect(nextStep('priceAnchor')).toBe('paywall');
   });
 
   it('skips the paywall for resolved-active access (creators/subscribers)', () => {
@@ -95,8 +110,9 @@ describe('onboarding flow', () => {
     expect(nextStep('deviceType')).toBe('concentration');
     expect(nextStep('frequency')).toBe('leanMass');
     expect(nextStep('leanMass')).toBe('lastShot');
-    expect(nextStep('lastShot')).toBe('shotDay');
-    expect(nextStep('shotDay')).toBe('shotTime');
+    // shotDay was CUT (2026-08-24) — it confirmed a weekday already derived
+    // from lastShot. The navigator sets shotDays on that answer instead.
+    expect(nextStep('lastShot')).toBe('shotTime');
     expect(nextStep('shotTime')).toBe('instrument');
     expect(nextStep('goalPace')).toBe('company');
     expect(nextStep('company')).toBe('dailyRoutine');
@@ -104,6 +120,10 @@ describe('onboarding flow', () => {
     expect(nextStep('symptomWeek')).toBe('notifications');
     expect(nextStep('notifications')).toBe('crafting');
   });
+
+  // The gives that can precede the problem statement. Kept local so the guard
+  // below does not depend on the run-length block further down.
+  const BEATS_EARLY = new Set<string>(['welcome', 'notAlone', 'commitment', 'meetPep']);
 
   it('names the problem early: the worry, then the answer, before any dosing', () => {
     // The point of the 2026-07-27 restructure. fearAnswered is the only turn
@@ -118,10 +138,16 @@ describe('onboarding flow', () => {
     expect(nextStep('discoverySource')).toBe('meetPep');
     expect(nextStep('nameCompanion')).toBe('medication');
     expect(stepIndex('fearAnswered')).toBeLessThan(stepIndex('currentDose'));
-    // Down to 4 (2026-08-21): the Pep pair moved BEHIND the answered worry,
-    // so the problem is now named after exactly two asks. The guard is about
-    // how much the user is ASKED before hearing a reason to care.
-    expect(stepIndex('fearAnswered')).toBeLessThanOrEqual(4);
+    // COUNTS ASKS, NOT POSITION (2026-08-24). This was `stepIndex <= 4`, which
+    // broke when the commitment pact was inserted at step 3 — a screen that
+    // asks for nothing and so cannot add to the friction this guard exists to
+    // bound. Its own comment already said the subject was how much the user is
+    // ASKED before hearing a reason to care; it just was not measuring that.
+    // Two: journeyStage and biggestWorry.
+    const asksBefore = ONBOARDING_STEPS.slice(0, stepIndex('fearAnswered')).filter(
+      (s) => !BEATS_EARLY.has(s),
+    ).length;
+    expect(asksBefore).toBeLessThanOrEqual(2);
   });
 
   it('never separates the worry from its answer', () => {
@@ -147,6 +173,10 @@ describe('onboarding flow', () => {
     // the question "is this really a payoff?" rather than passing silently.
     const BEATS = new Set<string>([
       'welcome', 'notAlone', 'meetPep', 'fearAnswered', 'leanMass', 'company', 'instrument', 'symptomWeek',
+      'doseForgiveness', 'muscleFloor', 'commitment',
+      // The warm-up gives were missing here, so the run counter was scoring
+      // three payoff screens as input turns.
+      'trialOffer', 'trialTimeline', 'priceAnchor',
       'crafting', 'reveal', 'paywall', 'welcomeIn',
     ]);
     const runLength = (steps: readonly string[]) => {
@@ -165,16 +195,38 @@ describe('onboarding flow', () => {
     // 2026-08-21 mascot reorder briefly made it 8 (nameCompanion landed next
     // to discoverySource) until meetPep was moved between them; this number
     // is the reason that pair sits where it does.
-    expect(runLength(ONBOARDING_STEPS)).toBeLessThanOrEqual(7);
+    // 12 → 9 → 7 → 4. The last step was 2026-08-24: doseForgiveness split the
+    // dosing block and muscleFloor split the goal stretch, each into 4 + 3.
+    // The goal stretch was the one the header calls "the one nobody escapes",
+    // and it is the reason this number could not get below 7 before.
+    expect(runLength(ONBOARDING_STEPS)).toBeLessThanOrEqual(4);
 
-    // The non-dosing path is one longer since the discovery ask: its skip
-    // rules erase the dosing block, so discoverySource joins the goal stretch
-    // (8 inputs before the company beat). Deliberate — the ask sits at Nick's
-    // chosen slot, after the answered worry. Tighten if a beat ever splits it.
-    const unskippable = ONBOARDING_STEPS.filter(
-      (s) => !shouldSkipStep(s, { journeyStage: 'none' }),
-    );
-    expect(runLength(unskippable)).toBeLessThanOrEqual(8);
+    // Both blocks pinned individually, so neither can regrow behind the
+    // aggregate. These are the two runs the gives exist to break.
+    const runOf = (from: OnboardingStep, to: OnboardingStep) =>
+      runLength(
+        ONBOARDING_STEPS.slice(ONBOARDING_STEPS.indexOf(from), ONBOARDING_STEPS.indexOf(to) + 1),
+      );
+    expect(runOf('nameCompanion', 'leanMass')).toBe(4);
+    // 4 → 3 when sexGender + birthday merged into aboutYou (2026-08-25).
+    expect(runOf('goalType', 'company')).toBe(3);
+
+    // EVERY PATH, NOT JUST THE DOSING ONE (2026-08-25). This used to assert
+    // `toBeLessThanOrEqual(8)` on the exploring path — a bound so loose it
+    // hid a real regression: skipping the medication block puts nameCompanion
+    // next to the goal stretch, and with sexGender and birthday still
+    // separate that was a run of FIVE. Nobody saw it, because the aggregate
+    // above only ever walks the unskipped list. Exact, and per stage, so the
+    // next reorder cannot hide in the slack.
+    for (const journeyStage of ['none', 'starting_soon'] as const) {
+      // hasBody, because anyone being asked a goal weight has answered
+      // height+weight — without it muscleFloor drops out and the walk models
+      // a user who cannot exist.
+      const seen = ONBOARDING_STEPS.filter((s) =>
+        !shouldSkipStep(s, { journeyStage, hasBody: true }),
+      );
+      expect(runLength(seen)).toBe(4);
+    }
   });
 
   it('offers the naming turn to everyone and never gates on it', () => {
@@ -208,7 +260,8 @@ describe('onboarding flow', () => {
     expect(prevStep('nameCompanion')).toBe('meetPep');
     expect(prevStep('meetPep')).toBe('discoverySource');
     expect(prevStep('discoverySource')).toBe('fearAnswered');
-    expect(prevStep('journeyStage')).toBe('notAlone');
+    expect(prevStep('journeyStage')).toBe('commitment');
+    expect(prevStep('commitment')).toBe('notAlone');
     expect(prevStep('notAlone')).toBe('welcome');
     expect(prevStep('welcome')).toBeNull();
   });
@@ -222,14 +275,39 @@ describe('onboarding flow', () => {
     const n = ONBOARDING_STEPS.length;
     expect(progressForStep('welcome')).toBeCloseTo(1 / n, 5);
     expect(progressForStep('notAlone')).toBeCloseTo(2 / n, 5);
-    expect(progressForStep('journeyStage')).toBeCloseTo(3 / n, 5);
-    expect(progressForStep('biggestWorry')).toBeCloseTo(4 / n, 5);
-    expect(progressForStep('fearAnswered')).toBeCloseTo(5 / n, 5);
+    expect(progressForStep('commitment')).toBeCloseTo(3 / n, 5);
+    expect(progressForStep('journeyStage')).toBeCloseTo(4 / n, 5);
+    expect(progressForStep('biggestWorry')).toBeCloseTo(5 / n, 5);
+    expect(progressForStep('fearAnswered')).toBeCloseTo(6 / n, 5);
     expect(progressForStep('welcomeIn')).toBe(1);
   });
 });
 
 describe('shouldSkipStep', () => {
+  // REGRESSION (2026-08-25). doseForgiveness was gated ONLY on half-life, and
+  // it is not in MEDICATION_BLOCK — so a starting_soon user, who skips
+  // currentDose, still got "A day late won't undo you". Consoling someone
+  // about missing a dose they have never taken, under a regimen echo that
+  // renders empty because currentDose never ran.
+  it('never consoles about missed doses before there are any doses', () => {
+    const med = { halfLifeDays: 5 } as const;
+    expect(shouldSkipStep('doseForgiveness', { ...med, journeyStage: 'active' })).toBe(false);
+    expect(shouldSkipStep('doseForgiveness', { ...med, journeyStage: 'starting_soon' })).toBe(true);
+    expect(shouldSkipStep('doseForgiveness', { ...med, journeyStage: 'none' })).toBe(true);
+  });
+
+  // startWeight asks where they began. Someone who has not begun started
+  // TODAY, and heightWeight collected that two screens earlier — so the
+  // screen asks for a number we already hold. The navigator defaults it.
+  it('asks where they started only of someone who has started', () => {
+    expect(shouldSkipStep('startWeight', { journeyStage: 'active' })).toBe(false);
+    expect(shouldSkipStep('startWeight', { journeyStage: 'starting_soon' })).toBe(true);
+    expect(shouldSkipStep('startWeight', { journeyStage: 'none' })).toBe(true);
+    // Unknown stage must still ASK: defaulting a start weight we were never
+    // told is how a progress chart quietly invents a loss.
+    expect(shouldSkipStep('startWeight', {})).toBe(false);
+  });
+
   it('keeps every dosing step for an active injectable, weekly vial user', () => {
     const ctx = {
       journeyStage: 'active',
@@ -244,7 +322,6 @@ describe('shouldSkipStep', () => {
       'concentration',
       'frequency',
       'lastShot',
-      'shotDay',
       'shotTime',
       'instrument',
     ] as const) {
@@ -259,17 +336,13 @@ describe('shouldSkipStep', () => {
     expect(shouldSkipStep('concentration', { journeyStage: 'active' })).toBe(true);
   });
 
-  it('skips shot day + time for oral or non-weekly schedules', () => {
-    expect(shouldSkipStep('shotDay', { journeyStage: 'active', route: 'oral' })).toBe(true);
+  it('skips shot TIME for oral or non-weekly schedules', () => {
     expect(shouldSkipStep('shotTime', { journeyStage: 'active', route: 'oral' })).toBe(true);
-    expect(shouldSkipStep('shotDay', { journeyStage: 'active', route: 'injection', frequency: 'biweekly' })).toBe(true);
     // Daily is the ONE case that changed (2026-08-07): the time question now
     // reaches daily schedules, because without it nothing projects a next
     // dose. The weekday question still doesn't.
     expect(shouldSkipStep('shotTime', { journeyStage: 'active', route: 'injection', frequency: 'daily' })).toBe(false);
-    expect(shouldSkipStep('shotDay', { journeyStage: 'active', route: 'injection', frequency: 'daily' })).toBe(true);
     expect(shouldSkipStep('shotTime', { journeyStage: 'active', route: 'oral', frequency: 'weekly' })).toBe(true);
-    expect(shouldSkipStep('shotDay', { journeyStage: 'active', route: 'injection', frequency: 'weekly' })).toBe(false);
     expect(shouldSkipStep('shotTime', { journeyStage: 'active', route: 'injection', frequency: 'weekly' })).toBe(false);
   });
 
@@ -292,7 +365,7 @@ describe('shouldSkipStep', () => {
 
   it('does not skip non-gated steps', () => {
     expect(shouldSkipStep('goalType', { journeyStage: 'none' })).toBe(false);
-    expect(shouldSkipStep('birthday', { journeyStage: 'starting_soon' })).toBe(false);
+    expect(shouldSkipStep('aboutYou', { journeyStage: 'starting_soon' })).toBe(false);
   });
 });
 
@@ -336,24 +409,20 @@ describe('shotTime for daily schedules', () => {
     // The steps oral users are meant to skip stay skipped.
     expect(shouldSkipStep('deviceType', ctx)).toBe(true);
     expect(shouldSkipStep('concentration', ctx)).toBe(true);
-    expect(shouldSkipStep('shotDay', ctx)).toBe(true);
   });
 
   it('asks the time for a daily INJECTABLE too (Saxenda/Victoza had the same broken projection)', () => {
     const ctx = { journeyStage: 'active', route: 'injection', frequency: 'daily' } as const;
     expect(shouldSkipStep('shotTime', ctx)).toBe(false);
-    expect(shouldSkipStep('shotDay', ctx)).toBe(true);
   });
 
   it('weekly is unchanged: both weekday and time', () => {
     const ctx = { journeyStage: 'active', route: 'injection', frequency: 'weekly' } as const;
-    expect(shouldSkipStep('shotDay', ctx)).toBe(false);
     expect(shouldSkipStep('shotTime', ctx)).toBe(false);
   });
 
   it('biweekly still skips both — unchanged', () => {
     const ctx = { journeyStage: 'active', route: 'injection', frequency: 'biweekly' } as const;
-    expect(shouldSkipStep('shotDay', ctx)).toBe(true);
     expect(shouldSkipStep('shotTime', ctx)).toBe(true);
   });
 });

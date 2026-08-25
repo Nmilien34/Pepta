@@ -30,6 +30,7 @@ import { Icon } from "../Icon";
 import { typography } from "../../theme/typography";
 import { Typewriter } from "./Typewriter";
 import { convo } from "./convoTokens";
+import { pace, questionSpeedMs } from "./convoPace";
 
 // Whether a turn should play its entrance (type the lines, stagger the chips).
 // The navigator flips `animate` to false when the user steps BACK to an
@@ -132,6 +133,21 @@ function TypingDots() {
   );
 }
 
+/**
+ * How a turn lays its answers out.
+ *
+ * `chips` — the wrapping, content-sized grid. The default, and what 22
+ * onboarding turns render. Right for two to five short words ("Yes" / "Not
+ * yet" / "Every week"), where a full-width row per answer would be absurd.
+ *
+ * `list` — full-width fixed-height rows. For a long set of unequal-length
+ * labels carrying leading marks, where the chip grid has nothing to align on:
+ * chips are sized by their text, so no two labels share a left edge, the right
+ * edge rags differently on every line, and which answers happen to pair up is
+ * decided by string length rather than by meaning.
+ */
+export type ConvoLayout = "chips" | "list";
+
 interface ChipItemProps {
   label: string;
   sub?: string;
@@ -140,25 +156,31 @@ interface ChipItemProps {
   revealed: boolean;
   animate: boolean;
   selected?: boolean;
+  layout: ConvoLayout;
   onPress: () => void;
 }
 
 /** One answer chip, staggering into view once the question has finished typing. */
-function ChipItem({ label, sub, leading, index, revealed, animate, selected, onPress }: ChipItemProps) {
+function ChipItem({ label, sub, leading, index, revealed, animate, selected, layout, onPress }: ChipItemProps) {
   const rise = useRef(new Animated.Value(animate ? 0 : 1)).current;
   useEffect(() => {
     if (!revealed || !animate) return;
     Animated.timing(rise, {
       toValue: 1,
-      duration: 300,
-      delay: index * 70,
+      duration: pace.revealMs,
+      // Scales with row count: DiscoverySourceScreen has eight, so its last
+      // row lands ~1.4s after its first. See convoPace.staggerMs.
+      delay: index * pace.staggerMs,
       easing: Easing.bezier(0.2, 0.7, 0.2, 1),
       useNativeDriver: true,
     }).start();
   }, [revealed, index, rise, animate]);
+  const isList = layout === "list";
   return (
     <Animated.View
       style={{
+        // Rows own the column's full width; chips are sized by their content.
+        alignSelf: isList ? "stretch" : undefined,
         opacity: rise,
         transform: [{ translateY: rise.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }],
       }}
@@ -169,13 +191,36 @@ function ChipItem({ label, sub, leading, index, revealed, animate, selected, onP
         accessibilityLabel={label}
         onPress={onPress}
         style={({ pressed }) => [
-          styles.chip,
-          sub != null && styles.chipWide,
-          selected && styles.chipSelected,
+          isList ? styles.row : styles.chip,
+          !isList && sub != null && styles.chipWide,
+          selected && (isList ? styles.rowSelected : styles.chipSelected),
           pressed && styles.chipPressed,
         ]}
       >
-        {leading ? (
+        {isList ? (
+          <>
+            {leading}
+            <View style={{ flex: 1 }}>
+              {/* ONE LINE, ellipsised. That is the trade the fixed height buys:
+                  the row cannot grow, so a label too long for the width is
+                  truncated rather than allowed to break the column. At 200%
+                  Dynamic Type "App Store search" needs ~240pt against ~217
+                  available, so it does ellipse — and that is still better than
+                  eight rows of differing height. */}
+              <Text style={styles.rowText} numberOfLines={1}>
+                {label}
+              </Text>
+              {/* NOTE: a `sub` does not fit here. The 60pt height is fixed, so
+                  a second line overflows the row. No list option uses one
+                  today; give the row a taller variant before adding one. */}
+              {sub ? <Text style={styles.chipSub}>{sub}</Text> : null}
+            </View>
+            {/* The row's affordance at rest. This turn fires on tap and
+                advances, so a chevron is the honest mark — a radio would
+                promise selection state the turn does not keep. */}
+            <Icon name="chevron-forward" size={20} color={convo.soft} />
+          </>
+        ) : leading ? (
           <View style={styles.chipLeadRow}>
             {leading}
             <View style={{ flexShrink: 1 }}>
@@ -195,7 +240,7 @@ function ChipItem({ label, sub, leading, index, revealed, animate, selected, onP
 }
 
 /** How long the sent bubble + typing dots hold before the flow advances. */
-const ACKNOWLEDGE_MS = 950;
+const ACKNOWLEDGE_MS = pace.acknowledgeMs;
 
 // The hairline progress fill persists across turns (module-level, Leanient's
 // trick) so it grows forward and shrinks back instead of resetting each mount.
@@ -252,6 +297,20 @@ interface ConvoScreenProps<T> {
   /** Reassurance line under the question, fades in once typing lands. */
   sub?: string;
   options?: ConvoOption<T>[];
+  /** Answer layout. Defaults to the wrapping chip grid — see ConvoLayout. */
+  layout?: ConvoLayout;
+  /**
+   * Renders the context line as an ASIDE rather than an echo.
+   *
+   * The 29pt default is a display size because on most turns this slot carries
+   * the user's own previous answer read back at full scale. When the line is
+   * Pep talking instead, 29pt makes the throwaway louder than the question
+   * beneath it — and it does not fit: measured in Hanken, "Quick one while I
+   * set up —" is 334.4pt against the 337pt of body width, so it clears one
+   * line by 2.6pt at default text size and wraps outright at 120% Dynamic
+   * Type. At 20pt it is 224.6pt, and 273.4pt even at 120%.
+   */
+  contextAside?: boolean;
   /** Tap = spoken answer: sent bubble + dots, then auto-advance. */
   onAnswer?: (value: T) => void;
   /** Sticky single-select (chips keep selection; Continue lives in footer). */
@@ -277,6 +336,8 @@ export function ConvoScreen<T>({
   questionAccent,
   sub,
   options,
+  layout = "chips",
+  contextAside,
   onAnswer,
   value,
   onSelect,
@@ -316,7 +377,7 @@ export function ConvoScreen<T>({
 
   useEffect(() => {
     if (!typed) return;
-    Animated.timing(reveal, { toValue: 1, duration: 320, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
+    Animated.timing(reveal, { toValue: 1, duration: pace.revealMs, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
     onTypedRef.current?.();
   }, [typed, reveal]);
 
@@ -374,12 +435,12 @@ export function ConvoScreen<T>({
           {context ? (
             <Typewriter
               text={context}
-              speed={14}
+              speed={pace.contextTypeMs}
               delay={120}
               animate={animate}
               caret={false}
               haptic={false}
-              style={styles.context}
+              style={contextAside ? [styles.context, styles.contextAside] : styles.context}
               onDone={() => setContextDone(true)}
             />
           ) : null}
@@ -388,18 +449,26 @@ export function ConvoScreen<T>({
               <Typewriter
                 text={question}
                 start={contextDone}
-                delay={300}
+                // Length-aware: short questions keep the full measured pace,
+                // long ones compress just enough to stay inside the budget.
+                speed={questionSpeedMs(question.length)}
+                delay={pace.questionDelayMs}
                 animate={animate}
                 style={styles.question}
                 onDone={() => setTyped(true)}
               />
-              {questionAccent && typed ? <Text style={styles.accent}>{" ■"}</Text> : null}
+              {/* NON-BREAKING space. With a normal one the square is its own
+                  word, so the moment the question fills the line it orphans
+                  onto a line of its own — which is what users past ~110%
+                  Dynamic Type actually saw, since type scales and the
+                  container does not. Now it wraps with "us?" or not at all. */}
+              {questionAccent && typed ? <Text style={styles.accent}>{" ■"}</Text> : null}
             </Text>
           </Animated.View>
           {sub ? <Animated.Text style={[styles.sub, { opacity: reveal }]}>{sub}</Animated.Text> : null}
 
           {options && !picked ? (
-            <View style={styles.chips}>
+            <View style={layout === "list" ? styles.list : styles.chips}>
               {options.map((option, i) => (
                 <ChipItem
                   key={option.label}
@@ -409,6 +478,7 @@ export function ConvoScreen<T>({
                   index={i}
                   revealed={typed}
                   animate={animate}
+                  layout={layout}
                   selected={
                     multi
                       ? values?.includes(option.value)
@@ -438,7 +508,11 @@ export function ConvoScreen<T>({
                   },
                 ]}
               >
-                {picked.leading ? <View style={styles.sentLead}>{picked.leading}</View> : null}
+                {picked.leading ? (
+                  <View style={styles.sentLead}>
+                    <View style={styles.sentLeadInner}>{picked.leading}</View>
+                  </View>
+                ) : null}
                 <Text style={styles.sentText}>{picked.label}</Text>
               </Animated.View>
               <TypingDots />
@@ -470,6 +544,9 @@ const styles = StyleSheet.create({
     color: convo.dim,
     marginBottom: 28,
   },
+  // See `contextAside` on the props. Overrides only what changes — the dim
+  // colour and the bold face are shared, because it is still the same voice.
+  contextAside: { fontSize: 20, lineHeight: 27, letterSpacing: -0.4, marginBottom: 14 },
   question: {
     fontFamily: typography.fonts.heavy,
     fontSize: 30,
@@ -480,6 +557,28 @@ const styles = StyleSheet.create({
   accent: { color: convo.primary, fontSize: 22 },
   sub: { fontFamily: typography.fonts.medium, fontSize: 14.5, lineHeight: 21, color: convo.soft, marginTop: 16 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 9, paddingTop: 26 },
+  // THE LIST. One column, so the tile, the label and the chevron each get a
+  // shared edge to line up on — the thing the wrapping grid cannot offer.
+  list: { gap: 8, paddingTop: 24 },
+  row: {
+    alignSelf: "stretch",
+    // FIXED height, which is the whole point: the row stops depending on its
+    // label, so the column measures the same at 100% and 200% Dynamic Type
+    // while a padding-driven chip grows with the text. Radius 16 on 60 keeps
+    // four corners; the chip's 24 on ~49 is a pill with none left.
+    height: 60,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: convo.chipBorder,
+    backgroundColor: convo.surface,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    paddingHorizontal: 16,
+  },
+  // Compensates the extra 0.5 of border so the contents do not shift on select.
+  rowSelected: { borderColor: convo.ink, borderWidth: 2, paddingHorizontal: 15.5 },
+  rowText: { fontFamily: typography.fonts.semiBold, fontSize: 16, letterSpacing: -0.2, color: convo.ink },
   chip: {
     paddingVertical: 13,
     paddingHorizontal: 18,
@@ -527,16 +626,17 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   sentText: { fontFamily: typography.fonts.bold, fontSize: 16, color: convo.onPrimary },
-  // White backing so brand marks stay legible on the purple bubble.
-  sentLead: {
-    width: 22,
-    height: 22,
-    borderRadius: 7,
-    backgroundColor: convo.onPrimary,
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-  },
+  // SCALES the mark rather than cropping it. This was a 22pt box with
+  // `overflow: hidden`, and the marks handed to it are 40pt — so the bubble
+  // was slicing 9pt off every side. (It cropped before this change too, just
+  // less: the old marks were 26.) A mark cannot carry one corner radius that
+  // is right at both 40 and 22, so the size difference is resolved here, by
+  // transform, and the mark stays whole.
+  sentLead: { width: 22, height: 22, alignItems: "center", justifyContent: "center" },
+  // No white backing any more — every mark brings its own ground or its own
+  // alpha shape, and a white square behind one that has rounded corners just
+  // shows white slivers at the corners on the purple bubble.
+  sentLeadInner: { width: 40, height: 40, transform: [{ scale: 22 / 40 }] },
   chipLeadRow: { flexDirection: "row", alignItems: "center", gap: 9 },
   typing: {
     alignSelf: "flex-start",

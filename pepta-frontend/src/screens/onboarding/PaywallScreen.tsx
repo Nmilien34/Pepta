@@ -13,7 +13,6 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import {
-  AccessibilityInfo,
   Animated,
   AppState,
   Easing,
@@ -33,7 +32,6 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "../../theme";
 import { AppText, GlassButton } from "../../components";
 import { typography } from "../../theme/typography";
-import { trialTermSlides, type TrialTermSlide } from "./paywallTimeline";
 import { useAuth } from "../../context/AuthContext";
 import { PRIVACY_URL, TERMS_URL } from "../../config";
 import { api } from "../../services/api";
@@ -336,7 +334,6 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
     paywallPackages != null && selectedPackage != null && paywallPackages.trial[plan].eligible
       ? freeTrialOf(selectedPackage)
       : null;
-  const termSlides = selectedTrial ? trialTermSlides(selectedTrial, new Date()) : null;
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.bg }}>
@@ -422,11 +419,7 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
               switches cross-fade the zone (160ms) without replaying the
               benefits above. */}
           <Rise delay={4 * RISE_STEP_MS}>
-            {termSlides ? (
-              <FadeIn key="terms-carousel">
-                <TrialTermsCarousel slides={termSlides} />
-              </FadeIn>
-            ) : (
+            {selectedTrial ? null : (
               <FadeIn key="terms-reassure">
                 <View style={styles.reassureRow}>
                   <View style={styles.reassureItem}>
@@ -438,7 +431,7 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
                   <View style={styles.reassureItem}>
                     <Icon name="checkmark" size={12} color={theme.colors.fiber} />
                     <AppText variant="caption" color="textSecondary" style={{ fontSize: 10.5 }}>
-                      {plan === "yearly" ? "One payment — done for the year" : "Billed monthly"}
+                      {plan === "yearly" ? "One payment, done for the year" : "Billed monthly"}
                     </AppText>
                   </View>
                   <View style={styles.reassureItem}>
@@ -511,10 +504,30 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
               Loading App Store plans…
             </AppText>
           ) : null}
+          {/* TRIAL ONLY. "No payment due now" is true of a free trial and
+              false of a straight purchase, so the control arm must never see
+              it — the whole point of this row is that it can be believed. */}
+          {selectedTrial ? (
+            <View style={styles.noPayRow}>
+              <Icon name="checkmark-circle" size={15} color="#1E8449" />
+              <AppText variant="caption" style={styles.noPayText}>
+                No payment due now
+              </AppText>
+            </View>
+          ) : null}
           <GlassButton
             label={completing ? "Working…" : pricing.cta[plan].label}
             onPress={() => void handleStart()}
             disabled={completing || !plansReady}
+            // Flat near-black, per the frame. On this screen the button sits
+            // under a price block, two plan cards and a carousel; the glass
+            // fill competes with them, the ink one terminates the page.
+            tone="ink"
+            // The cancel promise belongs at the moment of the tap. It was only
+            // in the 11pt legal footer, which is where people stop reading.
+            sublabel={
+              completing || !selectedTrial ? undefined : "2 taps to start · cancel in one tap"
+            }
           />
           {pricing.cta[plan].subline ? (
             <AppText
@@ -526,6 +539,9 @@ export function PaywallScreen({ onComplete }: PaywallScreenProps) {
               {pricing.cta[plan].subline}
             </AppText>
           ) : null}
+          <AppText variant="caption" align="center" style={styles.securedText}>
+            Secured by the App Store — we never see your card
+          </AppText>
           <PaywallLegalFooter text={pricing.footer[plan]} />
         </Rise>
       </SafeAreaView>
@@ -641,98 +657,6 @@ function FadeIn({ children }: { children: React.ReactNode }) {
 
 // Carousel timing: 2.2s hold per term, 260ms slide-fade transition (130 out +
 // 130 in), matching design-lab/paywall-v2.html's 6.6s full cycle.
-const SLIDE_HOLD_MS = 2200;
-const SLIDE_FADE_MS = 130;
-
-/**
- * The looping trial-terms carousel: one term per slot with sync'd dots.
- * Reassurance layer only — the 3.1.2 disclosure lives in the always-visible
- * CTA subline + legal footer, so any slide may be up at decision time.
- * Reduce Motion: the loop is replaced by the static all-terms strip.
- */
-function TrialTermsCarousel({ slides }: { slides: TrialTermSlide[] }) {
-  const theme = useTheme();
-  const [index, setIndex] = useState(0);
-  const [reduceMotion, setReduceMotion] = useState(false);
-  const indexRef = useRef(0);
-  const fade = useRef(new Animated.Value(1)).current;
-  const shift = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    let mounted = true;
-    AccessibilityInfo.isReduceMotionEnabled()
-      .then((enabled) => {
-        if (mounted) setReduceMotion(enabled);
-      })
-      .catch(() => undefined);
-    const subscription = AccessibilityInfo.addEventListener("reduceMotionChanged", setReduceMotion);
-    return () => {
-      mounted = false;
-      subscription.remove();
-    };
-  }, []);
-
-  useEffect(() => {
-    if (reduceMotion || slides.length < 2) return undefined;
-    let cancelled = false;
-    const tick = () => {
-      Animated.parallel([
-        Animated.timing(fade, { toValue: 0, duration: SLIDE_FADE_MS, easing: RISE_EASING, useNativeDriver: true }),
-        Animated.timing(shift, { toValue: -9, duration: SLIDE_FADE_MS, easing: RISE_EASING, useNativeDriver: true }),
-      ]).start(({ finished }) => {
-        if (!finished || cancelled) return;
-        indexRef.current = (indexRef.current + 1) % slides.length;
-        setIndex(indexRef.current);
-        shift.setValue(9);
-        Animated.parallel([
-          Animated.timing(fade, { toValue: 1, duration: SLIDE_FADE_MS, easing: RISE_EASING, useNativeDriver: true }),
-          Animated.timing(shift, { toValue: 0, duration: SLIDE_FADE_MS, easing: RISE_EASING, useNativeDriver: true }),
-        ]).start();
-      });
-    };
-    const interval = setInterval(tick, SLIDE_HOLD_MS + SLIDE_FADE_MS * 2);
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, [reduceMotion, slides.length, fade, shift]);
-
-  if (reduceMotion) {
-    return (
-      <View style={styles.termsStrip}>
-        <AppText variant="caption" color="textPrimary" style={styles.termsStaticText} numberOfLines={1}>
-          {slides.map((slide) => slide.label).join("  ·  ")}
-        </AppText>
-      </View>
-    );
-  }
-
-  // Slides can shrink on a plan switch (different trial length) — clamp.
-  const active = slides[Math.min(index, slides.length - 1)]!;
-  return (
-    <View style={styles.termsStrip}>
-      <Animated.View
-        style={[styles.termsSlide, { opacity: fade, transform: [{ translateY: shift }] }]}
-      >
-        <Icon name={active.icon} size={14} color={theme.colors.primary} />
-        <AppText variant="caption" color="textPrimary" style={styles.termsLabel} numberOfLines={1}>
-          {active.label}
-        </AppText>
-      </Animated.View>
-      <View style={styles.termsDots} pointerEvents="none">
-        {slides.map((slide, dotIndex) => (
-          <View
-            key={slide.key}
-            style={[
-              styles.termsDot,
-              { backgroundColor: dotIndex === index ? theme.colors.primary : "rgba(124,92,252,0.25)" },
-            ]}
-          />
-        ))}
-      </View>
-    </View>
-  );
-}
 
 interface PlanColumnProps {
   selected: boolean;
@@ -855,6 +779,15 @@ const styles = StyleSheet.create({
     gap: 3.5,
   },
   termsDot: { width: 4.5, height: 4.5, borderRadius: 999 },
+  noPayRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    marginBottom: 11,
+  },
+  noPayText: { fontFamily: typography.fonts.bold, fontSize: 12.5, color: "#1E8449" },
+  securedText: { fontSize: 10.5, opacity: 0.55, marginTop: 8 },
   reassureRow: {
     flexDirection: "row",
     justifyContent: "center",

@@ -37,7 +37,7 @@ const FEAR_COPY: Record<BiggestWorry, FearCopy> = {
   ozempic_face: {
     spoken: '“Ozempic face”',
     statNum: '25–39%',
-    line: 'of rapid loss can be lean mass, and it shows in the face first. Pace and protein are the two guards — Pepta watches both, every week.',
+    line: 'of rapid loss can be lean mass, and it shows in the face first. Pace and protein are the two guards. Pepta watches both, every week.',
     cite: 'STEP-1 & SURMOUNT-1 body-composition analyses',
   },
   side_effects: {
@@ -46,7 +46,7 @@ const FEAR_COPY: Record<BiggestWorry, FearCopy> = {
   },
   stalling: {
     spoken: 'Stalling out',
-    line: 'Plateaus are part of every real weight curve — the hard part is telling a true stall from a noisy week. Pepta’s trend line separates them weeks before the scale does.',
+    line: 'Plateaus are part of every real weight curve. The hard part is telling a true stall from a noisy week. Pepta’s trend line separates them weeks before the scale does.',
   },
   rebound: {
     spoken: 'Regaining it',

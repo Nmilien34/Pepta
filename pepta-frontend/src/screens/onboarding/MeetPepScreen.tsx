@@ -71,9 +71,9 @@ export function MeetPepScreen({ progress, onBack, onContinue }: MeetPepScreenPro
       progress={progress}
       onBack={onBack}
       context="Glad you’re here."
-      question="Now — meet Pep"
+      question="Now, meet Pep"
       questionAccent
-      sub="Your guide in here. Pep turns your answers into your plan — and explains any number you ever wonder about."
+      sub="Your guide in here. Pep turns your answers into your plan, and explains any number you ever wonder about."
       onTyped={greet}
       footer={<ConvoButton label={waved ? 'Pep waves back!' : 'Wave back 👋'} onPress={wave} />}
     >
@@ -88,7 +88,7 @@ export function MeetPepScreen({ progress, onBack, onContinue }: MeetPepScreenPro
             ],
           }}
         >
-          <Bubble text="Hi — I’m Pep! 👋" />
+          <Bubble text="Hi! I’m Pep 👋" />
         </Animated.View>
 
         <View style={{ height: 200, alignItems: 'center', justifyContent: 'flex-end', marginTop: 10 }}>

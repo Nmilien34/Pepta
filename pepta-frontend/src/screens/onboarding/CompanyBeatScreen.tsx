@@ -31,7 +31,7 @@ export function CompanyBeatScreen({ progress, onBack, context, onContinue }: Com
         land={typed}
         style={{ paddingTop: 40 }}
         value="~15%"
-        line="Average body-weight reduction at 68 weeks for adults on once-weekly semaglutide — the largest trial of its kind. Steady, tracked progress is the proven road."
+        line="Average body-weight reduction at 68 weeks for adults on once-weekly semaglutide, the largest trial of its kind. Steady, tracked progress is the proven road."
         cite="STEP-1 trial, New England Journal of Medicine, 2021"
       />
     </ConvoScreen>

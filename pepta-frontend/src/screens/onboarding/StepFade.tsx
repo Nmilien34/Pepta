@@ -1,7 +1,16 @@
-// Subtle fade-through between onboarding turns: the leaving turn dips out
-// fast, the next one eases in — one soft blink instead of a hard cut, in both
-// directions. Deliberately restrained (no slide, no scale): the turns already
-// animate their own content, so the container only softens the swap.
+// Fade-through between onboarding turns: the leaving turn dips out, the next
+// eases in and settles up a few points — one soft blink instead of a hard cut,
+// in both directions.
+//
+// SLOWED AND GIVEN A RISE on 2026-08-24 (Nick, via design-lab/onboarding-pace).
+// This was 90ms out / 160ms in, and 90ms is below the threshold where the eye
+// reads a dissolve at all — so every turn snapped away rather than settling,
+// which was half of why the flow felt like a quiz. It is now ~1.0s end to end.
+//
+// The rise REVERSES this file's previous rule. "Deliberately restrained (no
+// slide, no scale)" was right at a 250ms swap, where movement would only have
+// added noise. At 1.0s a pure opacity fade reads as the app hesitating; a few
+// points of drift is what makes the same duration read as intentional.
 //
 // Mechanics: while the fade-out plays, the OLD turn stays mounted (held from
 // the last render at its key) with input blocked; the new turn mounts only
@@ -11,11 +20,17 @@
 import React, { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Animated, Easing } from 'react-native';
 
-export const STEP_FADE_OUT_MS = 90;
-export const STEP_FADE_IN_MS = 160;
+import { pace } from '../../components/onboarding/convoPace';
+
+export const STEP_FADE_OUT_MS = pace.stepFadeOutMs;
+export const STEP_FADE_IN_MS = pace.stepFadeInMs;
+export const STEP_RISE_PT = pace.stepRisePt;
 
 export function StepFade({ stepKey, children }: { stepKey: string; children: ReactNode }) {
   const opacity = useRef(new Animated.Value(1)).current;
+  // 0 = settled. Driven only on the way IN; the outgoing turn just dips, so it
+  // never appears to slide away from the user.
+  const rise = useRef(new Animated.Value(0)).current;
   const [displayed, setDisplayed] = useState(stepKey);
   const held = useRef<ReactNode>(children);
   const latestKey = useRef(stepKey);
@@ -36,18 +51,27 @@ export function StepFade({ stepKey, children }: { stepKey: string; children: Rea
       // A newer step change interrupted this fade — its own run finishes the job.
       if (!finished) return;
       setDisplayed(latestKey.current);
-      Animated.timing(opacity, {
-        toValue: 1,
-        duration: STEP_FADE_IN_MS,
-        easing: Easing.out(Easing.quad),
-        useNativeDriver: true,
-      }).start();
+      rise.setValue(STEP_RISE_PT);
+      Animated.parallel([
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: STEP_FADE_IN_MS,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(rise, {
+          toValue: 0,
+          duration: STEP_FADE_IN_MS,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ]).start();
     });
-  }, [stepKey, displayed, opacity]);
+  }, [stepKey, displayed, opacity, rise]);
 
   return (
     <Animated.View
-      style={{ flex: 1, opacity }}
+      style={{ flex: 1, opacity, transform: [{ translateY: rise }] }}
       // The outgoing turn should not take taps mid-dissolve.
       pointerEvents={displayed === stepKey ? 'auto' : 'none'}
     >

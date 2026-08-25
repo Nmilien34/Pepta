@@ -37,7 +37,7 @@ export function NotificationsScreen({ progress, onBack, context, sub, oral, onAl
       onBack={onBack}
       context={context}
       question={oral ? "Want dose-time pings?" : "Want shot-day pings?"}
-      sub={sub ?? 'Dose, water and protein reminders — only when they help.'}
+      sub={sub ?? 'Dose, water and protein reminders, only when they help.'}
       footer={<ConvoButton label="Continue" disabled={busy} onPress={handleAllow} />}
     />
   );

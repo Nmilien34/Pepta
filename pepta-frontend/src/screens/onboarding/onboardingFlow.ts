@@ -58,11 +58,28 @@
 import type { SideEffectType } from '@pepta/shared';
 import { symptomForWeekBeat } from './symptomWeek';
 
+/**
+ * Below this half-life the forgiveness give has no honest version — a drug
+ * mostly gone in a day cannot absorb a missed day. Oral semaglutide is ~1.6.
+ *
+ * Lives HERE, not on the screen, because this file is deliberately RN-free so
+ * it unit-tests in plain Node. Importing the constant from the .tsx would drag
+ * react-native into the step machine and break that.
+ */
+export const FORGIVING_HALF_LIFE_DAYS = 2;
+
 export const ONBOARDING_STEPS = [
   'welcome',
   // The gift, given before anything is asked. Was the welcome screen's payload
   // until the carousel took screen 1 — see NotAloneScreen.
   'notAlone',
+  // The commitment pact, HERE by explicit call (Nick, 2026-08-24). It sat
+  // before the paywall, where a personal promise softening a sales page is a
+  // persuasion technique. Here it is 35 screens from any price, so it cannot
+  // read as one — and an early commitment shapes everything after it, which a
+  // post-purchase one cannot. It follows notAlone because the pact answers
+  // that screen: you are not the only one, so here is what I am in for.
+  'commitment',
   // ASK ABOUT THEM BEFORE INTRODUCING THE MASCOT (moved 2026-08-21, Nick).
   // Pep used to be screens 3–4, immediately after "you're not the only one
   // doing this" — a cartoon shown to someone the app had not yet said one
@@ -89,11 +106,17 @@ export const ONBOARDING_STEPS = [
   // as a mascot handed to a stranger. Better entrance than the old slot,
   // independent of the bounce argument.
   //
-  // AND IT LOAD-BEARS: this beat is what keeps the dosing run at 7. The first
-  // draft of this reorder put the pair BEFORE discoverySource, which left
-  // nameCompanion adjacent to it and made the run to the leanMass beat 8 asks
-  // long — a reorder meant to cut early friction that quietly added some. The
-  // run-length test caught it. Do not move meetPep past nameCompanion.
+  // WHY IT SITS HERE NOW (2026-08-24). It used to be load-bearing for run
+  // length: this beat was the only thing keeping the dosing stretch at 7, and
+  // the note here read "do not move meetPep past nameCompanion." That
+  // constraint is GONE. doseForgiveness breaks that run now, so this screen is
+  // free to move for the first time and stays put on merit instead.
+  //
+  // The merit: Pep lands immediately before medication, route and currentDose,
+  // the heaviest ask block in the flow. A guide introduced right before the
+  // demanding part reads as "here is who is with you". Introduced earlier,
+  // with nothing yet to guide anyone through, it is just a mascot. Brief, then
+  // the work starts, which is also what keeps it from becoming annoying.
   'meetPep',
   // Optional, never a gate — the default stays 'Pep'. Sits here so the
   // introduction is still on screen; asking later would feel bolted on.
@@ -103,6 +126,12 @@ export const ONBOARDING_STEPS = [
   'medication',
   'route',
   'currentDose',
+  // The forgiveness give (2026-08-24). Placed HERE, not later, for two
+  // reasons: the "what if I'm late" anxiety is live the moment they have just
+  // named a dose, and this is the screen that breaks the first seven-ask run
+  // (nameCompanion → frequency) into 4 + 3. Skips itself when the drug's
+  // half-life is too short for the claim to hold.
+  'doseForgiveness',
   'deviceType',
   'concentration',
   'frequency',
@@ -111,13 +140,18 @@ export const ONBOARDING_STEPS = [
   // on this" is about THEIR regimen rather than an abstract statistic.
   'leanMass',
   'lastShot',
-  'shotDay',
   'shotTime',
   'instrument',
   'goalType',
-  'sexGender',
-  'birthday',
+  // MERGED 2026-08-25: was `sexGender` + `birthday`, two screens that
+  // justified themselves with the same sentence. Merging them is also what
+  // restores the 4-ask ceiling on the exploring path (see AboutYouScreen).
+  'aboutYou',
   'heightWeight',
+  // The muscle-floor give (2026-08-24). Breaks the goal stretch — the run the
+  // header below calls "the one nobody escapes" — into 4 + 3, and answers the
+  // hardest number in the flow with something instead of another question.
+  'muscleFloor',
   'startWeight',
   'goalWeight',
   'goalPace',
@@ -149,7 +183,18 @@ export const ONBOARDING_STEPS = [
   // trial, and these screens silently skip themselves rather than promise
   // free days that arm's wall won't deliver.
   'trialOffer',
-  'trialCarousel',
+  // Was `trialCarousel` until 2026-08-24. That screen showed invented demo
+  // numbers (1.42 mg, -12 lb) on the last screen before the wall; this one
+  // answers the dominant objection to a free trial instead — when am I
+  // charged — using rows that already existed in paywallTimeline.ts and were
+  // imported by nothing. Same trial gate: no trial on the live offering and
+  // it skips itself to the paywall.
+  'trialTimeline',
+  // The price anchor. The wall had NO price framing of any kind — $59.99
+  // arrived cold — and this user is already paying for the medication, so the
+  // honest comparison is against effort already committed. Skips itself if the
+  // annual product will not resolve, rather than inventing a number.
+  'priceAnchor',
   // NOTE: the 'referral' code-entry turn used to sit between auth and the
   // paywall. Removed 2026-07-27 — near-everyone who reached it tapped Skip.
   // `ReferralCodeScreen` is kept (the only code-claim surface in the app)
@@ -202,26 +247,72 @@ export interface FlowContext {
   frequency?: 'weekly' | 'biweekly' | 'daily' | 'custom';
   /** Their side-effect picks — gates the symptom-week beat. */
   sideEffects?: readonly SideEffectType[];
+  /**
+   * The picked medication's elimination half-life. Only the NUMBER is here,
+   * not the medication: the flow needs to know whether the forgiveness give
+   * has an honest version, nothing else about the drug.
+   */
+  halfLifeDays?: number | null;
+  /** Whether height+weight were actually answered — gates the muscle floor. */
+  hasBody?: boolean;
 }
 
 // The dosing block only makes sense for someone actively on a GLP-1.
 const MEDICATION_BLOCK: readonly OnboardingStep[] = [
   'currentDose',
-  'leanMass',
+  // `leanMass` LEFT THIS BLOCK 2026-08-25. It was gated to active dosers, but
+  // nothing on it is about their dose: it is the "where the weight comes
+  // from" education and the 39% lean-mass stat, and leanMassContext already
+  // degrades to "Here is why this matters." with no medication on file. It
+  // was cut from the two paths that need it MOST — someone deciding whether
+  // to start is exactly who that stat is for. Removing it also restores the
+  // 4-ask ceiling for those paths, which fixing the doseForgiveness bug had
+  // broken: that screen was wrongly showing to starting_soon users, and as a
+  // beat it was accidentally the only thing splitting their run of six.
   'deviceType',
   'concentration',
   'frequency',
   'lastShot',
-  'shotDay',
   'shotTime',
   'instrument',
 ];
 
 export function shouldSkipStep(step: OnboardingStep, ctx: FlowContext): boolean {
+  // "A day late won't undo you" is only true of a drug that stays in you for
+  // days. No half-life on record, or one too short to absorb a missed dose,
+  // and there is no honest version of the screen — so it goes rather than
+  // reassuring someone about a dose they should actually take.
+  // No recorded body, no floor. resolveWeights would happily fall back to
+  // DEFAULT_BODY and the screen would show a confident number derived from
+  // someone else's weight — the same failure the price anchor skips to avoid.
+  if (step === 'muscleFloor') return !ctx.hasBody;
+
+  if (step === 'doseForgiveness') {
+    // NOT BEFORE THE FIRST DOSE (2026-08-25). This was gated on half-life
+    // alone, so a starting_soon user was told "a day late won't undo you"
+    // about a dose they had never taken — under a regimen echo that rendered
+    // EMPTY, because currentDose is in MEDICATION_BLOCK and had been skipped.
+    // Note this cannot be fixed by adding the step to MEDICATION_BLOCK: the
+    // half-life return below runs first and would preempt that check.
+    if (ctx.journeyStage && ctx.journeyStage !== 'active') return true;
+    return (
+      typeof ctx.halfLifeDays !== 'number' || ctx.halfLifeDays < FORGIVING_HALF_LIFE_DAYS
+    );
+  }
+  // "Where did you start?" only means something to someone who has started.
+  // Everyone else started TODAY, and heightWeight collected that weight two
+  // screens earlier — so the screen asked for a number already on file. The
+  // navigator mirrors currentWeight into startWeight when this is skipped.
+  // An UNKNOWN stage still asks: defaulting a start weight nobody gave us is
+  // how a progress chart quietly invents a loss that never happened.
+  if (step === 'startWeight' && ctx.journeyStage && ctx.journeyStage !== 'active') return true;
   // Approved creators / active subscribers never see the wall — and a trial
   // pitch for a wall they'll never see is worse than pointless.
   if (
-    (step === 'paywall' || step === 'trialOffer' || step === 'trialCarousel') &&
+    (step === 'paywall' ||
+      step === 'trialOffer' ||
+      step === 'trialTimeline' ||
+      step === 'priceAnchor') &&
     ctx.accessActive
   ) {
     return true;
@@ -243,13 +334,10 @@ export function shouldSkipStep(step: OnboardingStep, ctx: FlowContext): boolean 
   if (step === 'deviceType' && ctx.route === 'oral') return true;
   // Concentration only matters when the user draws doses from a vial.
   if (step === 'concentration' && ctx.deviceType !== 'syringe_vial') return true;
-  // WHICH weekday is a weekly-injection question only.
-  if (
-    step === 'shotDay' &&
-    (ctx.route === 'oral' || (ctx.frequency != null && ctx.frequency !== 'weekly'))
-  ) {
-    return true;
-  }
+  // The `shotDay` step was CUT (2026-08-24). It asked "Tuesdays are shot day?"
+  // with the answer already derived from lastShot and pre-selected — a screen
+  // to confirm something we knew. The navigator now derives shotDays when
+  // lastShot is answered, and reminder settings is where it changes.
   // WHAT TIME: weekly injections as before, PLUS every daily schedule
   // regardless of route (2026-08-07) — a daily cadence with no time of day
   // projects no next dose at all, which broke oral dailies and daily

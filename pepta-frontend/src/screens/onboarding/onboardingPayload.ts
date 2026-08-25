@@ -23,7 +23,7 @@ import type { JourneyStage } from './JourneyStageScreen';
 import type { DoseValue } from './DoseScreen';
 import type { DoseFrequency } from './FrequencyScreen';
 import type { GoalType } from './GoalTypeScreen';
-import type { GenderIdentity } from './SexGenderScreen';
+import type { GenderIdentity } from './AboutYouScreen';
 import type { WeightUnit } from './GoalWeightScreen';
 import type { SideEffectType } from './SideEffectsScreen';
 import type { MedicationRoute } from './RouteScreen';

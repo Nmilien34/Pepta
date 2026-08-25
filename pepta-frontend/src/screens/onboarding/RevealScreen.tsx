@@ -15,39 +15,28 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import Svg, { Circle, Defs, LinearGradient, Path, Stop } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { Linking } from 'react-native';
 import { Confetti, ConvoButton, ConvoScreen, convo } from '../../components';
+import { RiskPayoff } from '../../components/onboarding/RiskPayoff';
+import type { RiskProfile } from '../../utils/riskProfile';
 import { ProviderButton } from '../auth/SignInScreen';
 import { useProviderSignIn } from '../auth/useProviderSignIn';
 import { PRIVACY_URL, TERMS_URL } from '../../config';
-import { buildRevealSegments } from './revealPacing';
 import { logRevealClaimTapped } from '../../services/funnelEvents';
-import type { RampStyle } from '../../utils/hapticRamp';
 import { typography } from '../../theme/typography';
 import { formatShortDate } from '../../utils/dateParts';
 import type { GoalProjection } from '../../utils/goalProjection';
 import type { PlanTargets } from '../../utils/planPreview';
 
-const AnimatedPath = Animated.createAnimatedComponent(Path);
 
-const IMPACT: Record<RampStyle, Haptics.ImpactFeedbackStyle> = {
-  soft: Haptics.ImpactFeedbackStyle.Soft,
-  light: Haptics.ImpactFeedbackStyle.Light,
-  medium: Haptics.ImpactFeedbackStyle.Medium,
-  rigid: Haptics.ImpactFeedbackStyle.Rigid,
-  heavy: Haptics.ImpactFeedbackStyle.Heavy,
-};
 
 // Graph geometry (viewBox 0 0 322 150): a gentle descent from today to goal.
-const CURVE = 'M14 24 C 96 44, 196 82, 300 120';
-const CURVE_LENGTH = 330; // safely >= the real path length for the dash trick
-const ORIGIN = { x: 14, y: 24 };
-const DRAW_DELAY_MS = 260; // the card settles before the line starts moving
 
 export interface RevealScreenProps {
+  /** Derived from their answers — see utils/riskProfile. */
+  risk: RiskProfile;
   progress: number;
   startWeight: number;
   goalWeight: number;
@@ -65,6 +54,7 @@ export interface RevealScreenProps {
 }
 
 export function RevealScreen({
+  risk,
   progress,
   startWeight,
   goalWeight,
@@ -118,6 +108,7 @@ export function RevealScreen({
         }
       >
         <GoalPathCard
+          risk={risk}
           start={revealed}
           startWeight={startWeight}
           goalWeight={goalWeight}
@@ -274,6 +265,7 @@ const authStyles = StyleSheet.create({
 });
 
 interface GoalPathCardProps {
+  risk: RiskProfile;
   start: boolean;
   startWeight: number;
   goalWeight: number;
@@ -282,121 +274,42 @@ interface GoalPathCardProps {
   onArrive(): void;
 }
 
-function GoalPathCard({ start, startWeight, goalWeight, unit, dateChip, onArrive }: GoalPathCardProps) {
-  const draw = useRef(new Animated.Value(0)).current;
-  const flagPop = useRef(new Animated.Value(0)).current;
+function GoalPathCard({ start, risk, goalWeight, unit, dateChip, onArrive }: GoalPathCardProps) {
+  // Latched: arrival fires once per mount, whatever re-renders happen.
   const arrived = useRef(false);
-  const hapticTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const onArriveRef = useRef(onArrive);
   onArriveRef.current = onArrive;
 
+  // No local animation left to drive: the card's motion lives in RiskPayoff,
+  // and arrival is reported by it. The previous sequence animated a value that
+  // nothing read after the hardcoded goal-path curve was removed — it was
+  // still firing haptics along a line that was no longer drawn.
 
-  useEffect(() => {
-    if (!start || arrived.current) return;
 
-    // The line is ASSEMBLED, not swept: short moves separated by catches that
-    // shorten as it resolves. Each segment start fires its own haptic, so the
-    // pause is felt rather than just seen — that is what makes the next move
-    // register as progress instead of a bar sliding across. See revealPacing.
-    const segments = buildRevealSegments();
-    const steps: Animated.CompositeAnimation[] = [];
-    let elapsed = DRAW_DELAY_MS;
-
-    segments.forEach((segment) => {
-      const at = elapsed;
-      hapticTimers.current.push(
-        setTimeout(() => {
-          if (Platform.OS !== 'web') {
-            void Haptics.impactAsync(IMPACT[segment.haptic]).catch(() => undefined);
-          }
-        }, at),
-      );
-      steps.push(
-        Animated.timing(draw, {
-          toValue: segment.to,
-          duration: segment.durationMs,
-          // Linear inside a segment: the pacing lives in the plan, and an ease
-          // per segment would blur the catches into one smooth glide.
-          easing: Easing.linear,
-          useNativeDriver: false,
-        }),
-      );
-      elapsed += segment.durationMs;
-      if (segment.pauseMs > 0) {
-        steps.push(Animated.delay(segment.pauseMs));
-        elapsed += segment.pauseMs;
-      }
-    });
-
-    const seq = Animated.sequence([
-      // let the card settle in first, then the line starts gathering
-      Animated.delay(DRAW_DELAY_MS),
-      ...steps,
-      Animated.spring(flagPop, { toValue: 1, friction: 4, tension: 160, useNativeDriver: true }),
-    ]);
-    seq.start(({ finished }) => {
-      if (finished) {
-        arrived.current = true;
-        onArriveRef.current();
-      }
-    });
-    return () => {
-      seq.stop();
-      hapticTimers.current.forEach(clearTimeout);
-      hapticTimers.current = [];
-    };
-  }, [start, draw, flagPop]);
-
-  const dashoffset = draw.interpolate({ inputRange: [0, 1], outputRange: [CURVE_LENGTH, 0] });
-  const flagStyle = {
-    opacity: flagPop,
-    transform: [
-      { scale: flagPop.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] }) },
-      { translateY: flagPop.interpolate({ inputRange: [0, 1], outputRange: [6, 0] }) },
-    ],
-  };
 
   return (
     <View style={styles.card}>
       <Text style={styles.eyebrow}>
-        GOAL PATH{dateChip ? <Text style={{ color: convo.primary }}>{`  ·  ${goalWeight} ${unit} by ${dateChip}`}</Text> : null}
+        MUSCLE RISK
+        <Text style={{ color: convo.primary }}>{`  ·  ${goalWeight} ${unit} by ${dateChip ?? 'your date'}`}</Text>
       </Text>
-
-      <View style={styles.graphWrap}>
-        <Svg width="100%" height={150} viewBox="0 0 322 150">
-          <Defs>
-            <LinearGradient id="revealPath" x1="0" y1="0" x2="1" y2="0">
-              <Stop offset="0" stopColor={convo.primary} />
-              <Stop offset="1" stopColor="#E25CC4" />
-            </LinearGradient>
-          </Defs>
-          {/* the faint full route, then the animated draw on top */}
-          <Path d={CURVE} stroke={convo.hairline} strokeWidth={2} strokeDasharray="5 7" fill="none" />
-          <AnimatedPath
-            d={CURVE}
-            stroke="url(#revealPath)"
-            strokeWidth={3.5}
-            strokeLinecap="round"
-            fill="none"
-            strokeDasharray={CURVE_LENGTH}
-            strokeDashoffset={dashoffset}
-          />
-          <Circle cx={ORIGIN.x} cy={ORIGIN.y} r={5.5} fill={convo.primary} stroke={convo.surface} strokeWidth={2.5} />
-        </Svg>
-
-        <Text style={[styles.originLabel, { top: 2, left: 24 }]}>{startWeight} {unit} today</Text>
-
-        <Animated.View style={[styles.flagWrap, flagStyle]}>
-          <View style={styles.flag}>
-            <Svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#B23A93" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
-              <Path d="M6 21V4M6 4h11l-2 4 2 4H6" />
-            </Svg>
-          </View>
-          <Text style={styles.flagLabel}>{goalWeight} {unit}</Text>
-        </Animated.View>
-      </View>
+      {/* Gated on `run`, the same flag the goal path used, so the payoff still
+          lands on the reveal's own beat and the confetti still follows it. */}
+      <RiskPayoff
+        profile={risk}
+        run={start}
+        onSettled={() => {
+          if (arrived.current) return;
+          arrived.current = true;
+          onArriveRef.current();
+        }}
+      />
+      <Text style={styles.riskFoot}>
+        This is the number Pepta watches. It moves every week you log.
+      </Text>
     </View>
   );
+
 }
 
 function ProofChips({ chips, show }: { chips: string[]; show: boolean }) {
@@ -458,6 +371,14 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     paddingVertical: 9,
     paddingHorizontal: 15,
+  },
+  riskFoot: {
+    fontFamily: typography.fonts.medium,
+    fontSize: 12,
+    lineHeight: 18,
+    color: convo.soft,
+    textAlign: 'center',
+    marginTop: 16,
   },
   chipText: { fontFamily: typography.fonts.semiBold, fontSize: 13.5, color: convo.ink },
 });

@@ -24,7 +24,7 @@ export function TrainingScreen({ progress, onBack, context, onAnswer }: Training
         { label: 'Regularly', sub: '2+ sessions a week', value: 'consistent' },
         { label: 'Getting back into it', value: 'returning' },
         { label: 'Just starting', value: 'beginner' },
-        { label: 'Not yet', sub: 'that’s fine — protein still protects', value: 'not_training' },
+        { label: 'Not yet', sub: 'that’s fine, protein still protects', value: 'not_training' },
       ]}
       onAnswer={onAnswer}
     />

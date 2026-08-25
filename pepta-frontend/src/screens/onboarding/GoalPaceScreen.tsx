@@ -49,7 +49,7 @@ export function GoalPaceScreen({
         value: PACE_VALUES.gentle as number,
       },
       {
-        label: 'Steady — recommended',
+        label: 'Steady · recommended',
         sub: `~${steady.weeklyLoss} ${unit} a week${dateLine(steady)}`,
         value: PACE_VALUES.steady as number,
       },
@@ -66,7 +66,7 @@ export function GoalPaceScreen({
       progress={progress}
       onBack={onBack}
       context={context}
-      question="Pick your pace."
+      question="How fast do you want this?"
       options={options}
       value={pace}
       onSelect={onPaceChange}

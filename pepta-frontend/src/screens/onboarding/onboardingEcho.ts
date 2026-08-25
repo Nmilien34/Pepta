@@ -9,6 +9,7 @@
 
 import { formatHeight, kgToLb, lbToKg, type BodyMeasure } from '../../utils/units';
 import { formatShortDate } from '../../utils/dateParts';
+import { proteinFloorG } from '../../utils/planPreview';
 import { projectGoal } from '../../utils/goalProjection';
 import type { OnboardingStep } from './onboardingFlow';
 import { sideEffectNamesEcho, symptomForWeekBeat } from './symptomWeek';
@@ -46,7 +47,6 @@ export interface EchoAnswers {
   goalNote?: string;
 }
 
-const DAY_SINGULAR = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const DAY_PLURAL = ['Sundays', 'Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays', 'Saturdays'];
 const DAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -73,7 +73,7 @@ export function shotDaysCompact(days: number[]): string {
   return `${names.slice(0, -1).join(', ')} & ${names[names.length - 1]}`;
 }
 
-function weekdayOf(parts: DateParts): number {
+export function weekdayOf(parts: DateParts): number {
   return new Date(parts.year, parts.month, parts.day).getDay();
 }
 
@@ -178,6 +178,12 @@ function goalInBodyUnit(a: EchoAnswers): { value: number; unit: 'lb' | 'kg' } {
  * The echo (dim recap) that types at the top of the given step. Undefined means
  * the screen owns its opener (or there is nothing to acknowledge yet).
  */
+/** The muscle-floor payoff, said back. Used by whichever screen follows it. */
+function floorEcho(a: EchoAnswers): string | undefined {
+  if (!a.body) return undefined;
+  return `${proteinFloorG(a.body.weight, a.body.units === 'metric' ? 'kg' : 'lb')} g a day. Locked in.`;
+}
+
 export function echoFor(step: OnboardingStep, a: EchoAnswers, now: Date = new Date()): string | undefined {
   const unit = a.medication?.doseUnit ?? 'mg';
   switch (step) {
@@ -202,8 +208,6 @@ export function echoFor(step: OnboardingStep, a: EchoAnswers, now: Date = new Da
       // the lean-mass beat sits between them, and repeating it here would echo
       // the same line the beat already opened with.
       return 'Back to your schedule.';
-    case 'shotDay':
-      return a.lastShot ? `Last shot was a ${DAY_SINGULAR[weekdayOf(a.lastShot)]}.` : undefined;
     case 'shotTime':
       // Daily users reach this turn without ever picking a weekday, so the
       // shot-day echo has nothing to say — their cadence IS the echo.
@@ -211,19 +215,32 @@ export function echoFor(step: OnboardingStep, a: EchoAnswers, now: Date = new Da
     case 'instrument':
       return instrumentContext(a);
     case 'goalType':
-      return a.journeyStage === 'active' ? 'Level model armed. Now you.' : 'Now, the goal.';
-    case 'sexGender':
+      return a.journeyStage === 'active' ? 'Your model’s running. Now you.' : 'Now, the goal.';
+    case 'aboutYou':
       // If they wrote their own goal, say it back. The preset echoes exist to
       // prove we heard the answer; quoting their sentence does that far better
       // than the generic fallback goalTypeEcho would land on here.
       return a.goalNote ? `“${a.goalNote}” — noted.` : goalTypeEcho(a.goalType);
-    case 'birthday':
-      return 'Perfect — that sharpens your targets.';
     case 'heightWeight':
       return 'Almost there on the numbers.';
-    case 'startWeight':
+    // The body line moved here from startWeight (2026-08-24): this is now the
+    // screen that immediately follows height+weight, and the protein number it
+    // shows is derived from that same answer — so the echo and the payoff come
+    // from one input.
+    case 'muscleFloor':
       return a.body ? `${formatHeight(a.body)}, ${a.body.weight} today.` : undefined;
+    // …and startWeight now echoes what the muscle-floor screen just GAVE,
+    // rather than repeating the body line one screen later.
+    case 'startWeight':
+      return floorEcho(a);
     case 'goalWeight':
+      // WHICHEVER SCREEN FOLLOWS THE GIVE CARRIES ITS ACKNOWLEDGMENT — the
+      // same rule the notifications turn inherited from the cut `needs` step.
+      // startWeight is gated to active users (2026-08-25), so for everyone
+      // else THIS screen is the one that follows muscleFloor, and the body
+      // line would otherwise land twice in a row: muscleFloor already opened
+      // with "5'10\", 226 today."
+      if (a.journeyStage && a.journeyStage !== 'active') return floorEcho(a);
       return a.body ? `${a.body.weight} today. Thanks for trusting me with that.` : undefined;
     case 'goalPace': {
       const goal = goalInBodyUnit(a);
@@ -238,7 +255,7 @@ export function echoFor(step: OnboardingStep, a: EchoAnswers, now: Date = new Da
     case 'sideEffects':
       return trainingEcho(a.trainingStatus);
     case 'biggestWorry':
-      return `${journeyEcho(a.journeyStage)} Now, honestly —`;
+      return `${journeyEcho(a.journeyStage)} Everyone has one.`;
     case 'symptomWeek':
       return sideEffectNamesEcho(a.sideEffects);
     case 'notifications':

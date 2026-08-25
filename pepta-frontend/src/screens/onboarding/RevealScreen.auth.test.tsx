@@ -116,6 +116,13 @@ vi.mock("../../services/funnelEvents", () => ({
   logRevealClaimTapped: mocks.logRevealClaimTapped,
 }));
 
+// The scored payoff reaches expo-modules-core through CountUp, which this
+// file's react-native mock does not cover. These tests are about the auth
+// gate, so the card is stubbed rather than the mock widened.
+vi.mock("../../components/onboarding/RiskPayoff", () => ({
+  RiskPayoff: () => null,
+}));
+
 import { RevealScreen } from "./RevealScreen";
 import { migrateLegacyStep, parseDraft, serializeDraft } from "./onboardingDraft";
 import { ONBOARDING_STEPS } from "./onboardingFlow";
@@ -131,7 +138,8 @@ async function mount(authenticated: boolean) {
   await act(async () => {
     tree = TestRenderer.create(
       <RevealScreen
-        progress={0.95}
+        risk={RISK}
+      progress={0.95}
         startWeight={226}
         goalWeight={185}
         unit="lb"
@@ -149,6 +157,18 @@ import { beforeEach } from "vitest";
 beforeEach(() => {
   mocks.logRevealClaimTapped.mockClear();
 });
+
+// The scored payoff is now the reveal's card. These tests are about the auth
+// gate, so a fixed profile keeps them independent of the risk model's tuning.
+const RISK = {
+  score: 48,
+  drivers: [
+    { key: 'pace' as const, label: 'Pace you picked', score: 52 },
+    { key: 'training' as const, label: 'Resistance training', score: 45 },
+    { key: 'age' as const, label: 'Age', score: 40 },
+    { key: 'activity' as const, label: 'Daily movement', score: 58 },
+  ],
+};
 
 describe("the payoff-first reveal (Start today for everyone, auth in a sheet)", () => {
   it("signed out: payoff CTA renders, NO auth block until the claim tap", async () => {
@@ -202,7 +222,8 @@ describe("the payoff-first reveal (Start today for everyone, auth in a sheet)", 
     await act(async () => {
       tree = TestRenderer.create(
         <RevealScreen
-          progress={0.95}
+          risk={RISK}
+      progress={0.95}
           startWeight={226}
           goalWeight={185}
           unit="lb"

@@ -70,7 +70,7 @@ export const PROOF_SLIDES: readonly ProofSlide[] = [
   {
     key: 'level',
     title: 'Know what’s still working',
-    sub: 'Your live level between shots — covered, or in a trough.',
+    sub: 'Your live level between shots. Covered, or in a trough.',
     render: () => (
       <>
         <View style={styles.rowBetween}>

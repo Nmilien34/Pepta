@@ -59,7 +59,7 @@ export function buildCraftingSteps(answers: FlowAnswers): string[] {
 
   // Drawing from a vial is the only path where the mixing maths is real work.
   if (answers.deviceType === 'syringe_vial') {
-    rows.push('Dose & mixing math — calculator armed');
+    rows.push('Dose & mixing math — calculator ready');
   }
   // They named a compound, so the tracker has something to track. The level
   // model is only armed for someone actively dosing — lastShot lives in the

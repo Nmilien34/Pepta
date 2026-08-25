@@ -66,7 +66,9 @@ const FALLBACK_PRICING: PaywallPricingCopy = {
   yearly: {
     title: "Yearly",
     sub: "once a year",
-    price: "$5.00",
+    // MUST match what monthlyEquivalent() computes for $59.99/yr, or the
+    // price visibly flips when offerings land. It floors: $4.99.
+    price: "$4.99",
     per: "/mo",
     priceNote: "$59.99/yr",
     badge: "SAVE 50%",
@@ -203,7 +205,7 @@ function numericPrice(pkg: PricePackage | null | undefined): number | null {
 }
 
 /**
- * The per-month anchor from the annual product ("$5.00" from $59.99/yr) —
+ * The per-month anchor from the annual product ("$4.99" from $59.99/yr) —
  * computed, never a literal, so ASC price changes need no build. Uses the numeric
  * price for math and the priceString's leading symbol for display; if the
  * currency formats with a suffix (e.g. "39,99 €") we can't format faithfully,
@@ -214,7 +216,33 @@ function monthlyEquivalent(yearly: PricePackage): string | null {
   if (!amount || amount <= 0) return null;
   const symbol = yearly.product.priceString?.match(/^[^\d-]*/)?.[0]?.trim();
   if (!symbol) return null;
-  return `${symbol}${(amount / 12).toFixed(2)}`;
+  // FLOOR, not round. $59.99/12 is 4.99916, and toFixed(2) rounded that to
+  // "$5.00" — pushing the anchor over the psychological threshold the
+  // per-month figure exists to stay under, and overstating what a month
+  // actually costs. Flooring also guarantees the anchor never claims a price
+  // lower than the yearly divided out, which is the direction that matters.
+  return `${symbol}${(Math.floor(amount / 12 * 100) / 100).toFixed(2)}`;
+}
+
+/**
+ * The annual price as a per-DAY figure — "16¢" from $59.99/yr.
+ *
+ * Same contract as monthlyEquivalent: derived from the live product, never a
+ * literal, and FLOORED so the anchor can never overstate what a day costs.
+ * Sub-dollar amounts render in cents because "$0.16 a day" reads as a price
+ * and "16¢ a day" reads as nothing — which is the entire point of the anchor.
+ *
+ * 365, not 365.25: the figure is a comparison, not an invoice, and a leap-year
+ * correction on a sixteen-cent number is noise pretending to be rigour.
+ */
+export function dailyEquivalent(yearly: PricePackage | null | undefined): string | null {
+  const amount = numericPrice(yearly);
+  if (!amount || amount <= 0) return null;
+  const perDay = Math.floor((amount / 365) * 100) / 100;
+  if (perDay <= 0) return null;
+  if (perDay < 1) return `${Math.floor(perDay * 100)}\u00A2`;
+  const symbol = yearly?.product.priceString?.match(/^[^\d-]*/)?.[0]?.trim();
+  return symbol ? `${symbol}${perDay.toFixed(2)}` : null;
 }
 
 function savingsBadge(monthly: PricePackage, yearly: PricePackage): string | undefined {

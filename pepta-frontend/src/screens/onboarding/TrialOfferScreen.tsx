@@ -284,7 +284,7 @@ export function TrialOfferScreen({
 
             <Entrance delayMs={520}>
               <Text style={styles.hero}>
-                {companionName} would love you{"\n"}to try Pepta —{"\n"}
+                {companionName} would love you{"\n"}to try Pepta,{"\n"}
                 <Text style={styles.heroAccent}>{trialLabel} on us</Text>
               </Text>
             </Entrance>

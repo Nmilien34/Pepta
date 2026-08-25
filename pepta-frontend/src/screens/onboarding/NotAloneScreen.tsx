@@ -61,7 +61,7 @@ export function NotAloneScreen({ progress, onBack, onContinue }: NotAloneScreenP
           <CitedStat
             land
             value="1 in 8"
-            line="American adults has taken a GLP-1. Most of them quietly — which is exactly why it can feel like just you."
+            line="American adults has taken a GLP-1. Most of them quietly, which is exactly why it can feel like just you."
             cite="KFF Health Tracking Poll, May 2024"
           />
           <View style={styles.faces}>

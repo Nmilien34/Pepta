@@ -33,7 +33,7 @@ export function ConcentrationScreen({
       onBack={onBack}
       context={context}
       question="What’s the concentration?"
-      sub="It’s on your vial or mixing notes — this turns doses into exact draw-to units."
+      sub="It’s on your vial or mixing notes. This turns doses into exact draw-to units."
       options={[
         ...COMMON_MG_PER_ML.map((mg) => ({ label: `${mg} mg/mL`, value: mg as ConcentrationValue })),
         { label: 'Not sure yet', value: 'unsure' as ConcentrationValue },

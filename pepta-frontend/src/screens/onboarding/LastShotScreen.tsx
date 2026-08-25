@@ -28,7 +28,7 @@ export function LastShotScreen({ progress, onBack, context, oral, value, onChang
       onBack={onBack}
       context={context}
       question={oral ? 'When was your last dose?' : 'When was your last shot?'}
-      sub="This date arms your level model."
+      sub="This is how I know what’s still in you."
       footer={<ConvoButton label="Continue" onPress={onContinue} />}
     >
       <View style={{ flex: 1, justifyContent: 'center', marginTop: 10 }}>

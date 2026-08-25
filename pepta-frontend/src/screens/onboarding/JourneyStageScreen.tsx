@@ -20,7 +20,7 @@ export function JourneyStageScreen({ progress, onBack, onAnswer }: JourneyStageS
     <ConvoScreen<JourneyStage>
       progress={progress}
       onBack={onBack}
-      context="Good. Let’s get to know each other."
+      context="That stays between us. Now let me catch up to you."
       question="Where are you in your GLP-1 journey?"
       options={[
         { label: 'Already dosing', sub: 'shots or oral, underway', value: 'active' },

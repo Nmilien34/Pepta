@@ -28,6 +28,22 @@ const ACTIVITY_STEPS: Record<ActivityLevel, number> = {
   active: 10000,
 };
 
+/**
+ * Daily protein floor in grams, from body weight alone.
+ *
+ * Its own function because the muscle-floor give needs it BEFORE a pace has
+ * been chosen — previewTargets demands a weeklyLoss it would have to be handed
+ * a fake value for, and a fake input to get a real number out is how a screen
+ * quietly starts lying.
+ *
+ * 0.7 g per lb is the muscle-protective end of the range, which is the whole
+ * point: this is a floor, not a target.
+ */
+export function proteinFloorG(currentWeight: number, unit: 'lb' | 'kg'): number {
+  const lb = unit === 'kg' ? kgToLb(currentWeight) : currentWeight;
+  return Math.round(lb * 0.7);
+}
+
 export function previewTargets(args: {
   currentWeight: number;
   unit: 'lb' | 'kg';
@@ -41,7 +57,7 @@ export function previewTargets(args: {
   const dailyDeficit = (weeklyLossLb * 3500) / 7;
   const calories = Math.max(1200, Math.round((maintenance - dailyDeficit) / 10) * 10);
   return {
-    proteinG: Math.round(lb * 0.7), // muscle-protective
+    proteinG: proteinFloorG(args.currentWeight, args.unit), // muscle-protective
     calories,
     waterOz: Math.round(lb * 0.5),
     fiberG: Math.max(25, Math.round((calories / 1000) * 14)),

@@ -91,9 +91,9 @@ export function InstrumentBeatScreen({ progress, onBack, context, onContinue }: 
       progress={progress}
       onBack={onBack}
       context={context}
-      question="Your level model is armed"
+      question="Now you’ll know what’s in you"
       questionAccent
-      sub="Every dose you log feeds this curve — you'll always know what's still active in you."
+      sub="Every dose you log feeds this curve, so you'll always know what's still active in you."
       footer={<ConvoButton label="Good to know" onPress={onContinue} />}
       onTyped={() => setTyped(true)}
     >

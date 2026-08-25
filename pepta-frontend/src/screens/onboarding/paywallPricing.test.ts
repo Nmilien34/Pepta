@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildPaywallPricing } from "./paywallPricing";
+import { buildPaywallPricing, dailyEquivalent } from "./paywallPricing";
 
 function packageWithPrice(priceString: string, price: number, currencyCode = "USD") {
   return {
@@ -54,7 +54,9 @@ describe("buildPaywallPricing", () => {
     const pricing = buildPaywallPricing(null);
 
     expect(pricing.monthly.price).toBe("$9.99");
-    expect(pricing.yearly.price).toBe("$5.00");
+    // $4.99, not $5.00 — the anchor floors as of 2026-08-24, and the loading
+    // fallback matches it so the price cannot visibly flip when offerings land.
+    expect(pricing.yearly.price).toBe("$4.99");
     expect(pricing.yearly.per).toBe("/mo");
     expect(pricing.yearly.priceNote).toBe("$59.99/yr");
     expect(pricing.yearly.sub).toBe("once a year");
@@ -300,7 +302,9 @@ describe("buildPaywallPricing", () => {
       yearly: packageWithPrice("$59.99", 59.99),
     });
     expect(pricing.yearly.badge).toBe("SAVE 50%");
-    expect(pricing.yearly.price).toBe("$5.00");
+    // $4.99, not $5.00 — the anchor floors as of 2026-08-24, and the loading
+    // fallback matches it so the price cannot visibly flip when offerings land.
+    expect(pricing.yearly.price).toBe("$4.99");
     expect(pricing.yearly.priceNote).toBe("$59.99/yr");
     expect(pricing.cta.yearly.label).toBe("Start my year — $59.99");
     // An exact saving stays exact.
@@ -346,5 +350,63 @@ describe("buildPaywallPricing", () => {
     expect(caseThree.yearly.badge).toBe("SAVE 50%");
     expect(caseThree.monthly.badge).toBeUndefined();
     expect(JSON.stringify(caseThree)).not.toContain("$0.00");
+  });
+});
+
+describe("the per-month anchor floors instead of rounding", () => {
+  it("renders $59.99/yr as $4.99, never $5.00", () => {
+    // Shipped as "$5.00" until 2026-08-24: (59.99 / 12).toFixed(2) is 4.99916
+    // rounded UP. Crossing $5 is exactly what a per-month anchor exists to
+    // avoid, and it overstates what a month costs.
+    const pricing = buildPaywallPricing({
+      monthly: packageWithPrice("$9.99", 9.99),
+      yearly: packageWithPrice("$59.99", 59.99),
+    });
+
+    expect(pricing.yearly.price).toBe("$4.99");
+    expect(pricing.yearly.priceNote).toBe("$59.99/yr");
+  });
+
+  it("never shows a month costing more than the year divided out", () => {
+    for (const yearly of [59.99, 71.99, 119.99, 12.0]) {
+      const pricing = buildPaywallPricing({
+        monthly: packageWithPrice("$9.99", 9.99),
+        yearly: packageWithPrice(`$${yearly.toFixed(2)}`, yearly),
+      });
+
+      expect(Number(pricing.yearly.price.slice(1))).toBeLessThanOrEqual(yearly / 12);
+    }
+  });
+});
+
+describe("dailyEquivalent", () => {
+  const yearly = (price: number) => packageWithPrice(`$${price.toFixed(2)}`, price);
+
+  it("turns $59.99/yr into 16¢", () => {
+    // The anchor the price screen leads with. 59.99/365 = 0.16435.
+    expect(dailyEquivalent(yearly(59.99))).toBe("16¢");
+  });
+
+  it("renders cents, not dollars, below a dollar", () => {
+    // "$0.16 a day" reads as a price; "16¢ a day" reads as nothing.
+    expect(dailyEquivalent(yearly(59.99))).not.toMatch(/\$/);
+    expect(dailyEquivalent(yearly(29.99))).toBe("8¢");
+  });
+
+  it("falls back to currency once a day costs a dollar or more", () => {
+    expect(dailyEquivalent(yearly(999.99))).toBe("$2.73");
+  });
+
+  it("floors, so the anchor never overstates the day", () => {
+    for (const price of [59.99, 29.99, 119.99, 999.99]) {
+      const shown = dailyEquivalent(yearly(price))!;
+      const value = shown.endsWith("¢") ? Number(shown.slice(0, -1)) / 100 : Number(shown.slice(1));
+      expect(value).toBeLessThanOrEqual(price / 365);
+    }
+  });
+
+  it("returns nothing rather than a zero for a missing or free product", () => {
+    expect(dailyEquivalent(null)).toBeNull();
+    expect(dailyEquivalent(yearly(0))).toBeNull();
   });
 });

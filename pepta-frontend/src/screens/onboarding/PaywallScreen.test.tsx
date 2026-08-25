@@ -501,7 +501,14 @@ describe("PaywallScreen legal links", () => {
     expect(text).toContain("3 days free — we'll remind you before it ends.");
     expect(text).toContain("Then $9.99/month, auto-renews. Cancel anytime");
     // The terms carousel replaced the reassure row for a trial plan.
-    expect(text).toContain("Free today — full access");
+// The rotating terms pill was REMOVED 2026-08-24: its three facts are the
+    // trialTimeline screen now, which only ever shows when there is a trial —
+    // the same condition that used to render this pill. Duplicating them above
+    // the CTA cost ~46px and put the charge date on screen a third of the time.
+    expect(text).not.toContain("Free today — full access");
+    // What replaces it, at the moment of the tap:
+    expect(text).toContain("No payment due now");
+    expect(text).toContain("Secured by the App Store");
   });
 
   it("fires paywall_shown once per presentation with the offering variant", async () => {

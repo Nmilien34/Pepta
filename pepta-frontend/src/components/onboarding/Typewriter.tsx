@@ -1,4 +1,4 @@
-// The app's voice: text types itself at reading speed (~32ms/char), each burst
+// The app's voice: text types itself at speaking speed (see convoPace), each burst
 // of characters landing with a soft haptic tick, a purple caret riding the
 // line. The building block of every conversation turn. Ported from Leanient's
 // proven engine; Pepta renders it on the light ground with the primary caret.
@@ -7,10 +7,15 @@ import React, { useEffect, useRef, useState } from "react";
 import { Platform, Text, type StyleProp, type TextStyle } from "react-native";
 import * as Haptics from "expo-haptics";
 import { convo } from "./convoTokens";
+import { pace } from "./convoPace";
 
 interface TypewriterProps {
   text: string;
-  /** Ms per character. 32ms tracks reading speed. */
+  /**
+   * Ms per character. The default is deliberately SLOWER than reading speed —
+   * a line that finishes before it is read makes the turn a quiz. See
+   * convoPace for the measurement.
+   */
   speed?: number;
   /** Thinking beat before the first character. */
   delay?: number;
@@ -31,7 +36,7 @@ const HAPTIC_EVERY = 3; // one tick per few characters keeps the buzz soft
 
 export function Typewriter({
   text,
-  speed = 32,
+  speed = pace.typeMs,
   delay = 350,
   animate = true,
   start = true,

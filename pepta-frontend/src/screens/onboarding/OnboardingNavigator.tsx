@@ -22,7 +22,7 @@ import {
 import { OnboardingMotionContext, convo } from '../../components';
 import { StepFade } from './StepFade';
 import { ONBOARDING_DRAFT_KEY, migrateLegacyStep, parseDraft, rewindResumeStep, rewindToUnansweredGate, serializeDraft } from './onboardingDraft';
-import { echoFor, instrumentContext, companyContext, leanMassContext } from './onboardingEcho';
+import { echoFor, instrumentContext, companyContext, leanMassContext, weekdayOf } from './onboardingEcho';
 import { DAY_PLURAL, DEFAULT_BODY, buildCraftingSteps, resolveWeights } from './craftingSteps';
 import { symptomForWeekBeat } from './symptomWeek';
 import { MeetPepScreen } from './MeetPepScreen';
@@ -37,14 +37,12 @@ import { DoseScreen, type DoseValue } from './DoseScreen';
 import { ConcentrationScreen, type ConcentrationValue } from './ConcentrationScreen';
 import { FrequencyScreen, type DoseFrequency } from './FrequencyScreen';
 import { LastShotScreen } from './LastShotScreen';
-import { ShotDayScreen } from './ShotDayScreen';
 import { ShotTimeScreen } from './ShotTimeScreen';
 import { InstrumentBeatScreen } from './InstrumentBeatScreen';
 import { LeanMassBeatScreen } from './LeanMassBeatScreen';
 import { SymptomWeekBeatScreen } from './SymptomWeekBeatScreen';
 import { GoalTypeScreen, type GoalType } from './GoalTypeScreen';
-import { SexGenderScreen, type GenderIdentity } from './SexGenderScreen';
-import { BirthdayScreen } from './BirthdayScreen';
+import { AboutYouScreen, type GenderIdentity } from './AboutYouScreen';
 import { HeightWeightScreen } from './HeightWeightScreen';
 import { StartWeightScreen } from './StartWeightScreen';
 import { GoalWeightScreen, type WeightUnit } from './GoalWeightScreen';
@@ -60,7 +58,11 @@ import { NotificationsScreen } from './NotificationsScreen';
 import { CraftingScreen } from './CraftingScreen';
 import { RevealScreen } from './RevealScreen';
 import { TrialOfferScreen } from './TrialOfferScreen';
-import { TrialCarouselScreen } from './TrialCarouselScreen';
+import { TrialTimelineScreen } from './TrialTimelineScreen';
+import { DoseForgivenessScreen } from './DoseForgivenessScreen';
+import { MuscleFloorScreen } from './MuscleFloorScreen';
+import { CommitmentScreen } from './CommitmentScreen';
+import { PriceAnchorScreen } from './PriceAnchorScreen';
 import { PaywallScreen } from './PaywallScreen';
 import { WelcomeInScreen } from './WelcomeInScreen';
 import type { ActivityLevel, BiggestWorry, DiscoverySource, InjectionDeviceType, TrainingStatus } from '@pepta/shared';
@@ -70,7 +72,8 @@ import { RouteScreen } from './RouteScreen';
 import { toDateParts, type DateParts } from '../../utils/dateParts';
 import { kgToLb, lbToKg, type BodyMeasure } from '../../utils/units';
 import { projectGoal } from '../../utils/goalProjection';
-import { previewTargets } from '../../utils/planPreview';
+import { previewTargets, proteinFloorG } from '../../utils/planPreview';
+import { buildRiskProfile } from '../../utils/riskProfile';
 import { buildOnboardingPayload } from './onboardingPayload';
 import { api } from '../../services/api';
 import { writeCompanionName } from '../../services/companionNameStore';
@@ -120,10 +123,6 @@ function toggleEffect(effects: SideEffectType[], effect: SideEffectType): SideEf
 }
 
 // Toggle a day in/out of the multi-select set, kept sorted.
-function toggleDay(days: number[], day: number): number[] {
-  return days.includes(day) ? days.filter((d) => d !== day) : [...days, day].sort((a, b) => a - b);
-}
-
 // The explicit route answer (ambiguous meds only) overrides the catalog
 // default; "unsure" falls back to the catalog route (injection).
 function ctxFromAnswers(a: FlowAnswers): FlowContext {
@@ -136,6 +135,10 @@ function ctxFromAnswers(a: FlowAnswers): FlowContext {
     deviceType: a.deviceType,
     frequency: a.frequency,
     sideEffects: a.sideEffects,
+    // Only the number reaches the step machine — it decides whether the
+    // forgiveness give has an honest version, nothing more.
+    halfLifeDays: a.medication?.halfLifeDays ?? null,
+    hasBody: a.body != null,
   };
 }
 
@@ -468,6 +471,25 @@ export function OnboardingNavigator() {
           onContinue={goNext}
         />
       );
+    case 'doseForgiveness': {
+      const med = answers.medication;
+      // shouldSkipStep guarantees both, but the screen states its own
+      // requirement rather than trusting the router.
+      if (!med || typeof med.halfLifeDays !== 'number') return null;
+      return (
+        <DoseForgivenessScreen
+          progress={progress}
+          onBack={goBack}
+          onContinue={goNext}
+          // "Tirzepatide · 5 mg." — frequency is not answered yet at this
+          // point and leanMassContext simply omits it, which is the echo the
+          // frame specifies.
+          context={leanMassContext(answers)}
+          medicationName={med.name}
+          halfLifeDays={med.halfLifeDays}
+        />
+      );
+    }
     case 'deviceType':
       return (
         <DeviceTypeScreen
@@ -506,26 +528,25 @@ export function OnboardingNavigator() {
           context={context}
           oral={ctx.route === 'oral'}
           value={answers.lastShot ?? toDateParts(new Date())}
-          onChange={(lastShot) => setAnswers((a) => ({ ...a, lastShot }))}
+          onChange={(lastShot) =>
+            setAnswers((a) => ({
+              ...a,
+              lastShot,
+              // The shotDay screen used to ask "Tuesdays are shot day?" with
+              // the answer already derived from this date and pre-selected.
+              // It was a confirmation of something we knew, so it is derived
+              // here instead — changeable in reminder settings. Only for
+              // weekly injectors. Editing lastShot on a back-step re-derives,
+              // which is right: the two answers describe the same schedule.
+              shotDays:
+                a.frequency !== 'weekly' || a.route === 'oral'
+                  ? a.shotDays
+                  : [weekdayOf(lastShot)],
+            }))
+          }
           onContinue={goNext}
         />
       );
-    case 'shotDay': {
-      const derivedDay = answers.lastShot
-        ? new Date(answers.lastShot.year, answers.lastShot.month, answers.lastShot.day).getDay()
-        : 0;
-      return (
-        <ShotDayScreen
-          progress={progress}
-          onBack={goBack}
-          context={context}
-          derivedDay={derivedDay}
-          value={answers.shotDays ?? [derivedDay]}
-          onToggle={(day) => setAnswers((a) => ({ ...a, shotDays: toggleDay(a.shotDays ?? [derivedDay], day) }))}
-          onAnswer={(shotDays) => commit({ shotDays })}
-        />
-      );
-    }
     case 'shotTime':
       return (
         <ShotTimeScreen
@@ -580,23 +601,16 @@ export function OnboardingNavigator() {
           onAnswer={(answer) => commit(answer)}
         />
       );
-    case 'sexGender':
+    case 'aboutYou':
       return (
-        <SexGenderScreen
+        <AboutYouScreen
           progress={progress}
           onBack={goBack}
           context={context}
-          onAnswer={(genderIdentity) => commit({ genderIdentity })}
-        />
-      );
-    case 'birthday':
-      return (
-        <BirthdayScreen
-          progress={progress}
-          onBack={goBack}
-          context={context}
-          value={answers.birthday ?? defaultBirthday()}
-          onChange={(birthday) => setAnswers((a) => ({ ...a, birthday }))}
+          genderIdentity={answers.genderIdentity}
+          onGenderChange={(genderIdentity) => setAnswers((a) => ({ ...a, genderIdentity }))}
+          birthday={answers.birthday ?? defaultBirthday()}
+          onBirthdayChange={(birthday) => setAnswers((a) => ({ ...a, birthday }))}
           onContinue={goNext}
         />
       );
@@ -611,6 +625,18 @@ export function OnboardingNavigator() {
           onContinue={goNext}
         />
       );
+    case 'muscleFloor': {
+      const { body, bodyUnit } = resolveWeights(answers);
+      return (
+        <MuscleFloorScreen
+          progress={progress}
+          onBack={goBack}
+          onContinue={goNext}
+          context={context}
+          proteinG={proteinFloorG(body.weight, bodyUnit)}
+        />
+      );
+    }
     case 'startWeight': {
       const body = answers.body ?? DEFAULT_BODY;
       return (
@@ -767,6 +793,17 @@ export function OnboardingNavigator() {
       });
       return (
         <RevealScreen
+          risk={buildRiskProfile({
+            weeklyLoss: projection.weeklyLoss,
+            weight: body.weight,
+            trainingStatus: answers.trainingStatus,
+            activityLevel: answers.activityLevel,
+            // Age from the birthday they gave; the risk model treats a
+            // missing one as unknown, never as young.
+            ageYears: answers.birthday
+              ? new Date().getFullYear() - answers.birthday.year
+              : undefined,
+          })}
           authenticated={auth.isAuthenticated}
           progress={progress}
           startWeight={answers.startWeight ?? body.weight}
@@ -778,6 +815,8 @@ export function OnboardingNavigator() {
         />
       );
     }
+    case 'commitment':
+      return <CommitmentScreen progress={progress} onBack={goBack} onSigned={goNext} />;
     case 'trialOffer':
       return (
         <TrialOfferScreen
@@ -791,10 +830,10 @@ export function OnboardingNavigator() {
           goalWeightUnit={resolveWeights(answers).bodyUnit}
           onContinue={goNext}
           // Control arm / no eligible trial / error: skip the whole warm-up.
-          // Advancing from trialCarousel walks shouldSkipStep, so this lands
+          // Advancing from trialTimeline walks shouldSkipStep, so this lands
           // on the paywall (or past it, for active-access users).
           onSkipToWall={() => {
-            const next = advanceWith('trialCarousel', 1, ctx);
+            const next = advanceWith('trialTimeline', 1, ctx);
             if (next) {
               setAnimateEntrance(true);
               setStep(next);
@@ -802,8 +841,33 @@ export function OnboardingNavigator() {
           }}
         />
       );
-    case 'trialCarousel':
-      return <TrialCarouselScreen progress={progress} onBack={goBack} onContinue={goNext} />;
+    case 'trialTimeline':
+      return (
+        <TrialTimelineScreen
+          progress={progress}
+          onBack={goBack}
+          onContinue={goNext}
+          // Same escape as the offer screen's: the control arm has no trial,
+          // so rather than show a timeline of dates that will not happen, go
+          // straight to the wall.
+          onSkipToWall={() => {
+            const next = advanceWith('trialTimeline', 1, ctx);
+            if (next) setStep(next);
+          }}
+        />
+      );
+    case 'priceAnchor':
+      return (
+        <PriceAnchorScreen
+          progress={progress}
+          onBack={goBack}
+          onContinue={goNext}
+          onSkip={() => {
+            const next = advanceWith('priceAnchor', 1, ctx);
+            if (next) setStep(next);
+          }}
+        />
+      );
     case 'paywall':
       return <PaywallScreen onComplete={goNext} />;
     case 'welcomeIn':
