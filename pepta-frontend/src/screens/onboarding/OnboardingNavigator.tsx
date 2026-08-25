@@ -62,7 +62,6 @@ import { TrialTimelineScreen } from './TrialTimelineScreen';
 import { DoseForgivenessScreen } from './DoseForgivenessScreen';
 import { MuscleFloorScreen } from './MuscleFloorScreen';
 import { CommitmentScreen } from './CommitmentScreen';
-import { PriceAnchorScreen } from './PriceAnchorScreen';
 import { PaywallScreen } from './PaywallScreen';
 import { WelcomeInScreen } from './WelcomeInScreen';
 import type { ActivityLevel, BiggestWorry, DiscoverySource, InjectionDeviceType, TrainingStatus } from '@pepta/shared';
@@ -852,18 +851,6 @@ export function OnboardingNavigator() {
           // straight to the wall.
           onSkipToWall={() => {
             const next = advanceWith('trialTimeline', 1, ctx);
-            if (next) setStep(next);
-          }}
-        />
-      );
-    case 'priceAnchor':
-      return (
-        <PriceAnchorScreen
-          progress={progress}
-          onBack={goBack}
-          onContinue={goNext}
-          onSkip={() => {
-            const next = advanceWith('priceAnchor', 1, ctx);
             if (next) setStep(next);
           }}
         />

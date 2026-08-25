@@ -29,7 +29,7 @@ import { convo } from '../../components/onboarding/convoTokens';
 import { typography } from '../../theme/typography';
 import { useAuth } from '../../context/AuthContext';
 import { revenueCat } from '../../services/revenueCat';
-import { freeTrialOf } from './paywallPricing';
+import { dailyEquivalent, freeTrialOf } from './paywallPricing';
 import {
   buildTrialTimeline,
   freeStartHeadline,
@@ -72,7 +72,16 @@ const ICON: Record<TrialTimelineRow['key'], React.ReactNode> = {
   ),
 };
 
-function Row({ row, last }: { row: TrialTimelineRow; last: boolean }) {
+function Row({
+  row,
+  last,
+  perDay,
+}: {
+  row: TrialTimelineRow;
+  last: boolean;
+  /** Per-day equivalent of the year, or null when it will not resolve. */
+  perDay?: string | null;
+}) {
   return (
     <View style={styles.row}>
       <View style={styles.gutter}>
@@ -85,6 +94,18 @@ function Row({ row, last }: { row: TrialTimelineRow; last: boolean }) {
         <Text style={styles.day}>{row.day.toUpperCase()}</Text>
         <Text style={styles.title}>{row.title}</Text>
         <Text style={styles.sub}>{row.sub}</Text>
+        {/* THE PRICE ANCHOR, FOLDED IN (2026-08-25). It used to be its own
+            screen between here and the wall, which made four monetization
+            screens in a row. One sentence is not a destination — and this row
+            is the only line before the paywall that raises money at all, so
+            the reframe belongs where the question gets asked. Silent when the
+            year will not price: the standalone screen self-skipped rather
+            than show a number it had to guess, and that rule survives it. */}
+        {row.key === 'charge' && perDay ? (
+          <Text style={styles.anchor}>
+            {perDay} a day, billed yearly. You&rsquo;re already doing the hard part.
+          </Text>
+        ) : null}
       </View>
     </View>
   );
@@ -98,6 +119,7 @@ export function TrialTimelineScreen({
 }: TrialTimelineScreenProps) {
   const auth = useAuth();
   const [trial, setTrial] = useState<TrialLike | null>(null);
+  const [perDay, setPerDay] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -115,6 +137,7 @@ export function TrialTimelineScreen({
         const resolved =
           (packages?.trial.yearly.eligible ? freeTrialOf(packages.yearly) : null) ??
           (packages?.trial.monthly.eligible ? freeTrialOf(packages.monthly) : null);
+        setPerDay(dailyEquivalent(packages?.yearly));
         if (resolved) setTrial(resolved);
         else onSkipToWall();
       })
@@ -160,7 +183,7 @@ export function TrialTimelineScreen({
     >
       <View style={styles.list}>
         {rows.map((row, i) => (
-          <Row key={row.key} row={row} last={i === rows.length - 1} />
+          <Row key={row.key} row={row} last={i === rows.length - 1} perDay={perDay} />
         ))}
       </View>
       <View style={styles.pepRow}>
@@ -205,6 +228,13 @@ const styles = StyleSheet.create({
     letterSpacing: -0.3,
     color: convo.ink,
     marginTop: 2,
+  },
+  anchor: {
+    fontFamily: typography.fonts.bold,
+    fontSize: 12.5,
+    lineHeight: 18,
+    color: convo.primary,
+    marginTop: 4,
   },
   sub: {
     fontFamily: typography.fonts.medium,

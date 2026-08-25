@@ -194,7 +194,6 @@ export const ONBOARDING_STEPS = [
   // arrived cold — and this user is already paying for the medication, so the
   // honest comparison is against effort already committed. Skips itself if the
   // annual product will not resolve, rather than inventing a number.
-  'priceAnchor',
   // NOTE: the 'referral' code-entry turn used to sit between auth and the
   // paywall. Removed 2026-07-27 — near-everyone who reached it tapped Skip.
   // `ReferralCodeScreen` is kept (the only code-claim surface in the app)
@@ -309,10 +308,7 @@ export function shouldSkipStep(step: OnboardingStep, ctx: FlowContext): boolean 
   // Approved creators / active subscribers never see the wall — and a trial
   // pitch for a wall they'll never see is worse than pointless.
   if (
-    (step === 'paywall' ||
-      step === 'trialOffer' ||
-      step === 'trialTimeline' ||
-      step === 'priceAnchor') &&
+    (step === 'paywall' || step === 'trialOffer' || step === 'trialTimeline') &&
     ctx.accessActive
   ) {
     return true;

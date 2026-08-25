@@ -43,13 +43,23 @@ const trialPkg = (units: number, unit = "DAY") => ({
   },
 });
 
-function withTrial(units: number) {
+function withTrial(units: number, yearlyPrice?: number) {
   mocks.packages = {
-    yearly: trialPkg(units),
+    yearly: yearlyPrice == null ? trialPkg(units) : pricedPkg(units, yearlyPrice),
     monthly: trialPkg(units),
     trial: { yearly: { eligible: true }, monthly: { eligible: true } },
   };
 }
+
+// A yearly package carrying a real price, so dailyEquivalent has something to
+// divide. The bare trialPkg has only an introPrice and yields no anchor.
+const pricedPkg = (units: number, price: number) => ({
+  product: {
+    price,
+    priceString: `$${price.toFixed(2)}`,
+    introPrice: { price: 0, periodNumberOfUnits: units, periodUnit: 'DAY' },
+  },
+});
 
 async function render() {
   let tree!: TestRenderer.ReactTestRenderer;
@@ -169,5 +179,44 @@ describe("no trial, no promises", () => {
     const tree = await render();
 
     expect(texts(tree)).toEqual([]);
+  });
+});
+
+// texts() above only collects Text nodes whose children is a STRING, so it
+// cannot see the anchor — that line interpolates {perDay}, making its children
+// an array. Asserting with it would pass whether or not the line rendered.
+function deepText(tree: TestRenderer.ReactTestRenderer): string {
+  const walk = (c: unknown): string =>
+    typeof c === 'string'
+      ? c
+      : Array.isArray(c)
+        ? c.map(walk).join('')
+        : '';
+  return tree.root
+    .findAll((n) => String(n.type) === 'Text')
+    .map((n) => walk(n.props.children))
+    .join(' ');
+}
+
+describe('the folded price anchor', () => {
+  // Was its own screen between here and the wall until 2026-08-25. It rides
+  // the CHARGE row specifically: that is the only line before the paywall
+  // that raises the question of money at all.
+  it('reframes the year on the charge row, floored to the cent', async () => {
+    withTrial(3, 59.99);
+    const all = deepText(await render());
+    // 59.99 / 365 = 0.16435… → floored to 16c, never rounded up to 17.
+    expect(all).toContain('16\u00A2 a day');
+    expect(all).toContain('billed yearly');
+  });
+
+  it('renders the timeline with NO anchor when the year will not price', async () => {
+    withTrial(3);
+    const all = deepText(await render());
+    expect(all).toContain('First charge');
+    // Silence, not a guessed number — the standalone screen used to self-skip
+    // for exactly this reason.
+    expect(all).not.toContain('a day');
+    expect(all).not.toContain('billed yearly');
   });
 });

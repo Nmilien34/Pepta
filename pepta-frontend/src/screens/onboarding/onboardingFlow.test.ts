@@ -26,8 +26,8 @@ describe('onboarding flow', () => {
     expect(nextStep('reveal')).toBe('trialOffer'); // the warm-up sits between auth and the wall
     // The price anchor sits between the timeline and the wall (2026-08-24):
     // the wall had no price framing of any kind before it.
-    expect(nextStep('trialTimeline')).toBe('priceAnchor');
-    expect(nextStep('priceAnchor')).toBe('paywall');
+    // priceAnchor folded into trialTimeline's charge row (2026-08-25).
+    expect(nextStep('trialTimeline')).toBe('paywall');
     // The referral code turn was removed — auth hands straight to the wall.
     
     expect(nextStep('paywall')).toBe('welcomeIn');
@@ -89,8 +89,8 @@ describe('onboarding flow', () => {
     expect(nextStep('reveal')).toBe('trialOffer'); // the warm-up sits between auth and the wall
     // The price anchor sits between the timeline and the wall (2026-08-24):
     // the wall had no price framing of any kind before it.
-    expect(nextStep('trialTimeline')).toBe('priceAnchor');
-    expect(nextStep('priceAnchor')).toBe('paywall');
+    // priceAnchor folded into trialTimeline's charge row (2026-08-25).
+    expect(nextStep('trialTimeline')).toBe('paywall');
   });
 
   it('skips the paywall for resolved-active access (creators/subscribers)', () => {
@@ -176,7 +176,7 @@ describe('onboarding flow', () => {
       'doseForgiveness', 'muscleFloor', 'commitment',
       // The warm-up gives were missing here, so the run counter was scoring
       // three payoff screens as input turns.
-      'trialOffer', 'trialTimeline', 'priceAnchor',
+      'trialOffer', 'trialTimeline',
       'crafting', 'reveal', 'paywall', 'welcomeIn',
     ]);
     const runLength = (steps: readonly string[]) => {
