@@ -5,15 +5,19 @@ import { z } from 'zod';
 dotenv.config();
 dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 
+/**
+ * The development fallback for JWT_SECRET. It is COMMITTED, so it is public: any
+ * build that signs sessions with it can have a token forged for any user id.
+ * Named here so production can reject it by value — see the superRefine below.
+ */
+const DEV_JWT_SECRET = 'dev_test_secret_replace_me_with_real_secret_64_chars_minimum_value';
+
 const envSchema = z
   .object({
     NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
     PORT: z.coerce.number().int().positive().default(8080),
     MONGODB_URI: z.string().min(1).default('mongodb://127.0.0.1:27017/pepta'),
-    JWT_SECRET: z
-      .string()
-      .min(64)
-      .default('dev_test_secret_replace_me_with_real_secret_64_chars_minimum_value'),
+    JWT_SECRET: z.string().min(64).default(DEV_JWT_SECRET),
     JWT_EXPIRES_IN: z.string().min(1).default('30d'),
     GOOGLE_CLIENT_ID: z.string().min(1).default('local-google-client-id'),
     FRONTEND_ORIGIN: z.string().url().default('http://localhost:8081'),
@@ -60,6 +64,22 @@ const envSchema = z
   .superRefine((value, context) => {
     if (value.NODE_ENV !== 'production') {
       return;
+    }
+
+    // JWT_SECRET IS NOT IN THE LIST BELOW ON PURPOSE — it cannot be. That loop
+    // tests truthiness, and this key carries a `.default()`, so its value is
+    // ALWAYS truthy and the check would pass while the server signs every
+    // session with a secret published in this repo. Anyone reading the source
+    // could then mint a token for any user id, and auth/middleware.ts trusts
+    // payload.sub with no further ownership check. So it is checked by VALUE,
+    // and against process.env directly, before the list runs.
+    if (!process.env.JWT_SECRET || value.JWT_SECRET === DEV_JWT_SECRET) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['JWT_SECRET'],
+        message:
+          'JWT_SECRET is required in production and must not be the committed development default',
+      });
     }
 
     const requiredProductionKeys = [

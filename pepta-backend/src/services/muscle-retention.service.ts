@@ -76,8 +76,24 @@ export async function getWeeklyRetention(userId: string, now = new Date()) {
     proteinByDay.set(key, (proteinByDay.get(key) ?? 0) + proteinLog.grams);
   }
 
+  // SCALE TO THE DAYS THAT HAVE HAPPENED (2026-08-25). utcWeekRange returns the
+  // Monday-anchored week CONTAINING now, so this query is week-to-DATE: on a
+  // Monday evening it can only hold one day of logs. Dividing by a hard 7 (and
+  // passing daysInWindow: 7) scored a user who had hit their target perfectly
+  // at one seventh of it, and the fold — protein at 0.45, training at 0.35 —
+  // dropped the total into verdictForScore's "at_risk" band, telling someone
+  // on target that "this week has a higher muscle-retention risk". Every
+  // Monday and Tuesday, for everyone. meal-scan.service.ts already scales its
+  // identical Monday-anchored window by elapsedWeekDays; this is that fix.
+  const elapsedDays = Math.min(
+    7,
+    Math.max(
+      1,
+      Math.floor((now.getTime() - range.start.getTime()) / (24 * 60 * 60 * 1000)) + 1,
+    ),
+  );
   const totalProtein = [...proteinByDay.values()].reduce((sum, grams) => sum + grams, 0);
-  const proteinActualGrams = totalProtein / 7;
+  const proteinActualGrams = totalProtein / elapsedDays;
   const proteinDaysHit = [...proteinByDay.values()].filter(
     (grams) => grams >= profile.dailyProteinTargetGrams,
   ).length;
@@ -94,9 +110,12 @@ export async function getWeeklyRetention(userId: string, now = new Date()) {
     proteinActualGrams,
     proteinTargetGrams: profile.dailyProteinTargetGrams,
     proteinDaysHit,
-    daysInWindow: 7,
+    daysInWindow: elapsedDays,
     resistanceSessions: activityLogs.length,
-    resistanceSessionTarget: 3,
+    // Scaled for the same reason: 3 sessions is a WEEK's target, and demanding
+    // all three by Monday scored every user 0 on a third of the verdict.
+    // Never below 1, or a fresh week would divide by zero.
+    resistanceSessionTarget: Math.max(1, Math.round((3 * elapsedDays) / 7)),
     weeklyWeightLossPercent,
   });
 
