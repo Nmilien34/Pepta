@@ -129,7 +129,14 @@ export function GlassButton({
             style={StyleSheet.absoluteFill}
           />
         </View>
-        <View pointerEvents="none" style={styles.topEdge} />
+        <LinearGradient
+          pointerEvents="none"
+          colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.5)', 'rgba(255,255,255,0)']}
+          locations={[0, 0.5, 1]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.topEdge}
+        />
         <Text style={styles.label}>{label}</Text>
         {sublabel ? <Text style={styles.sublabel}>{sublabel}</Text> : null}
       </View>
@@ -173,14 +180,23 @@ const styles = StyleSheet.create({
     height: '260%',
     transform: [{ rotate: '22deg' }],
   },
+  // THE CHIPPED CORNER (2026-08-25). This was a flat 1px bar of
+  // rgba(255,255,255,0.5) inset 14 from each side. But the pill's radius is
+  // 28, so from x=14 to x=28 the top edge has already curved away — the bar
+  // was sitting outside the shape there and `overflow: 'hidden'` sliced it
+  // with a hard VERTICAL cut. That cut, a bright stub ending square against a
+  // rounded corner, is what read as a chip taken out of the top right.
+  //
+  // Inset to the radius so the highlight only spans the genuinely flat span,
+  // and fade both ends to transparent so it has no hard termination to notice.
+  // A gradient rather than a wider inset alone: a solid bar stopping dead at
+  // x=28 just moves the same square end somewhere less obvious.
   topEdge: {
     position: 'absolute',
     top: 0,
-    left: 14,
-    right: 14,
+    left: 28,
+    right: 28,
     height: 1,
-    borderRadius: 1,
-    backgroundColor: 'rgba(255,255,255,0.5)',
   },
   innerInk: { shadowColor: '#17141F', shadowOpacity: 0.45, shadowRadius: 12 },
   label: {
