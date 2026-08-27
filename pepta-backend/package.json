@@ -46,7 +46,7 @@
     "helmet": "^8.1.0",
     "jose": "^5.10.0",
     "jsonwebtoken": "^9.0.2",
-    "mongoose": "^8.14.0",
+    "mongoose": "^8.24.4",
     "node-cron": "^3.0.3",
     "openai": "^6.41.0",
     "pino": "^9.6.0",

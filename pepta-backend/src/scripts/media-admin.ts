@@ -51,7 +51,13 @@ function hasFlag(name: string): boolean {
 }
 
 function confirmProductionMutation(action: string): void {
-  if (!env.isProduction) return;
+  // env.looksDeployed, NOT env.isProduction. This guard opened with
+  // `if (!env.isProduction) return` and was therefore a NO-OP on the Render
+  // deploy that booted with NODE_ENV unset — the confirmation refusing
+  // destructive writes against production did nothing, precisely because
+  // production had not been labelled production. Pointing at a non-local
+  // database is the fact that matters here; the label is not.
+  if (!env.looksDeployed) return;
   if (process.env.CONFIRM_PRODUCTION === "yes") return;
   console.error(
     `Refusing to ${action} against PRODUCTION without CONFIRM_PRODUCTION=yes.`,

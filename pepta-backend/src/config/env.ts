@@ -1,3 +1,4 @@
+import { looksDeployed } from './deployed';
 import path from 'node:path';
 import dotenv from 'dotenv';
 import { z } from 'zod';
@@ -173,6 +174,13 @@ const apple =
 
 export const env = {
   nodeEnv: parsed.data.NODE_ENV,
+  /**
+   * Whether this process can reach production DATA, independent of what
+   * NODE_ENV claims. See config/deployed.ts — the Render deploy of
+   * 2026-08-27 ran against the production database while calling itself
+   * "development", which silently disabled every guard keyed to the label.
+   */
+  looksDeployed: looksDeployed(parsed.data.MONGODB_URI),
   isDevelopment: parsed.data.NODE_ENV === 'development',
   isProduction: parsed.data.NODE_ENV === 'production',
   isTest: parsed.data.NODE_ENV === 'test',
