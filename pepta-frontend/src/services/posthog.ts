@@ -5,6 +5,10 @@
 // touched. funnelEvents.ts fans every event out to both, under the same event
 // names, so the two tools can be compared directly.
 //
+// SESSION REPLAY SHIPS OFF. Events, identify and reset are fully live; only
+// recording is gated, until the MaskedHealthValue pass is verified against a
+// real replay (VERIFICATION.md). See POSTHOG_SESSION_REPLAY_ENABLED.
+//
 // THIS IS A HEALTH APP. Screens carry medication names, doses and body weight,
 // so replay masking is a correctness requirement rather than a setting: every
 // mask option is ON and stays on. See `SESSION_REPLAY_CONFIG` below.
@@ -18,7 +22,13 @@ import Constants from "expo-constants";
 import PostHog, {
   type PostHogSessionReplayConfig,
 } from "posthog-react-native";
-import { POSTHOG_API_KEY, POSTHOG_ENVIRONMENT, POSTHOG_HOST } from "../config";
+import {
+  POSTHOG_API_KEY,
+  POSTHOG_ENVIRONMENT,
+  POSTHOG_HOST,
+  POSTHOG_SESSION_REPLAY_ENABLED,
+  POSTHOG_SESSION_REPLAY_SAMPLE_RATE,
+} from "../config";
 
 function isDevRuntime(): boolean {
   return typeof __DEV__ !== "undefined" ? __DEV__ : false;
@@ -42,14 +52,19 @@ export const SESSION_REPLAY_CONFIG: PostHogSessionReplayConfig = {
   maskAllSandboxedViews: true,
   // Console logs on a health app can carry payload fragments in a stack trace.
   captureLog: false,
+  // 0 unless replay is explicitly enabled. Redundant with the enable flag by
+  // design: flipping one without the other must still record nothing.
+  sampleRate: POSTHOG_SESSION_REPLAY_SAMPLE_RATE,
 };
 
 /**
- * 100%, deliberately. At ~40 installs/day the volume is trivial, and a
- * sampled replay is worth very little when the question is usually "what did
- * THIS user hit" rather than an aggregate. Revisit if installs pass ~1k/day.
+ * Whether the native recorder starts at all, and at what rate. BOTH come from
+ * config and both are off by default — see POSTHOG_SESSION_REPLAY_ENABLED.
+ * Re-exported so a test can assert the shipped default without reaching into
+ * process.env.
  */
-export const SESSION_REPLAY_SAMPLE_RATE = 1;
+export const SESSION_REPLAY_ENABLED = POSTHOG_SESSION_REPLAY_ENABLED;
+export const SESSION_REPLAY_SAMPLE_RATE = POSTHOG_SESSION_REPLAY_SAMPLE_RATE;
 
 let client: PostHog | null = null;
 let initAttempted = false;
@@ -100,7 +115,10 @@ export function initPostHog(): boolean {
       // AppsFlyer/PostHog comparison meaningless — which is the entire reason
       // the event names were kept identical.
       captureAppLifecycleEvents: false,
-      enableSessionReplay: true,
+      // OFF unless explicitly enabled. With this false the native replay
+      // module never initialises, so there is no recorder to mis-sample —
+      // a stronger guarantee than sampleRate: 0, which still boots it.
+      enableSessionReplay: POSTHOG_SESSION_REPLAY_ENABLED,
       sessionReplayConfig: SESSION_REPLAY_CONFIG,
     });
 

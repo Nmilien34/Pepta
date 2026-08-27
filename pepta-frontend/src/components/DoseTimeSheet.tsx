@@ -2,6 +2,7 @@
 // the schedule settings row, so the capability is reachable without waiting for
 // a card to appear — and both write the same schedule field.
 
+import { MASK_PROPS } from "./MaskedHealthValue";
 import { View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { AppText } from './AppText';
@@ -34,7 +35,7 @@ export function DoseTimeSheet({
   onPick(time: string): void;
 }) {
   return (
-    <BottomSheet visible={visible} onClose={onClose} avoidKeyboard={false}>
+    <BottomSheet panelProps={MASK_PROPS} visible={visible} onClose={onClose} avoidKeyboard={false}>
       <AppText variant="cardTitle" style={{ fontSize: 17 }}>
         When do you take {compoundName}?
       </AppText>

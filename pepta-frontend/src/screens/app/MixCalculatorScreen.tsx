@@ -6,6 +6,7 @@
 // appears for FDA-labeled compounds (doseRanges), advises, and routes to the
 // prescriber; research peptides get no invented range and no warning.
 
+import { MASK_PROPS } from "../../components/MaskedHealthValue";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, TextInput, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
@@ -137,7 +138,7 @@ export function MixCalculatorScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.bg }}>
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
-        <ScrollView
+        <ScrollView {...MASK_PROPS}
           contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 6, paddingBottom: 28 }}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"

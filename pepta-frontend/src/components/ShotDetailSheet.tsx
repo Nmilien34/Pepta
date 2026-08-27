@@ -10,6 +10,7 @@
 // change" and "we only have one weigh-in" are different statements, and only
 // one of them is true.
 
+import { MASK_PROPS } from "./MaskedHealthValue";
 import { useState } from 'react';
 import { View, type LayoutChangeEvent } from 'react-native';
 import Svg, { Circle, Defs, LinearGradient, Line, Path, Stop } from 'react-native-svg';
@@ -33,7 +34,7 @@ export function ShotDetailSheet({ visible, shot, onClose }: ShotDetailSheetProps
   const theme = useTheme();
 
   return (
-    <BottomSheet visible={visible} onClose={onClose} scrollable avoidKeyboard={false}>
+    <BottomSheet panelProps={MASK_PROPS} visible={visible} onClose={onClose} scrollable avoidKeyboard={false}>
       {shot ? (
         <View>
           <AppText variant="cardTitle" style={{ fontSize: 18 }}>

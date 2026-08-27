@@ -8,6 +8,7 @@
 // All rest/due/logged truth comes from scheduleView + cycleWindows, the same
 // functions the Track strip uses — the two surfaces can never disagree.
 
+import { MASK_PROPS } from "./MaskedHealthValue";
 import React, { useEffect, useMemo, useState } from 'react';
 import { capitalize, globalDoseNoun } from '../screens/app/levelSuppression';
 import { Pressable, View } from 'react-native';
@@ -243,7 +244,7 @@ export function ScheduleSheet({ visible, onClose, onEditCycle, onDismissed }: Sc
     : 'Set up an on/off cycle';
 
   return (
-    <BottomSheet visible={visible} onClose={onClose} onDismissed={onDismissed} avoidKeyboard={false} scrollable>
+    <BottomSheet panelProps={MASK_PROPS} visible={visible} onClose={onClose} onDismissed={onDismissed} avoidKeyboard={false} scrollable>
       {/* month header */}
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
         <AppText variant="cardTitle" style={{ fontSize: 17 }}>

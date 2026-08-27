@@ -5,6 +5,7 @@
 // optimistically folds macros into today's Home totals, then POSTs /meal-logs
 // and reconciles.
 
+import { MASK_PROPS } from "./MaskedHealthValue";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -981,7 +982,7 @@ function AIConsentView({
   onManual: () => void;
 }) {
   return (
-    <View style={{ marginTop: 18, gap: 16 }}>
+    <View {...MASK_PROPS} style={{ marginTop: 18, gap: 16 }}>
       <View
         style={{
           borderRadius: 22,

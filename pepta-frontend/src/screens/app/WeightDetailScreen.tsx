@@ -1,3 +1,4 @@
+import { MASK_PROPS } from "../../components/MaskedHealthValue";
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
@@ -47,7 +48,7 @@ export function WeightDetailScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.bg }}>
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 6, paddingBottom: 28 }} showsVerticalScrollIndicator={false}>
+        <ScrollView {...MASK_PROPS} contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 6, paddingBottom: 28 }} showsVerticalScrollIndicator={false}>
           <DetailHeader title="Weight" onBack={() => navigation.goBack()} />
           <SectionErrorBanner errors={sectionErrors} style={{ marginTop: theme.spacing.md }} />
 

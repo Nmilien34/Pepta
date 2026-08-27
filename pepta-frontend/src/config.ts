@@ -33,6 +33,33 @@ export const POSTHOG_HOST =
   process.env.EXPO_PUBLIC_POSTHOG_HOST ?? "https://us.i.posthog.com";
 
 /**
+ * SESSION REPLAY IS OFF BY DEFAULT, AND THAT IS THE SHIPPING STATE.
+ *
+ * This is a GLP-1 app. Global masking covers text INPUTS and images, but a
+ * value the user already committed renders back as a plain <Text> — "5 mg",
+ * "226 lb", "Tirzepatide" — and no global switch reaches those. Until the
+ * MaskedHealthValue pass has been verified on a real replay (see
+ * VERIFICATION.md), recording anything risks a readable medical record.
+ *
+ * Opt-in only, and deliberately env-driven rather than a code constant, so
+ * turning it on is a deploy-time decision someone makes on purpose. Anything
+ * other than the exact string "true" leaves it off.
+ */
+export const POSTHOG_SESSION_REPLAY_ENABLED =
+  process.env.EXPO_PUBLIC_POSTHOG_SESSION_REPLAY === "true";
+
+/**
+ * Belt to the braces above. `enableSessionReplay: false` already stops the
+ * native recorder from initialising at all; this makes the sample rate 0 in
+ * the same breath, so a future edit that flips only ONE of the two still
+ * records nothing. 1 (100%) applies only once replay is explicitly enabled —
+ * at ~40 installs/day the volume is trivial and a sampled replay answers
+ * "what did THIS user hit" poorly.
+ */
+export const POSTHOG_SESSION_REPLAY_SAMPLE_RATE =
+  POSTHOG_SESSION_REPLAY_ENABLED ? 1 : 0;
+
+/**
  * Stamped on every PostHog event as `$environment` so a TestFlight or
  * simulator session cannot be mistaken for real traffic. __DEV__ is false in
  * TestFlight (it is a Release build), so this alone would call TestFlight

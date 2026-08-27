@@ -5,6 +5,7 @@
 // Add medication), open the mix calculator (reconstituted compounds), and
 // open source links.
 
+import { MASK_PROPS } from "../../components/MaskedHealthValue";
 import React, { useMemo, useState } from 'react';
 import { Linking, Pressable, ScrollView, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
@@ -77,7 +78,7 @@ export function LibraryEntryScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.bg }}>
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
-        <ScrollView
+        <ScrollView {...MASK_PROPS}
           contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 6, paddingBottom: 28 }}
           showsVerticalScrollIndicator={false}
         >

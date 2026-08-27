@@ -7,6 +7,7 @@
 // nextDoseAt from these times, which retimes the Track countdown and dose
 // reminders automatically.
 
+import { MASK_PROPS } from "./MaskedHealthValue";
 import React, { useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
@@ -101,7 +102,7 @@ export function TimingSheet({ visible, onClose, onDismissed }: TimingSheetProps)
   };
 
   return (
-    <BottomSheet visible={visible} onClose={onClose} onDismissed={onDismissed} avoidKeyboard={false}>
+    <BottomSheet panelProps={MASK_PROPS} visible={visible} onClose={onClose} onDismissed={onDismissed} avoidKeyboard={false}>
       <AppText variant="cardTitle" style={{ fontSize: 17 }}>
         Dose timing
       </AppText>

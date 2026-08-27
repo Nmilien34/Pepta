@@ -8,6 +8,7 @@
 //
 // The rows are the card's rows — same component, so the two cannot drift.
 
+import { MASK_PROPS } from "../../components/MaskedHealthValue";
 import React, { useMemo, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
@@ -89,7 +90,7 @@ export function ActivityLogScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.bg }}>
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
-        <ScrollView
+        <ScrollView {...MASK_PROPS}
           contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: 28 }}
           showsVerticalScrollIndicator={false}
           refreshControl={

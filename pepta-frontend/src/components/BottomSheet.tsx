@@ -3,7 +3,7 @@
 // Same motion the QuickLog sheet uses, factored out for reuse.
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, View, useWindowDimensions, type ViewStyle } from 'react-native';
+import { Animated, Easing, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, View, useWindowDimensions, type ViewProps, type ViewStyle } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../theme';
 import { useKeyboardVisible } from './useKeyboardVisible';
@@ -17,10 +17,24 @@ export interface BottomSheetProps {
   scrollable?: boolean;
   height?: ViewStyle['height'];
   avoidKeyboard?: boolean;
+  /**
+   * Extra props for the sheet PANEL (the animated container holding the
+   * content), not the backdrop.
+   *
+   * Exists so callers can spread MASK_PROPS and redact a sheet's contents from
+   * PostHog session replay. Without a passthrough the spread lands on
+   * BottomSheetProps and is silently DROPPED — and because JSX spread skips
+   * excess-property checks, TypeScript says nothing. Five health sheets were
+   * masked that way and every one was a no-op.
+   */
+  panelProps?: Pick<
+    ViewProps,
+    "accessibilityLabel" | "importantForAccessibility" | "collapsable"
+  >;
   children: React.ReactNode;
 }
 
-export function BottomSheet({ visible, onClose, onDismissed, scrollable, height, avoidKeyboard = true, children }: BottomSheetProps) {
+export function BottomSheet({ visible, onClose, onDismissed, scrollable, height, avoidKeyboard = true, panelProps, children }: BottomSheetProps) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const window = useWindowDimensions();
@@ -64,6 +78,7 @@ export function BottomSheet({ visible, onClose, onDismissed, scrollable, height,
         style={{ position: 'absolute', left: 0, right: 0, bottom: avoidKeyboard && keyboardVisible ? -insets.bottom : 0 }}
       >
         <Animated.View
+          {...panelProps}
           style={{
             transform: [{ translateY: slide }],
             backgroundColor: theme.colors.surface,

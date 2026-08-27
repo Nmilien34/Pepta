@@ -7,6 +7,7 @@
 // The cycles API has no PATCH, so saving replaces the active cycle
 // (create-then-soft-delete via context.saveCycle).
 
+import { MASK_PROPS } from "../../components/MaskedHealthValue";
 import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
@@ -110,7 +111,7 @@ export function CycleSetupScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.bg }}>
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 6, paddingBottom: 28 }} showsVerticalScrollIndicator={false}>
+        <ScrollView {...MASK_PROPS} contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 6, paddingBottom: 28 }} showsVerticalScrollIndicator={false}>
           {/* header — back chevron, title, Save link (design: Cycle setup frame) */}
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 44 }}>
             <Pressable

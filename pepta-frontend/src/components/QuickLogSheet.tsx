@@ -3,6 +3,7 @@
 // entry form per log type. Every save posts to the real route and refreshes the
 // affected screens. No fakery — drafts → typed inputs via quickLog builders.
 
+import { MASK_PROPS } from "./MaskedHealthValue";
 import React, { useEffect, useRef, useState } from "react";
 import {
   Animated,
@@ -522,7 +523,7 @@ export function QuickLogSheet({
                 </Pressable>
               </View>
 
-              <ScrollView
+              <ScrollView {...MASK_PROPS}
                 style={{ flexShrink: 1 }}
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"

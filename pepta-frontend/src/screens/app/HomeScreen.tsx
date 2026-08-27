@@ -6,6 +6,7 @@
 // calories / protein / fiber / water vs. their profile targets, logging streak,
 // setup progress, latest weight, and the first insight.
 
+import { MASK_PROPS } from "../../components/MaskedHealthValue";
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, Switch, View } from 'react-native';
 import { Icon } from "../../components/Icon";
@@ -302,7 +303,7 @@ export function HomeScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.bg }}>
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
-        <ScrollView
+        <ScrollView {...MASK_PROPS}
           contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: 28 }}
           showsVerticalScrollIndicator={false}
           refreshControl={

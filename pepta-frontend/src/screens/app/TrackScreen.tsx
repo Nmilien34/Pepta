@@ -2,6 +2,7 @@
 // and dose logs from /track (the injection map + dose history). Pull-to-refresh,
 // staggered entrance, mascot empty states. Renders whatever loaded (partial).
 
+import { MASK_PROPS } from "../../components/MaskedHealthValue";
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { Icon } from "../../components/Icon";
@@ -141,7 +142,7 @@ export function TrackScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.bg }}>
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
-        <ScrollView
+        <ScrollView {...MASK_PROPS}
           ref={scrollRef}
           contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: 28 }}
           showsVerticalScrollIndicator={false}

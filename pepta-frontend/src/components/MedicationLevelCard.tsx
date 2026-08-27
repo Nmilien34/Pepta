@@ -6,6 +6,7 @@
 // and nothing caught it because nothing rendered it. It is a Pressable now,
 // and the tests below press it.
 
+import { MASK_PROPS } from "./MaskedHealthValue";
 import React from 'react';
 import { CardIcon } from './CardIcon';
 import { ActivityIndicator, Pressable, View } from 'react-native';
@@ -117,7 +118,7 @@ export function MedicationLevelCard({
             {LEVEL_RANGES.map((option) => {
               const on = range.range === option.key;
               return (
-                <Pressable
+                <Pressable {...MASK_PROPS}
                   key={option.key}
                   onPress={() => {
                     Haptics.selectionAsync().catch(() => undefined);

@@ -1,3 +1,4 @@
+import { MASK_PROPS } from "../../components/MaskedHealthValue";
 import React, { useEffect } from "react";
 import { Pressable, ScrollView, View } from "react-native";
 import * as Haptics from "expo-haptics";
@@ -39,7 +40,7 @@ export function WidgetSetupScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.bg }}>
       <SafeAreaView edges={["top"]} style={{ flex: 1 }}>
-        <ScrollView
+        <ScrollView {...MASK_PROPS}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{
             paddingHorizontal: 16,

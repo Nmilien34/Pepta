@@ -9,6 +9,7 @@
  * This is maintenance, not engagement. No modals, no badges, no re-asking.
  */
 
+import { MASK_PROPS } from "./MaskedHealthValue";
 import { useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
@@ -256,7 +257,7 @@ function DuplicateChooserSheet({
   }, [visible, candidates]);
 
   return (
-    <BottomSheet visible={visible} onClose={onClose} avoidKeyboard={false} scrollable>
+    <BottomSheet panelProps={MASK_PROPS} visible={visible} onClose={onClose} avoidKeyboard={false} scrollable>
       <AppText variant="cardTitle" style={{ fontSize: 17 }}>
         Which one do you use?
       </AppText>

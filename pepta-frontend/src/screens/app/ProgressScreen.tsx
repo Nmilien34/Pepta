@@ -3,6 +3,7 @@
 // weight, height for BMI). Functional range toggle, animated weight chart + bars
 // + rings, count-ups, pull-to-refresh, mascot states. Nothing faked.
 
+import { MASK_PROPS } from "../../components/MaskedHealthValue";
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import Svg, { Line, Rect, Text as SvgText } from 'react-native-svg';
@@ -209,7 +210,7 @@ export function ProgressScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.bg }}>
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
-        <ScrollView
+        <ScrollView {...MASK_PROPS}
           contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: 28 }}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={progressRefreshing} onRefresh={refreshAll} tintColor={theme.colors.primary} />}

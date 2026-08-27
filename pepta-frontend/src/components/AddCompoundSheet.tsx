@@ -9,6 +9,7 @@
 // ever created literally named "Something else" with an invented injection
 // identity. The schedule is created in the same save.
 
+import { MASK_PROPS } from "./MaskedHealthValue";
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, TextInput, View } from 'react-native';
 import { Icon } from "./Icon";
@@ -210,7 +211,7 @@ export function AddCompoundSheet({ visible, onClose, initialQuery, onBrowseLibra
   };
 
   return (
-    <BottomSheet visible={visible} onClose={onClose} onDismissed={onDismissed} avoidKeyboard={false} scrollable>
+    <BottomSheet panelProps={MASK_PROPS} visible={visible} onClose={onClose} onDismissed={onDismissed} avoidKeyboard={false} scrollable>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 4 }}>
         {selected || custom ? (
           <Pressable
