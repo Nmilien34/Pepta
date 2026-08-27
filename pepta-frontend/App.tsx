@@ -11,6 +11,7 @@ import { PeptaDataProvider } from './src/context/PeptaDataContext';
 import { AccessGate } from './src/components/AccessGate';
 import { loadMedicationCatalog } from './src/services/medicationCatalogStore';
 import { attLaunchPrompt } from './src/services/attPrompt';
+import { initPostHog } from './src/services/posthog';
 
 // Holds the first paint until the Hanken faces are ready, so text never flashes
 // in the system fallback. Renders a themed blank background meanwhile.
@@ -27,6 +28,14 @@ export default function App() {
   // ATT must be requested at launch, not behind sign-in — App Review installs
   // fresh, never authenticates, and must still see the dialog (2.1 rejection).
   React.useEffect(() => {
+    // PostHog first, and SYNCHRONOUSLY — initPostHog never throws (it catches
+    // internally and returns false), so nothing here can delay or break the
+    // launch sequence below it. Started before ATT on purpose: it must be live
+    // before the first funnel event, and onboarding_started can fire while the
+    // ATT dialog is still on screen.
+    //
+    // AppsFlyer is untouched by this and still initialises from AuthContext.
+    initPostHog();
     attLaunchPrompt.start();
     // Medication catalog: hydrate from cache, refresh if older than 24h.
     // Fire-and-forget — the picker renders from the bundled list meanwhile

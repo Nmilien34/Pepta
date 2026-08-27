@@ -11,6 +11,29 @@
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { appsFlyer } from "./appsflyer";
+import { capture as posthogCapture } from "./posthog";
+
+/**
+ * THE ONE FAN-OUT POINT. Every funnel event goes to AppsFlyer (attribution,
+ * Meta postbacks) and PostHog (product analytics, replay) under the SAME event
+ * name and the same properties — parity is the point, so the two tools can be
+ * compared directly. Do not rename an event in one destination only.
+ *
+ * ORDER MATTERS: AppsFlyer first. It is the destination with contractual
+ * obligations attached, and posthogCapture already swallows its own errors, so
+ * putting it second means a PostHog problem cannot interpose on the send that
+ * matters most. The awaited AppsFlyer promise is returned unchanged, so
+ * logOncePerInstall's AsyncStorage write still keys off the AppsFlyer result
+ * alone — PostHog must never be able to consume a once-per-install token.
+ */
+function fanOut(
+  eventName: string,
+  eventValues: Record<string, string> = {},
+): Promise<unknown> {
+  const sent = appsFlyer.logAnalyticsEvent(eventName, eventValues);
+  posthogCapture(eventName, eventValues);
+  return Promise.resolve(sent);
+}
 
 const ONCE_KEY_PREFIX = "pepta:funnel:";
 
@@ -28,7 +51,7 @@ async function logOncePerInstall(
     const key = `${ONCE_KEY_PREFIX}${eventName}`;
     const already = await AsyncStorage.getItem(key);
     if (already) return;
-    await appsFlyer.logAnalyticsEvent(eventName, eventValues);
+    await fanOut(eventName, eventValues);
     await AsyncStorage.setItem(key, new Date().toISOString());
   } catch (error) {
     console.warn(`[Funnel] Failed to log ${eventName}.`, error);
@@ -58,7 +81,7 @@ export function logOnboardingStep(stepId: string, index: number): void {
   if (stepsSeenThisSession.has(stepId)) return;
   stepsSeenThisSession.add(stepId);
   // The AppsFlyer wrapper takes string values only.
-  void appsFlyer.logAnalyticsEvent("onboarding_step", {
+  void fanOut("onboarding_step", {
     step: stepId,
     index: String(index),
   });
@@ -75,7 +98,7 @@ export function logPaywallShown(
   },
 ): void {
   // The wrapper takes string values only, so bools are stringified.
-  void appsFlyer.logAnalyticsEvent("paywall_shown", {
+  void fanOut("paywall_shown", {
     variant,
     defaultSelectedPlan: extras.defaultSelectedPlan,
     trialCopyShown: String(extras.trialCopyShown),
@@ -110,7 +133,7 @@ export function logPaywallOfferingDebug(payload: {
       pkg.rawEligibilityStatus === null ? "null" : String(pkg.rawEligibilityStatus),
     [`${prefix}TrialEligible`]: String(pkg.trialEligible),
   });
-  void appsFlyer.logAnalyticsEvent("paywall_offering_debug", {
+  void fanOut("paywall_offering_debug", {
     offeringId: payload.offeringId,
     ...flat("monthly", payload.monthly),
     ...flat("yearly", payload.yearly),
@@ -129,7 +152,7 @@ export function logPaywallDismissed(payload: {
   selectedPlan: string;
   trialCopyShown: boolean;
 }): void {
-  void appsFlyer.logAnalyticsEvent("paywall_dismissed", {
+  void fanOut("paywall_dismissed", {
     variant: payload.variant,
     selectedPlan: payload.selectedPlan,
     trialCopyShown: String(payload.trialCopyShown),
@@ -145,14 +168,14 @@ let revealClaimLogged = false;
 export function logRevealClaimTapped(): void {
   if (revealClaimLogged) return;
   revealClaimLogged = true;
-  void appsFlyer.logAnalyticsEvent("reveal_claim_tapped", {});
+  void fanOut("reveal_claim_tapped", {});
 }
 
 // "Where did you find us?" — fires at answer time (device-level, pre-auth;
 // the backend copy is written best-effort after sign-in). The self-report
 // matters most exactly where ATT blinds AppsFlyer's own attribution.
 export function logDiscoverySourceReported(source: string): void {
-  void appsFlyer.logAnalyticsEvent("discovery_source_reported", { source });
+  void fanOut("discovery_source_reported", { source });
 }
 
 // Update-prompt engagement: shown fires once per displayed prompt, action
@@ -162,7 +185,7 @@ export function logUpdatePromptShown(payload: {
   latestVersion: string | null;
   mode: "soft" | "hard";
 }): void {
-  void appsFlyer.logAnalyticsEvent("update_prompt_shown", {
+  void fanOut("update_prompt_shown", {
     runningVersion: payload.runningVersion,
     latestVersion: payload.latestVersion ?? "null",
     mode: payload.mode,
@@ -170,14 +193,14 @@ export function logUpdatePromptShown(payload: {
 }
 
 export function logUpdatePromptAction(action: "update" | "later"): void {
-  void appsFlyer.logAnalyticsEvent("update_prompt_action", { action });
+  void fanOut("update_prompt_action", { action });
 }
 
 export function logPurchaseStarted(
   variant: string,
   packageType: "monthly" | "annual",
 ): void {
-  void appsFlyer.logAnalyticsEvent("purchase_started", {
+  void fanOut("purchase_started", {
     variant,
     package: packageType,
   });

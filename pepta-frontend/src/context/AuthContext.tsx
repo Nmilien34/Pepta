@@ -1,3 +1,4 @@
+import { Platform } from "react-native";
 import React, {
   createContext,
   useCallback,
@@ -14,6 +15,7 @@ import { api } from "../services/api";
 import { clearPurchaseGrace } from "../services/purchaseGrace";
 import { clearSnapshot } from "../services/peptaSnapshotStore";
 import { appsFlyer } from "../services/appsflyer";
+import { identify as posthogIdentify, reset as posthogReset } from "../services/posthog";
 import { revenueCat } from "../services/revenueCat";
 import {
   AUTH_STORAGE_KEY,
@@ -79,6 +81,19 @@ async function initializeAppsFlyerForUser(
     console.error("[AppsFlyer] init failed:", error);
     return false;
   });
+}
+
+/**
+ * PostHog identity. Backend user id only, plus the two non-sensitive
+ * properties this app already attaches elsewhere.
+ *
+ * DELIBERATELY NOT the email/displayName that ride along to RevenueCat below:
+ * those exist so a paying customer is findable in the RC dashboard, which is a
+ * billing need. PostHog is product analytics on a HEALTH app, and a person
+ * profile there must not carry PII or anything clinical.
+ */
+function identifyPostHogUser(userId: string): void {
+  posthogIdentify(userId, { platform: Platform.OS });
 }
 
 async function identifyRevenueCatUser(user: {
@@ -202,6 +217,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // already-signed-in user back to the sign-in screen.
           await runSignInSideEffects(async () => {
             await initializeAppsFlyerForUser(stored.user.id);
+            identifyPostHogUser(stored.user.id);
             await identifyRevenueCatUser(stored.user);
           });
           if (active) setAuth(stored);
@@ -229,6 +245,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await runSignInSideEffects(async () => {
       await initializeAppsFlyerForUser(response.user.id);
       await logCompleteRegistrationIfNeeded(response, method);
+      identifyPostHogUser(response.user.id);
       await identifyRevenueCatUser(response.user);
     });
     setAuth(response);
@@ -314,6 +331,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.warn("[auth] Could not clear the offline snapshot.", error);
       });
     }
+    // Drop the PostHog identity with the rest of the session. Account
+    // DELETION routes through here too (AccountDetailsScreen calls logout
+    // after api.deleteAccount), so both paths are covered by this one line —
+    // the same reason the snapshot purge lives here. Without it the next
+    // person to sign in on a shared or resold handset continues the previous
+    // user's PostHog person and session recording.
+    posthogReset();
     setAuth(null);
     api.setAuthToken(null);
     persistAuth(null);

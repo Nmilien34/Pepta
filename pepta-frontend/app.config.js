@@ -9,6 +9,10 @@ const appsFlyerAppId = process.env.EXPO_PUBLIC_APPSFLYER_APP_ID ?? "";
 const appsFlyerDiagnosticEventEnabled =
   process.env.EXPO_PUBLIC_APPSFLYER_DIAGNOSTIC_EVENT_ENABLED === "true";
 
+const posthogApiKey = process.env.EXPO_PUBLIC_POSTHOG_API_KEY ?? "";
+const posthogHost =
+  process.env.EXPO_PUBLIC_POSTHOG_HOST ?? "https://us.i.posthog.com";
+
 module.exports = {
   expo: {
     name: "Pepta",
@@ -116,6 +120,8 @@ module.exports = {
       appsFlyerDevKey,
       appsFlyerAppId,
       appsFlyerDiagnosticEventEnabled,
+      posthogApiKey,
+      posthogHost,
       eas: {
         projectId: "4004b063-3984-463d-825d-01fb70cc4fa5",
       },

@@ -25,6 +25,22 @@ export const APPSFLYER_DIAGNOSTIC_EVENT_ENABLED =
   process.env.EXPO_PUBLIC_APPSFLYER_DIAGNOSTIC_EVENT_ENABLED === "true" &&
   (typeof __DEV__ !== "undefined" ? __DEV__ : false);
 
+// PostHog — product analytics + session replay. Second destination behind the
+// funnelEvents wrapper; AppsFlyer remains the attribution backbone and is
+// untouched. An empty key disables PostHog entirely rather than half-arming it.
+export const POSTHOG_API_KEY = process.env.EXPO_PUBLIC_POSTHOG_API_KEY ?? "";
+export const POSTHOG_HOST =
+  process.env.EXPO_PUBLIC_POSTHOG_HOST ?? "https://us.i.posthog.com";
+
+/**
+ * Stamped on every PostHog event as `$environment` so a TestFlight or
+ * simulator session cannot be mistaken for real traffic. __DEV__ is false in
+ * TestFlight (it is a Release build), so this alone would call TestFlight
+ * "production" — analytics.ts refines it with the Expo release channel.
+ */
+export const POSTHOG_ENVIRONMENT: "production" | "development" =
+  typeof __DEV__ !== "undefined" && __DEV__ ? "development" : "production";
+
 // Legal pages served by the active backend for onboarding, settings, and App Store metadata.
 export const TERMS_URL = `${API_BASE_URL}/legal/terms`;
 export const PRIVACY_URL = `${API_BASE_URL}/legal/privacy`;

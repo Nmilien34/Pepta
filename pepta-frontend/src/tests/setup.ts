@@ -56,6 +56,21 @@ vi.mock("react-native-purchases", () => ({
 // expo-haptics reaches expo-modules-core (crashes on __DEV__ under node).
 // Screens fire haptics fire-and-forget, so inert mocks are all tests need;
 // suites asserting haptic ORDER (useSpeechHaptic) override this locally.
+// PostHog's SDK is a native module like react-native-purchases above: node
+// cannot parse it, and every context that touches analytics would fail at
+// COLLECTION time without this. The real posthog.ts wrapper still runs — only
+// the SDK edge is inert, so the null-guard and error-swallowing logic is
+// exercised rather than mocked away.
+vi.mock("posthog-react-native", () => ({
+  default: class {
+    capture() {}
+    identify() {}
+    reset() {}
+    register() {}
+  },
+  PostHogMaskView: ({ children }: { children: unknown }) => children,
+}));
+
 vi.mock("expo-haptics", () => ({
   impactAsync: vi.fn(() => Promise.resolve()),
   notificationAsync: vi.fn(() => Promise.resolve()),
