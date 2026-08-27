@@ -38,6 +38,8 @@ export interface EchoAnswers {
   shotDays?: number[];
   goalType?: GoalType;
   body?: BodyMeasure;
+  /** Where they began, when they have already been dosing. */
+  startWeight?: number;
   goalWeight?: number;
   goalWeightUnit?: 'lb' | 'kg';
   pace?: number;
@@ -178,6 +180,29 @@ function goalInBodyUnit(a: EchoAnswers): { value: number; unit: 'lb' | 'kg' } {
  * The echo (dim recap) that types at the top of the given step. Undefined means
  * the screen owns its opener (or there is nothing to acknowledge yet).
  */
+/**
+ * What they have already lost, when startWeight says they have lost anything.
+ * Returns undefined rather than a zero or a negative — someone who has gained
+ * or held does not need it read back to them at the moment they are being
+ * asked for a target.
+ */
+function startProgressEcho(a: EchoAnswers): string | undefined {
+  const body = a.body;
+  if (!body || typeof a.startWeight !== 'number') return undefined;
+  const lost = Math.round(a.startWeight - body.weight);
+  if (lost <= 0) return undefined;
+  return `Down ${lost} ${body.units === 'metric' ? 'kg' : 'lb'} already. Now the target.`;
+}
+
+/** Said back after the "how do you take it" turn. */
+function routeEcho(route?: 'injection' | 'oral' | 'unsure'): string | undefined {
+  // 'unsure' gets nothing rather than a confident line about a route the user
+  // has just told us they do not know.
+  if (route === 'oral') return 'Oral it is.';
+  if (route === 'injection') return 'Injection it is.';
+  return undefined;
+}
+
 /** The muscle-floor payoff, said back. Used by whichever screen follows it. */
 function floorEcho(a: EchoAnswers): string | undefined {
   if (!a.body) return undefined;
@@ -194,7 +219,12 @@ export function echoFor(step: OnboardingStep, a: EchoAnswers, now: Date = new Da
     case 'route':
       return medEcho(a.medication);
     case 'currentDose':
-      return medEcho(a.medication);
+      // The route turn runs ONLY for a medication that does not pin its own
+      // route. When it ran it already showed medEcho, so repeating it here
+      // put the identical sentence on two consecutive screens. When it was
+      // skipped (every branded pick) this screen follows medication directly
+      // and the medication line is exactly right.
+      return a.medication?.routeAmbiguous ? routeEcho(a.route) : medEcho(a.medication);
     case 'deviceType':
       return doseEcho(a.dose, unit, a.route);
     case 'concentration':
@@ -241,7 +271,20 @@ export function echoFor(step: OnboardingStep, a: EchoAnswers, now: Date = new Da
       // line would otherwise land twice in a row: muscleFloor already opened
       // with "5'10\", 226 today."
       if (a.journeyStage && a.journeyStage !== 'active') return floorEcho(a);
-      return a.body ? `${a.body.weight} today. Thanks for trusting me with that.` : undefined;
+      // THE ACTIVE PATH ECHOES WHERE THEY STARTED, NOT WHERE THEY ARE
+      // (2026-08-27). This used to say "226 today", which muscleFloor had
+      // already opened with two screens earlier — the same number, twice,
+      // with only startWeight between them. startWeight is the answer this
+      // screen actually follows, so echo THAT: for anyone already dosing it
+      // is a loss they have earned, which is worth more than a restated
+      // weight. Falls back to the floor line when there is nothing to
+      // subtract, rather than reaching for the body weight again.
+      // NOT floorEcho as the fallback: startWeight itself shows that line, so
+      // falling back to it would trade one repeat for another on consecutive
+      // screens. WheelPicker only fires onChange when the index MOVES, so a
+      // user who accepts the prefilled start weight leaves it undefined —
+      // that is the common path, not an edge case.
+      return startProgressEcho(a) ?? 'Now the target.';
     case 'goalPace': {
       const goal = goalInBodyUnit(a);
       return goal.value ? `${goal.value}. I like it.` : undefined;

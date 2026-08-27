@@ -22,9 +22,15 @@ describe('the muscle-floor acknowledgment follows the give', () => {
     }
   });
 
-  it('leaves the active path alone — startWeight still carries it', () => {
+  // UPDATED 2026-08-27. This used to assert goalWeight contained "226 today",
+  // which is exactly the repeat Nick caught on the device: muscleFloor opens
+  // with that same weight two screens earlier. The assertion had encoded the
+  // bug. What still matters here is the half this file exists for — the
+  // acknowledgment stays on startWeight for an active user — so that is kept
+  // and the repeat is now asserted AGAINST. See onboardingEcho.repeats.test.
+  it('leaves the active path alone — startWeight still carries the floor', () => {
     const a = { journeyStage: 'active', body: BODY } as never;
     expect(echoFor('startWeight', a)).toContain('Locked in');
-    expect(echoFor('goalWeight', a)).toContain('226 today');
+    expect(echoFor('goalWeight', a)).not.toContain('226');
   });
 });
