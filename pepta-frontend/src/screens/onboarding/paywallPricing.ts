@@ -66,11 +66,13 @@ const FALLBACK_PRICING: PaywallPricingCopy = {
   yearly: {
     title: "Yearly",
     sub: "once a year",
+    price: "$59.99",
+    per: "/yr",
     // MUST match what monthlyEquivalent() computes for $59.99/yr, or the
-    // price visibly flips when offerings land. It floors: $4.99.
-    price: "$4.99",
-    per: "/mo",
-    priceNote: "$59.99/yr",
+    // number visibly flips when offerings land. It floors: $4.99. Subordinate
+    // to the billed amount above it — see the 3.1.2(c) note in
+    // buildPaywallPricing.
+    priceNote: "≈ $4.99/mo",
     badge: "SAVE 50%",
   },
   monthly: {
@@ -192,6 +194,18 @@ function planFooter(
     return `${price}/${planNoun}, auto-renews until cancelled. Cancel anytime · Terms & Privacy`;
   }
   return `Then ${price}/${planNoun}, auto-renews. Cancel anytime · Terms & Privacy`;
+}
+
+/**
+ * The product's own localised price string, or null when it will not resolve.
+ *
+ * Distinct from priceString() below, which substitutes a hardcoded fallback.
+ * Callers that must show a BILLED amount or nothing at all use this — a
+ * guessed price on a purchase surface is a 3.1.2 problem, not a cosmetic one.
+ */
+export function priceStringOf(pkg: PricePackage | null | undefined): string | null {
+  const raw = pkg?.product.priceString;
+  return typeof raw === "string" && raw.length > 0 ? raw : null;
 }
 
 function priceString(pkg: PricePackage | null | undefined, fallback: string): string {
@@ -317,13 +331,19 @@ export function buildPaywallPricing(
       : "once a year";
 
   return {
+    // 3.1.2(c), rejected 2026-08-28. This used to put perMonthAnchor in
+    // `price` (19pt statMedium) and the annual total in `priceNote` (10pt
+    // textTertiary) — the CALCULATED figure outranking the BILLED one on
+    // every factor Apple names: size, colour and location. Swapped. The
+    // per-month number survives only as a subordinate equivalence, and reads
+    // as one ("≈ $4.99/mo") rather than as a price.
     yearly: perMonthAnchor
       ? {
           title: "Yearly",
           sub: yearlySub,
-          price: perMonthAnchor,
-          per: "/mo",
-          priceNote: `${annualPrice}/yr`,
+          price: annualPrice,
+          per: "/yr",
+          priceNote: `≈ ${perMonthAnchor}/mo`,
           badge: yearlyBadge,
           badgeTone: yearlyTrialBadge ? "trial" : "save",
         }

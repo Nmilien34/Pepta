@@ -362,11 +362,18 @@ describe("PaywallScreen legal links", () => {
     expect(allText(tree!.root).toLowerCase()).not.toContain("free trial");
     expect(allText(tree!.root).toLowerCase()).not.toContain("7 days free");
 
-    // Yearly card: bold per-month anchor with the billed total right under it
-    // (3.1.2(c) — the anchor must never render without the billed price).
+    // Yearly card: the BILLED total is the dominant element and the per-month
+    // figure is a subordinate equivalence beneath it.
+    //
+    // This assertion used to require only that the billed price was PRESENT
+    // ("the anchor must never render without the billed price"). Apple
+    // rejected exactly that reading on 2026-08-28: presence is not the test,
+    // prominence is. The dominant slot renders at 19pt statMedium, the note at
+    // 10pt textTertiary — so asserting WHICH string is in which slot is what
+    // actually pins the guideline.
     const text = allText(tree!.root);
-    expect(text).toContain("$3.33");
-    expect(text).toContain("$40.00/yr");
+    expect(text).toContain("$40.00");
+    expect(text).toContain("≈ $3.33/mo");
     expect(text).toContain("$40.00/year, auto-renews until cancelled. Cancel anytime");
   });
 

@@ -39,7 +39,7 @@ import {
 } from "./accountView";
 import { LIBRARY_ENTRIES } from "../../data/peptideLibrary";
 import { ReminderSettingsScreen } from "./ReminderSettingsScreen";
-import { isHealthSyncEnabled, setHealthSyncEnabled } from "../../services/healthSync";
+import { healthAvailability, isHealthSyncEnabled, setHealthSyncEnabled } from "../../services/healthSync";
 import { PaywallScreen } from "../onboarding/PaywallScreen";
 import {
   buildPeptaReportExportPayload,
@@ -322,22 +322,51 @@ export function AccountScreen() {
       chevron: true,
     },
   ];
+  // 2.1(a), rejected 2026-08-28 on an iPad: this row did nothing when tapped.
+  // It was fired as `void toggleHealthSync()`, which DISCARDS the promise — a
+  // resolved `false` showed an alert, but a THROW showed nothing at all, and
+  // iPadOS has no HealthKit so the enable path threw before reaching the
+  // alert. Now: availability is checked first, the whole body is wrapped so no
+  // path can be silent, and the row shows a busy state while the OS sheet is
+  // up so a slow response never reads as dead.
+  const [healthBusy, setHealthBusy] = useState(false);
+
   const toggleHealthSync = async () => {
-    const next = !healthSyncOn;
-    if (!next) {
-      await setHealthSyncEnabled(false);
-      setHealthSyncOn(false);
-      return;
-    }
-    // Enabling prompts for HealthKit access; the OS sheet is the consent.
-    // A denial leaves the toggle off rather than half-on.
-    const granted = await setHealthSyncEnabled(true);
-    setHealthSyncOn(granted);
-    if (!granted) {
+    if (healthBusy) return;
+    setHealthBusy(true);
+    try {
+      if (healthSyncOn) {
+        await setHealthSyncEnabled(false);
+        setHealthSyncOn(false);
+        return;
+      }
+
+      if ((await healthAvailability()) !== "available") {
+        Alert.alert(
+          "Apple Health isn’t available",
+          "This device doesn’t support Apple Health. Pepta works normally without it — you can log activity by hand.",
+        );
+        return;
+      }
+
+      // The OS sheet is the consent. A denial leaves the row off, not half-on.
+      const granted = await setHealthSyncEnabled(true);
+      setHealthSyncOn(granted);
+      if (!granted) {
+        Alert.alert(
+          "Apple Health access needed",
+          "Allow Steps and Workouts for Pepta in the Health app, then try again.",
+        );
+      }
+    } catch (error) {
+      // A reviewer taps this row. Nothing here may fail quietly.
+      console.warn("[health] Sync toggle failed.", error);
       Alert.alert(
-        "Apple Health access needed",
-        "Allow Steps and Workouts for Pepta in the Health app, then try again.",
+        "Couldn’t reach Apple Health",
+        "Something went wrong turning sync on. Please try again.",
       );
+    } finally {
+      setHealthBusy(false);
     }
   };
 
@@ -346,7 +375,9 @@ export function AccountScreen() {
       icon: "heart-pulse",
       label: "Sync Apple Health",
       // The row states the CONTRACT, not just on/off: read-only, and what for.
-      value: healthSyncOn ? "On" : "Off",
+      // "Checking…" while the request is in flight, so a double tap is a
+      // no-op the user can SEE rather than an unresponsive control.
+      value: healthBusy ? "Checking…" : healthSyncOn ? "On" : "Off",
       onPress: () => void toggleHealthSync(),
       chevron: false,
     },

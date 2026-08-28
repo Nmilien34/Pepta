@@ -29,7 +29,7 @@ import { convo } from '../../components/onboarding/convoTokens';
 import { typography } from '../../theme/typography';
 import { useAuth } from '../../context/AuthContext';
 import { revenueCat } from '../../services/revenueCat';
-import { dailyEquivalent, freeTrialOf } from './paywallPricing';
+import { dailyEquivalent, freeTrialOf, priceStringOf } from './paywallPricing';
 import {
   buildTrialTimeline,
   freeStartHeadline,
@@ -76,11 +76,14 @@ function Row({
   row,
   last,
   perDay,
+  billed,
 }: {
   row: TrialTimelineRow;
   last: boolean;
   /** Per-day equivalent of the year, or null when it will not resolve. */
   perDay?: string | null;
+  /** The BILLED annual amount. Must lead — see the 3.1.2(c) note below. */
+  billed?: string | null;
 }) {
   return (
     <View style={styles.row}>
@@ -101,9 +104,15 @@ function Row({
             the reframe belongs where the question gets asked. Silent when the
             year will not price: the standalone screen self-skipped rather
             than show a number it had to guess, and that rule survives it. */}
-        {row.key === 'charge' && perDay ? (
+        {/* 3.1.2(c), rejected 2026-08-28. This line used to read "16¢ a day,
+            billed yearly" — a CALCULATED price on the only pre-paywall screen
+            that mentions money at all, with no billed amount anywhere on it.
+            The billed total now leads and carries the emphasis; the per-day
+            figure follows in parentheses as an equivalence. */}
+        {row.key === 'charge' && billed ? (
           <Text style={styles.anchor}>
-            {perDay} a day, billed yearly. You&rsquo;re already doing the hard part.
+            {billed} a year
+            {perDay ? <Text style={styles.anchorAside}> (about {perDay} a day)</Text> : null}
           </Text>
         ) : null}
       </View>
@@ -120,6 +129,7 @@ export function TrialTimelineScreen({
   const auth = useAuth();
   const [trial, setTrial] = useState<TrialLike | null>(null);
   const [perDay, setPerDay] = useState<string | null>(null);
+  const [billed, setBilled] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -144,6 +154,7 @@ export function TrialTimelineScreen({
         // YEAR under monthly dates puts a date and a billing period from two
         // different plans in the same row, one screen before purchase.
         setPerDay(yearlyTrial ? dailyEquivalent(packages?.yearly) : null);
+        setBilled(yearlyTrial ? priceStringOf(packages?.yearly) : null);
         if (resolved) setTrial(resolved);
         else onSkipToWall();
       })
@@ -189,7 +200,7 @@ export function TrialTimelineScreen({
     >
       <View style={styles.list}>
         {rows.map((row, i) => (
-          <Row key={row.key} row={row} last={i === rows.length - 1} perDay={perDay} />
+          <Row key={row.key} row={row} last={i === rows.length - 1} perDay={perDay} billed={billed} />
         ))}
       </View>
       <View style={styles.pepRow}>
@@ -234,6 +245,11 @@ const styles = StyleSheet.create({
     letterSpacing: -0.3,
     color: convo.ink,
     marginTop: 2,
+  },
+  anchorAside: {
+    fontFamily: typography.fonts.semiBold,
+    fontSize: 11.5,
+    color: convo.soft,
   },
   anchor: {
     fontFamily: typography.fonts.bold,

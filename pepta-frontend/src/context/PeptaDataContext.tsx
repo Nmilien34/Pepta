@@ -5,6 +5,8 @@
 // optimistically; positive deltas are persisted as append-only log rows and the
 // next refresh reconciles to server truth.
 
+import { recordLoggedDay } from '../services/reviewPromptStore';
+import { localDay } from '../screens/app/activityFeed';
 import React, {
   createContext,
   useCallback,
@@ -663,6 +665,12 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
     );
   }, []);
   const addDoseLog = useCallback((input: DoseLogInput) => {
+    // A logged dose is the primary "day of real use" signal the review gate
+    // counts (5.6.3). Recorded DEVICE-LOCALLY and idempotent per day, so a
+    // seeded account cannot manufacture engagement and one busy session
+    // cannot look like a habit. Fire-and-forget: analytics-grade bookkeeping
+    // must never delay or fail a log.
+    void recordLoggedDay(localDay(new Date().toISOString()));
     setTrack((t) =>
       t
         ? {

@@ -12,6 +12,7 @@ import { AccessGate } from './src/components/AccessGate';
 import { loadMedicationCatalog } from './src/services/medicationCatalogStore';
 import { attLaunchPrompt } from './src/services/attPrompt';
 import { initPostHog } from './src/services/posthog';
+import { recordFirstOpen } from './src/services/reviewPromptStore';
 
 // Holds the first paint until the Hanken faces are ready, so text never flashes
 // in the system fallback. Renders a themed blank background meanwhile.
@@ -36,6 +37,10 @@ export default function App() {
     //
     // AppsFlyer is untouched by this and still initialises from AuthContext.
     initPostHog();
+    // Stamp first launch on THIS install. Write-once, and the one condition
+    // the review gate cannot have backdated by a seeded account — see
+    // services/reviewPrompt (5.6.3).
+    void recordFirstOpen();
     attLaunchPrompt.start();
     // Medication catalog: hydrate from cache, refresh if older than 24h.
     // Fire-and-forget — the picker renders from the bundled list meanwhile

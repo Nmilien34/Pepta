@@ -3,6 +3,8 @@
 // hands off to the full chat surface, which lives in PepChatProvider so any
 // screen (e.g. the peptide library) can open it too.
 
+import { reviewGateDecision } from '../services/reviewPrompt';
+import { firstOpenAt, lastAskedAt, loggedDays } from '../services/reviewPromptStore';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Pressable, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
@@ -111,6 +113,19 @@ export function PepCompanion() {
         requestReview: () => StoreReview.requestReview(),
         hasAsked: hasAskedForReview,
         markAsked: () => markReviewAsked(),
+        // The device-local half. PepCompanion only ever mounts inside the
+        // authenticated app shell, never during onboarding, so that flag is a
+        // constant here rather than a lie — the gate keeps the parameter for
+        // the day something else calls this.
+        gate: async () =>
+          reviewGateDecision({
+            now: Date.now(),
+            firstOpenAt: await firstOpenAt(),
+            loggedDays: await loggedDays(),
+            onboardingActive: false,
+            lastAskedAt: await lastAskedAt(),
+            available: await StoreReview.isAvailableAsync(),
+          }),
       });
     }
   }, [home, seenMilestones, activeMilestone]);

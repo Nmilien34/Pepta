@@ -12,7 +12,7 @@ function packageWithPrice(priceString: string, price: number, currencyCode = "US
 }
 
 describe("buildPaywallPricing", () => {
-  it("anchors the yearly card on the per-month equivalent with the billed total beneath", () => {
+  it("anchors the yearly card on the BILLED total, with the per-month equivalent beneath (3.1.2(c))", () => {
     const pricing = buildPaywallPricing({
       monthly: packageWithPrice("$9.99", 9.99),
       yearly: packageWithPrice("$39.99", 39.99),
@@ -20,9 +20,9 @@ describe("buildPaywallPricing", () => {
 
     expect(pricing.monthly.price).toBe("$9.99");
     // $39.99 / 12 — the bold anchor; the billed total rides underneath.
-    expect(pricing.yearly.price).toBe("$3.33");
-    expect(pricing.yearly.per).toBe("/mo");
-    expect(pricing.yearly.priceNote).toBe("$39.99/yr");
+    expect(pricing.yearly.price).toBe("$39.99");
+    expect(pricing.yearly.per).toBe("/yr");
+    expect(pricing.yearly.priceNote).toBe("≈ $3.33/mo");
     expect(pricing.yearly.sub).toBe("once a year");
     // round(66.64) — conventional rounding, per Nick (49 "reads weaker").
     expect(pricing.yearly.badge).toBe("SAVE 67%");
@@ -56,9 +56,9 @@ describe("buildPaywallPricing", () => {
     expect(pricing.monthly.price).toBe("$9.99");
     // $4.99, not $5.00 — the anchor floors as of 2026-08-24, and the loading
     // fallback matches it so the price cannot visibly flip when offerings land.
-    expect(pricing.yearly.price).toBe("$4.99");
-    expect(pricing.yearly.per).toBe("/mo");
-    expect(pricing.yearly.priceNote).toBe("$59.99/yr");
+    expect(pricing.yearly.price).toBe("$59.99");
+    expect(pricing.yearly.per).toBe("/yr");
+    expect(pricing.yearly.priceNote).toBe("≈ $4.99/mo");
     expect(pricing.yearly.sub).toBe("once a year");
     // Last-resort constants, aligned to the Aug 5 2026 US list prices.
     expect(pricing.yearly.badge).toBe("SAVE 50%");
@@ -304,8 +304,8 @@ describe("buildPaywallPricing", () => {
     expect(pricing.yearly.badge).toBe("SAVE 50%");
     // $4.99, not $5.00 — the anchor floors as of 2026-08-24, and the loading
     // fallback matches it so the price cannot visibly flip when offerings land.
-    expect(pricing.yearly.price).toBe("$4.99");
-    expect(pricing.yearly.priceNote).toBe("$59.99/yr");
+    expect(pricing.yearly.price).toBe("$59.99");
+    expect(pricing.yearly.priceNote).toBe("≈ $4.99/mo");
     expect(pricing.cta.yearly.label).toBe("Start my year — $59.99");
     // An exact saving stays exact.
     const exact = buildPaywallPricing({
@@ -363,8 +363,8 @@ describe("the per-month anchor floors instead of rounding", () => {
       yearly: packageWithPrice("$59.99", 59.99),
     });
 
-    expect(pricing.yearly.price).toBe("$4.99");
-    expect(pricing.yearly.priceNote).toBe("$59.99/yr");
+    expect(pricing.yearly.price).toBe("$59.99");
+    expect(pricing.yearly.priceNote).toBe("≈ $4.99/mo");
   });
 
   it("never shows a month costing more than the year divided out", () => {
@@ -374,7 +374,10 @@ describe("the per-month anchor floors instead of rounding", () => {
         yearly: packageWithPrice(`$${yearly.toFixed(2)}`, yearly),
       });
 
-      expect(Number(pricing.yearly.price.slice(1))).toBeLessThanOrEqual(yearly / 12);
+      // The per-month figure moved to priceNote when the billed amount took
+      // the dominant slot (3.1.2(c)). Same invariant, new home.
+      const perMonth = Number((pricing.yearly.priceNote ?? "").replace(/[^\d.]/g, ""));
+      expect(perMonth).toBeLessThanOrEqual(yearly / 12);
     }
   });
 });

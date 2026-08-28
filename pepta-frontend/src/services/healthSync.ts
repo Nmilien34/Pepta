@@ -63,6 +63,41 @@ export async function isHealthSyncEnabled(): Promise<boolean> {
   return (await AsyncStorage.getItem(ENABLED_KEY)) === 'true';
 }
 
+export type HealthAvailability = 'available' | 'unavailable';
+
+/**
+ * Does HealthKit exist on this device at all?
+ *
+ * 2.1(a), rejected 2026-08-28 on an iPad: nothing ever asked. iPadOS does not
+ * support HealthKit, so the enable path reached into a native module that had
+ * never initialised and THREW — and AccountScreen fired the handler as
+ * `void toggleHealthSync()`, which discards the promise. A resolved `false`
+ * would have shown an alert; a throw showed nothing, which is precisely the
+ * "not responsive" the reviewer reported.
+ *
+ * NEVER REJECTS. Every failure — callback error, missing module, a throw on
+ * property access — resolves to 'unavailable', because the entire point is
+ * that a caller can render a definite state instead of dying.
+ */
+export async function healthAvailability(): Promise<HealthAvailability> {
+  if (Platform.OS !== 'ios') return 'unavailable';
+  try {
+    const kit = await healthKit();
+    if (typeof kit?.isAvailable !== 'function') return 'unavailable';
+    return await new Promise<HealthAvailability>((resolve) => {
+      try {
+        kit.isAvailable((error: unknown, result: boolean) => {
+          resolve(error || !result ? 'unavailable' : 'available');
+        });
+      } catch {
+        resolve('unavailable');
+      }
+    });
+  } catch {
+    return 'unavailable';
+  }
+}
+
 /**
  * Turn sync on (prompting for HealthKit access) or off.
  *
@@ -84,6 +119,9 @@ export async function setHealthSyncEnabled(enabled: boolean): Promise<boolean> {
 
 async function initHealthKit(): Promise<boolean> {
   if (Platform.OS !== 'ios') return false;
+  // Ask before reaching in. permissionsFor() dereferences kit.Constants,
+  // which throws on a device where the native module never loaded.
+  if ((await healthAvailability()) !== 'available') return false;
   const kit = await healthKit();
   return new Promise((resolve) => {
     kit.initHealthKit(permissionsFor(kit), (error) => {

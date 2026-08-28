@@ -11,6 +11,9 @@ const deps = (over: Partial<RequestReviewDeps> = {}): RequestReviewDeps => ({
   requestReview: vi.fn().mockResolvedValue(undefined),
   hasAsked: vi.fn().mockResolvedValue(false),
   markAsked: vi.fn().mockResolvedValue(undefined),
+  // Open by default: these cases exercise the ACCOUNT-side decision, and the
+  // device-local gate has its own suite (reviewPrompt.gate.test.ts).
+  gate: vi.fn().mockResolvedValue('ask'),
   ...over,
 });
 

@@ -205,9 +205,13 @@ describe('the folded price anchor', () => {
   it('reframes the year on the charge row, floored to the cent', async () => {
     withTrial(3, 59.99);
     const all = deepText(await render());
+    // 3.1.2(c): the BILLED amount leads, the per-day figure follows as an
+    // equivalence. Asserting order, not just presence — Apple rejected this
+    // app for showing a calculated price more prominently than a billed one.
+    expect(all).toContain('$59.99 a year');
     // 59.99 / 365 = 0.16435… → floored to 16c, never rounded up to 17.
     expect(all).toContain('16\u00A2 a day');
-    expect(all).toContain('billed yearly');
+    expect(all.indexOf('$59.99')).toBeLessThan(all.indexOf('16\u00A2'));
   });
 
   // The dates come from whichever package actually carries the free intro.
