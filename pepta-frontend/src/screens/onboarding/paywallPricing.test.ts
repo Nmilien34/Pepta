@@ -81,7 +81,7 @@ describe("buildPaywallPricing", () => {
           price: 9.99,
           priceString: "$9.99",
           currencyCode: "USD",
-          introPrice: { price: 0, periodNumberOfUnits: 3, periodUnit: "DAY" },
+          introPrice: { price: 0, priceString: "$0.00", periodNumberOfUnits: 3, periodUnit: "DAY" },
         },
       },
       yearly: packageWithPrice("$40.00", 40),
@@ -116,7 +116,7 @@ describe("buildPaywallPricing", () => {
         product: {
           price: 4.99,
           priceString: "$4.99",
-          introPrice: { price: 0, periodNumberOfUnits: 1, periodUnit: "WEEK" },
+          introPrice: { price: 0, priceString: "$0.00", periodNumberOfUnits: 1, periodUnit: "WEEK" },
         },
       },
       yearly: packageWithPrice("$40.00", 40),
@@ -163,7 +163,7 @@ describe("buildPaywallPricing", () => {
         product: {
           price: 9.99,
           priceString: "$9.99",
-          introPrice: { price: 0, periodNumberOfUnits: 3, periodUnit: "DAY" },
+          introPrice: { price: 0, priceString: "$0.00", periodNumberOfUnits: 3, periodUnit: "DAY" },
         },
       },
       yearly: packageWithPrice("$40.00", 40),
@@ -183,7 +183,7 @@ describe("buildPaywallPricing", () => {
         product: {
           price: 9.99,
           priceString: "$9.99",
-          introPrice: { price: 0, periodNumberOfUnits: 3, periodUnit: "DAY" },
+          introPrice: { price: 0, priceString: "$0.00", periodNumberOfUnits: 3, periodUnit: "DAY" },
         },
       },
       yearly: packageWithPrice("$40.00", 40),
@@ -206,7 +206,7 @@ describe("buildPaywallPricing", () => {
       product: {
         price: amount,
         priceString: price,
-        introPrice: { price: 0, periodNumberOfUnits: units, periodUnit: unit },
+        introPrice: { price: 0, priceString: "$0.00", periodNumberOfUnits: units, periodUnit: unit },
       },
     });
 
@@ -326,7 +326,7 @@ describe("buildPaywallPricing", () => {
       product: {
         price: amount,
         priceString: price,
-        introPrice: { price: 0, periodNumberOfUnits: 3, periodUnit: "DAY" },
+        introPrice: { price: 0, priceString: "$0.00", periodNumberOfUnits: 3, periodUnit: "DAY" },
       },
     });
     const both = { monthly: trialPkg("$9.99", 9.99), yearly: trialPkg("$59.99", 59.99) };

@@ -35,6 +35,12 @@ export interface PaywallPricingCopy {
 // introPrice = null. Copy is DERIVED from this — never hardcoded per arm.
 interface StoreIntroPrice {
   price?: number | null;
+  /**
+   * The localized zero, e.g. "$0.00" or "0,00 €". Present on RevenueCat's
+   * PurchasesIntroPrice; this mirror had omitted it, which is why the trial
+   * CTA hardcoded dollars.
+   */
+  priceString?: string | null;
   periodNumberOfUnits?: number | null;
   periodUnit?: string | null;
 }
@@ -99,7 +105,7 @@ const FALLBACK_PRICING: PaywallPricingCopy = {
 /** Free trial iff the product carries a zero-price introductory offer. */
 export function freeTrialOf(
   pkg: PricePackage | null | undefined,
-): { periodNumberOfUnits: number; periodUnit: string } | null {
+): { periodNumberOfUnits: number; periodUnit: string; priceString?: string | null } | null {
   const intro = pkg?.product.introPrice;
   if (intro == null || intro.price !== 0) return null;
   const units = intro.periodNumberOfUnits;
@@ -107,7 +113,13 @@ export function freeTrialOf(
   if (typeof units !== "number" || units <= 0 || typeof unit !== "string") {
     return null;
   }
-  return { periodNumberOfUnits: units, periodUnit: unit };
+  // The localized zero ("$0.00", "0,00 €") straight from StoreKit. Optional
+  // because the field is only meaningfully present on a real product; the CTA
+  // says "free" rather than guessing a currency when it is missing.
+  const priceString = typeof intro.priceString === "string" && intro.priceString.length > 0
+    ? intro.priceString
+    : null;
+  return { periodNumberOfUnits: units, periodUnit: unit, priceString };
 }
 
 // "3 days", "1 week", … — duration comes from the product, never a literal.
@@ -157,7 +169,14 @@ function planCta(
     // user is being charged today, which converts better than the word free.
     // The duration deliberately does NOT live on the button (per Nick) — the
     // subline carries it for the Apple 3.1.2 duration disclosure.
-    label: "Try today for $0.00",
+    // LOCALIZED, never "$0.00" (2026-08-29). This is the most prominent price
+    // on the paywall and it was a US-dollar literal for every storefront on
+    // earth — a pricing-display defect on a build being resubmitted over a
+    // pricing-display rejection. Falls back to the word "free" rather than a
+    // guessed currency when StoreKit gives no intro price string.
+    label: trial.priceString
+      ? `Try today for ${trial.priceString}`
+      : "Try today for free",
     // DELIBERATELY price-free (Nick, 2026-08-05, paywall v2 rev 5): restating
     // the annual total at reading size beside the button creates hesitance.
     // The price + auto-renewal half of the 3.1.2 trio moved to the legal
@@ -254,9 +273,14 @@ export function dailyEquivalent(yearly: PricePackage | null | undefined): string
   if (!amount || amount <= 0) return null;
   const perDay = Math.floor((amount / 365) * 100) / 100;
   if (perDay <= 0) return null;
-  if (perDay < 1) return `${Math.floor(perDay * 100)}\u00A2`;
+  // Symbol FIRST. The sub-dollar branch used to run before this line, so a
+  // eurozone user was shown "10¢" — a symbol that denominates nothing on their
+  // storefront — for a price in euros. Cents are correct only where the
+  // storefront actually is dollars.
   const symbol = yearly?.product.priceString?.match(/^[^\d-]*/)?.[0]?.trim();
-  return symbol ? `${symbol}${perDay.toFixed(2)}` : null;
+  if (!symbol) return null;
+  if (perDay < 1 && symbol === "$") return `${Math.floor(perDay * 100)}\u00A2`;
+  return `${symbol}${perDay.toFixed(2)}`;
 }
 
 function savingsBadge(monthly: PricePackage, yearly: PricePackage): string | undefined {
