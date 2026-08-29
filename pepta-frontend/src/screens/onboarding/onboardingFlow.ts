@@ -173,16 +173,18 @@ export const ONBOARDING_STEPS = [
   // "here is your plan" and "make an account" is gone. A saved draft sitting
   // at 'auth' resumes at 'reveal' via migrateLegacyStep in onboardingDraft.
   'reveal',
-  // Trial warm-up (2026-08-01, design-lab/trial-warmup.html): the offer
-  // announcement and the value carousel, AFTER the merged reveal+auth turn —
-  // "See my FREE offer" landing on an account wall would be a bait-and-switch
-  // that breaks the micro-commitment ladder, and 1.0.4's funnel shows auth
-  // isn't leaking (8 reached the wall, 8 registered), so the gift framing is
-  // spent warming the paywall instead. Both steps are also TRIAL-GATED at
-  // runtime inside TrialOfferScreen: the control arm of expa9f87848e1 has no
-  // trial, and these screens silently skip themselves rather than promise
-  // free days that arm's wall won't deliver.
-  'trialOffer',
+  // Trial warm-up, AFTER the merged reveal+auth turn — "See my FREE offer"
+  // landing on an account wall would be a bait-and-switch that breaks the
+  // micro-commitment ladder. TRIAL-GATED at runtime: the control arm of
+  // expa9f87848e1 has no trial, and this screen skips itself rather than
+  // promise free days that arm's wall won't deliver.
+  //
+  // `trialOffer` sat here until 2026-08-28 and was CUT. It announced "3 days
+  // on us"; trialTimeline then announced "Your 3 free days start now" plus
+  // the charge dates plus the price. The same promise twice, with the second
+  // screen saying strictly more — a duplicate celebration that measuring
+  // against PeptidePal (25 screens to our paywall against their 13) made
+  // indefensible.
   // Was `trialCarousel` until 2026-08-24. That screen showed invented demo
   // numbers (1.42 mg, -12 lb) on the last screen before the wall; this one
   // answers the dominant objection to a free trial instead — when am I
@@ -315,7 +317,7 @@ export function shouldSkipStep(step: OnboardingStep, ctx: FlowContext): boolean 
   // Approved creators / active subscribers never see the wall — and a trial
   // pitch for a wall they'll never see is worse than pointless.
   if (
-    (step === 'paywall' || step === 'trialOffer' || step === 'trialTimeline') &&
+    (step === 'paywall' || step === 'trialTimeline') &&
     ctx.accessActive
   ) {
     return true;

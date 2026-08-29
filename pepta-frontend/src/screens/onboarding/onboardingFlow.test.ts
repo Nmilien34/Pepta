@@ -23,7 +23,7 @@ describe('onboarding flow', () => {
     // The commitment pact sits between the payoff and the warm-up (2026-08-24):
     // they see their plan, promise something to themselves, and only then meet
     // an offer. It asks for nothing, so nothing skips it.
-    expect(nextStep('reveal')).toBe('trialOffer'); // the warm-up sits between auth and the wall
+    expect(nextStep('reveal')).toBe('trialTimeline'); // the warm-up sits between auth and the wall
     // The price anchor sits between the timeline and the wall (2026-08-24):
     // the wall had no price framing of any kind before it.
     // priceAnchor folded into trialTimeline's charge row (2026-08-25).
@@ -86,7 +86,7 @@ describe('onboarding flow', () => {
     // The commitment pact sits between the payoff and the warm-up (2026-08-24):
     // they see their plan, promise something to themselves, and only then meet
     // an offer. It asks for nothing, so nothing skips it.
-    expect(nextStep('reveal')).toBe('trialOffer'); // the warm-up sits between auth and the wall
+    expect(nextStep('reveal')).toBe('trialTimeline'); // the warm-up sits between auth and the wall
     // The price anchor sits between the timeline and the wall (2026-08-24):
     // the wall had no price framing of any kind before it.
     // priceAnchor folded into trialTimeline's charge row (2026-08-25).
@@ -176,7 +176,7 @@ describe('onboarding flow', () => {
       'doseForgiveness', 'muscleFloor', 'commitment',
       // The warm-up gives were missing here, so the run counter was scoring
       // three payoff screens as input turns.
-      'trialOffer', 'trialTimeline',
+      'trialTimeline',
       'crafting', 'reveal', 'paywall', 'welcomeIn',
     ]);
     const runLength = (steps: readonly string[]) => {

@@ -58,7 +58,6 @@ import { DiscoverySourceScreen } from './DiscoverySourceScreen';
 import { NotificationsScreen } from './NotificationsScreen';
 import { CraftingScreen } from './CraftingScreen';
 import { RevealScreen } from './RevealScreen';
-import { TrialOfferScreen } from './TrialOfferScreen';
 import { TrialTimelineScreen } from './TrialTimelineScreen';
 import { DoseForgivenessScreen } from './DoseForgivenessScreen';
 import { MuscleFloorScreen } from './MuscleFloorScreen';
@@ -848,30 +847,6 @@ export function OnboardingNavigator() {
     }
     case 'commitment':
       return <CommitmentScreen progress={progress} onBack={goBack} onSigned={goNext} />;
-    case 'trialOffer':
-      return (
-        <TrialOfferScreen
-          progress={progress}
-          onBack={goBack}
-          // The gift comes from the companion they named in step 4, not from
-          // "we" — useCompanionName reads the profile, which does not exist
-          // yet mid-onboarding, so the answer is passed straight through.
-          companionName={answers.companionName?.trim() || 'Pep'}
-          goalWeight={Math.round(resolveWeights(answers).goalInBodyUnit)}
-          goalWeightUnit={resolveWeights(answers).bodyUnit}
-          onContinue={goNext}
-          // Control arm / no eligible trial / error: skip the whole warm-up.
-          // Advancing from trialTimeline walks shouldSkipStep, so this lands
-          // on the paywall (or past it, for active-access users).
-          onSkipToWall={() => {
-            const next = advanceWith('trialTimeline', 1, ctx);
-            if (next) {
-              setAnimateEntrance(true);
-              setStep(next);
-            }
-          }}
-        />
-      );
     case 'trialTimeline':
       return (
         <TrialTimelineScreen

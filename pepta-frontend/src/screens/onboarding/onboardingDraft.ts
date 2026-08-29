@@ -55,7 +55,10 @@ export function migrateLegacyStep(step: string): string {
  * In-session navigator remounts restore from flowCache and skip hydration,
  * so this only fires when the app actually restarted.
  */
-const OFFER_TAIL = new Set(['trialOffer', 'trialCarousel', 'paywall']);
+// trialOffer and trialCarousel are both CUT; kept in this set because a draft
+// saved by an older build can still name them, and resuming onto a step that
+// no longer exists would strand the user.
+const OFFER_TAIL = new Set(['trialOffer', 'trialCarousel', 'trialTimeline', 'paywall']);
 
 export function rewindResumeStep(step: string): string {
   return OFFER_TAIL.has(step) ? 'reveal' : step;
