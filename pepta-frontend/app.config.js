@@ -35,6 +35,45 @@ module.exports = {
           "Pepta uses your photo library so you can upload progress photos and meal images.",
         NSMicrophoneUsageDescription:
           "Pepta uses your microphone so you can log meals by voice.",
+        // SKADNETWORK — ADDED 2026-08-28, AND ITS ABSENCE WAS THE BUG.
+        //
+        // There was no SKAdNetworkItems array at all, so Apple sent a postback
+        // to NOBODY. For every ATT-denied user — the overwhelming majority —
+        // SKAN is the only attribution channel iOS has, so Facebook installs
+        // arrived with no signal and defaulted to organic: 745 clicks across
+        // Aug 26-28 while "organic" jumped from ~2.4/day to ~28/day.
+        //
+        // Declared HERE rather than in ios/Pepta/Info.plist because prebuild
+        // regenerates that file. Config that does not reach the built plist is
+        // worth nothing, which is the same class of mistake as the missing
+        // array itself — see the prebuild verification in the report.
+        //
+        // IDs are transcribed from each network's own published list, never
+        // from memory: a wrong identifier fails SILENTLY, which is exactly the
+        // failure mode being fixed. Sources and dates:
+        //   Meta      v9wttpbfk9 / n38lu8286q
+        //             developers.facebook.com/docs/setting-up/platform-setup/
+        //             ios/SKAdNetwork/ — and independently confirmed against
+        //             Google's third-party list below, which carries both.
+        //   Google    cstr6suwn9
+        //             developers.google.com/admob/ios/quick-start
+        //             (3p list last updated 2026-01-30)
+        //   TikTok    mj797d8u6f
+        //             TikTok's own SKAN page does not publish the identifier;
+        //             taken from Adjust's TikTok For Business integration doc,
+        //             where it appears as the ad-network-id in a live postback.
+        //
+        // NO APPLE ENTRY EXISTS TO ADD. Apple Search Ads attributes through
+        // the AdServices framework, not SKAdNetwork, so there is no Apple
+        // SKAdNetworkIdentifier — adding a guessed one would be worse than
+        // leaving it out. AppsFlyer is an MMP rather than an ad network and
+        // likewise has none.
+        SKAdNetworkItems: [
+          { SKAdNetworkIdentifier: "v9wttpbfk9.skadnetwork" },
+          { SKAdNetworkIdentifier: "n38lu8286q.skadnetwork" },
+          { SKAdNetworkIdentifier: "cstr6suwn9.skadnetwork" },
+          { SKAdNetworkIdentifier: "mj797d8u6f.skadnetwork" },
+        ],
       },
       appleTeamId: "N8J23B3BBW",
     },
@@ -104,6 +143,27 @@ module.exports = {
         "react-native-appsflyer",
         {
           shouldUseStrictMode: false,
+          // DELIBERATELY FALSE — REVENUECAT OWNS PURCHASE REPORTING.
+          //
+          // Reviewed 2026-08-28 while fixing attribution. Turning this on
+          // would DOUBLE COUNT: revenueCat.ts already calls setAppsflyerID()
+          // when the AppsFlyer ID becomes available (revenueCat.ts:245-247),
+          // which switches on RevenueCat's server-to-server integration. That
+          // pipe demonstrably works — the single af_start_trial in the Aug
+          // 21-28 AppsFlyer report came from it, not from this app, which
+          // sends no af_purchase anywhere outside a test file.
+          //
+          // RevenueCat wins on merit, not just on being first. The Purchase
+          // Connector only sees a StoreKit transaction at the moment of
+          // purchase. RevenueCat is already this app's source of truth for
+          // subscription STATE and reports renewals, refunds, grace periods,
+          // cancellations and trial conversions — the events that matter for
+          // ROAS. Running both would report each purchase twice and corrupt
+          // exactly the revenue numbers the switch was meant to fix.
+          //
+          // The reason Meta receives no Purchase or StartTrial is NOT this
+          // flag: those events already reach AppsFlyer. They stop at the
+          // AppsFlyer -> Meta postback mapping, which is dashboard config.
           shouldUsePurchaseConnector: false,
           preferAppsFlyerBackupRules: false,
         },

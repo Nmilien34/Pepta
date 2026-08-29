@@ -72,6 +72,19 @@ export class AttLaunchPrompt {
   private started = false;
   private attemptInFlight = false;
   private unsubscribe?: Unsubscribe;
+  /**
+   * Resolves the moment ATT reaches a DETERMINED status (granted, denied,
+   * restricted) or is unavailable. Never rejects.
+   *
+   * Added 2026-08-28 so AppsFlyer can hold its install event until the IDFA
+   * question is actually answered. It observes; it does not change WHEN the
+   * dialog appears. The launch-time placement and its independence from auth
+   * are what fixed the Guideline 2.1 rejection and are untouched here.
+   */
+  private settledResolve?: () => void;
+  private readonly settledPromise: Promise<void> = new Promise((resolve) => {
+    this.settledResolve = resolve;
+  });
 
   public constructor(options: AttLaunchPromptOptions = {}) {
     this.platformOS = options.platformOS ?? Platform.OS;
@@ -102,6 +115,19 @@ export class AttLaunchPrompt {
   private finish(): void {
     this.unsubscribe?.();
     this.unsubscribe = undefined;
+    // Every terminal path routes through here: determined, already answered,
+    // and unavailable. So this is the one place settlement can be announced.
+    this.settledResolve?.();
+    this.settledResolve = undefined;
+  }
+
+  /**
+   * Await a determined ATT status. Resolves immediately on non-iOS, where
+   * there is no dialog and nothing to wait for.
+   */
+  public whenSettled(): Promise<void> {
+    if (this.platformOS !== "ios") return Promise.resolve();
+    return this.settledPromise;
   }
 
   private async attempt(): Promise<void> {
