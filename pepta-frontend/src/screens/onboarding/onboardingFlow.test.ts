@@ -131,7 +131,10 @@ describe('onboarding flow', () => {
     // The point of the 2026-07-27 restructure. fearAnswered is the only turn
     // that states a PROBLEM; it sat at step 29 of 36, so anyone who left before
     // it never heard one reason to want this.
-    expect(nextStep('journeyStage')).toBe('biggestWorry');
+    // The goal now opens the arc: what do you want, what is in the way, here
+    // is the answer to that — all before a single dosing question.
+    expect(nextStep('journeyStage')).toBe('goalType');
+    expect(nextStep('goalType')).toBe('biggestWorry');
     expect(nextStep('biggestWorry')).toBe('fearAnswered');
     // The discovery ask (2026-08-06, Nick's placement) rides the trust peak
     // after the answered worry and the Pep introduction, before the
@@ -145,11 +148,19 @@ describe('onboarding flow', () => {
     // asks for nothing and so cannot add to the friction this guard exists to
     // bound. Its own comment already said the subject was how much the user is
     // ASKED before hearing a reason to care; it just was not measuring that.
-    // Two: journeyStage and biggestWorry.
+    // Was two (journeyStage, biggestWorry); three since goalType moved to
+    // step 5 on 2026-08-28. That IS a cost — one more ask before the first
+    // payoff — and it is accepted deliberately: the three now form a complete
+    // arc (what do you want, what is in the way, here is the answer), and all
+    // three are single taps. PeptidePal asks its goal question second for the
+    // same reason.
+    //
+    // Three is the ceiling. A fourth ask before fearAnswered means the flow is
+    // interrogating before it has given anything.
     const asksBefore = ONBOARDING_STEPS.slice(0, stepIndex('fearAnswered')).filter(
       (s) => !BEATS_EARLY.has(s),
     ).length;
-    expect(asksBefore).toBeLessThanOrEqual(2);
+    expect(asksBefore).toBeLessThanOrEqual(3);
   });
 
   it('never separates the worry from its answer', () => {
@@ -224,7 +235,9 @@ describe('onboarding flow', () => {
     // asks into one screen shortens the run as well as the flow, which is the
     // argument for merges over deletions: cutting muscleFloor made this worse,
     // merging these made it better.
-    expect(runOf('goalType', 'company')).toBe(4);
+    // 4 -> 3: goalType left this block for step 5, so the body stretch is
+    // aboutYou -> heightWeight -> weightJourney.
+    expect(runOf('aboutYou', 'company')).toBe(3);
 
     // EVERY PATH, NOT JUST THE DOSING ONE (2026-08-25). This used to assert
     // `toBeLessThanOrEqual(8)` on the exploring path — a bound so loose it
@@ -245,7 +258,8 @@ describe('onboarding flow', () => {
       // a future insertion has to come back through this assertion.
       // 4 on the non-dosing paths: startWeight is gated out, so the goal
       // block is one shorter than the aggregate above.
-      expect(runLength(seen)).toBe(4);
+      // 4 -> 3 as goalType left the body block for step 5.
+      expect(runLength(seen)).toBe(3);
     }
   });
 
@@ -297,8 +311,10 @@ describe('onboarding flow', () => {
     expect(progressForStep('notAlone')).toBeCloseTo(2 / n, 5);
     expect(progressForStep('commitment')).toBeCloseTo(3 / n, 5);
     expect(progressForStep('journeyStage')).toBeCloseTo(4 / n, 5);
-    expect(progressForStep('biggestWorry')).toBeCloseTo(5 / n, 5);
-    expect(progressForStep('fearAnswered')).toBeCloseTo(6 / n, 5);
+    // goalType moved to #5 (2026-08-28), shifting the worry pair by one.
+    expect(progressForStep('goalType')).toBeCloseTo(5 / n, 5);
+    expect(progressForStep('biggestWorry')).toBeCloseTo(6 / n, 5);
+    expect(progressForStep('fearAnswered')).toBeCloseTo(7 / n, 5);
     expect(progressForStep('welcomeIn')).toBe(1);
   });
 });

@@ -92,6 +92,21 @@ export const ONBOARDING_STEPS = [
   // its answer, which is the one thing in this block worth protecting — see
   // finding (1) below for why fearAnswered was dragged up here at all.
   'journeyStage',
+  // GOAL MOVED HERE 2026-08-28, from step 19. It used to sit AFTER the entire
+  // medication block, so the user answered eleven questions about their drug
+  // before ever being asked what they wanted. PeptidePal asks it second, and
+  // the reason it works is structural rather than cosmetic: once the goal is
+  // stated, everything after it reads as serving that goal instead of as an
+  // intake form.
+  //
+  // It also completes an arc in the first six screens — what do you want, what
+  // is in the way, here is the answer to that — which is the emotional spine
+  // the flow was reaching for by putting biggestWorry early in the first place.
+  //
+  // Free to move: goalType feeds goalIntent and the payload, neither of which
+  // cares about position. The only tie was aboutYou's echo quoting it back,
+  // which now echoes the screen that actually precedes it.
+  'goalType',
   'biggestWorry',
   'fearAnswered',
   // "Where did you find us?" (design-lab/where-found-us.html, 2026-08-06).
@@ -142,7 +157,6 @@ export const ONBOARDING_STEPS = [
   'lastShot',
   'shotTime',
   'instrument',
-  'goalType',
   // MERGED 2026-08-25: was `sexGender` + `birthday`, two screens that
   // justified themselves with the same sentence. Merging them is also what
   // restores the 4-ask ceiling on the exploring path (see AboutYouScreen).

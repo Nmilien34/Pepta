@@ -115,18 +115,6 @@ function deviceEcho(device?: InjectionDeviceType): string {
   }
 }
 
-function goalTypeEcho(goal?: GoalType): string {
-  switch (goal) {
-    case 'lose_fat':
-      return 'Lose fat, keep muscle. Clear.';
-    case 'recomp':
-      return 'Build and recomp. Ambitious.';
-    case 'maintain':
-      return 'Maintain. Steady.';
-    default:
-      return 'Got it.';
-  }
-}
 
 
 function activityEcho(level?: ActivityLevel): string {
@@ -226,12 +214,15 @@ export function echoFor(step: OnboardingStep, a: EchoAnswers, now: Date = new Da
     case 'instrument':
       return instrumentContext(a);
     case 'goalType':
-      return a.journeyStage === 'active' ? 'Your model’s running. Now you.' : 'Now, the goal.';
+      // goalType now follows journeyStage directly (2026-08-28), so it echoes
+      // the stage rather than the instrument beat it used to sit behind.
+      return journeyEcho(a.journeyStage);
     case 'aboutYou':
-      // If they wrote their own goal, say it back. The preset echoes exist to
-      // prove we heard the answer; quoting their sentence does that far better
-      // than the generic fallback goalTypeEcho would land on here.
-      return a.goalNote ? `“${a.goalNote}” — noted.` : goalTypeEcho(a.goalType);
+      // The goal moved to step 5, so quoting it here would echo something six
+      // screens back. This is now the screen after the medication block (or
+      // after discoverySource for anyone not dosing), and it opens the body
+      // stretch rather than acknowledging an answer.
+      return 'Two quick things about you.';
     case 'heightWeight':
       return 'Almost there on the numbers.';
     // THE BODY LINE FOLLOWS HEIGHT+WEIGHT, wherever that lands. It lived on
