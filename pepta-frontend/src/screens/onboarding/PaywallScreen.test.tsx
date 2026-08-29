@@ -627,3 +627,44 @@ describe("PaywallScreen legal links", () => {
     expect(eventOrder).toBeLessThan(purchaseOrder);
   });
 });
+
+// 3.1.2(c) IS A RENDERED PROPERTY, NOT A DATA ONE.
+//
+// paywallPricing.hierarchy.test pins WHICH string lands in the dominant slot.
+// That is necessary and not sufficient: Apple rejected build 45 on how the two
+// prices LOOKED — "font, size, color, location" are the factors named in the
+// guideline. So the sizes are pinned here too.
+//
+// The note was 10pt/textTertiary immediately after the rejection, which was an
+// over-correction to the point of being unreadable. It is 12pt/textSecondary
+// now. This test exists so the next person who nudges it has to argue with a
+// number instead of eyeballing it.
+describe("the billed amount stays visibly dominant", () => {
+  function sizesOf(tree: TestRenderer.ReactTestRenderer) {
+    const texts = tree.root.findAll((n) => String(n.type) === "Text");
+    const sizeFor = (match: (t: string) => boolean) => {
+      const node = texts.find((n) => match(nodeText(n)));
+      if (!node) return undefined;
+      return Object.assign({}, ...[node.props.style].flat().filter(Boolean)) as {
+        fontSize?: number;
+      };
+    };
+    return {
+      billed: sizeFor((t) => t.includes("$40.00")),
+      note: sizeFor((t) => t.includes("/mo")),
+    };
+  }
+
+  it("renders the billed price larger than the per-month equivalence", async () => {
+    let tree!: TestRenderer.ReactTestRenderer;
+    await act(async () => {
+      tree = TestRenderer.create(<PaywallScreen onComplete={vi.fn()} />);
+    });
+    const { billed, note } = sizesOf(tree);
+    expect(billed?.fontSize).toBeDefined();
+    expect(note?.fontSize).toBeDefined();
+    expect(note!.fontSize!).toBeLessThan(billed!.fontSize!);
+    // And legible: the point of the adjustment was that 10pt was unreadable.
+    expect(note!.fontSize!).toBeGreaterThanOrEqual(12);
+  });
+});

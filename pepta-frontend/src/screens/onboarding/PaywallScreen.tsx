@@ -761,7 +761,15 @@ function PlanColumn({
             {per}
           </AppText>
         </View>
-        <AppText variant="caption" color="textTertiary" style={{ marginTop: 1, fontSize: 10 }}>
+        {/* 3.1.2(c) LIVES IN THIS GAP. The billed amount above is 19pt ink; this
+            is the calculated per-month equivalence. Apple's rule is about
+            RELATIVE prominence — font, size, colour, location — not about
+            hiding the derived number, and all four factors still point at the
+            line above: 19 vs 12, ink vs secondary, and it sits below.
+            10pt/tertiary was over-corrected after the build 45 rejection to the
+            point of being unreadable, which costs the framing that actually
+            converts without buying any extra compliance. */}
+        <AppText variant="caption" color="textSecondary" style={{ marginTop: 2, fontSize: 12 }}>
           {priceNote ?? " "}
         </AppText>
       </Animated.View>
