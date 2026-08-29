@@ -328,6 +328,13 @@ export function shouldSkipStep(step: OnboardingStep, ctx: FlowContext): boolean 
   // The symptom-week beat only makes sense when they reported something that
   // actually follows a post-dose arc. "None yet", an empty pick, or only
   // injection-site/hair-loss/other → no curve to draw about them.
+  // NOT BEFORE THE FIRST DOSE (2026-08-28). "Any side effects so far?" was
+  // asked of everyone, its sub promising "the log ties them to doses" — to
+  // someone who has never taken one. Same class as doseForgiveness: a
+  // question about an experience the user has not had. Gating it also drops
+  // a screen from the two shortest paths, which is where the PeptidePal
+  // comparison hurt most.
+  if (step === 'sideEffects' && ctx.journeyStage && ctx.journeyStage !== 'active') return true;
   if (step === 'symptomWeek' && !symptomForWeekBeat(ctx.sideEffects)) return true;
   // Not on a GLP-1 at all → also skip the medication picker (and its route question).
   if (ctx.journeyStage === 'none' && (step === 'medication' || step === 'route')) return true;

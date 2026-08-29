@@ -225,7 +225,10 @@ describe('onboarding flow', () => {
       const seen = ONBOARDING_STEPS.filter((s) =>
         !shouldSkipStep(s, { journeyStage, hasBody: true }),
       );
-      expect(runLength(seen)).toBe(4);
+      // 4 -> 3 (2026-08-28) when sideEffects was gated to active users. The
+      // number going DOWN as a screen is cut is the point; pinned exactly so
+      // a future insertion has to come back through this assertion.
+      expect(runLength(seen)).toBe(3);
     }
   });
 
@@ -284,6 +287,22 @@ describe('onboarding flow', () => {
 });
 
 describe('shouldSkipStep', () => {
+  // Nick, testing against PeptidePal 2026-08-28: 25 screens to our paywall
+  // versus their 13. Part of the gap is asking questions that cannot apply.
+  //
+  // "Any side effects so far?" — sub: "The log ties them to doses" — was
+  // asked of everyone, including someone who has never taken a dose. Same
+  // class as the doseForgiveness bug: a question about an experience the user
+  // has not had, and a free screen to cut for the two shortest paths.
+  it('never asks about side effects of a medication never taken', () => {
+    expect(shouldSkipStep('sideEffects', { journeyStage: 'active' })).toBe(false);
+    expect(shouldSkipStep('sideEffects', { journeyStage: 'starting_soon' })).toBe(true);
+    expect(shouldSkipStep('sideEffects', { journeyStage: 'none' })).toBe(true);
+    // Unknown stage still asks: better a redundant question than losing a
+    // real side-effect report from someone mid-therapy.
+    expect(shouldSkipStep('sideEffects', {})).toBe(false);
+  });
+
   // The catalog gives Rybelsus / Wegovy Pill / oral semaglutide a 7-day
   // half-life, so the half-life gate passes and the screen renders its
   // INJECTION copy — "one shot covers a week", axis label "shot day" — to
