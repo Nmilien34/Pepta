@@ -154,7 +154,7 @@ export function LeanMassBeatScreen({
       progress={progress}
       onBack={onBack}
       context={context}
-      question="Where the weight comes from"
+      question="Not all the weight you lose is fat"
       questionAccent
       footer={<ConvoButton label="Show me" onPress={onContinue} />}
       onTyped={() => setTyped(true)}

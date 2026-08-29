@@ -94,7 +94,7 @@ export function DoseForgivenessScreen({
       context={context}
       question="A day late won’t undo you"
       questionAccent
-      footer={<ConvoButton label="Good to know" onPress={onContinue} />}
+      footer={<ConvoButton label="That helps" onPress={onContinue} />}
       onTyped={() => setTyped(true)}
     >
       {/* The decay curve with the still-covered window shaded. The point of

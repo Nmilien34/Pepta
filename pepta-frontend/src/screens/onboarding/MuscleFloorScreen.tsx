@@ -53,7 +53,7 @@ export function MuscleFloorScreen({
       context={context}
       question="Your floor, not your target"
       questionAccent
-      footer={<ConvoButton label="Good to know" onPress={onContinue} />}
+      footer={<ConvoButton label="Got it" onPress={onContinue} />}
     >
       <CitedStat
         style={styles.stat}

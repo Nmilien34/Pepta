@@ -40,10 +40,10 @@ export function CompanyBeatScreen({ progress, onBack, context, onContinue }: Com
       progress={progress}
       onBack={onBack}
       context={context}
-      question="This is what the trial found"
+      question="The research is on your side"
       questionAccent
       onTyped={() => setTyped(true)}
-      footer={<ConvoButton label="Good to know" onPress={onContinue} />}
+      footer={<ConvoButton label="Good to hear" onPress={onContinue} />}
     >
       <CitedStat
         land={typed}

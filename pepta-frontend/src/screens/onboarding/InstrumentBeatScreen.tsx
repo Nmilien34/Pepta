@@ -94,7 +94,7 @@ export function InstrumentBeatScreen({ progress, onBack, context, onContinue }: 
       question="Now you’ll know what’s in you"
       questionAccent
       sub="Every dose you log feeds this curve, so you'll always know what's still active in you."
-      footer={<ConvoButton label="Good to know" onPress={onContinue} />}
+      footer={<ConvoButton label="That’s useful" onPress={onContinue} />}
       onTyped={() => setTyped(true)}
     >
       <LevelCurve armed={typed} />
