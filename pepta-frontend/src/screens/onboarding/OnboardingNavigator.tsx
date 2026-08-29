@@ -45,8 +45,7 @@ import { SymptomWeekBeatScreen } from './SymptomWeekBeatScreen';
 import { GoalTypeScreen, type GoalType } from './GoalTypeScreen';
 import { AboutYouScreen, type GenderIdentity } from './AboutYouScreen';
 import { HeightWeightScreen } from './HeightWeightScreen';
-import { StartWeightScreen } from './StartWeightScreen';
-import { GoalWeightScreen, type WeightUnit } from './GoalWeightScreen';
+import { WeightJourneyScreen, type WeightUnit } from './WeightJourneyScreen';
 import { CompanyBeatScreen } from './CompanyBeatScreen';
 import { DailyRoutineScreen } from './DailyRoutineScreen';
 import { TrainingScreen } from './TrainingScreen';
@@ -646,44 +645,50 @@ export function OnboardingNavigator() {
           onContinue={() => commit({ body: answers.body ?? DEFAULT_BODY })}
         />
       );
-    case 'startWeight': {
-      const body = answers.body ?? DEFAULT_BODY;
-      return (
-        <StartWeightScreen
-          progress={progress}
-          onBack={goBack}
-          context={context}
-          units={body.units}
-          currentWeight={body.weight}
-          startWeight={answers.startWeight ?? body.weight}
-          onStartWeightChange={(startWeight) => setAnswers((a) => ({ ...a, startWeight }))}
-          startDate={answers.startDate ?? toDateParts(new Date())}
-          onStartDateChange={(startDate) => setAnswers((a) => ({ ...a, startDate }))}
-          onContinue={goNext}
-        />
-      );
-    }
-    case 'goalWeight': {
+    case 'weightJourney': {
       const body = answers.body ?? DEFAULT_BODY;
       const unit: WeightUnit = answers.goalWeightUnit ?? (body.units === 'metric' ? 'kg' : 'lb');
       const fallback = unit === 'kg' ? Math.max(32, body.weight - 7) : Math.max(70, body.weight - 15);
       return (
-        <GoalWeightScreen
+        <WeightJourneyScreen
           progress={progress}
           onBack={goBack}
           context={context}
-          value={answers.goalWeight ?? fallback}
           unit={unit}
-          onValueChange={(goalWeight) => setAnswers((a) => ({ ...a, goalWeight }))}
+          currentWeight={body.weight}
+          // Only someone already dosing has a start weight distinct from
+          // today's — everyone else started today, and heightWeight already
+          // holds that number. Same gate the standalone step carried.
+          showStart={answers.journeyStage === 'active'}
+          startWeight={answers.startWeight ?? body.weight}
+          goalWeight={answers.goalWeight ?? fallback}
+          onStartWeightChange={(startWeight) => setAnswers((a) => ({ ...a, startWeight }))}
+          onGoalWeightChange={(goalWeight) => setAnswers((a) => ({ ...a, goalWeight }))}
           onUnitChange={(nextUnit) =>
             setAnswers((a) => {
-              const current = a.goalWeight ?? fallback;
-              const converted =
-                nextUnit === unit ? current : Math.round(nextUnit === 'kg' ? lbToKg(current) : kgToLb(current));
-              return { ...a, goalWeight: converted, goalWeightUnit: nextUnit };
+              // Convert BOTH numbers, not just the goal. The old screen only
+              // ever held one, so a unit flip that left startWeight in pounds
+              // beside a goal in kilos was not reachable until this merge.
+              const convert = (n: number) =>
+                nextUnit === unit ? n : Math.round(nextUnit === 'kg' ? lbToKg(n) : kgToLb(n));
+              return {
+                ...a,
+                startWeight: a.startWeight == null ? a.startWeight : convert(a.startWeight),
+                goalWeight: convert(a.goalWeight ?? fallback),
+                goalWeightUnit: nextUnit,
+              };
             })
           }
-          onContinue={goNext}
+          // Commit what is on screen: the ruler only fires onChange when the
+          // value MOVES, so accepting the prefilled goal would otherwise leave
+          // it undefined — the same trap the height/weight wheels had.
+          onContinue={() =>
+            commit({
+              startWeight: answers.startWeight ?? body.weight,
+              goalWeight: answers.goalWeight ?? fallback,
+              goalWeightUnit: unit,
+            })
+          }
         />
       );
     }

@@ -179,19 +179,6 @@ function goalInBodyUnit(a: EchoAnswers): { value: number; unit: 'lb' | 'kg' } {
  * The echo (dim recap) that types at the top of the given step. Undefined means
  * the screen owns its opener (or there is nothing to acknowledge yet).
  */
-/**
- * What they have already lost, when startWeight says they have lost anything.
- * Returns undefined rather than a zero or a negative — someone who has gained
- * or held does not need it read back to them at the moment they are being
- * asked for a target.
- */
-function startProgressEcho(a: EchoAnswers): string | undefined {
-  const body = a.body;
-  if (!body || typeof a.startWeight !== 'number') return undefined;
-  const lost = Math.round(a.startWeight - body.weight);
-  if (lost <= 0) return undefined;
-  return `Down ${lost} ${body.units === 'metric' ? 'kg' : 'lb'} already. Now the target.`;
-}
 
 /** Said back after the "how do you take it" turn. */
 function routeEcho(route?: 'injection' | 'oral' | 'unsure'): string | undefined {
@@ -251,30 +238,13 @@ export function echoFor(step: OnboardingStep, a: EchoAnswers, now: Date = new Da
     // muscleFloor until that screen was cut (2026-08-28); startWeight is now
     // the screen immediately after height+weight on the active path, so it
     // inherits the echo. Same rule that moved it in the first place.
-    case 'startWeight':
+    // The body line follows height+weight, and this is now the screen after
+    // it on every path. goalWeight used to open by quoting startWeight back;
+    // the merged screen states both numbers itself, in one live line, so the
+    // echo is free to do what every other echo does — acknowledge the answer
+    // before it.
+    case 'weightJourney':
       return a.body ? `${formatHeight(a.body)}, ${a.body.weight} today.` : undefined;
-    case 'goalWeight':
-      // WHICHEVER SCREEN FOLLOWS THE GIVE CARRIES ITS ACKNOWLEDGMENT — the
-      // same rule the notifications turn inherited from the cut `needs` step.
-      // startWeight is gated to active users, so for everyone else THIS is
-      // the screen that follows height+weight and carries the body line.
-      if (a.journeyStage && a.journeyStage !== 'active') {
-        return a.body ? `${formatHeight(a.body)}, ${a.body.weight} today.` : undefined;
-      }
-      // THE ACTIVE PATH ECHOES WHERE THEY STARTED, NOT WHERE THEY ARE
-      // (2026-08-27). This used to say "226 today", which muscleFloor had
-      // already opened with two screens earlier — the same number, twice,
-      // with only startWeight between them. startWeight is the answer this
-      // screen actually follows, so echo THAT: for anyone already dosing it
-      // is a loss they have earned, which is worth more than a restated
-      // weight. Falls back to the floor line when there is nothing to
-      // subtract, rather than reaching for the body weight again.
-      // NOT floorEcho as the fallback: startWeight itself shows that line, so
-      // falling back to it would trade one repeat for another on consecutive
-      // screens. WheelPicker only fires onChange when the index MOVES, so a
-      // user who accepts the prefilled start weight leaves it undefined —
-      // that is the common path, not an edge case.
-      return startProgressEcho(a) ?? 'Now the target.';
     case 'company':
       return companyContext(a, now);
     case 'dailyRoutine':

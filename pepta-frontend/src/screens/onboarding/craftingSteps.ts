@@ -22,7 +22,7 @@ import { formatShortDate } from '../../utils/dateParts';
 import { kgToLb, lbToKg, type BodyMeasure } from '../../utils/units';
 import { projectGoal } from '../../utils/goalProjection';
 import { previewTargets } from '../../utils/planPreview';
-import type { WeightUnit } from './GoalWeightScreen';
+import type { WeightUnit } from './WeightJourneyScreen';
 
 export const DEFAULT_BODY: BodyMeasure = { units: 'imperial', height: 66, weight: 184 };
 

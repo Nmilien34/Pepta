@@ -24,7 +24,7 @@ import type { DoseValue } from './DoseScreen';
 import type { DoseFrequency } from './FrequencyScreen';
 import type { GoalType } from './GoalTypeScreen';
 import type { GenderIdentity } from './AboutYouScreen';
-import type { WeightUnit } from './GoalWeightScreen';
+import type { WeightUnit } from './WeightJourneyScreen';
 import type { SideEffectType } from './SideEffectsScreen';
 import type { MedicationRoute } from './RouteScreen';
 import type { ConcentrationValue } from './ConcentrationScreen';

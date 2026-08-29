@@ -154,8 +154,14 @@ export const ONBOARDING_STEPS = [
   // one whose CONTENT survives without it: the protein target still reaches
   // the user through crafting and the reveal, both of which read
   // proteinFloorG from planPreview.
-  'startWeight',
-  'goalWeight',
+  // MERGED 2026-08-28: was `startWeight` + `goalWeight`. They asked for the
+  // same kind of number, in the same unit, back to back — and with two
+  // different pickers. The split showed in the echo, where goalWeight had to
+  // open by quoting startWeight back ("Down 24 lb already") to make its own
+  // question land. One screen, two fields, one ruler. The started-at field is
+  // hidden for anyone not already dosing, which is the gate startWeight
+  // carried as a whole step.
+  'weightJourney',
   // `goalPace` was CUT the same day. On a GLP-1 the rate is set by the drug
   // and the titration schedule, not by preference — a menu of paces the user
   // cannot actually choose between. Cutting it also matters for RHYTHM:
@@ -319,7 +325,6 @@ export function shouldSkipStep(step: OnboardingStep, ctx: FlowContext): boolean 
   // navigator mirrors currentWeight into startWeight when this is skipped.
   // An UNKNOWN stage still asks: defaulting a start weight nobody gave us is
   // how a progress chart quietly invents a loss that never happened.
-  if (step === 'startWeight' && ctx.journeyStage && ctx.journeyStage !== 'active') return true;
   // Approved creators / active subscribers never see the wall — and a trial
   // pitch for a wall they'll never see is worse than pointless.
   if (

@@ -116,7 +116,7 @@ describe('onboarding flow', () => {
     expect(nextStep('shotTime')).toBe('instrument');
     // goalPace was CUT (2026-08-28); goalWeight now hands straight to the
     // company beat, which is what breaks the goal-block ask run.
-    expect(nextStep('goalWeight')).toBe('company');
+    expect(nextStep('weightJourney')).toBe('company');
     expect(nextStep('company')).toBe('dailyRoutine');
     expect(nextStep('sideEffects')).toBe('symptomWeek');
     expect(nextStep('symptomWeek')).toBe('notifications');
@@ -220,7 +220,11 @@ describe('onboarding flow', () => {
       );
     expect(runOf('nameCompanion', 'leanMass')).toBe(4);
     // 4 → 3 when sexGender + birthday merged into aboutYou (2026-08-25).
-    expect(runOf('goalType', 'company')).toBe(5);
+    // 5 -> 4 when startWeight and goalWeight merged (2026-08-28). Merging two
+    // asks into one screen shortens the run as well as the flow, which is the
+    // argument for merges over deletions: cutting muscleFloor made this worse,
+    // merging these made it better.
+    expect(runOf('goalType', 'company')).toBe(4);
 
     // EVERY PATH, NOT JUST THE DOSING ONE (2026-08-25). This used to assert
     // `toBeLessThanOrEqual(8)` on the exploring path — a bound so loose it
@@ -338,16 +342,16 @@ describe('shouldSkipStep', () => {
     expect(shouldSkipStep('doseForgiveness', { ...med, journeyStage: 'none' })).toBe(true);
   });
 
-  // startWeight asks where they began. Someone who has not begun started
-  // TODAY, and heightWeight collected that two screens earlier — so the
-  // screen asks for a number we already hold. The navigator defaults it.
-  it('asks where they started only of someone who has started', () => {
-    expect(shouldSkipStep('startWeight', { journeyStage: 'active' })).toBe(false);
-    expect(shouldSkipStep('startWeight', { journeyStage: 'starting_soon' })).toBe(true);
-    expect(shouldSkipStep('startWeight', { journeyStage: 'none' })).toBe(true);
-    // Unknown stage must still ASK: defaulting a start weight we were never
-    // told is how a progress chart quietly invents a loss.
-    expect(shouldSkipStep('startWeight', {})).toBe(false);
+  // The "where did you start" GATE moved from a step skip to a field on the
+  // merged weightJourney screen (2026-08-28), so it is asserted where it now
+  // lives — see WeightJourneyScreen's journeyLine tests. What remains true at
+  // the flow level is that the merged step itself is never skipped: everyone
+  // sets a goal weight.
+  it('always asks for a goal weight, whatever the journey stage', () => {
+    for (const journeyStage of ['active', 'starting_soon', 'none'] as const) {
+      expect(shouldSkipStep('weightJourney', { journeyStage })).toBe(false);
+    }
+    expect(shouldSkipStep('weightJourney', {})).toBe(false);
   });
 
   it('keeps every dosing step for an active injectable, weekly vial user', () => {

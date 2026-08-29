@@ -20,14 +20,14 @@ describe('the echo chain does not repeat itself', () => {
       journeyStage: 'active', body: BODY, startWeight: 250, goalWeight: 180,
       goalWeightUnit: 'lb',
     } as never;
-    const stated = (['heightWeight', 'startWeight', 'goalWeight'] as const)
+    const stated = (['heightWeight', 'weightJourney'] as const)
       .map((step) => echoFor(step, active, NOW) ?? '')
       .filter((line) => line.includes('226'));
     expect(stated).toHaveLength(1);
 
     // And on the path where startWeight is gated out, goalWeight inherits it.
     const exploring = { journeyStage: 'none', body: BODY, goalWeight: 180 } as never;
-    const exploringStated = (['heightWeight', 'goalWeight'] as const)
+    const exploringStated = (['heightWeight', 'weightJourney'] as const)
       .map((step) => echoFor(step, exploring, NOW) ?? '')
       .filter((line) => line.includes('226'));
     expect(exploringStated).toHaveLength(1);
