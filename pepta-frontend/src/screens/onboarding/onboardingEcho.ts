@@ -9,7 +9,6 @@
 
 import { formatHeight, kgToLb, lbToKg, type BodyMeasure } from '../../utils/units';
 import { formatShortDate } from '../../utils/dateParts';
-import { proteinFloorG } from '../../utils/planPreview';
 import { projectGoal } from '../../utils/goalProjection';
 import type { OnboardingStep } from './onboardingFlow';
 import { sideEffectNamesEcho, symptomForWeekBeat } from './symptomWeek';
@@ -203,11 +202,6 @@ function routeEcho(route?: 'injection' | 'oral' | 'unsure'): string | undefined 
   return undefined;
 }
 
-/** The muscle-floor payoff, said back. Used by whichever screen follows it. */
-function floorEcho(a: EchoAnswers): string | undefined {
-  if (!a.body) return undefined;
-  return `${proteinFloorG(a.body.weight, a.body.units === 'metric' ? 'kg' : 'lb')} g a day. Locked in.`;
-}
 
 export function echoFor(step: OnboardingStep, a: EchoAnswers, now: Date = new Date()): string | undefined {
   const unit = a.medication?.doseUnit ?? 'mg';
@@ -253,24 +247,20 @@ export function echoFor(step: OnboardingStep, a: EchoAnswers, now: Date = new Da
       return a.goalNote ? `“${a.goalNote}” — noted.` : goalTypeEcho(a.goalType);
     case 'heightWeight':
       return 'Almost there on the numbers.';
-    // The body line moved here from startWeight (2026-08-24): this is now the
-    // screen that immediately follows height+weight, and the protein number it
-    // shows is derived from that same answer — so the echo and the payoff come
-    // from one input.
-    case 'muscleFloor':
-      return a.body ? `${formatHeight(a.body)}, ${a.body.weight} today.` : undefined;
-    // …and startWeight now echoes what the muscle-floor screen just GAVE,
-    // rather than repeating the body line one screen later.
+    // THE BODY LINE FOLLOWS HEIGHT+WEIGHT, wherever that lands. It lived on
+    // muscleFloor until that screen was cut (2026-08-28); startWeight is now
+    // the screen immediately after height+weight on the active path, so it
+    // inherits the echo. Same rule that moved it in the first place.
     case 'startWeight':
-      return floorEcho(a);
+      return a.body ? `${formatHeight(a.body)}, ${a.body.weight} today.` : undefined;
     case 'goalWeight':
       // WHICHEVER SCREEN FOLLOWS THE GIVE CARRIES ITS ACKNOWLEDGMENT — the
       // same rule the notifications turn inherited from the cut `needs` step.
-      // startWeight is gated to active users (2026-08-25), so for everyone
-      // else THIS screen is the one that follows muscleFloor, and the body
-      // line would otherwise land twice in a row: muscleFloor already opened
-      // with "5'10\", 226 today."
-      if (a.journeyStage && a.journeyStage !== 'active') return floorEcho(a);
+      // startWeight is gated to active users, so for everyone else THIS is
+      // the screen that follows height+weight and carries the body line.
+      if (a.journeyStage && a.journeyStage !== 'active') {
+        return a.body ? `${formatHeight(a.body)}, ${a.body.weight} today.` : undefined;
+      }
       // THE ACTIVE PATH ECHOES WHERE THEY STARTED, NOT WHERE THEY ARE
       // (2026-08-27). This used to say "226 today", which muscleFloor had
       // already opened with two screens earlier — the same number, twice,
@@ -285,10 +275,6 @@ export function echoFor(step: OnboardingStep, a: EchoAnswers, now: Date = new Da
       // user who accepts the prefilled start weight leaves it undefined —
       // that is the common path, not an edge case.
       return startProgressEcho(a) ?? 'Now the target.';
-    case 'goalPace': {
-      const goal = goalInBodyUnit(a);
-      return goal.value ? `${goal.value}. I like it.` : undefined;
-    }
     case 'company':
       return companyContext(a, now);
     case 'dailyRoutine':

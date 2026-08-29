@@ -39,6 +39,18 @@ const ACTIVITY_STEPS: Record<ActivityLevel, number> = {
  * 0.7 g per lb is the muscle-protective end of the range, which is the whole
  * point: this is a floor, not a target.
  */
+/**
+ * The pace used when the user never picks one.
+ *
+ * `goalPace` was CUT 2026-08-28: on a GLP-1 the rate is set by the drug and
+ * the titration schedule, not by preference, so it was a choice the user could
+ * not actually make. Every consumer already had a fallback — but the navigator
+ * used 0.55 while crafting and the payload used 0.5, which nobody noticed
+ * while the screen was there to set it. With the screen gone that split would
+ * have shown a reveal projection the persisted plan disagreed with.
+ */
+export const DEFAULT_PACE = 0.5;
+
 export function proteinFloorG(currentWeight: number, unit: 'lb' | 'kg'): number {
   const lb = unit === 'kg' ? kgToLb(currentWeight) : currentWeight;
   return Math.round(lb * 0.7);

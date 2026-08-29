@@ -47,7 +47,6 @@ import { AboutYouScreen, type GenderIdentity } from './AboutYouScreen';
 import { HeightWeightScreen } from './HeightWeightScreen';
 import { StartWeightScreen } from './StartWeightScreen';
 import { GoalWeightScreen, type WeightUnit } from './GoalWeightScreen';
-import { GoalPaceScreen } from './GoalPaceScreen';
 import { CompanyBeatScreen } from './CompanyBeatScreen';
 import { DailyRoutineScreen } from './DailyRoutineScreen';
 import { TrainingScreen } from './TrainingScreen';
@@ -60,7 +59,6 @@ import { CraftingScreen } from './CraftingScreen';
 import { RevealScreen } from './RevealScreen';
 import { TrialTimelineScreen } from './TrialTimelineScreen';
 import { DoseForgivenessScreen } from './DoseForgivenessScreen';
-import { MuscleFloorScreen } from './MuscleFloorScreen';
 import { CommitmentScreen } from './CommitmentScreen';
 import { PaywallScreen } from './PaywallScreen';
 import { WelcomeInScreen } from './WelcomeInScreen';
@@ -71,7 +69,7 @@ import { RouteScreen } from './RouteScreen';
 import { toDateParts, type DateParts } from '../../utils/dateParts';
 import { kgToLb, lbToKg, type BodyMeasure } from '../../utils/units';
 import { projectGoal } from '../../utils/goalProjection';
-import { previewTargets, proteinFloorG } from '../../utils/planPreview';
+import { DEFAULT_PACE, previewTargets } from '../../utils/planPreview';
 import { buildRiskProfile } from '../../utils/riskProfile';
 import { buildOnboardingPayload, isEscapeHatchMedication } from './onboardingPayload';
 import { api } from '../../services/api';
@@ -648,18 +646,6 @@ export function OnboardingNavigator() {
           onContinue={() => commit({ body: answers.body ?? DEFAULT_BODY })}
         />
       );
-    case 'muscleFloor': {
-      const { body, bodyUnit } = resolveWeights(answers);
-      return (
-        <MuscleFloorScreen
-          progress={progress}
-          onBack={goBack}
-          onContinue={goNext}
-          context={context}
-          proteinG={proteinFloorG(body.weight, bodyUnit)}
-        />
-      );
-    }
     case 'startWeight': {
       const body = answers.body ?? DEFAULT_BODY;
       return (
@@ -697,22 +683,6 @@ export function OnboardingNavigator() {
               return { ...a, goalWeight: converted, goalWeightUnit: nextUnit };
             })
           }
-          onContinue={goNext}
-        />
-      );
-    }
-    case 'goalPace': {
-      const { body, bodyUnit, goalInBodyUnit } = resolveWeights(answers);
-      return (
-        <GoalPaceScreen
-          progress={progress}
-          onBack={goBack}
-          context={context}
-          pace={answers.pace ?? 0.55}
-          onPaceChange={(pace) => setAnswers((a) => ({ ...a, pace }))}
-          currentWeight={body.weight}
-          goalWeight={goalInBodyUnit}
-          unit={bodyUnit}
           onContinue={goNext}
         />
       );
@@ -805,7 +775,7 @@ export function OnboardingNavigator() {
       const projection = projectGoal({
         currentWeight: body.weight,
         goalWeight: goalInBodyUnit,
-        pace: answers.pace ?? 0.55,
+        pace: answers.pace ?? DEFAULT_PACE,
         now: new Date(),
       });
       const targets = previewTargets({

@@ -114,7 +114,9 @@ describe('onboarding flow', () => {
     // from lastShot. The navigator sets shotDays on that answer instead.
     expect(nextStep('lastShot')).toBe('shotTime');
     expect(nextStep('shotTime')).toBe('instrument');
-    expect(nextStep('goalPace')).toBe('company');
+    // goalPace was CUT (2026-08-28); goalWeight now hands straight to the
+    // company beat, which is what breaks the goal-block ask run.
+    expect(nextStep('goalWeight')).toBe('company');
     expect(nextStep('company')).toBe('dailyRoutine');
     expect(nextStep('sideEffects')).toBe('symptomWeek');
     expect(nextStep('symptomWeek')).toBe('notifications');
@@ -199,7 +201,16 @@ describe('onboarding flow', () => {
     // dosing block and muscleFloor split the goal stretch, each into 4 + 3.
     // The goal stretch was the one the header calls "the one nobody escapes",
     // and it is the reason this number could not get below 7 before.
-    expect(runLength(ONBOARDING_STEPS)).toBeLessThanOrEqual(4);
+    // 12 -> 9 -> 7 -> 4 -> 3 -> 5. The rise on 2026-08-28 is DELIBERATE and
+    // is the price of three cuts made to close the gap on PeptidePal (23
+    // screens to our paywall against their 13): muscleFloor was the give that
+    // split the goal block, and goalPace and sideEffects went with it. The
+    // block is now goalType -> aboutYou -> heightWeight -> startWeight ->
+    // goalWeight, broken by the company beat.
+    //
+    // 5 is the ceiling, not a target. If anything is ever inserted into the
+    // goal block, a give has to come with it.
+    expect(runLength(ONBOARDING_STEPS)).toBeLessThanOrEqual(5);
 
     // Both blocks pinned individually, so neither can regrow behind the
     // aggregate. These are the two runs the gives exist to break.
@@ -209,7 +220,7 @@ describe('onboarding flow', () => {
       );
     expect(runOf('nameCompanion', 'leanMass')).toBe(4);
     // 4 → 3 when sexGender + birthday merged into aboutYou (2026-08-25).
-    expect(runOf('goalType', 'company')).toBe(3);
+    expect(runOf('goalType', 'company')).toBe(5);
 
     // EVERY PATH, NOT JUST THE DOSING ONE (2026-08-25). This used to assert
     // `toBeLessThanOrEqual(8)` on the exploring path — a bound so loose it
@@ -228,7 +239,9 @@ describe('onboarding flow', () => {
       // 4 -> 3 (2026-08-28) when sideEffects was gated to active users. The
       // number going DOWN as a screen is cut is the point; pinned exactly so
       // a future insertion has to come back through this assertion.
-      expect(runLength(seen)).toBe(3);
+      // 4 on the non-dosing paths: startWeight is gated out, so the goal
+      // block is one shorter than the aggregate above.
+      expect(runLength(seen)).toBe(4);
     }
   });
 

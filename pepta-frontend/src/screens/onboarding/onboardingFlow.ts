@@ -148,16 +148,23 @@ export const ONBOARDING_STEPS = [
   // restores the 4-ask ceiling on the exploring path (see AboutYouScreen).
   'aboutYou',
   'heightWeight',
-  // The muscle-floor give (2026-08-24). Breaks the goal stretch — the run the
-  // header below calls "the one nobody escapes" — into 4 + 3, and answers the
-  // hardest number in the flow with something instead of another question.
-  'muscleFloor',
+  // `muscleFloor` was CUT 2026-08-28 (Nick's call, after seeing it rendered).
+  // It derived a protein floor from the height+weight above it and was a real
+  // give, but at 23 screens to the paywall against PeptidePal's 13 it was the
+  // one whose CONTENT survives without it: the protein target still reaches
+  // the user through crafting and the reveal, both of which read
+  // proteinFloorG from planPreview.
   'startWeight',
   'goalWeight',
-  'goalPace',
+  // `goalPace` was CUT the same day. On a GLP-1 the rate is set by the drug
+  // and the titration schedule, not by preference — a menu of paces the user
+  // cannot actually choose between. Cutting it also matters for RHYTHM:
+  // losing muscleFloor left goalType through goalPace as six unbroken asks,
+  // and removing this one ends that run at goalWeight, where company breaks
+  // it. DEFAULT_PACE now supplies the value everything downstream reads.
+  //
   // Proof beat. It breaks the longest UNSKIPPABLE run in the flow — goalType
-  // through notifications — and the STEP-1 number lands best right after the
-  // user has just set a goal and a pace.
+  // through notifications — and the STEP-1 number lands right after the goal.
   'company',
   'dailyRoutine',
   'training',
@@ -286,7 +293,6 @@ export function shouldSkipStep(step: OnboardingStep, ctx: FlowContext): boolean 
   // No recorded body, no floor. resolveWeights would happily fall back to
   // DEFAULT_BODY and the screen would show a confident number derived from
   // someone else's weight — the same failure the price anchor skips to avoid.
-  if (step === 'muscleFloor') return !ctx.hasBody;
 
   if (step === 'doseForgiveness') {
     // NOT BEFORE THE FIRST DOSE (2026-08-25). This was gated on half-life

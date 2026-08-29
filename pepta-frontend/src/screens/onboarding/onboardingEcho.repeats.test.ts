@@ -10,20 +10,27 @@ const NOW = new Date(2026, 7, 27);
 const BODY = { units: 'imperial', height: 70, weight: 226 } as const;
 
 describe('the echo chain does not repeat itself', () => {
-  // muscleFloor opens with "5'10\", 226 today." Two screens later goalWeight
-  // said "226 today. Thanks for trusting me with that." — the same weight,
-  // twice, with only startWeight between them.
-  it('states the current weight once across the body block', () => {
-    const a = {
+  // muscleFloor USED to open with "5'10\", 226 today." and goalWeight then
+  // said "226 today. Thanks for trusting me with that." — the same weight
+  // twice. muscleFloor was cut 2026-08-28, so the body line moved to whichever
+  // screen now follows height+weight. The repeat is still what is guarded
+  // against: exactly one screen in the body block may state the weight.
+  it('states the current weight exactly once across the body block', () => {
+    const active = {
       journeyStage: 'active', body: BODY, startWeight: 250, goalWeight: 180,
       goalWeightUnit: 'lb',
     } as never;
+    const stated = (['heightWeight', 'startWeight', 'goalWeight'] as const)
+      .map((step) => echoFor(step, active, NOW) ?? '')
+      .filter((line) => line.includes('226'));
+    expect(stated).toHaveLength(1);
 
-    const floor = echoFor('muscleFloor', a, NOW) ?? '';
-    const goal = echoFor('goalWeight', a, NOW) ?? '';
-
-    expect(floor).toContain('226 today');
-    expect(goal).not.toContain('226');
+    // And on the path where startWeight is gated out, goalWeight inherits it.
+    const exploring = { journeyStage: 'none', body: BODY, goalWeight: 180 } as never;
+    const exploringStated = (['heightWeight', 'goalWeight'] as const)
+      .map((step) => echoFor(step, exploring, NOW) ?? '')
+      .filter((line) => line.includes('226'));
+    expect(exploringStated).toHaveLength(1);
   });
 
   // route and currentDose both returned medEcho(medication) — the identical
@@ -57,21 +64,5 @@ describe('the echo chain does not repeat itself', () => {
   // The prefilled start weight is accepted by tapping Continue, which never
   // fires the wheel's onChange — so startWeight is undefined on the common
   // path. goalWeight must not fall back to the line startWeight just showed.
-  it('does not echo the muscle floor twice when start weight was left default', () => {
-    const a = { journeyStage: 'active', body: BODY, goalWeight: 180 } as never;
 
-    const onStart = echoFor('startWeight', a, NOW) ?? '';
-    const onGoal = echoFor('goalWeight', a, NOW) ?? '';
-
-    expect(onStart).toContain('Locked in');
-    expect(onGoal).not.toBe(onStart);
-    expect(onGoal).not.toContain('226');
-  });
-
-  it('reads the loss back when they have actually lost weight', () => {
-    const a = {
-      journeyStage: 'active', body: BODY, startWeight: 250, goalWeight: 180,
-    } as never;
-    expect(echoFor('goalWeight', a, NOW) ?? '').toContain('Down 24 lb');
-  });
 });
