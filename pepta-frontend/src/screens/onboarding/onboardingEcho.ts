@@ -200,15 +200,20 @@ export function echoFor(step: OnboardingStep, a: EchoAnswers, now: Date = new Da
     case 'instrument':
       return instrumentContext(a);
     case 'goalType':
-      // goalType now follows journeyStage directly (2026-08-28), so it echoes
-      // the stage rather than the instrument beat it used to sit behind.
-      return journeyEcho(a.journeyStage);
+      // goalType follows journeyStage directly since 2026-08-28. It must NOT
+      // use journeyEcho: biggestWorry, the very next screen, already opens
+      // with it — moving goalType here put the identical sentence on two
+      // consecutive screens. This acknowledges the stage without restating it.
+      return 'Good to know.';
     case 'aboutYou':
       // The goal moved to step 5, so quoting it here would echo something six
-      // screens back. This is now the screen after the medication block (or
-      // after discoverySource for anyone not dosing), and it opens the body
-      // stretch rather than acknowledging an answer.
-      return 'Two quick things about you.';
+      // screens back. This opens the body stretch instead — and deliberately
+      // avoids "Two things", which is how the screen's own question starts.
+      // Not "Now the numbers" — heightWeight, the next screen, opens with
+      // "Almost there on the numbers." The consecutive-duplicate guard only
+      // catches identical or prefixed lines, so a shared keyword one screen
+      // apart still has to be caught by reading the chain.
+      return 'Now a bit about you.';
     case 'heightWeight':
       return 'Almost there on the numbers.';
     // THE BODY LINE FOLLOWS HEIGHT+WEIGHT, wherever that lands. It lived on
@@ -225,7 +230,9 @@ export function echoFor(step: OnboardingStep, a: EchoAnswers, now: Date = new Da
     case 'company':
       return companyContext(a, now);
     case 'lifestyle':
-      return 'Now, your days.';
+      // Not "Now, your days" — the screen's own question is "Now, your week",
+      // so the echo would repeat both the opening word and a near-synonym.
+      return 'Two more and the plan is yours.';
     case 'sideEffects':
       // The lifestyle screen carries TWO answers; this echoes the training
       // one because it is the warmer acknowledgment ("Consistent. Respect.")

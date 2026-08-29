@@ -5,6 +5,7 @@
 // two screens earlier. Nick spotted both from the device before any test did.
 import { describe, expect, it } from 'vitest';
 import { echoFor } from './onboardingEcho';
+import { ONBOARDING_STEPS, shouldSkipStep } from './onboardingFlow';
 
 const NOW = new Date(2026, 7, 27);
 const BODY = { units: 'imperial', height: 70, weight: 226 } as const;
@@ -65,4 +66,38 @@ describe('the echo chain does not repeat itself', () => {
   // fires the wheel's onChange — so startWeight is undefined on the common
   // path. goalWeight must not fall back to the line startWeight just showed.
 
+
+  // THE GENERAL GUARD. The two repeats Nick caught by eye were both "the same
+  // line twice, one screen apart", and a third appeared the moment goalType
+  // moved to step 5 — its echo became journeyEcho, which biggestWorry already
+  // opened with. Spotting these by reading the chain does not scale; every
+  // reorder can create one.
+  //
+  // Walks the real flow and asserts no echo repeats the one before it.
+  it('never shows the same context line on consecutive screens', () => {
+    const a = {
+      journeyStage: 'active', route: 'injection', routeLocked: true,
+      deviceType: 'auto_injector', frequency: 'weekly', halfLifeDays: 5,
+      hasBody: true, sideEffects: ['nausea'], body: BODY,
+      goalWeight: 180, goalWeightUnit: 'lb', startWeight: 250,
+      medication: { name: 'Zepbound', doseUnit: 'mg', halfLifeDays: 5, routeAmbiguous: false },
+      dose: 5, goalType: 'lose_fat', trainingStatus: 'consistent', activityLevel: 'moderate',
+    } as never;
+
+    const seen = ONBOARDING_STEPS.filter((s) => !shouldSkipStep(s, a));
+    const dupes: string[] = [];
+    let previous: string | undefined;
+    let previousStep = '';
+    for (const step of seen) {
+      const line = echoFor(step, a, NOW);
+      if (line && previous && (line === previous || line.startsWith(previous))) {
+        dupes.push(`${previousStep} -> ${step}: "${line}"`);
+      }
+      if (line) {
+        previous = line;
+        previousStep = step;
+      }
+    }
+    expect(dupes).toEqual([]);
+  });
 });
