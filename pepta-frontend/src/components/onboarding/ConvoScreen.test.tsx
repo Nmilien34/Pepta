@@ -244,3 +244,84 @@ describe("the row chevron is legible", () => {
     expect(chevrons(render({ layout: "list" }))[0]!.props.color).not.toBe(convo.faint);
   });
 });
+
+// TWO QUESTIONS ON ONE SCREEN (2026-08-28).
+//
+// The flow has pairs that are one thought asked twice — dose + frequency,
+// device + concentration, routine + training. Merging them was blocked on this
+// component: it took a single `options` list with a single onAnswer, and its
+// card was not exported, so every merge meant hand-copying the card styling
+// and breaking the tap-to-advance grammar.
+//
+// `groups` renders each set under its own label using THE SAME cards, holds
+// the selection instead of advancing, and leaves Continue to the caller.
+describe("grouped answers", () => {
+  const GROUPS = [
+    {
+      label: "MOST DAYS",
+      options: [
+        { label: "Mostly sitting", value: "sedentary" },
+        { label: "Very active", value: "active" },
+      ],
+      value: undefined,
+      onSelect: () => {},
+    },
+    {
+      label: "LIFTING",
+      options: [
+        { label: "Regularly", value: "regular" },
+        { label: "Not yet", value: "none" },
+      ],
+      value: undefined,
+      onSelect: () => {},
+    },
+  ];
+
+  function grouped(extra: Record<string, unknown> = {}) {
+    return render({ options: undefined, onAnswer: undefined, groups: GROUPS, ...extra });
+  }
+
+  function texts(tree: TestRenderer.ReactTestRenderer) {
+    return tree.root
+      .findAll((n) => String(n.type) === "Text")
+      .flatMap((n) => (typeof n.props.children === "string" ? [n.props.children] : []));
+  }
+
+  it("renders every option from every group", () => {
+    const all = texts(grouped());
+    for (const label of ["Mostly sitting", "Very active", "Regularly", "Not yet"]) {
+      expect(all).toContain(label);
+    }
+  });
+
+  it("labels each group, so two questions cannot read as one list", () => {
+    const all = texts(grouped());
+    expect(all).toContain("MOST DAYS");
+    expect(all).toContain("LIFTING");
+  });
+
+  it("uses the same cards as a single-option screen", () => {
+    // Not a lookalike: identical Pressable skin, so the two can never drift.
+    const single = skinOf(render(), "Reddit");
+    const fromGroup = skinOf(grouped(), "Regularly");
+    expect(fromGroup.borderRadius).toBe(single.borderRadius);
+    expect(fromGroup.paddingVertical).toBe(single.paddingVertical);
+  });
+
+  it("holds the selection instead of advancing", () => {
+    // Two questions on one screen cannot auto-advance on the first tap — the
+    // caller supplies Continue. Selecting shows a selected card rather than
+    // the sent-message beat.
+    const picked = [{ ...GROUPS[0]!, value: "active" }, GROUPS[1]!];
+    const tree = grouped({ groups: picked });
+    expect(one(tree, "Very active").props.accessibilityState?.selected).toBe(true);
+    expect(one(tree, "Regularly").props.accessibilityState?.selected).toBe(false);
+  });
+
+  it("leaves the single-option path completely untouched", () => {
+    // The 20-odd screens still on `options` must not notice this exists.
+    const all = texts(render());
+    expect(all).toContain("Reddit");
+    expect(all).not.toContain("MOST DAYS");
+  });
+});

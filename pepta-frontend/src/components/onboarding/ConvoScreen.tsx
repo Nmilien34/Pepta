@@ -62,6 +62,25 @@ export interface ConvoOption<T> {
 }
 
 /** The conversation's action pill. Outlined by default; solid purple is reserved. */
+/**
+ * One labelled question inside a multi-question turn.
+ *
+ * Added 2026-08-28 to unblock merging pairs that are really one thought asked
+ * twice — dose + frequency, device + concentration, routine + training. Each
+ * group renders under its own label using the SAME cards as a single-option
+ * screen, so the two paths cannot drift apart visually.
+ *
+ * Selection HOLDS rather than advancing: with two questions on screen the
+ * first tap cannot mean "done", so the caller supplies Continue in `footer`.
+ */
+export interface ConvoGroup<T> {
+  label: string;
+  options: ConvoOption<T>[];
+  /** The current pick, or undefined while unanswered. */
+  value?: T;
+  onSelect(value: T): void;
+}
+
 export function ConvoButton({
   label,
   disabled,
@@ -297,6 +316,11 @@ interface ConvoScreenProps<T> {
   /** Reassurance line under the question, fades in once typing lands. */
   sub?: string;
   options?: ConvoOption<T>[];
+  /**
+   * Two or more labelled questions on one turn. Mutually exclusive with
+   * `options` — a screen is either one question or several, never both.
+   */
+  groups?: ConvoGroup<T>[];
   /** Answer layout. Defaults to the wrapping chip grid — see ConvoLayout. */
   layout?: ConvoLayout;
   /**
@@ -336,6 +360,7 @@ export function ConvoScreen<T>({
   questionAccent,
   sub,
   options,
+  groups,
   layout = "chips",
   contextAside,
   onAnswer,
@@ -514,6 +539,33 @@ export function ConvoScreen<T>({
             </View>
           ) : null}
 
+          {groups && !picked
+            ? groups.map((group) => (
+                <View key={group.label} style={styles.group}>
+                  <Text style={styles.groupLabel}>{group.label}</Text>
+                  <View style={layout === "list" ? styles.list : styles.chips}>
+                    {group.options.map((option, i) => (
+                      <ChipItem
+                        key={option.label}
+                        label={option.label}
+                        sub={option.sub}
+                        leading={option.leading}
+                        index={i}
+                        revealed={typed}
+                        animate={animate}
+                        layout={layout}
+                        // Explicitly boolean, never undefined: undefined is how
+                        // the auto-advance path asks for "no selected state at
+                        // all", and a held group must always show one.
+                        selected={group.value === option.value}
+                        onPress={() => group.onSelect(option.value)}
+                      />
+                    ))}
+                  </View>
+                </View>
+              ))
+            : null}
+
           {picked ? (
             <View style={styles.answered}>
               <Animated.View
@@ -555,6 +607,14 @@ const styles = StyleSheet.create({
   header: { flexDirection: "row", alignItems: "center", gap: 16, paddingHorizontal: 22, paddingTop: 12, paddingBottom: 8 },
   track: { flex: 1, height: 3, borderRadius: 1.5, backgroundColor: convo.hairline },
   fill: { height: 3, borderRadius: 1.5, backgroundColor: convo.primary },
+  group: { marginTop: 18 },
+  groupLabel: {
+    fontFamily: typography.fonts.bold,
+    fontSize: 10,
+    letterSpacing: 1.1,
+    color: convo.faint,
+    marginBottom: 8,
+  },
   body: { paddingHorizontal: 28, paddingTop: 36, paddingBottom: 30, flexGrow: 1 },
   context: {
     fontFamily: typography.fonts.bold,

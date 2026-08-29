@@ -47,8 +47,7 @@ import { AboutYouScreen, type GenderIdentity } from './AboutYouScreen';
 import { HeightWeightScreen } from './HeightWeightScreen';
 import { WeightJourneyScreen, type WeightUnit } from './WeightJourneyScreen';
 import { CompanyBeatScreen } from './CompanyBeatScreen';
-import { DailyRoutineScreen } from './DailyRoutineScreen';
-import { TrainingScreen } from './TrainingScreen';
+import { LifestyleScreen } from './LifestyleScreen';
 import { SideEffectsScreen, type SideEffectType } from './SideEffectsScreen';
 import { BiggestWorryScreen } from './BiggestWorryScreen';
 import { FearAnsweredScreen } from './FearAnsweredScreen';
@@ -701,22 +700,17 @@ export function OnboardingNavigator() {
           onContinue={goNext}
         />
       );
-    case 'dailyRoutine':
+    case 'lifestyle':
       return (
-        <DailyRoutineScreen
+        <LifestyleScreen
           progress={progress}
           onBack={goBack}
           context={context}
-          onAnswer={(activityLevel) => commit({ activityLevel })}
-        />
-      );
-    case 'training':
-      return (
-        <TrainingScreen
-          progress={progress}
-          onBack={goBack}
-          context={context}
-          onAnswer={(trainingStatus) => commit({ trainingStatus })}
+          activityLevel={answers.activityLevel}
+          trainingStatus={answers.trainingStatus}
+          onActivityChange={(activityLevel) => setAnswers((a) => ({ ...a, activityLevel }))}
+          onTrainingChange={(trainingStatus) => setAnswers((a) => ({ ...a, trainingStatus }))}
+          onContinue={goNext}
         />
       );
     case 'sideEffects':

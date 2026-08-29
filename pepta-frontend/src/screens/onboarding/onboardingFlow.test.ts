@@ -117,7 +117,7 @@ describe('onboarding flow', () => {
     // goalPace was CUT (2026-08-28); goalWeight now hands straight to the
     // company beat, which is what breaks the goal-block ask run.
     expect(nextStep('weightJourney')).toBe('company');
-    expect(nextStep('company')).toBe('dailyRoutine');
+    expect(nextStep('company')).toBe('lifestyle');
     expect(nextStep('sideEffects')).toBe('symptomWeek');
     expect(nextStep('symptomWeek')).toBe('notifications');
     expect(nextStep('notifications')).toBe('crafting');

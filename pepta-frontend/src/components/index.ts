@@ -32,6 +32,7 @@ export {
   ConvoGround,
   OnboardingMotionContext,
   type ConvoOption,
+  type ConvoGroup,
 } from "./onboarding/ConvoScreen";
 export { CitedStat, type CitedStatProps } from "./onboarding/CitedStat";
 export { convo } from "./onboarding/convoTokens";

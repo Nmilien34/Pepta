@@ -117,20 +117,6 @@ function deviceEcho(device?: InjectionDeviceType): string {
 
 
 
-function activityEcho(level?: ActivityLevel): string {
-  switch (level) {
-    case 'sedentary':
-      return 'Mostly sitting. Honest.';
-    case 'light':
-      return 'Lightly active. Good.';
-    case 'moderate':
-      return 'Active. Nice.';
-    case 'active':
-      return 'Very active. Impressive.';
-    default:
-      return 'Got it.';
-  }
-}
 
 function trainingEcho(status?: TrainingStatus): string {
   switch (status) {
@@ -238,11 +224,13 @@ export function echoFor(step: OnboardingStep, a: EchoAnswers, now: Date = new Da
       return a.body ? `${formatHeight(a.body)}, ${a.body.weight} today.` : undefined;
     case 'company':
       return companyContext(a, now);
-    case 'dailyRoutine':
+    case 'lifestyle':
       return 'Now, your days.';
-    case 'training':
-      return activityEcho(a.activityLevel);
     case 'sideEffects':
+      // The lifestyle screen carries TWO answers; this echoes the training
+      // one because it is the warmer acknowledgment ("Consistent. Respect.")
+      // and the heavier input to the risk score. Acknowledging one of the two
+      // is the convention — every echo quotes a single answer back.
       return trainingEcho(a.trainingStatus);
     case 'biggestWorry':
       return `${journeyEcho(a.journeyStage)} Everyone has one.`;

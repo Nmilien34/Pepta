@@ -186,8 +186,12 @@ export const ONBOARDING_STEPS = [
   // Proof beat. It breaks the longest UNSKIPPABLE run in the flow — goalType
   // through notifications — and the STEP-1 number lands right after the goal.
   'company',
-  'dailyRoutine',
-  'training',
+  // MERGED 2026-08-28: was `dailyRoutine` + `training`. Adjacent, both single
+  // taps, and both feeding the same muscle-retention risk score — one picture
+  // of someone's week asked as two turns. Needed ConvoGroup first, so the
+  // merged screen uses the same cards as every other turn instead of a
+  // hand-copied lookalike.
+  'lifestyle',
   'sideEffects',
   // Conviction beat. Collect the worry, then draw it. Skipped for "none yet"
   // and for picks that do not follow a post-dose arc — see symptomForWeekBeat.
