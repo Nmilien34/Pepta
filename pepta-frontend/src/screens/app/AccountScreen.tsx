@@ -24,6 +24,7 @@ import { AppText, Card, Mascot, Reveal, UserAvatar } from "../../components";
 import { BottomSheet } from "../../components/BottomSheet";
 import { useAuth } from "../../context/AuthContext";
 import { usePeptaData } from "../../context/PeptaDataContext";
+import { healthRowState, type HealthAvailability } from "./healthRow";
 import { PRIVACY_URL, TERMS_URL } from "../../config";
 import { api } from "../../services/api";
 import type {
@@ -67,6 +68,8 @@ type AccountNavigationParamList = {
 interface Row {
   icon: string;
   label: string;
+  /** Line under the label. Carries the Apple Health disclosure (2.5.1). */
+  sub?: string;
   value?: string;
   badge?: { text: string; color: string; bg: string };
   onPress?: () => void;
@@ -330,6 +333,24 @@ export function AccountScreen() {
   // path can be silent, and the row shows a busy state while the OS sheet is
   // up so a slow response never reads as dead.
   const [healthBusy, setHealthBusy] = useState(false);
+  // Resolved on mount, not on tap. The row cannot offer a control until it
+  // knows the device can honour it — see healthRow.ts for both rejections.
+  const [healthAvail, setHealthAvail] = useState<HealthAvailability>("checking");
+  useEffect(() => {
+    let alive = true;
+    healthAvailability()
+      .then((result) => {
+        if (alive) setHealthAvail(result === "available" ? "available" : "unavailable");
+      })
+      // Never throws to the screen: an unreadable capability is "unavailable",
+      // which renders an explanation rather than an error.
+      .catch(() => {
+        if (alive) setHealthAvail("unavailable");
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const toggleHealthSync = async () => {
     if (healthBusy) return;
@@ -370,15 +391,18 @@ export function AccountScreen() {
     }
   };
 
+  const healthRow = healthRowState(healthAvail, healthSyncOn, healthBusy);
+
   const preferences: Row[] = [
     {
       icon: "heart-pulse",
       label: "Sync Apple Health",
-      // The row states the CONTRACT, not just on/off: read-only, and what for.
-      // "Checking…" while the request is in flight, so a double tap is a
-      // no-op the user can SEE rather than an unresponsive control.
-      value: healthBusy ? "Checking…" : healthSyncOn ? "On" : "Off",
-      onPress: () => void toggleHealthSync(),
+      // Every part of this row — the value, the description and whether it can
+      // be tapped at all — comes from healthRow.ts, which carries the two
+      // rejections that shaped it.
+      sub: healthRow.sub,
+      value: healthRow.value,
+      onPress: healthRow.tappable ? () => void toggleHealthSync() : undefined,
       chevron: false,
     },
     {
@@ -952,9 +976,18 @@ function SettingRow({ row, last }: { row: Row; last: boolean }) {
       >
         <Icon name={row.icon} size={17} color={theme.colors.primary} />
       </View>
-      <AppText variant="bodyStrong" style={{ flex: 1, fontWeight: "600" }}>
-        {row.label}
-      </AppText>
+      <View style={{ flex: 1 }}>
+        <AppText variant="bodyStrong" style={{ fontWeight: "600" }}>
+          {row.label}
+        </AppText>
+        {/* The Apple Health disclosure lives here (2.5.1). It stays on screen
+            in every state, including on a device that has no HealthKit. */}
+        {row.sub ? (
+          <AppText variant="caption" color="textSecondary" style={{ marginTop: 2 }}>
+            {row.sub}
+          </AppText>
+        ) : null}
+      </View>
       {row.value ? (
         <AppText variant="caption" color="textSecondary">
           {row.value}
