@@ -99,12 +99,17 @@ const dataMocks = vi.hoisted(() => ({
   // Stable across renders so a test can count how many saves one sheet made.
   saveLog: vi.fn(async () => "saved" as const),
   bumpWater: vi.fn(),
+  // Hoisted so a test can assert the sheet reconciles the surface that
+  // actually renders today's steps (track), not just home.
+  addActivityLog: vi.fn(),
+  refreshTrack: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock("../context/PeptaDataContext", () => ({
   usePeptaData: () => ({
     saveLog: dataMocks.saveLog,
     addDoseLog: vi.fn(),
+    addActivityLog: dataMocks.addActivityLog,
     addMeasurement: vi.fn(),
     addSideEffectLog: vi.fn(),
     addWeightLog: vi.fn(),
@@ -126,7 +131,7 @@ vi.mock("../context/PeptaDataContext", () => ({
     homeLoading: false,
     refreshHome: vi.fn(() => Promise.resolve()),
     refreshProgress: vi.fn(() => Promise.resolve()),
-    refreshTrack: vi.fn(() => Promise.resolve()),
+    refreshTrack: dataMocks.refreshTrack,
     track: { doseLogs: [] },
   }),
 }));
@@ -424,4 +429,88 @@ describe("QuickLogSheet", () => {
 
     expect(dataMocks.saveLog).toHaveBeenCalledTimes(2);
   });
+
+  // Reported by a customer on the live build (2026-08-30):
+  // "I also tried to add 4000 steps and it would not save it."
+  //
+  // It DID save. The POST goes out and the row lands. What never happened was
+  // the screen changing: today's steps are summed from track.activityLogs
+  // (buildActivity keeps 'today' local so optimistic rows count), and the
+  // sheet reconciled home instead — where only the step TARGET lives. No
+  // optimistic row either, so the number sat at its old value until something
+  // unrelated refreshed track. A save you cannot see is a save that did not
+  // happen, as far as the person holding the phone is concerned.
+  it("shows the steps it just saved", async () => {
+    dataMocks.saveLog.mockClear();
+    dataMocks.addActivityLog.mockClear();
+    dataMocks.refreshTrack.mockClear();
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+    await act(async () => {
+      tree = TestRenderer.create(
+        React.createElement(QuickLogSheet, {
+          visible: true,
+          onClose: vi.fn(),
+          onMeal: vi.fn(),
+          initialMode: "activity" as const,
+        }),
+      );
+    });
+    const steps = tree!.root.findAllByType("TextInput" as never)[0]!;
+    await act(async () => {
+      steps.props.onChangeText("4000");
+    });
+    const save = tree!.root
+      .findAllByType("Button" as never)
+      .find((b) => b.props.label === "Save activity")!;
+    await act(async () => {
+      save.props.onPress();
+    });
+
+    expect(dataMocks.saveLog).toHaveBeenCalledWith(
+      "activity",
+      expect.objectContaining({ steps: 4000 }),
+    );
+    // The optimistic row is what makes the number move before the network
+    // answers — without it the sheet closes onto an unchanged screen.
+    expect(dataMocks.addActivityLog).toHaveBeenCalledWith(
+      expect.objectContaining({ steps: 4000 }),
+    );
+    // And track is the surface that has to be reconciled, so the temp row
+    // becomes the real one.
+    expect(dataMocks.refreshTrack).toHaveBeenCalled();
+  });
+
+  // Same report: "I want to add 12 oz of black tea but it does not let me."
+  //
+  // The Water screen offers a "Custom / Type it" tile whose comment claims the
+  // water sheet "already takes an arbitrary amount". It does not — it offers
+  // four fixed chips (8/12/16/20) and no text field, so the one tile promising
+  // free entry leads to a dead end.
+  it("takes a typed water amount, not just the preset chips", async () => {
+    dataMocks.bumpWater.mockClear();
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+    await act(async () => {
+      tree = TestRenderer.create(
+        React.createElement(QuickLogSheet, {
+          visible: true,
+          onClose: vi.fn(),
+          onMeal: vi.fn(),
+          initialMode: "water" as const,
+        }),
+      );
+    });
+    const field = tree!.root.findAllByType("TextInput" as never)[0];
+    expect(field).toBeDefined();
+    await act(async () => {
+      field!.props.onChangeText("30");
+    });
+    const save = tree!.root
+      .findAllByType("Button" as never)
+      .find((b) => b.props.label === "Add water")!;
+    await act(async () => {
+      save.props.onPress();
+    });
+    expect(dataMocks.bumpWater).toHaveBeenCalledWith(30);
+  });
+
 });

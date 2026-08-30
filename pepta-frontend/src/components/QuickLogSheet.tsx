@@ -134,6 +134,7 @@ export function QuickLogSheet({
     addWeightLog,
     addMeasurement,
     addSideEffectLog,
+    addActivityLog,
     saveLog,
   } = usePeptaData();
   const [render, setRender] = useState(visible);
@@ -367,12 +368,19 @@ export function QuickLogSheet({
       };
       if (!isActivityValid(draft)) return;
       const input = toActivityInput(draft, ts);
-      // Activity has no read surface yet, so there's nothing to optimistically
-      // update — just POST and reconcile Home (where step targets live).
+      // Reported 2026-08-30: "I tried to add 4000 steps and it would not save
+      // it." The POST was always going out — what was missing was any sign of
+      // it. The comment here used to say activity had no read surface, and
+      // that stopped being true: Home shows a steps card, and buildActivity
+      // sums TODAY from track.activityLogs precisely so optimistic rows count.
+      // Reconciling home alone refreshed the step TARGET and nothing else, so
+      // the sheet closed onto an unchanged number.
       commit(
-        () => undefined,
+        () => addActivityLog(input),
         () => saveLog("activity", input),
-        refreshHome,
+        // Track first — it holds the row. Home too, since the target and the
+        // ring around it live there.
+        refreshHomeTrack,
       );
     }
   };
@@ -581,6 +589,7 @@ export function QuickLogSheet({
                     onChange={setProtein}
                     unit="g"
                     color={theme.colors.protein}
+                    theme={theme}
                   />
                 ) : null}
 
@@ -591,6 +600,7 @@ export function QuickLogSheet({
                     onChange={setWater}
                     unit="oz"
                     color={theme.colors.water}
+                    theme={theme}
                   />
                 ) : null}
 
@@ -679,6 +689,9 @@ export function QuickLogSheet({
                           seTypes,
                           measureValue,
                           activity,
+                          // This branch is the weight button only, and weight
+                          // is gated on `weight` — the amount is never read.
+                          amount: 0,
                         })
                       }
                       onPress={onSave}
@@ -693,6 +706,7 @@ export function QuickLogSheet({
                           seTypes,
                           measureValue,
                           activity,
+                          amount: mode === "water" ? water : protein,
                         })
                       }
                       onPress={onSave}
@@ -838,6 +852,8 @@ function canSave(
     seTypes: SideEffectType[];
     measureValue: number;
     activity: ActivityState;
+    /** The protein/water amount, which can now be typed and so can be empty. */
+    amount: number;
   },
 ): boolean {
   if (mode === "dose") return isDoseValid(s.dose);
@@ -850,7 +866,11 @@ function canSave(
       Number(s.activity.workoutMinutes) > 0 ||
       s.activity.resistance
     );
-  return true; // protein/water always have a selected amount
+  // Was `return true` on the grounds that protein/water "always have a
+  // selected amount" — true while the only controls were chips. The typed
+  // field can be empty (0), and 0 oz is not something to save.
+  if (mode === "protein" || mode === "water") return s.amount > 0;
+  return true;
 }
 
 function Chooser({
@@ -1420,19 +1440,45 @@ function SheetSaveButton({
   );
 }
 
+/**
+ * A big amount, four common shortcuts, and — since 2026-08-30 — a field to
+ * type anything else.
+ *
+ * The chips existed alone, which made every amount that was not 8/12/16/20 oz
+ * (or 10/20/30/40 g) unloggable. The Water screen even shipped a "Custom /
+ * Type it" tile that opened this sheet, on a comment asserting it "already
+ * takes an arbitrary amount" — it did not, so the one control promising free
+ * entry led nowhere. A customer hit exactly that wall.
+ *
+ * The typed value drives the same `value` the chips do, so the big number, the
+ * chip selection and the save button all stay one source of truth.
+ */
 function QuickAmount({
   options,
   value,
   onChange,
   unit,
   color,
+  theme,
 }: {
   options: number[];
   value: number;
   onChange: (n: number) => void;
   unit: string;
   color: string;
+  theme: Theme;
 }) {
+  // The typed text is held locally so a chip tap can CLEAR it. Without that
+  // the two controls disagree on screen — type 30, tap +8, and the box still
+  // reads 30 while the amount is 8.
+  const [typed, setTyped] = useState("");
+  // Digits only. Empty parses to 0, which the save button treats as nothing to
+  // log rather than as a zero-ounce entry.
+  const onType = (text: string) => {
+    const digits = text.replace(/[^0-9]/g, "");
+    setTyped(digits);
+    onChange(Number(digits) || 0);
+  };
   return (
     <View style={{ marginTop: 18, alignItems: "center" }}>
       <View
@@ -1466,10 +1512,49 @@ function QuickAmount({
             selected={o === value}
             onPress={() => {
               Haptics.selectionAsync().catch(() => undefined);
+              setTyped("");
               onChange(o);
             }}
           />
         ))}
+      </View>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 8,
+          marginTop: 14,
+          backgroundColor: theme.colors.surfaceAlt,
+          borderRadius: 14,
+          paddingHorizontal: 14,
+          height: 50,
+        }}
+      >
+        <AppText variant="bodyStrong" style={{ flex: 1, fontWeight: "600" }}>
+          Or type it
+        </AppText>
+        <TextInput
+          // Not `value={String(value)}` — that would fight the chips by
+          // re-rendering "8" into the box the moment one is tapped, and it
+          // makes the field impossible to clear. The chips own the number;
+          // this only ever pushes a typed one back out.
+          value={typed}
+          onChangeText={onType}
+          placeholder={`${value}`}
+          placeholderTextColor={theme.colors.textTertiary}
+          keyboardType="number-pad"
+          accessibilityLabel={`Type an amount in ${unit}`}
+          style={{
+            fontSize: 18,
+            fontWeight: "800",
+            color: theme.colors.textPrimary,
+            minWidth: 64,
+            textAlign: "right",
+          }}
+        />
+        <AppText variant="caption" color="textSecondary">
+          {unit}
+        </AppText>
       </View>
     </View>
   );
