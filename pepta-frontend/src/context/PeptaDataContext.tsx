@@ -451,6 +451,26 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
   // Optimistic inline-stepper bumps. We update the on-screen total immediately,
   // then persist the delta — a plus as a new log, a minus as a deletion of the
   // log it undoes. On a failed write we revert.
+  /**
+   * Mirror a plus into track, so every surface derived from track moves with
+   * the ring instead of lagging a refresh behind it: Home's streak bars, its
+   * 28-day dots, its "logged today" state, the recent-log chips and the Track
+   * feed all read track.<kind>Logs and never home's running totals. Before
+   * this, a day whose only entry was water read as a day with nothing in it.
+   *
+   * The row carries a temp id, which is safe here: undoBump already refreshes
+   * track before choosing a row to delete (trackMissesABump is set by every
+   * plus), so no minus can target one of these.
+   */
+  const addBumpRow = useCallback(
+    (key: "waterLogs" | "proteinLogs" | "fiberLogs", input: object) => {
+      setTrack((t) =>
+        t ? { ...t, [key]: [optimisticRow<never>(input), ...t[key]] } : t,
+      );
+    },
+    [],
+  );
+
   const bumpProtein = useCallback(
     (grams: number) => {
       const applyDelta = (delta: number) =>
@@ -487,14 +507,27 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
       applyDelta(grams);
       // Durable: offline/5xx queues the log (optimistic total stays — the log
       // WILL land); only a final server rejection reverts the total.
+      // One timestamp for both the optimistic row and the POST, so the row
+      // the screens show is the row the server stores.
+      const row = { grams, datetime: new Date().toISOString() };
+      addBumpRow("proteinLogs", row);
       saveLogRef
-        .current("protein", { grams, datetime: new Date().toISOString() })
+        .current("protein", row)
+        .then((result) => {
+          if (epoch !== sessionEpoch.current) return;
+          // "saved" → pull server truth so the temp id becomes the real one a
+          // later minus can delete. "queued" → the log WILL land, so keep the
+          // optimistic row, exactly as the sheet's commit() does.
+          if (result === "saved") void refreshTrackRef.current();
+        })
         .catch(() => {
           if (epoch !== sessionEpoch.current) return;
           applyDelta(-grams);
+          // Final rejection: the row never existed server-side, so drop it.
+          void refreshTrackRef.current();
         });
     },
-    [undoBump, updateRangeTotals],
+    [addBumpRow, undoBump, updateRangeTotals],
   );
   const bumpWater = useCallback(
     (oz: number) => {
@@ -527,14 +560,27 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
       // Track no longer reflects reality; the next minus must refresh first.
       trackMissesABump.current = true;
       applyDelta(oz);
+      // One timestamp for both the optimistic row and the POST, so the row
+      // the screens show is the row the server stores.
+      const row = { amountOz: oz, datetime: new Date().toISOString() };
+      addBumpRow("waterLogs", row);
       saveLogRef
-        .current("water", { amountOz: oz, datetime: new Date().toISOString() })
+        .current("water", row)
+        .then((result) => {
+          if (epoch !== sessionEpoch.current) return;
+          // "saved" → pull server truth so the temp id becomes the real one a
+          // later minus can delete. "queued" → the log WILL land, so keep the
+          // optimistic row, exactly as the sheet's commit() does.
+          if (result === "saved") void refreshTrackRef.current();
+        })
         .catch(() => {
           if (epoch !== sessionEpoch.current) return;
           applyDelta(-oz);
+          // Final rejection: the row never existed server-side, so drop it.
+          void refreshTrackRef.current();
         });
     },
-    [undoBump, updateRangeTotals],
+    [addBumpRow, undoBump, updateRangeTotals],
   );
   const bumpFiber = useCallback(
     (grams: number) => {
@@ -570,14 +616,27 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
       // Track no longer reflects reality; the next minus must refresh first.
       trackMissesABump.current = true;
       applyDelta(grams);
+      // One timestamp for both the optimistic row and the POST, so the row
+      // the screens show is the row the server stores.
+      const row = { grams, datetime: new Date().toISOString() };
+      addBumpRow("fiberLogs", row);
       saveLogRef
-        .current("fiber", { grams, datetime: new Date().toISOString() })
+        .current("fiber", row)
+        .then((result) => {
+          if (epoch !== sessionEpoch.current) return;
+          // "saved" → pull server truth so the temp id becomes the real one a
+          // later minus can delete. "queued" → the log WILL land, so keep the
+          // optimistic row, exactly as the sheet's commit() does.
+          if (result === "saved") void refreshTrackRef.current();
+        })
         .catch(() => {
           if (epoch !== sessionEpoch.current) return;
           applyDelta(-grams);
+          // Final rejection: the row never existed server-side, so drop it.
+          void refreshTrackRef.current();
         });
     },
-    [undoBump, updateRangeTotals],
+    [addBumpRow, undoBump, updateRangeTotals],
   );
 
   const refreshTrack = useCallback(async () => {
@@ -773,16 +832,16 @@ export function PeptaDataProvider({ children }: { children: ReactNode }) {
     setHome((h) => homeWithLatestWeight(h, row));
   }, []);
   const addMeasurement = useCallback((input: MeasurementInput) => {
+    // TWO stores, because two screens show it: ProgressScreen reads
+    // progress.measurements, and the Track feed reads track.measurements
+    // (activityFeed). Writing only to progress left a just-taken measurement
+    // missing from the feed until an unrelated refresh happened to run.
+    const row = optimisticRow<MeasurementResponse>(input);
     setProgress((p) =>
-      p
-        ? {
-            ...p,
-            measurements: [
-              optimisticRow<MeasurementResponse>(input),
-              ...p.measurements,
-            ],
-          }
-        : p,
+      p ? { ...p, measurements: [row, ...p.measurements] } : p,
+    );
+    setTrack((t) =>
+      t ? { ...t, measurements: [row, ...t.measurements] } : t,
     );
   }, []);
   const addMeal = useCallback(

@@ -293,6 +293,8 @@ export function QuickLogSheet({
   const now = () => new Date().toISOString();
   const refreshHomeTrack = () =>
     Promise.all([refreshHome(), refreshTrack()]).then(() => undefined);
+  const refreshProgressTrack = () =>
+    Promise.all([refreshProgress(), refreshTrack()]).then(() => undefined);
   const refreshHomeProgress = () =>
     // Track included: the optimistic weight row lands in track.weightLogs too
     // (Your log, the streak sheet), and its temp id must become real —
@@ -358,7 +360,9 @@ export function QuickLogSheet({
       commit(
         () => addMeasurement(input),
         () => saveLog("measurement", input),
-        refreshProgress,
+        // Progress AND track: the measurement shows on both, so reconciling
+        // one leaves the other holding a temp row.
+        refreshProgressTrack,
       );
     } else if (mode === "activity") {
       const draft = {
