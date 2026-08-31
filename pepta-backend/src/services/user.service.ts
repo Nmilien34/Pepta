@@ -419,6 +419,86 @@ export async function updateCurrentUser(
 }
 
 /**
+ * Every collection whose rows belong to ONE user and die with the account.
+ *
+ * A LIST, not a hand-written fan-out, because the fan-out silently missed a
+ * collection: discovery sources survived deletion and were still keyed to the
+ * deleted user's id. Nothing failed and nothing logged — the line was simply
+ * never added. `user.deletion-coverage.test.ts` walks the real model registry
+ * and fails when a userId-bearing model appears in neither this list nor
+ * RETAINED_WITH_USER_ID, so the next one cannot be forgotten quietly.
+ */
+interface UserOwnedModel {
+  /** Mongoose sets this; it is what the coverage test matches on. */
+  readonly modelName: string;
+  deleteMany(filter: { userId: string }): PromiseLike<unknown>;
+}
+
+const USER_OWNED_MODELS: readonly UserOwnedModel[] = [
+  UserProfileModel,
+  CompoundModel,
+  ScheduleModel,
+  CycleModel,
+  WeightLogModel,
+  DoseLogModel,
+  MealLogModel,
+  WaterLogModel,
+  ProteinLogModel,
+  FiberLogModel,
+  FavouriteModel,
+  ActivityLogModel,
+  SideEffectLogModel,
+  MeasurementModel,
+  ProgressPhotoModel,
+  MealScanModel,
+  InsightModel,
+  WeeklyRetentionModel,
+  PushTokenModel,
+  ReferralClaimModel,
+  RecipeModel,
+  PepMemoryModel,
+  PepPushDeliveryModel,
+  DismissedNudgeModel,
+  // Added 2026-08-31. Its absence was the bug this list exists to prevent: a
+  // deleted user's "how did you hear about us" answer stayed behind, keyed to
+  // an id whose account was gone.
+  DiscoverySourceModel,
+];
+
+/**
+ * User-keyed rows that this fan-out must NOT touch, and why. Deleting any of
+ * them here would be a bug, so each carries its reason rather than sitting in
+ * an unexplained exclusion list.
+ */
+const PURGED_ELSEWHERE: Readonly<Record<string, string>> = {
+  // queueAllUserMediaForDeletion marks these deletion_pending and clears their
+  // links; a worker removes the S3 objects and then the rows. Deleting the
+  // rows here would strand the objects they point at, permanently.
+  MediaAsset: "media deletion queue (S3 objects must go before the rows)",
+  // prepareComplimentaryCleanupForDeletion deletes the grant outright when no
+  // remote call is possible, and otherwise queues a durable cleanup so the
+  // RevenueCat revoke survives an outage. Deleting it here would lose that.
+  ComplimentaryAccessGrant: "complimentary cleanup queue (revoke must outlive a RevenueCat outage)",
+};
+
+/**
+ * Keyed by user, deliberately kept. Payment receipts outlive the account by
+ * design (see stripPaymentReceiptsForDeletedUser) — they are stripped of the
+ * user reference rather than deleted, because Apple disputes arrive later and
+ * defending one needs the transaction, not the person.
+ */
+const RETAINED_WITH_USER_ID: Readonly<Record<string, string>> = {
+  ProcessedWebhookEvent: "financial records for Apple disputes; user reference stripped instead",
+};
+
+/** Read by user.deletion-coverage.test.ts. */
+export const DELETION_COVERAGE = {
+  purged: USER_OWNED_MODELS.map((model) => model.modelName),
+  elsewhere: Object.keys(PURGED_ELSEWHERE),
+  retained: Object.keys(RETAINED_WITH_USER_ID),
+};
+
+/**
  * Strips a deleted account's payment receipts to a financial-records core.
  *
  * The receipts are KEPT — Apple disputes and chargebacks arrive after someone
@@ -450,33 +530,9 @@ export async function deleteCurrentUser(userId: string): Promise<void> {
   await sweepLegacyMediaForDeletion(userId);
   await queueAllUserMediaForDeletion(userId);
 
-  await Promise.all([
-    UserProfileModel.deleteMany({ userId }),
-    CompoundModel.deleteMany({ userId }),
-    ScheduleModel.deleteMany({ userId }),
-    CycleModel.deleteMany({ userId }),
-    WeightLogModel.deleteMany({ userId }),
-    DoseLogModel.deleteMany({ userId }),
-    MealLogModel.deleteMany({ userId }),
-    WaterLogModel.deleteMany({ userId }),
-    ProteinLogModel.deleteMany({ userId }),
-    FiberLogModel.deleteMany({ userId }),
-    FavouriteModel.deleteMany({ userId }),
-    ActivityLogModel.deleteMany({ userId }),
-    SideEffectLogModel.deleteMany({ userId }),
-    MeasurementModel.deleteMany({ userId }),
-    ProgressPhotoModel.deleteMany({ userId }),
-    MealScanModel.deleteMany({ userId }),
-    InsightModel.deleteMany({ userId }),
-    WeeklyRetentionModel.deleteMany({ userId }),
-    PushTokenModel.deleteMany({ userId }),
-    ReferralClaimModel.deleteMany({ userId }),
-    RecipeModel.deleteMany({ userId }),
-    PepMemoryModel.deleteMany({ userId }),
-    PepPushDeliveryModel.deleteMany({ userId }),
-    DismissedNudgeModel.deleteMany({ userId }),
-    // NOT deleted — see stripPaymentReceiptsForDeletedUser below.
-  ]);
+  await Promise.all(
+    USER_OWNED_MODELS.map((model) => model.deleteMany({ userId })),
+  );
 
   // Payment receipts are RETAINED, stripped to a financial-records core.
   // Apple disputes and chargebacks arrive after a user deletes their account,

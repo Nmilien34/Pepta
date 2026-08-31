@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
     ActivityLogModel: vi.fn(),
     CompoundModel: vi.fn(),
     CycleModel: vi.fn(),
+    DiscoverySourceModel: vi.fn(),
     DismissedNudgeModel: vi.fn(),
     DoseLogModel: vi.fn(),
     FiberLogModel: vi.fn(),
@@ -51,6 +52,10 @@ vi.mock("../../models", () => ({
   ActivityLogModel: { deleteMany: mocks.modelDeleteMany.ActivityLogModel },
   CompoundModel: { deleteMany: mocks.modelDeleteMany.CompoundModel },
   CycleModel: { deleteMany: mocks.modelDeleteMany.CycleModel },
+  DiscoverySourceModel: {
+    deleteMany: mocks.modelDeleteMany.DiscoverySourceModel,
+    findOneAndUpdate: vi.fn(),
+  },
   DoseLogModel: { deleteMany: mocks.modelDeleteMany.DoseLogModel },
   FiberLogModel: { deleteMany: mocks.modelDeleteMany.FiberLogModel },
   FavouriteModel: { deleteMany: mocks.modelDeleteMany.FavouriteModel },
@@ -406,6 +411,11 @@ describe("user service account settings", () => {
       userId,
     });
     expect(mocks.modelDeleteMany.MealLogModel).toHaveBeenCalledWith({
+      userId,
+    });
+    // Was missing from the fan-out until 2026-08-31: a deleted user's
+    // "how did you hear about us" answer outlived their account.
+    expect(mocks.modelDeleteMany.DiscoverySourceModel).toHaveBeenCalledWith({
       userId,
     });
     expect(mocks.modelDeleteMany.ProgressPhotoModel).toHaveBeenCalledWith({
