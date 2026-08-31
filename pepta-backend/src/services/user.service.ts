@@ -434,36 +434,45 @@ interface UserOwnedModel {
   deleteMany(filter: { userId: string }): PromiseLike<unknown>;
 }
 
-const USER_OWNED_MODELS: readonly UserOwnedModel[] = [
-  UserProfileModel,
-  CompoundModel,
-  ScheduleModel,
-  CycleModel,
-  WeightLogModel,
-  DoseLogModel,
-  MealLogModel,
-  WaterLogModel,
-  ProteinLogModel,
-  FiberLogModel,
-  FavouriteModel,
-  ActivityLogModel,
-  SideEffectLogModel,
-  MeasurementModel,
-  ProgressPhotoModel,
-  MealScanModel,
-  InsightModel,
-  WeeklyRetentionModel,
-  PushTokenModel,
-  ReferralClaimModel,
-  RecipeModel,
-  PepMemoryModel,
-  PepPushDeliveryModel,
-  DismissedNudgeModel,
+/**
+ * A FUNCTION, not a module-level array. Building the list at import time made
+ * importing this module touch every model, which broke every test that
+ * partially mocks "../../models" — auth.service.test.ts went red on
+ * CompoundModel, a model it has nothing to do with. Reading the models inside
+ * the call keeps the old laziness: nothing is touched until a deletion runs.
+ */
+function userOwnedModels(): readonly UserOwnedModel[] {
+  return [
+    UserProfileModel,
+    CompoundModel,
+    ScheduleModel,
+    CycleModel,
+    WeightLogModel,
+    DoseLogModel,
+    MealLogModel,
+    WaterLogModel,
+    ProteinLogModel,
+    FiberLogModel,
+    FavouriteModel,
+    ActivityLogModel,
+    SideEffectLogModel,
+    MeasurementModel,
+    ProgressPhotoModel,
+    MealScanModel,
+    InsightModel,
+    WeeklyRetentionModel,
+    PushTokenModel,
+    ReferralClaimModel,
+    RecipeModel,
+    PepMemoryModel,
+    PepPushDeliveryModel,
+    DismissedNudgeModel,
   // Added 2026-08-31. Its absence was the bug this list exists to prevent: a
   // deleted user's "how did you hear about us" answer stayed behind, keyed to
   // an id whose account was gone.
-  DiscoverySourceModel,
-];
+      DiscoverySourceModel,
+  ];
+}
 
 /**
  * User-keyed rows that this fan-out must NOT touch, and why. Deleting any of
@@ -492,11 +501,13 @@ const RETAINED_WITH_USER_ID: Readonly<Record<string, string>> = {
 };
 
 /** Read by user.deletion-coverage.test.ts. */
-export const DELETION_COVERAGE = {
-  purged: USER_OWNED_MODELS.map((model) => model.modelName),
-  elsewhere: Object.keys(PURGED_ELSEWHERE),
-  retained: Object.keys(RETAINED_WITH_USER_ID),
-};
+export function deletionCoverage() {
+  return {
+    purged: userOwnedModels().map((model) => model.modelName),
+    elsewhere: Object.keys(PURGED_ELSEWHERE),
+    retained: Object.keys(RETAINED_WITH_USER_ID),
+  };
+}
 
 /**
  * Strips a deleted account's payment receipts to a financial-records core.
@@ -531,7 +542,7 @@ export async function deleteCurrentUser(userId: string): Promise<void> {
   await queueAllUserMediaForDeletion(userId);
 
   await Promise.all(
-    USER_OWNED_MODELS.map((model) => model.deleteMany({ userId })),
+    userOwnedModels().map((model) => model.deleteMany({ userId })),
   );
 
   // Payment receipts are RETAINED, stripped to a financial-records core.

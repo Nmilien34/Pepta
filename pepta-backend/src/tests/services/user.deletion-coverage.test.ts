@@ -17,7 +17,7 @@
 import { describe, expect, it } from "vitest";
 import mongoose from "mongoose";
 import * as models from "../../models";
-import { DELETION_COVERAGE } from "../../services/user.service";
+import { deletionCoverage } from "../../services/user.service";
 
 /**
  * The two fields this test needs. Mongoose's Model generic differs per
@@ -54,10 +54,11 @@ describe("account deletion covers every collection that stores a userId", () => 
   });
 
   it("purges or explicitly retains each one", () => {
+    const coverage = deletionCoverage();
     const accounted = new Set([
-      ...DELETION_COVERAGE.purged,
-      ...DELETION_COVERAGE.elsewhere,
-      ...DELETION_COVERAGE.retained,
+      ...coverage.purged,
+      ...coverage.elsewhere,
+      ...coverage.retained,
     ]);
     const unaccounted = userScopedModels()
       .map((model) => model.modelName)
@@ -66,7 +67,7 @@ describe("account deletion covers every collection that stores a userId", () => 
     expect(
       unaccounted,
       `These models store a userId but account deletion neither purges nor `
-        + `retains them. Add each to USER_OWNED_MODELS in user.service.ts, or `
+        + `retains them. Add each to userOwnedModels() in user.service.ts, or `
         + `to PURGED_ELSEWHERE / RETAINED_WITH_USER_ID with the reason: `
         + unaccounted.join(", "),
     ).toEqual([]);
@@ -75,7 +76,7 @@ describe("account deletion covers every collection that stores a userId", () => 
   it("does not name a model it cannot purge", () => {
     // A typo'd or removed model in the list would delete nothing, quietly.
     const real = new Set(userScopedModels().map((model) => model.modelName));
-    for (const name of [...DELETION_COVERAGE.purged, ...DELETION_COVERAGE.elsewhere]) {
+    for (const name of [...deletionCoverage().purged, ...deletionCoverage().elsewhere]) {
       expect(real.has(name), `${name} is listed for deletion but stores no userId`).toBe(true);
     }
   });
@@ -83,7 +84,7 @@ describe("account deletion covers every collection that stores a userId", () => 
   it("keeps payment receipts, which outlive the account on purpose", () => {
     // Apple disputes arrive after deletion and defending one needs the
     // transaction. The row is stripped of its user reference, not deleted.
-    expect(DELETION_COVERAGE.retained).toContain("ProcessedWebhookEvent");
-    expect(DELETION_COVERAGE.purged).not.toContain("ProcessedWebhookEvent");
+    expect(deletionCoverage().retained).toContain("ProcessedWebhookEvent");
+    expect(deletionCoverage().purged).not.toContain("ProcessedWebhookEvent");
   });
 });
